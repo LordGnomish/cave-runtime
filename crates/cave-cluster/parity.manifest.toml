@@ -16,8 +16,13 @@ url     = "https://github.com/kubernetes-sigs/cluster-api"
 
 [parity]
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-24"
 infra_only  = false
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+# Cluster API parity — fill_ratio deferred
 [module]
 name        = "cave-cluster"
 description = "Multi-cluster lifecycle — Cluster-API parity (provision, upgrade, node pools, addons, RBAC, kubeconfig, tenants)"

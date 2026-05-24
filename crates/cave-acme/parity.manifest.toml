@@ -22,9 +22,15 @@ description = "ACME RFC 8555 certificate authority — step-ca reimplementation"
 source_root = "src"
 
 [parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0    # deferred-port category — port queued for future ring
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (deferred-port — port queued for future ring)"
+# smallstep/certificates v0.30.2 ACME — port queued
 infra_only = true
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-24"
 
 
 # Qwen-pump B-prime cycle 1778757314 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)

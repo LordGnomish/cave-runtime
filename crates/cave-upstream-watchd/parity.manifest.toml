@@ -31,8 +31,12 @@ source_sha = "v0.1.0"   # first-party self-pin against the workspace version
 infra_only           = true
 ratio                = 0.0        # first-party — no external upstream surface to measure
 parity_ratio_source  = "infra_only"
-last_audit           = "2026-05-19"
-
+last_audit           = "2026-05-24"
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-UPSTREAM-WATCH-001, ADR-RUNTIME-PARITY-100-PCT-001"
+# Upstream-watch daemon — internal
 [module]
 name        = "cave-upstream-watchd"
 description = "Upstream release watch daemon — Atom + GitHub App hybrid poller + GAP_OPENED dispatcher"

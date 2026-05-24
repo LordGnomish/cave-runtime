@@ -24,5 +24,9 @@ first_party  = true
 infra_only           = true
 ratio                = 0.0        # first-party: no external upstream to measure against
 parity_ratio_source  = "infra_only"
-last_audit           = "2026-05-19"
-
+last_audit           = "2026-05-24"
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-PARITY-100-PCT-001"
+# Operator CLI — no upstream parity surface

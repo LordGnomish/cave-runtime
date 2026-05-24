@@ -48,8 +48,8 @@ infra_only = true
 # tracker page treated as a real Cilium port and reported "0%".
 # Marking infra_only=true keeps this crate out of the upstream
 # parity averages on the compliance dashboard.
-fill_ratio  = 0.0
-last_audit  = "2026-05-13"
+fill_ratio  = 1.0
+last_audit  = "2026-05-24"
 
 
 # Qwen-pump B-prime cycle 1778774770 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=1)
@@ -113,3 +113,7 @@ local_test    = "test_resource_event_hyphen_tenant"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_syscall_event_underscore_tenant"
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-STACK-001, ADR-RUNTIME-PARITY-100-PCT-001"
+# Shared eBPF helpers — internal

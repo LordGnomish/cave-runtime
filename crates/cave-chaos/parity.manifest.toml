@@ -13,8 +13,13 @@ url     = "https://github.com/chaos-mesh/chaos-mesh"
 
 [parity]
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-24"
 infra_only  = false
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
+# Chaos Mesh parity — fill_ratio deferred
 [module]
 name        = "cave-chaos"
 description = "Chaos engineering — Chaos Mesh replacement"

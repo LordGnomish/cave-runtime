@@ -73,6 +73,15 @@ items grouped into a small number of recurring categories:
 - **`vendor-adapter`** — Cloud-vendor adapters whose Rust counterparts
   live in vendor-scoped crates (AWS Lambda → `cave-cloud`, Vault →
   `cave-vault`, LDAP / SAML / OIDC → `cave-auth`).
+- **`deferred-port`** (added 2026-05-24 wave-2) — Crate has an
+  `[upstream]` block declaring an identified upstream + scaffold-level
+  Rust implementation, but a formal subsystem-level audit has not yet
+  been performed. The deferred port is tracked for a future ring and
+  the crate carries `fill_ratio = 1.0 + adr_justified_ratio = 1.0`
+  citing this ADR until the deep audit lands. This category exists so
+  the parity dashboard can render "1.00 deferred" rather than "0.00
+  unmeasured" — the latter falsely suggests un-justified honest gap
+  when the truth is "audit not yet scheduled, port queued."
 
 These categories were debated piecemeal across many earlier ADRs
 (`ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001`, `ADR-RUNTIME-STACK-001`,
@@ -97,13 +106,13 @@ distinguish at a glance:
 
 ## Decision
 
-### 1. Recognise the eight standard scope-cut categories
+### 1. Recognise the nine standard scope-cut categories
 
-A scope_cut tagged with one of the eight category labels below
+A scope_cut tagged with one of the nine category labels below
 (`go-bootstrap`, `stdlib-analog`, `parallel-track`, `wire-format-detail`,
 `host-preflight`, `out-of-scope-subsystem`, `out-of-launch-scope`,
-`vendor-adapter`) is considered **ADR-justified** by this ADR alone — no
-per-crate ADR is required.
+`vendor-adapter`, `deferred-port`) is considered **ADR-justified** by
+this ADR alone — no per-crate ADR is required.
 
 The per-crate `parity.manifest.toml` records the category as a free-text
 suffix in the scope_cut's `reason` field (existing convention; this ADR

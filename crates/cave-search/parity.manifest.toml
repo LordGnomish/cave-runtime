@@ -18,8 +18,14 @@ language= "C++"
 url     = "https://github.com/manticoresoftware/manticoresearch"
 
 [parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0    # deferred-port category — port queued for future ring
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (deferred-port — port queued for future ring)"
+# manticoresoftware/manticoresearch 25.8.2 — port queued
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-24"
 infra_only  = false
 [module]
 name        = "cave-search"

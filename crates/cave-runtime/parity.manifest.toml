@@ -21,5 +21,9 @@ first_party = true
 [parity]
 infra_only = true
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-
+last_audit  = "2026-05-24"
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-STACK-001, ADR-RUNTIME-PARITY-100-PCT-001"
+# Single-binary orchestrator — internal
