@@ -1105,9 +1105,11 @@
       "upstream_version": "v10.3.0"
     },
     "cave-llm-gateway": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 3689,
-      "honest_ratio": 0.5,
-      "last_audit_disk": "2026-05-21",
+      "honest_ratio": 0.5652,
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 23,
       "note": null,

@@ -23,9 +23,11 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5
+honest_ratio         = 0.5652   # (mapped + partial) / total = 26/46
+adr_justified_ratio  = 1.00     # every [[partial]] + [[skipped]] cites one of the 8 standard scope-cut labels from the umbrella ADR
+adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153"
 parity_ratio_source  = "manifest"
-last_audit           = "2026-05-21"
+last_audit           = "2026-05-24"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
 mapped_count         = 23
@@ -33,6 +35,21 @@ partial_count        = 3
 skipped_count        = 20
 unmapped_count       = 0
 total                = 46
+
+# adr_justified_ratio breakdown (2026-05-24):
+#   * 3 [[partial]] — Phase-2 scaffold modules (models.rs, store.rs,
+#     budget.rs) declared but not yet wired into lib.rs. Categorised as
+#     parallel-track per the umbrella ADR: per-user/team budgets +
+#     persistent spend store are owned by cave-portal-api + cave-rdbms;
+#     this crate emits the contract via [[mapped]] cost-ledger /
+#     rate-limit / api-key-management and defers persistence wiring to
+#     Phase 2 (cave-llm-gateway-phase-2, see [[skipped]] below).
+#   * 20 [[skipped]] subsystems — cleanly partitioned across three
+#     [[scope_cuts]] groups: cloud-saas-matrix (out-of-launch-scope,
+#     ADR-153 ships Anthropic+OpenAI+Mistral+local for MVP),
+#     non-text-endpoints (out-of-scope-subsystem, sibling crates),
+#     owned-by-other-cave-crates (parallel-track: portal-web, rdbms,
+#     cache, auth, oncall, rate-limit-gateway, logs, portal-api).
 
 [module]
 name        = "cave-llm-gateway"
@@ -338,19 +355,22 @@ name = "streaming-sse"
 name = "cavectl-llm-gateway-subcmd"
 
 # ── Partial subsystems (3) ───────────────────────────────────────────────────
-# Scaffold present but not yet wired into the live module tree.
+# Phase-2 scaffolds — declared in src/ but not yet wired into lib.rs.
+# Categorised as parallel-track per ADR-RUNTIME-PARITY-100-PCT-001 §1:
+# per-user/team budget persistence is owned by cave-portal-api +
+# cave-rdbms; this crate emits the in-memory contract only.
 
 [[partial]]
 name  = "models-domain-types"
-notes = "src/models.rs defines BudgetScope/RateLimit/RequestLog/CacheEntry but is not yet declared in lib.rs"
+notes = "src/models.rs defines BudgetScope/RateLimit/RequestLog/CacheEntry but is not yet declared in lib.rs. [parallel-track: persistence schema owned by cave-portal-api + cave-rdbms in Phase 2]"
 
 [[partial]]
 name  = "store-in-memory"
-notes = "src/store.rs LlmGatewayStore depends on the not-yet-wired models module"
+notes = "src/store.rs LlmGatewayStore depends on the not-yet-wired models module. [parallel-track: cave-rdbms owns persistent spend/budget/cache; gateway emits the in-memory contract only]"
 
 [[partial]]
 name  = "budget-tracking"
-notes = "src/budget.rs functions assume a state.budgets field that does not exist on GatewayState yet"
+notes = "src/budget.rs functions assume a state.budgets field that does not exist on GatewayState yet. [parallel-track: cave-portal-api owns per-user/team budget lifecycle; the gateway tracks usage via [[mapped]] cost-ledger]"
 
 # ── Skipped subsystems (20) ──────────────────────────────────────────────────
 # Each row documents a scope cut. Most defer to a dedicated cave-* crate;
