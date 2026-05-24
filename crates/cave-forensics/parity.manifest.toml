@@ -30,13 +30,18 @@ description   = "Tetragon v1.7.0 deep-port — TracingPolicy + kernel hooks + fi
 source_root   = "src"
 
 [parity]
-fill_ratio            = 0.9545
+# 2026-05-23 wave-4: +4 [[skipped]] entries documenting Falco companion-upstream
+# scope_cut. Falco (falcosecurity/falco v0.43.1) is formally recognised here
+# but routed to a future cave-falco crate so we don't claim parity that doesn't
+# exist on disk. Counts updated accordingly: skipped 12 → 16, total 44 → 48,
+# fill_ratio 0.9545 → 0.9583 (no rounding artifacts).
+fill_ratio            = 0.9583
 honest_ratio          = 0.6818
 mapped_count          = 30
 partial_count         = 0
-skipped_count         = 12
+skipped_count         = 16
 unmapped_count        = 2
-total                 = 44
+total                 = 48
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-23"
 infra_only            = false
@@ -284,6 +289,43 @@ scope_cut_target = "cave-artifacts"
 name = "policyfilter_cgroup_v1"
 reason = "cgroup-v1 path matcher; cave-runtime targets v2-only hosts."
 scope_cut_target = "cave-runtime"
+
+# ─── 2026-05-23 wave-4: Falco scope_cut (companion upstream) ───────────────
+#
+# falcosecurity/falco v0.43.1 (Apache-2.0, source_sha
+# ce1de5597be047f9cd48a131794ac35bdfa5f97a) is the sibling kernel/eBPF runtime
+# security tool to Tetragon. The two are architecturally distinct (Falco uses
+# a YAML rule DSL + libsinsp syscall capture; Tetragon uses TracingPolicy +
+# eBPF probes). Co-hosting them inside cave-forensics would dilute the
+# Tetragon deep-port — the right path is a future cave-falco crate that
+# parallels cave-forensics under the same "runtime-security" umbrella.
+#
+# Tracked here as a formal scope_cut so the security-ecosystem ray closes
+# without claiming Falco parity that doesn't exist on disk.
+
+[[skipped]]
+name = "falco_rule_engine"
+reason = "Falco YAML rule DSL + condition expressions — different model from Tetragon TracingPolicy (CEL-like vs CRD selectors). Deferred to a sibling crate."
+scope_cut_target = "cave-falco (Phase 2 separate crate)"
+upstream = "falcosecurity/falco@v0.43.1 — userspace/engine/*"
+
+[[skipped]]
+name = "falco_libsinsp_syscall_capture"
+reason = "libsinsp syscall capture path — C++ library + eBPF probe + kernel module variants; Tetragon's eBPF probe (already mapped) covers the same observability domain for cave-runtime."
+scope_cut_target = "cave-falco (Phase 2 separate crate)"
+upstream = "falcosecurity/falco@v0.43.1 — userspace/libsinsp/*"
+
+[[skipped]]
+name = "falco_k8s_audit_plugin"
+reason = "k8s_audit + k8saudit-eks plugins — already covered by cave-policy admission webhook + cave-apiserver audit log path."
+scope_cut_target = "cave-policy + cave-apiserver"
+upstream = "falcosecurity/falco@v0.43.1 — plugins/k8saudit/*"
+
+[[skipped]]
+name = "falco_sidekick_output"
+reason = "Falcosidekick fan-out to Slack/PagerDuty/Mattermost/SNS — already covered by cave-noti notification transport."
+scope_cut_target = "cave-noti"
+upstream = "falcosecurity/falcosidekick (companion repo)"
 
 # ─── UNMAPPED (honest gaps) ────────────────────────────────────────────────
 
