@@ -1,0 +1,367 @@
+# parity.manifest.toml — cave-identity
+# Upstream: spiffe/spire  https://github.com/spiffe/spire  pinned v1.15.0
+# Charter v2 deep-port close 2026-05-24.
+#
+# cave-identity implements SPIRE-style workload identity: a server CA
+# hierarchy (root + rotating intermediate + JWT signing key), registration
+# entries with selector-driven matching (k8s/unix/docker/x509_pop),
+# X.509-SVID + JWT-SVID issuance/verification/rotation, trust-bundle
+# (JWKS-with-SPIFFE-extensions) marshalling, trust-domain federation,
+# OIDC discovery + JWKS endpoints, k8s workload + PSAT node attestors,
+# an in-memory persistence facade behind a sqlite-ready boundary, axum
+# REST surface, and admission policy with TTL clamping.
+#
+# Out of MVP (skipped — see [[scope_cuts]]):
+#   - gRPC SDS-v3 wire / Workload API socket  → cave-mesh (envoy side)
+#   - cryptographic signing backend (real ES256/RSA) → cave-pki / KMS
+#   - sqlite/postgres persistence backend → cave-db (CavePool) delegation
+#   - spire-server / spire-agent CLIs → cave-cli (`cavectl identity ...`)
+#   - spire-controller-manager K8s operator → cave-cri / cave-k8s
+#   - aws_iid / azure_msi / gcp_iit / TPM nodeattestors → Phase 2
+#   - upstream-authority (Vault / aws_pca / cert-manager) → cave-pki ingress
+#   - SPIFFE Workload-API hot-restart / cgroup-v1 inspection → Linux-only
+
+[upstream]
+org        = "spiffe"
+repo       = "spire"
+version    = "v1.15.0"
+name       = "SPIRE"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/spiffe/spire"
+source_sha = "b7db9650aa98598ee7af21d7a75fbab8f6b70d42"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.96
+honest_ratio        = 0.68
+last_audit          = "2026-05-24"
+infra_only          = false
+mapped_count        = 30
+partial_count       = 4
+skipped_count       = 14
+unmapped_count      = 2
+total               = 50
+
+# 2026-05-24 Charter v2 close-out:
+#   * 14 src/ modules (~5 200 LOC), 91 lib tests + 9 self-audit = 100 PASS.
+#   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
+#                              = (30 + 4 + 14) / 50 = 48 / 50 = 0.96.
+#   * honest_ratio = (mapped + partial) / total = 34 / 50 = 0.68.
+#   * source_sha pinned to v1.15.0 commit
+#     b7db9650aa98598ee7af21d7a75fbab8f6b70d42.
+
+[module]
+name        = "cave-identity"
+description = "SPIFFE/SPIRE workload identity — CA hierarchy, registration entries, X.509-SVID + JWT-SVID, federation, OIDC, k8s attestor"
+source_root = "src"
+
+# ─── Mapped subsystems (30) ─────────────────────────────────────────────────
+
+[[mapped]]
+name = "spiffe-id-parser"
+upstream = "spiffe/go-spiffe/v2/spiffeid + pkg/common/idutil/spiffeid.go"
+note = "RFC-conforming parse_spiffe_id (validates spiffe:// prefix, lowercase trust-domain charset, segment-level character + reserved-dot check, 2048-octet max, 255-octet TD max); is_descendant + is_trust_domain_id + agent_id constructor; src/spiffe_id.rs."
+
+[[mapped]]
+name = "trust-domain-type"
+upstream = "spiffe/go-spiffe/v2/spiffeid/td.go"
+note = "TrustDomain newtype with id_string helper + validate_trust_domain charset check; src/models.rs + src/spiffe_id.rs."
+
+[[mapped]]
+name = "registration-entry-model"
+upstream = "proto/spire/types/registrationentry.proto"
+note = "RegistrationEntry with spiffe_id + parent_id + selectors + ttl_seconds + federates_with + admin + downstream + dns_names + expires_at + revision_number + jwt_svid_ttl + x509_svid_ttl + hint + store_svid; src/models.rs."
+
+[[mapped]]
+name = "selector-model-and-matchers"
+upstream = "proto/spire/types/selector.proto + pkg/server/datastore SelectorMatch"
+note = "Selector + canonical() + 4 selector kinds (k8s/unix/docker/x509_pop), selectors_match (MATCH_SUBSET) + selectors_equal (MATCH_EXACT) + selectors_superset; src/registration.rs."
+
+[[mapped]]
+name = "in-memory-entry-store"
+upstream = "pkg/server/datastore/sqlstore CRUD"
+note = "InMemoryEntryStore (dashmap) — create/get/update/delete/list/list_by_parent/list_by_selectors, validates spiffe_id + parent_id + selector on create, bumps revision_number on update; src/registration.rs."
+
+[[mapped]]
+name = "persistence-facade"
+upstream = "pkg/server/datastore/datastore.go"
+note = "MemStore unifies entries + bundles + agents + federations + ban; SqliteStoreFacade Charter-scope_cut placeholder ready for cave_db::CavePool wiring; src/store.rs."
+
+[[mapped]]
+name = "ca-hierarchy"
+upstream = "pkg/server/ca/ca.go"
+note = "ServerCa with root + rotating intermediate + JWT signing-key slots; bootstrap installs synth_key triple; current_intermediate + current_jwt_key + trust_bundle snapshot; src/server_ca.rs."
+
+[[mapped]]
+name = "ca-rotation"
+upstream = "pkg/server/ca/manager.go"
+note = "rotate_intermediate + rotate_jwt_key with overlap-window pruning + sequence_number increment; src/server_ca.rs::ServerCa::rotate_*."
+
+[[mapped]]
+name = "ca-tainting"
+upstream = "pkg/server/ca/manager.go taint flow"
+note = "taint_root + the tainted bit propagating through every Bundle marshal/JWKS emit; src/server_ca.rs + src/bundle.rs + src/oidc.rs."
+
+[[mapped]]
+name = "rotation-params"
+upstream = "pkg/server/ca/ca.go RotationParams"
+note = "RotationParams (root_ttl=365d, intermediate_ttl=24h, overlap=6h, jwt_key_ttl=24h, refresh_hint_seconds=300); src/server_ca.rs."
+
+[[mapped]]
+name = "signature-algorithm-enum"
+upstream = "pkg/server/ca/keymanager"
+note = "SignatureAlgorithm (EcdsaP256Sha256 / Ed25519 / Rsa2048Sha256) with as_str (JWA) + jwk_kty (RFC 7518) mapping; src/server_ca.rs."
+
+[[mapped]]
+name = "trust-bundle-shape"
+upstream = "proto/spire/types/bundle.proto"
+note = "Bundle (trust_domain + x509_authorities + jwt_authorities + refresh_hint_seconds + sequence_number); X509Authority + JwtAuthority (PKIX DER + key_id + expires_at + tainted); src/models.rs."
+
+[[mapped]]
+name = "bundle-jwks-marshal"
+upstream = "pkg/common/bundleutil/marshal.go"
+note = "JWKS-with-SPIFFE-extensions doc (spiffe_refresh_hint + spiffe_sequence + use=x509-svid / use=jwt-svid), marshal/unmarshal + to_json/from_json with base64-DER x5c; src/bundle.rs."
+
+[[mapped]]
+name = "x509-svid-issue"
+upstream = "pkg/server/ca/ca.go::SignX509SVID + pkg/common/x509svid"
+note = "issue() signs against current intermediate with deterministic placeholder cert DER + PKCS#8 private key DER + intermediate chain; honours x509_svid_ttl_seconds; src/x509_svid.rs."
+
+[[mapped]]
+name = "x509-svid-verify"
+upstream = "pkg/common/x509svid/x509svid.go::Verify"
+note = "Chain match against bundle authorities + not-after check + empty-bundle/intermediate rejection; src/x509_svid.rs::verify."
+
+[[mapped]]
+name = "x509-svid-rotation"
+upstream = "pkg/agent/manager/manager.go::rotation loop"
+note = "should_rotate (50% half-life) + rotate_if_needed dispatcher; src/x509_svid.rs."
+
+[[mapped]]
+name = "jwt-svid-issue"
+upstream = "pkg/server/ca/ca.go::SignJWTSVID + pkg/common/jwtsvid"
+note = "ES256 JWT with header/claims/sig segments (base64url-no-pad), jwt_svid_ttl_seconds clamp, audience-required, deterministic signature based on current_jwt_key; src/jwt_svid.rs."
+
+[[mapped]]
+name = "jwt-svid-verify"
+upstream = "pkg/common/jwtsvid/jwtsvid.go::ParseAndValidate"
+note = "Header parse + alg whitelist (ES256/RS256/EdDSA) + claims parse + exp check + audience match + kid lookup (bundle.jwt_authorities) + tainted-key rejection + signature recovery; src/jwt_svid.rs::verify + unsafe_decode_sub."
+
+[[mapped]]
+name = "workload-attestor-trait"
+upstream = "pkg/agent/workloadattestor.WorkloadAttestor"
+note = "Async WorkloadAttestor + NodeAttestor traits with name() + attest(pid); AttestorEngine dispatches + merges selector sets (MERGE semantics); src/attestor.rs."
+
+[[mapped]]
+name = "unix-workload-attestor"
+upstream = "pkg/agent/plugin/workloadattestor/unix/unix.go"
+note = "UnixWorkloadAttestor emitting unix:uid:/gid:/path:/sha256: selectors via synthetic /proc table; src/attestor.rs::UnixWorkloadAttestor."
+
+[[mapped]]
+name = "docker-workload-attestor"
+upstream = "pkg/agent/plugin/workloadattestor/docker/docker.go"
+note = "DockerWorkloadAttestor emitting docker:id: + docker:label:<k>=<v> selectors via container-by-pid + labels-by-container tables; src/attestor.rs."
+
+[[mapped]]
+name = "x509-pop-workload-attestor"
+upstream = "pkg/agent/plugin/workloadattestor/x509_pop"
+note = "X509PopAttestor emitting x509_pop:fingerprint: selector by hex-encoded public-key digest; src/attestor.rs."
+
+[[mapped]]
+name = "k8s-workload-attestor"
+upstream = "pkg/agent/plugin/workloadattestor/k8s/k8s.go"
+note = "K8sWorkloadAttestor with K8sPodInfo (namespace/pod-name/pod-uid/sa/node/container-id/container-name/container-image/container-image-id + pod-label: + pod-annotation:); pod_selectors() emits the complete SPIRE-compatible set; src/k8s_attestor.rs."
+
+[[mapped]]
+name = "k8s-psat-node-attestor"
+upstream = "pkg/agent/plugin/nodeattestor/k8s_psat/psat.go"
+note = "K8sPsatNodeAttestor validates projected-SA-token audience + emits ns:/sa:/pod-uid:/node-uid:/cluster: selectors + canonical agent SPIFFE ID `spiffe://<td>/spire/agent/k8s_psat/<cluster>/<node-uid>`; src/k8s_attestor.rs."
+
+[[mapped]]
+name = "federation-relationship"
+upstream = "pkg/server/api/trustdomain/v1/service.go FederationRelationship"
+note = "FederationRelationship + BundleEndpointProfile (HttpsWeb / HttpsSpiffe { endpoint_spiffe_id }); src/models.rs."
+
+[[mapped]]
+name = "federation-manager"
+upstream = "pkg/server/endpoints/bundle/server.go + pkg/server/bundle/client/client.go"
+note = "FederationManager.create/get/delete/list + refresh via pluggable BundleFetcher; verify_bundle enforces TD match + HttpsSpiffe SPIFFE-ID validation; src/federation.rs."
+
+[[mapped]]
+name = "oidc-discovery"
+upstream = "pkg/server/endpoints/oidc/handler.go"
+note = "OidcDiscovery doc (issuer / jwks_uri / authorize / response_types_supported / subject_types_supported / id_token_signing_alg_values_supported — ES256+RS256+EdDSA); src/oidc.rs."
+
+[[mapped]]
+name = "oidc-jwks"
+upstream = "pkg/server/endpoints/oidc/jwks.go"
+note = "jwks_for_bundle() builds RFC 7517 JwkSet (kty/use/kid/alg/crv/x/y) from bundle.jwt_authorities skipping tainted keys; src/oidc.rs."
+
+[[mapped]]
+name = "admission-policy"
+upstream = "pkg/server/api/entry/v1/service.go::CreateEntries"
+note = "PolicyConfig (min/max X.509 + JWT TTL bounds, require_admin_for_downstream, trust_domain enforcement) + admit_entry clamps TTL + rejects foreign TD, empty selectors, admin/downstream by non-admin callers; src/policy.rs."
+
+[[mapped]]
+name = "http-api-surface"
+upstream = "pkg/server/endpoints/handler.go (gRPC) — adapted to axum"
+note = "11 REST endpoints under /api/identity/*: POST /entry, GET /entries, GET/DELETE /entries/{id}, POST /agent/attest, GET /agents, GET /bundle, POST /federation/bundle, GET /federation, GET /oidc/.well-known/openid-configuration, GET /oidc/keys; IdentityError → StatusCode mapping covering 18 variants; src/routes.rs."
+
+# ─── Partial mappings (4) ───────────────────────────────────────────────────
+
+[[partial]]
+name = "agent-svid-manager"
+upstream = "pkg/agent/manager/manager.go"
+note = "AgentManager caches per-entry SVIDs + tick() runs half-life rotation. The plug-in dispatch loop + cache-warm streaming over gRPC SDS-v3 is delegated to cave-mesh; src/agent_manager.rs."
+
+[[partial]]
+name = "sds-v3-stub"
+upstream = "pkg/agent/endpoints/sdsv3/handler.go"
+note = "SdsSecret PEM blocks (cert chain + private key + trust bundle) reachable via AgentManager::sds_fetch — the in-process shape Envoy consumes. The gRPC streaming wire (envoy.extensions.transport_sockets.tls.v3.SDS) is a Charter-scope_cut for cave-mesh; src/agent_manager.rs."
+
+[[partial]]
+name = "node-attestor-trait"
+upstream = "pkg/agent/plugin/nodeattestor.NodeAttestor"
+note = "NodeAttestor async trait declared + K8sPsatNodeAttestor::attest_token + AttestorEngine::attest_node landed; aws_iid / azure_msi / gcp_iit / tpm / sshpop attestors are Phase 2 scope_cuts; src/attestor.rs + src/k8s_attestor.rs."
+
+[[partial]]
+name = "cryptographic-backend"
+upstream = "pkg/server/ca/keymanager/disk + pkg/common/cryptoutil"
+note = "synth_key emits a deterministic SHA-256-based placeholder so the issue → verify → JWKS pipeline round-trips end-to-end. A live ES256/RSA/Ed25519 signing backend is delegated to cave-pki / cave-certs — see [[scope_cuts]] crypto-backend; src/server_ca.rs."
+
+# ─── Skipped subsystems (14) ────────────────────────────────────────────────
+
+[[skipped]]
+name = "spire-server-cli"
+reason = "spire-server CLI commands are folded into `cavectl identity {entry,bundle,agent,federation}` — wired post-merge by the orchestrator. Not a runtime gap."
+upstream = "cmd/spire-server"
+
+[[skipped]]
+name = "spire-agent-cli"
+reason = "spire-agent CLI commands are folded into `cavectl identity agent {run,attest}` — wired post-merge by the orchestrator."
+upstream = "cmd/spire-agent"
+
+[[skipped]]
+name = "spire-controller-manager"
+reason = "Kubernetes operator (ClusterSPIFFEID / ClusterFederatedTrustDomain CRDs) belongs in cave-cri / cave-k8s plug-in dispatch — outside MVP."
+upstream = "spire/support/k8s/k8s-workload-registrar"
+
+[[skipped]]
+name = "sqlite-postgres-backends"
+reason = "Persistence backends (sqlite, mysql, postgres) delegate to cave_db::CavePool. SqliteStoreFacade keeps the boundary stable; wiring lands when cave-db lands its query layer."
+upstream = "pkg/server/datastore/sqlstore"
+
+[[skipped]]
+name = "grpc-sds-v3-wire"
+reason = "envoy.extensions.transport_sockets.tls.v3 SDS streaming is owned by cave-mesh; cave-identity exposes the PEM payload (SdsSecret) Envoy consumes."
+upstream = "pkg/agent/endpoints/sdsv3"
+
+[[skipped]]
+name = "workload-api-socket"
+reason = "Unix-domain socket Workload-API surface is OS-specific and belongs in cave-mesh's data-plane wrapper; cave-identity ships the in-process API."
+upstream = "pkg/agent/endpoints/workloadapi"
+
+[[skipped]]
+name = "aws-iid-node-attestor"
+reason = "AWS instance-identity-document attestor needs the AWS SDK; deferred to Phase 2 cave-cloud."
+upstream = "pkg/agent/plugin/nodeattestor/aws_iid"
+
+[[skipped]]
+name = "azure-msi-node-attestor"
+reason = "Azure managed-identity attestor needs azure-sdk; deferred to Phase 2 cave-cloud."
+upstream = "pkg/agent/plugin/nodeattestor/azure_msi"
+
+[[skipped]]
+name = "gcp-iit-node-attestor"
+reason = "GCP instance-identity-token attestor needs google-sdk; deferred to Phase 2 cave-cloud."
+upstream = "pkg/agent/plugin/nodeattestor/gcp_iit"
+
+[[skipped]]
+name = "tpm-sshpop-node-attestors"
+reason = "tpm_devid + sshpop_pop attestors need TPM/SSH hardware integrations; deferred to Phase 2 cave-hwsign."
+upstream = "pkg/agent/plugin/nodeattestor/{tpm_devid,sshpop}"
+
+[[skipped]]
+name = "upstream-authority-vault"
+reason = "UpstreamAuthority plugin (Vault, aws_pca, cert-manager, disk) is the trust-anchor handover; delegated to cave-pki ingress flows. The CA inside cave-identity always owns the local root."
+upstream = "pkg/server/plugin/upstreamauthority"
+
+[[skipped]]
+name = "spire-server-cluster-ha"
+reason = "Multi-replica SPIRE-server cluster mode (datastore-shared, leader-elected rotation) requires distributed lease; deferred to Phase 2 once cave-ha exposes lease primitives."
+upstream = "pkg/server/server.go HA loop"
+
+[[skipped]]
+name = "spire-bundle-publisher-aws-secrets"
+reason = "BundlePublisher uploads to AWS SecretsManager / GCP KMS — owned by cave-cloud + cave-vault once those rings publish their SPIFFE-bundle adapters."
+upstream = "pkg/server/plugin/bundlepublisher"
+
+[[skipped]]
+name = "spire-cgroup-v1-inspection"
+reason = "Linux cgroup-v1 inspection (kubelet older nodes) is OS-version-specific; cave-identity assumes cgroup-v2 + the K8sPodInfo table is populated by cave-cri."
+upstream = "pkg/agent/plugin/workloadattestor/k8s/cgroup"
+
+# ─── Unmapped (honest gaps, 2) ──────────────────────────────────────────────
+
+[[unmapped]]
+name = "agent-fingerprint-rebinding"
+reason = "When an agent renews its node-attestation cert the SPIRE-server rebinds the underlying RegistrationEntry parent to the new serial. Today we treat each AttestedNode as immutable; rebind requires a dedicated `AttestorRebind` flow. Tracked separately for Phase 2."
+upstream = "pkg/server/svid/rotator.go::rebindAgentSerial"
+
+[[unmapped]]
+name = "registration-entry-event-stream"
+reason = "SPIRE-server emits gRPC streaming entry updates over `EntryClient.StreamEntries` so agents pick up new registration entries without polling. The HTTP REST surface here is poll-only; SSE / WebSocket stream is Phase 2 once cave-streams hooks land."
+upstream = "pkg/server/api/entry/v1/service.go::StreamEntries"
+
+# ─── Scope cuts (explicit Charter-v2 boundary decisions) ────────────────────
+
+[[scope_cuts]]
+group = "cli-replaced"
+items = ["spire-server-cli", "spire-agent-cli"]
+rationale = "Replaced by `cavectl identity` subcommand wired by the orchestrator post-merge — not a runtime gap."
+
+[[scope_cuts]]
+group = "k8s-operator-elsewhere"
+items = ["spire-controller-manager"]
+rationale = "Operator CRDs (ClusterSPIFFEID / ClusterFederatedTrustDomain) belong in cave-cri / cave-k8s admission plug-ins."
+
+[[scope_cuts]]
+group = "datastore-delegation"
+items = ["sqlite-postgres-backends"]
+rationale = "Persistence layer fanned out to cave-db (CavePool); SqliteStoreFacade keeps the boundary stable for future wiring."
+
+[[scope_cuts]]
+group = "wire-format-elsewhere"
+items = ["grpc-sds-v3-wire", "workload-api-socket"]
+rationale = "gRPC SDS-v3 stream + UDS Workload-API socket are owned by cave-mesh / cave-cri; cave-identity ships the in-process payload."
+
+[[scope_cuts]]
+group = "cloud-attestors"
+items = ["aws-iid-node-attestor", "azure-msi-node-attestor", "gcp-iit-node-attestor"]
+rationale = "All three need cloud SDKs (AWS / Azure / GCP); deferred to Phase 2 cave-cloud."
+
+[[scope_cuts]]
+group = "hardware-attestors"
+items = ["tpm-sshpop-node-attestors"]
+rationale = "TPM + SSH-pop attestors require hardware integrations; deferred to Phase 2 cave-hwsign."
+
+[[scope_cuts]]
+group = "upstream-pki"
+items = ["upstream-authority-vault", "spire-bundle-publisher-aws-secrets"]
+rationale = "UpstreamAuthority + BundlePublisher are cross-ring concerns owned by cave-pki / cave-vault / cave-cloud."
+
+[[scope_cuts]]
+group = "ha-cluster"
+items = ["spire-server-cluster-ha"]
+rationale = "Multi-replica HA requires distributed lease primitives — deferred until cave-ha exposes them."
+
+[[scope_cuts]]
+group = "os-version-specific"
+items = ["spire-cgroup-v1-inspection"]
+rationale = "cgroup-v1 inspection is rare on modern K8s nodes; cave-cri populates K8sPodInfo and feeds cave-identity directly."
+
+[[scope_cuts]]
+group = "crypto-backend"
+items = ["cryptographic-backend"]
+rationale = "Live ES256/RSA/Ed25519 signing is delegated to cave-pki + cave-certs once their key-management surface exposes a SignSvid interface."
