@@ -735,6 +735,93 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "crm",
         phase: 4,
     },
+    // ============================================================
+    // CHARTER v2 merge wave 2026-05-23/24 — TRACKED_PROJECTS backfill
+    // (parity.manifest.toml landed on main but projects.rs was not
+    //  edited at close-time; entries added so /api/upstream/tracker
+    //  surfaces these crates.)
+    // ============================================================
+    TrackedProject {
+        name: "kube-bench",
+        github_repo: "aquasecurity/kube-bench",
+        cave_module: "cave-bench",
+        track_features: "CIS benchmark master/node/etcd/control-plane checks, YAML rule loader, test operators, JSON/SARIF report",
+        check_frequency: "biweekly",
+        category: "security",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "kubescape",
+        github_repo: "kubescape/kubescape",
+        cave_module: "cave-bench",
+        track_features: "NSA + MITRE ATT&CK for K8s control catalogue, manifest facts evaluator, scan runner modes",
+        check_frequency: "biweekly",
+        category: "security",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "SPIRE",
+        github_repo: "spiffe/spire",
+        cave_module: "cave-identity",
+        track_features: "SPIFFE ID/SVID issuance, workload attestation, X.509 + JWT SVID, federation trust bundle, registration API",
+        check_frequency: "biweekly",
+        category: "identity",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "gVisor",
+        github_repo: "google/gvisor",
+        cave_module: "cave-sandbox",
+        track_features: "User-space kernel (runsc), syscall interception, OCI runtime, platform=ptrace/kvm, seccomp profile",
+        check_frequency: "biweekly",
+        category: "virtualization",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Kata Containers",
+        github_repo: "kata-containers/kata-containers",
+        cave_module: "cave-sandbox",
+        track_features: "VM-isolated containers, kata-agent, hypervisor drivers (qemu/cloud-hypervisor/firecracker), OCI runtime, snapshot",
+        check_frequency: "biweekly",
+        category: "virtualization",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Firecracker",
+        github_repo: "firecracker-microvm/firecracker",
+        cave_module: "cave-sandbox",
+        track_features: "microVM hypervisor, jailer, KVM API, vsock, balloon, snapshot/restore, REST control plane",
+        check_frequency: "biweekly",
+        category: "virtualization",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Knative Serving",
+        github_repo: "knative/serving",
+        cave_module: "cave-knative",
+        track_features: "Service/Configuration/Revision/Route CRDs, KPA autoscaler (stable+panic), TrafficTarget, RevisionTemplateSpec",
+        check_frequency: "biweekly",
+        category: "serverless",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Knative Eventing",
+        github_repo: "knative/eventing",
+        cave_module: "cave-knative",
+        track_features: "Broker/Trigger/Channel/Subscription CRDs, CloudEvents 1.0 spec, in-memory channel, Argo Events sources",
+        check_frequency: "biweekly",
+        category: "serverless",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Crossplane",
+        github_repo: "crossplane/crossplane",
+        cave_module: "cave-crossplane",
+        track_features: "XRD + Composition v2 pipeline (FunctionRef), XR/Claim lifecycle, Provider/Function/Configuration packages, ProviderConfig + DeploymentRuntime",
+        check_frequency: "biweekly",
+        category: "infrastructure",
+        phase: 2,
+    },
 ];
 
 #[cfg(test)]
