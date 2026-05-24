@@ -442,6 +442,18 @@ def disk_manifest_state(crate: str) -> dict:
     # compliance dashboard.
     hm = re.search(r'^\s*honest_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
     honest_ratio = float(hm.group(1)) if hm else None
+    # NEW 2026-05-24: adr_justified_ratio = ratio that includes scope_cuts
+    # which are formally justified by an ADR (i.e. the missing surface is
+    # a deliberate architectural decision, owned by another cave-* crate,
+    # or out of OSS-launch scope). When present, the compliance dashboard
+    # renders this number alongside the honest fill_ratio so reviewers
+    # see "honest = X, ADR-justified = Y" rather than just a single
+    # ambiguous percentage. The accompanying `adr_justification` field
+    # is a free-text comma-separated list of ADR ids the ratio leans on.
+    aj = re.search(r'^\s*adr_justified_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    adr_justified_ratio = float(aj.group(1)) if aj else None
+    ajn = re.search(r'^\s*adr_justification\s*=\s*"([^"]+)"', block, flags=re.MULTILINE)
+    adr_justification = ajn.group(1) if ajn else None
     # Per-class counts (added 2026-05-13 alongside [[partial]]).
     def _int_field(name: str) -> int | None:
         m = re.search(rf'^\s*{re.escape(name)}\s*=\s*([0-9]+)', block, flags=re.MULTILINE)
@@ -475,6 +487,8 @@ def disk_manifest_state(crate: str) -> dict:
         "manifest_filled": filled,
         "parity_ratio_disk": ratio,
         "honest_ratio_disk": honest_ratio,
+        "adr_justified_ratio_disk": adr_justified_ratio,
+        "adr_justification_disk": adr_justification,
         "infra_only_disk": infra,
         "last_audit_disk": last_audit,
         "mapped_count": mapped_count,
@@ -568,6 +582,17 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
             # No manifest [[partial]] block authored yet — honest ratio
             # is conservatively the same as the standard one.
             entry["honest_ratio"] = disk_ratio
+        # ADR-justified-parity axis (added 2026-05-24, line-by-line uplift
+        # ray). Surfaces the ratio that counts every formally-ADR-justified
+        # scope_cut as completed work. Reviewers see the difference
+        # (honest vs ADR-justified) and can drill into the cited ADRs to
+        # confirm each architectural decision still holds.
+        aj_disk = disk.get("adr_justified_ratio_disk")
+        if aj_disk is not None:
+            entry["adr_justified_ratio"] = aj_disk
+        aj_just = disk.get("adr_justification_disk")
+        if aj_just:
+            entry["adr_justification"] = aj_just
         # Per-class counts, when the manifest carries them.
         for k in ("mapped_count", "partial_count", "skipped_count",
                   "unmapped_count", "total_count"):
