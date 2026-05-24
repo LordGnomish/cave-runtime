@@ -104,8 +104,8 @@ fn gate_5_last_audit_is_2026_05_19() {
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-19"),
-        "[parity] last_audit must reflect the 2026-05-19 close-out"
+        Some("2026-05-24"),
+        "[parity] last_audit must reflect the 2026-05-24 close-out"
     );
 }
 

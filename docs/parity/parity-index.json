@@ -305,14 +305,19 @@
     },
     "cave-container-scan": {
       "cave_src_loc": 2340,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.7115,
+      "last_audit_disk": "2026-05-23",
       "manifest_filled": true,
+      "mapped_count": 35,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9615,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "C",
+      "total_count": 52,
+      "unmapped_count": 2,
       "upstream": "aquasecurity/trivy",
       "upstream_version": "v0.48.0"
     },
@@ -783,9 +788,11 @@
       "upstream_version": "v3.5.13"
     },
     "cave-hermes": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.9531,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 34,
       "note": "added by disk-overlay; not in audit doc",
@@ -821,6 +828,8 @@
       "upstream_version": null
     },
     "cave-identity": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.68,
       "last_audit_disk": "2026-05-24",
@@ -901,9 +910,11 @@
       "upstream_version": null
     },
     "cave-keda": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 1145,
       "honest_ratio": 0.75,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 21,
       "note": null,
@@ -1016,9 +1027,11 @@
       "upstream_version": null
     },
     "cave-lakehouse": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.9348,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 31,
       "note": "added by disk-overlay; not in audit doc",
@@ -1116,9 +1129,11 @@
       "upstream_version": "v4.36"
     },
     "cave-logs": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 7285,
       "honest_ratio": 0.875,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 15,
       "note": null,
@@ -1159,9 +1174,11 @@
       "upstream_version": "1.20.0"
     },
     "cave-metrics": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 9530,
       "honest_ratio": 0.9,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 19,
       "note": null,
@@ -1887,7 +1904,7 @@
     "injected": 13,
     "new_filled": 98,
     "phantoms": 0,
-    "ratio_overrides": 69
+    "ratio_overrides": 70
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
