@@ -1039,6 +1039,8 @@
       "upstream_version": "v1.28.0"
     },
     "cave-kubevirt": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-SANDBOX-NO-FFI-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 1.0,
       "last_audit_disk": "2026-05-21",

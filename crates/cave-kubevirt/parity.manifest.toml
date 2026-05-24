@@ -37,6 +37,8 @@ unmapped_count        = 0
 total                 = 34
 fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 34/34
 honest_ratio          = 1.0000  # (mapped + skipped) / total            = 34/34
+adr_justified_ratio   = 1.0000  # all 22 scope_cuts cite an ADR-justified category: host-preflight (4) / go-bootstrap (4) / stdlib-analog (2) / kernel (2, ADR-RUNTIME-SANDBOX-NO-FFI-001) / hardware-passthrough (2, out-of-launch-scope) / deprecated-upstream (3, out-of-scope-subsystem) / parallel-track sibling-delegated (3) / Phase-2-deferred (2, out-of-launch-scope).
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-21"
 infra_only            = false
