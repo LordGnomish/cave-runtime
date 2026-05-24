@@ -37,6 +37,8 @@ unmapped_count        = 2
 total                 = 65
 fill_ratio            = 0.9692   # (mapped + partial + skipped) / total = 63/65
 honest_ratio          = 0.9231   # (mapped + skipped) / total           = 60/65
+adr_justified_ratio   = 1.0      # 30 skipped scope_cut to siblings (cave-portal/cave-auth/cave-noti/cave-metrics) = out-of-scope-subsystem; 3 partial + 2 unmapped P2/P3 deferrals = out-of-launch-scope.
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-19"
 infra_only            = false
