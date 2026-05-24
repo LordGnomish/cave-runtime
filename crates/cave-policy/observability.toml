@@ -1,0 +1,108 @@
+# observability.toml — cave-policy (Charter v2 G6)
+#
+# Panels ≥ 8, alerts ≥ 5.  Backs the Grafana dashboard at
+# /portal/dashboards/policy and the cave-oncall route group `policy.*`.
+
+[meta]
+crate           = "cave-policy"
+generated_for   = "Charter v2 close 2026-05-23"
+upstream_opa    = "open-policy-agent/opa@v1.16.2"
+upstream_gk     = "open-policy-agent/gatekeeper@v3.22.2"
+upstream_kv     = "kyverno/kyverno@v1.18.1"
+
+# ─── Panels (9) ─────────────────────────────────────────────────────────────
+
+[[panels]]
+id          = "policy.decisions.rate"
+title       = "Decision rate (req/s)"
+metric      = "cave_policy_decisions_total"
+kind        = "graph"
+description = "Rate of policy decisions across OPA Rego + Kyverno engines."
+
+[[panels]]
+id          = "policy.decisions.allow_deny"
+title       = "Allow vs deny ratio"
+metric      = "cave_policy_decisions_total{outcome=~\"allow|deny\"}"
+kind        = "stat"
+description = "Stacked allow/deny per minute."
+
+[[panels]]
+id          = "policy.eval.latency"
+title       = "Rego eval p95/p99 (ms)"
+metric      = "cave_policy_rego_eval_ms_bucket"
+kind        = "heatmap"
+description = "Rego evaluator latency — partial-eval residual generation excluded."
+
+[[panels]]
+id          = "policy.kyverno.rule_outcomes"
+title       = "Kyverno rule outcomes"
+metric      = "cave_policy_kyverno_rule_total{kind=~\"validate|mutate|generate|verifyImages\"}"
+kind        = "table"
+description = "Per-rule pass/fail/skip counts."
+
+[[panels]]
+id          = "policy.bundle.refresh"
+title       = "Bundle refresh lag (s)"
+metric      = "cave_policy_bundle_refresh_age_s"
+kind        = "graph"
+description = "Time since last successful bundle activation."
+
+[[panels]]
+id          = "policy.decision_log.lag"
+title       = "Decision log queue depth"
+metric      = "cave_policy_decision_log_queue_depth"
+kind        = "graph"
+description = "Number of decision-log entries waiting for upload to remote sink."
+
+[[panels]]
+id          = "policy.webhook.latency"
+title       = "Admission webhook p95/p99 (ms)"
+metric      = "cave_policy_webhook_ms_bucket"
+kind        = "heatmap"
+description = "AdmissionReview round-trip latency (fail-open vs fail-closed split)."
+
+[[panels]]
+id          = "policy.constraint_template.compile_errors"
+title       = "ConstraintTemplate compile errors"
+metric      = "cave_policy_constraint_template_compile_errors_total"
+kind        = "stat"
+description = "Failed Rego compilation when reconciling ConstraintTemplate CRDs."
+
+[[panels]]
+id          = "policy.image_verify.attestations"
+title       = "verifyImages attestation outcomes"
+metric      = "cave_policy_verify_images_total{outcome=~\"verified|unsigned|invalid\"}"
+kind        = "graph"
+description = "cosign signature / SBOM attestation verification outcomes (delegated to cave-sign)."
+
+# ─── Alerts (5) ─────────────────────────────────────────────────────────────
+
+[[alerts]]
+id          = "policy.eval.p99_high"
+expr        = "histogram_quantile(0.99, rate(cave_policy_rego_eval_ms_bucket[5m])) > 250"
+severity    = "warning"
+description = "Rego eval p99 above 250ms — slow policy or large input."
+
+[[alerts]]
+id          = "policy.webhook.fail_closed_storm"
+expr        = "rate(cave_policy_decisions_total{outcome=\"deny\",mode=\"fail-closed\"}[5m]) > 50"
+severity    = "critical"
+description = "Fail-closed deny rate elevated — admission webhook may be wedged."
+
+[[alerts]]
+id          = "policy.bundle.activation_stale"
+expr        = "cave_policy_bundle_refresh_age_s > 600"
+severity    = "warning"
+description = "Bundle refresh older than 10 minutes — upstream feed broken?"
+
+[[alerts]]
+id          = "policy.decision_log.backpressure"
+expr        = "cave_policy_decision_log_queue_depth > 5000"
+severity    = "warning"
+description = "Decision log sink unable to keep up — risk of dropping audit data."
+
+[[alerts]]
+id          = "policy.constraint_template.compile_storm"
+expr        = "increase(cave_policy_constraint_template_compile_errors_total[15m]) > 10"
+severity    = "warning"
+description = "ConstraintTemplate compile errors spiking — bad Rego deployed?"
