@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Cluster gateway — wraps a kube::Client and provides the primitives
-//! that the sync engine needs: apply (SSA), get, delete, list.
+//! Cluster registry + Kubernetes REST URL builders.
 //!
-//! In test / dry-run mode (`client = None`) every mutating call is a no-op
-//! and reads return `None` / `[]`.  This lets the full sync pipeline run
-//! without a real cluster, which is critical for unit tests.
+//! The MVP scope does not include a kube::Client binding (deferred to Phase 2
+//! `cave-deploy-runtime`). This module exposes the deterministic pieces the
+//! sync engine needs: kind-to-plural mapping and URL construction.
 
-use crate::error::DeployError;
-use crate::models::Manifest;
-use crate::sync::CAVE_MANAGER;
-use kube::Client;
-use serde_json::Value;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info};
+use uuid::Uuid;
 
-/// Maps common Kubernetes kinds to their plural resource names.
-/// Used for constructing REST API paths.
+/// Plural resource names for the well-known Kubernetes kinds.
 pub fn kind_to_plural(kind: &str) -> String {
     match kind {
         "Deployment" => "deployments",
@@ -45,7 +40,6 @@ pub fn kind_to_plural(kind: &str) -> String {
         "ResourceQuota" => "resourcequotas",
         "LimitRange" => "limitranges",
         other => {
-            // Naive pluralisation: lowercase + "s"
             let lower = other.to_lowercase();
             return if lower.ends_with('s') { lower } else { format!("{lower}s") };
         }
@@ -53,201 +47,71 @@ pub fn kind_to_plural(kind: &str) -> String {
     .to_string()
 }
 
-/// Gateway to a single Kubernetes cluster.
-pub struct ClusterGateway {
-    pub(crate) client: Option<Client>,
+/// Build the namespaced/cluster-scoped Kubernetes REST path for a single resource.
+pub fn build_resource_url(
+    api_version: &str,
+    kind: &str,
+    name: &str,
+    namespace: Option<&str>,
+) -> String {
+    let plural = kind_to_plural(kind);
+    let api_path = if api_version.contains('/') {
+        format!("apis/{api_version}")
+    } else {
+        format!("api/{api_version}")
+    };
+    match namespace {
+        Some(ns) => format!("/{api_path}/namespaces/{ns}/{plural}/{name}"),
+        None => format!("/{api_path}/{plural}/{name}"),
+    }
+}
+
+/// Build the list path for a kind (optionally namespaced).
+pub fn build_list_url(api_version: &str, kind: &str, namespace: Option<&str>) -> String {
+    let plural = kind_to_plural(kind);
+    let api_path = if api_version.contains('/') {
+        format!("apis/{api_version}")
+    } else {
+        format!("api/{api_version}")
+    };
+    match namespace {
+        Some(ns) => format!("/{api_path}/namespaces/{ns}/{plural}"),
+        None => format!("/{api_path}/{plural}"),
+    }
+}
+
+// ─── Cluster CRD ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Cluster {
+    pub id: Uuid,
+    pub name: String,
+    /// Kubernetes API server URL (e.g. https://kubernetes.default.svc).
     pub server: String,
+    /// Bearer-token / kubeconfig credential reference (keychain key — never
+    /// inlined).
+    pub credential_ref: Option<String>,
+    /// Free-form labels for selector targeting.
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
+    #[serde(default)]
+    pub annotations: HashMap<String, String>,
+    /// Project that owns this cluster (empty = global).
+    pub project: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-impl ClusterGateway {
-    /// Connect using the default kubeconfig / in-cluster service account.
-    pub async fn try_connect(server: &str) -> Result<Self, DeployError> {
-        let client = Client::try_default()
-            .await
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-        info!(%server, "Connected to Kubernetes cluster");
-        Ok(Self { client: Some(client), server: server.to_string() })
-    }
-
-    /// Mock gateway — all mutating operations are no-ops, reads return empty.
-    pub fn mock(server: &str) -> Self {
-        Self { client: None, server: server.to_string() }
-    }
-
-    pub fn is_connected(&self) -> bool {
-        self.client.is_some()
-    }
-
-    /// Server-Side Apply a manifest.  Returns the applied object as JSON.
-    pub async fn apply_ssa(
-        &self,
-        manifest: &mut Manifest,
-        app_name: &str,
-        dry_run: bool,
-    ) -> Result<Value, DeployError> {
-        // Inject tracking labels before apply
-        crate::sync::inject_tracking(&mut manifest.raw, app_name);
-
-        if dry_run || self.client.is_none() {
-            debug!(kind = %manifest.kind, name = %manifest.name, "dry-run / mock apply");
-            return Ok(manifest.raw.clone());
-        }
-
-        // Real SSA via kube Client — build URL and use raw HTTP PATCH
-        let client = self.client.as_ref().unwrap();
-        let url = self.build_resource_url(
-            &manifest.api_version,
-            &manifest.kind,
-            &manifest.name,
-            manifest.namespace.as_deref(),
-        );
-        let query = format!("{url}?fieldManager={CAVE_MANAGER}&force=true");
-
-        let body = serde_json::to_vec(&manifest.raw)
-            .map_err(|e| DeployError::ManifestParse(e.to_string()))?;
-
-        let req = http::Request::builder()
-            .method("PATCH")
-            .uri(&query)
-            .header("Content-Type", "application/apply-patch+yaml")
-            .body(body)
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-
-        let result: Value = client
-            .request(req)
-            .await
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-
-        info!(kind = %manifest.kind, name = %manifest.name, "SSA apply succeeded");
-        Ok(result)
-    }
-
-    /// Get the live state of a resource. Returns `None` if not found.
-    pub async fn get_live(
-        &self,
-        api_version: &str,
-        kind: &str,
-        name: &str,
-        namespace: Option<&str>,
-    ) -> Result<Option<Value>, DeployError> {
-        let Some(client) = &self.client else {
-            return Ok(None);
-        };
-        let url = self.build_resource_url(api_version, kind, name, namespace);
-        let req = http::Request::builder()
-            .method("GET")
-            .uri(&url)
-            .body(vec![])
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-
-        match client.request::<Value>(req).await {
-            Ok(v) => Ok(Some(v)),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("404") || msg.contains("NotFound") {
-                    Ok(None)
-                } else {
-                    Err(DeployError::Kubernetes(msg))
-                }
-            }
-        }
-    }
-
-    /// Delete a resource (prune).
-    pub async fn delete(
-        &self,
-        api_version: &str,
-        kind: &str,
-        name: &str,
-        namespace: Option<&str>,
-    ) -> Result<(), DeployError> {
-        let Some(client) = &self.client else {
-            return Ok(());
-        };
-        let url = self.build_resource_url(api_version, kind, name, namespace);
-        let req = http::Request::builder()
-            .method("DELETE")
-            .uri(&url)
-            .body(vec![])
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-        client
-            .request::<Value>(req)
-            .await
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-        info!(kind, name, "Resource pruned");
-        Ok(())
-    }
-
-    /// List all resources of a given kind managed by cave-deploy (label selector).
-    pub async fn list_managed(
-        &self,
-        api_version: &str,
-        kind: &str,
-        namespace: Option<&str>,
-        app_name: &str,
-    ) -> Result<Vec<Value>, DeployError> {
-        let Some(client) = &self.client else {
-            return Ok(vec![]);
-        };
-        let base = self.build_list_url(api_version, kind, namespace);
-        let url = format!(
-            "{base}?labelSelector=argocd.argoproj.io%2Fapp-name%3D{app_name}"
-        );
-        let req = http::Request::builder()
-            .method("GET")
-            .uri(&url)
-            .body(vec![])
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-        let list: Value = client
-            .request(req)
-            .await
-            .map_err(|e| DeployError::Kubernetes(e.to_string()))?;
-        let items = list["items"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        Ok(items)
-    }
-
-    // ─── URL builders ─────────────────────────────────────────────────────────
-
-    fn build_resource_url(
-        &self,
-        api_version: &str,
-        kind: &str,
-        name: &str,
-        namespace: Option<&str>,
-    ) -> String {
-        let plural = kind_to_plural(kind);
-        let api_path = if api_version.contains('/') {
-            format!("apis/{api_version}")
-        } else {
-            format!("api/{api_version}")
-        };
-        match namespace {
-            Some(ns) => format!("/{api_path}/namespaces/{ns}/{plural}/{name}"),
-            None => format!("/{api_path}/{plural}/{name}"),
-        }
-    }
-
-    fn build_list_url(
-        &self,
-        api_version: &str,
-        kind: &str,
-        namespace: Option<&str>,
-    ) -> String {
-        let plural = kind_to_plural(kind);
-        let api_path = if api_version.contains('/') {
-            format!("apis/{api_version}")
-        } else {
-            format!("api/{api_version}")
-        };
-        match namespace {
-            Some(ns) => format!("/{api_path}/namespaces/{ns}/{plural}"),
-            None => format!("/{api_path}/{plural}"),
-        }
+impl Cluster {
+    pub fn matches_labels(&self, selector: &HashMap<String, String>) -> bool {
+        selector.iter().all(|(k, v)| self.labels.get(k) == Some(v))
     }
 }
+
+/// Tracking label key used by cave-deploy. Mirrors ArgoCD's well-known key so
+/// that imports of an existing fleet do not need to be re-stamped.
+pub const TRACKING_LABEL: &str = "argocd.argoproj.io/instance";
 
 #[cfg(test)]
 mod tests {
@@ -258,25 +122,50 @@ mod tests {
         assert_eq!(kind_to_plural("Deployment"), "deployments");
         assert_eq!(kind_to_plural("Service"), "services");
         assert_eq!(kind_to_plural("ConfigMap"), "configmaps");
+        assert_eq!(kind_to_plural("Ingress"), "ingresses");
     }
 
     #[test]
     fn test_kind_to_plural_unknown_appends_s() {
         assert_eq!(kind_to_plural("FooBar"), "foobars");
+        assert_eq!(kind_to_plural("Things"), "things"); // already plural
     }
 
     #[test]
     fn test_build_resource_url_namespaced() {
-        let gw = ClusterGateway::mock("https://k8s.example.com");
-        let url = gw.build_resource_url("apps/v1", "Deployment", "myapp", Some("default"));
+        let url = build_resource_url("apps/v1", "Deployment", "myapp", Some("default"));
         assert_eq!(url, "/apis/apps/v1/namespaces/default/deployments/myapp");
     }
 
     #[test]
     fn test_build_resource_url_cluster_scoped() {
-        let gw = ClusterGateway::mock("https://k8s.example.com");
-        let url =
-            gw.build_resource_url("v1", "Namespace", "kube-system", None);
+        let url = build_resource_url("v1", "Namespace", "kube-system", None);
         assert_eq!(url, "/api/v1/namespaces/kube-system");
+    }
+
+    #[test]
+    fn list_url_namespaced() {
+        let url = build_list_url("v1", "ConfigMap", Some("kube-system"));
+        assert_eq!(url, "/api/v1/namespaces/kube-system/configmaps");
+    }
+
+    #[test]
+    fn cluster_matches_labels() {
+        let now = Utc::now();
+        let cluster = Cluster {
+            id: Uuid::new_v4(),
+            name: "prod".into(),
+            server: "https://k.example".into(),
+            credential_ref: None,
+            labels: [("env".to_string(), "prod".to_string())].into(),
+            annotations: Default::default(),
+            project: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let selector = [("env".to_string(), "prod".to_string())].into();
+        assert!(cluster.matches_labels(&selector));
+        let mismatch = [("env".to_string(), "staging".to_string())].into();
+        assert!(!cluster.matches_labels(&mismatch));
     }
 }

@@ -522,6 +522,83 @@ pub enum SSOProvider {
     Okta,
 }
 
+// ─── Rendered manifest ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Manifest {
+    pub api_version: String,
+    pub kind: String,
+    pub name: String,
+    pub namespace: Option<String>,
+    pub raw: serde_json::Value,
+}
+
+impl Manifest {
+    pub fn from_value(raw: serde_json::Value) -> Option<Self> {
+        let api_version = raw.get("apiVersion")?.as_str()?.to_string();
+        let kind = raw.get("kind")?.as_str()?.to_string();
+        let meta = raw.get("metadata")?;
+        let name = meta.get("name")?.as_str()?.to_string();
+        let namespace = meta.get("namespace").and_then(|v| v.as_str()).map(String::from);
+        Some(Manifest { api_version, kind, name, namespace, raw })
+    }
+}
+
+// ─── Progressive delivery (rollouts) ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum RolloutStrategy {
+    Canary,
+    BlueGreen,
+    Rolling,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum RolloutStatus {
+    Progressing,
+    Paused,
+    Promoting,
+    Completed,
+    Aborting,
+    Aborted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RolloutStep {
+    pub step_index: usize,
+    pub weight: u8,
+    pub pause_duration_secs: Option<u32>,
+    pub analysis: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RolloutStepRequest {
+    pub weight: u8,
+    pub pause_duration_secs: Option<u32>,
+    pub analysis: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rollout {
+    pub id: Uuid,
+    pub application_id: Uuid,
+    pub strategy: RolloutStrategy,
+    pub status: RolloutStatus,
+    pub current_step: usize,
+    pub steps: Vec<RolloutStep>,
+    pub stable_revision: String,
+    pub canary_revision: String,
+    pub traffic_weight: u8,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub error: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

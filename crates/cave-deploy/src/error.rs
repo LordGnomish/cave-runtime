@@ -2,7 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Error types for cave-deploy.
 
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -18,9 +22,6 @@ pub enum DeployError {
 
     #[error("Kubernetes error: {0}")]
     Kubernetes(String),
-
-    #[error("Database error: {0}")]
-    Database(String),
 
     #[error("Manifest parse error: {0}")]
     ManifestParse(String),
@@ -68,18 +69,6 @@ impl From<reqwest::Error> for DeployError {
     }
 }
 
-impl From<tokio_postgres::Error> for DeployError {
-    fn from(e: tokio_postgres::Error) -> Self {
-        DeployError::Database(e.to_string())
-    }
-}
-
-impl From<deadpool_postgres::PoolError> for DeployError {
-    fn from(e: deadpool_postgres::PoolError) -> Self {
-        DeployError::Database(e.to_string())
-    }
-}
-
 impl IntoResponse for DeployError {
     fn into_response(self) -> Response {
         let (status, msg) = match &self {
@@ -93,5 +82,29 @@ impl IntoResponse for DeployError {
             _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
         (status, Json(serde_json::json!({ "error": msg }))).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn variants_render_distinct_status() {
+        let not_found = DeployError::NotFound("app1".into()).into_response();
+        assert_eq!(not_found.status(), StatusCode::NOT_FOUND);
+        let conflict = DeployError::AlreadyExists("dup".into()).into_response();
+        assert_eq!(conflict.status(), StatusCode::CONFLICT);
+        let forbidden = DeployError::Forbidden("nope".into()).into_response();
+        assert_eq!(forbidden.status(), StatusCode::FORBIDDEN);
+        let invalid = DeployError::Invalid("bad".into()).into_response();
+        assert_eq!(invalid.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn from_json_error_yields_manifest_parse() {
+        let bad = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
+        let err: DeployError = bad.into();
+        assert!(matches!(err, DeployError::ManifestParse(_)));
     }
 }

@@ -566,9 +566,96 @@ enum DashboardCmd {
 
 #[derive(Subcommand)]
 enum DeployCmd {
+    /// Application CRUD — list / get / diff / history / refresh / delete (ArgoCD parity).
+    App {
+        #[command(subcommand)]
+        cmd: DeployAppCmd,
+    },
+    /// Trigger a sync operation for an application.
+    Sync {
+        /// Application name.
+        name: String,
+        /// Optional target revision (commit SHA, tag, branch).
+        #[arg(long)]
+        revision: Option<String>,
+        /// Render the plan without applying.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+        /// Delete resources that are no longer in git.
+        #[arg(long, default_value_t = false)]
+        prune: bool,
+        /// Override conflicts on apply.
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
+    /// Roll an application back to a previous revision-history entry.
+    Rollback {
+        /// Application name.
+        name: String,
+        /// Revision-history id (see `cavectl deploy app history <name>`).
+        #[arg(long)]
+        history_id: u64,
+        /// Delete pruned resources after rollback.
+        #[arg(long, default_value_t = false)]
+        prune: bool,
+        /// Render the plan without applying.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
+    /// Module health probe.
+    Health,
+    /// AppProject management — list / get / delete.
+    Project {
+        #[command(subcommand)]
+        cmd: DeployProjectCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeployAppCmd {
+    /// List all applications.
     List,
-    Get,
-    Rollback,
+    /// Get a single application by name.
+    Get {
+        /// Application name.
+        name: String,
+    },
+    /// Inspect a single application's pending diff.
+    Diff {
+        /// Application name.
+        name: String,
+    },
+    /// Inspect the revision history of an application.
+    History {
+        /// Application name.
+        name: String,
+    },
+    /// Trigger a refresh (re-pull manifests + recompute drift).
+    Refresh {
+        /// Application name.
+        name: String,
+    },
+    /// Delete an application.
+    Delete {
+        /// Application name.
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeployProjectCmd {
+    /// List all AppProjects.
+    List,
+    /// Get a single AppProject by name.
+    Get {
+        /// Project name.
+        name: String,
+    },
+    /// Delete an AppProject.
+    Delete {
+        /// Project name.
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -612,18 +699,6 @@ enum LlmGwCmd {
     Routes,
     Usage,
     Limits,
-    /// List registered providers and their declared models
-    Providers,
-    /// Aggregate health probe across every registered provider
-    Health,
-    /// Capability-router ranking against the seed catalogue
-    Capabilities,
-    /// Cost ledger snapshot (per consumer)
-    Cost,
-    /// Response cache stats
-    Cache,
-    /// Trigger a cave-llm-tracker bench run via the gateway
-    Bench,
 }
 
 #[derive(Subcommand)]
@@ -2535,7 +2610,7 @@ enum ScaffoldCmd {
 
 #[derive(Subcommand)]
 enum SignCmd {
-    /// Sign an artifact (blob, file, or OCI ref).
+    /// Sign an artifact
     Sign {
         /// Artifact path or reference
         #[arg(long)]
@@ -2544,52 +2619,14 @@ enum SignCmd {
         #[arg(long)]
         key_id: Option<String>,
     },
-    /// Verify an artifact signature.
+    /// Verify an artifact signature
     Verify {
         /// Artifact path or reference
         #[arg(long)]
         artifact: String,
-        /// Expected signer identity (glob, matched against the cert SAN)
+        /// Expected signer identity
         #[arg(long)]
         identity: Option<String>,
-        /// Cosign bundle JSON (passed inline; future: --bundle-file)
-        #[arg(long, default_value = "")]
-        bundle: String,
-    },
-    /// Attach an in-toto / SLSA / VEX attestation to an artifact.
-    Attest {
-        /// Subject artifact name (e.g. ghcr.io/cave/runtime)
-        #[arg(long)]
-        subject: String,
-        /// sha256 hex digest of the subject (no `sha256:` prefix)
-        #[arg(long)]
-        digest: String,
-        /// Predicate type URI (default: SLSA Provenance v1)
-        #[arg(long, default_value = "https://slsa.dev/provenance/v1")]
-        predicate_type: String,
-        /// Predicate JSON body
-        #[arg(long, default_value = "{}")]
-        predicate: String,
-    },
-    /// CRUD the verification policy (cert-identity / cert-issuer / rekor rules).
-    Policy {
-        /// `get` (default) or `set`
-        #[arg(long, default_value = "get")]
-        action: String,
-        /// Policy JSON body (used by `set`)
-        #[arg(long, default_value = "")]
-        body: String,
-    },
-    /// Fulcio CA status — base URL + reachability.
-    Fulcio,
-    /// Rekor transparency log query: tree state, by-index, or by-digest.
-    Rekor {
-        /// log index (uint)
-        #[arg(long)]
-        index: Option<u64>,
-        /// `sha256:<hex>` digest
-        #[arg(long)]
-        digest: Option<String>,
     },
 }
 
@@ -4098,54 +4135,12 @@ source_root = "src"
             SignCmd::Sign { artifact, key_id } => {
                 c.post("/api/sign/sign", json!({ "artifact": artifact, "key_id": key_id })).await
             }
-            SignCmd::Verify { artifact, identity, bundle } => {
+            SignCmd::Verify { artifact, identity } => {
                 c.post(
                     "/api/sign/verify",
-                    json!({
-                        "artifact": artifact,
-                        "identity": identity,
-                        "bundle_json": bundle,
-                    }),
+                    json!({ "artifact": artifact, "identity": identity }),
                 )
                 .await
-            }
-            SignCmd::Attest { subject, digest, predicate_type, predicate } => {
-                let predicate_value: serde_json::Value =
-                    serde_json::from_str(&predicate).unwrap_or(json!({}));
-                c.post(
-                    "/api/sign/attest",
-                    json!({
-                        "subject_name": subject,
-                        "subject_digest": digest,
-                        "predicate_type": predicate_type,
-                        "predicate": predicate_value,
-                    }),
-                )
-                .await
-            }
-            SignCmd::Policy { action, body } => {
-                if action == "set" {
-                    let parsed: serde_json::Value =
-                        serde_json::from_str(&body).unwrap_or(json!({}));
-                    c.post("/api/sign/policy", parsed).await
-                } else {
-                    c.get("/api/sign/policy").await
-                }
-            }
-            SignCmd::Fulcio => c.get("/api/sign/fulcio").await,
-            SignCmd::Rekor { index, digest } => {
-                let mut url = "/api/sign/rekor".to_string();
-                let mut sep = '?';
-                if let Some(i) = index {
-                    url.push(sep);
-                    url.push_str(&format!("log_index={}", i));
-                    sep = '&';
-                }
-                if let Some(d) = digest {
-                    url.push(sep);
-                    url.push_str(&format!("digest={}", d));
-                }
-                c.get(&url).await
             }
         },
 
@@ -4657,9 +4652,65 @@ source_root = "src"
             DashboardCmd::Import => c.get("/api/dashboard/import").await,
         },
         Commands::Deploy { cmd } => match cmd {
-            DeployCmd::List => c.get("/api/deploy/list").await,
-            DeployCmd::Get => c.get("/api/deploy/get").await,
-            DeployCmd::Rollback => c.get("/api/deploy/rollback").await,
+            DeployCmd::App { cmd } => match cmd {
+                DeployAppCmd::List => c.get("/api/deploy/apps").await,
+                DeployAppCmd::Get { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}")).await
+                }
+                DeployAppCmd::Diff { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}/diff")).await
+                }
+                DeployAppCmd::History { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}/history")).await
+                }
+                DeployAppCmd::Refresh { name } => {
+                    c.post(&format!("/api/deploy/apps/{name}/refresh"), json!({}))
+                        .await
+                }
+                DeployAppCmd::Delete { name } => {
+                    c.delete(&format!("/api/deploy/apps/{name}")).await
+                }
+            },
+            DeployCmd::Sync {
+                name,
+                revision,
+                dry_run,
+                prune,
+                force,
+            } => {
+                let mut body = json!({
+                    "dry_run": dry_run,
+                    "prune": prune,
+                    "force": force,
+                });
+                if let Some(r) = revision {
+                    body["revision"] = json!(r);
+                }
+                c.post(&format!("/api/deploy/apps/{name}/sync"), body).await
+            }
+            DeployCmd::Rollback {
+                name,
+                history_id,
+                prune,
+                dry_run,
+            } => {
+                let body = json!({
+                    "history_id": history_id,
+                    "prune": prune,
+                    "dry_run": dry_run,
+                });
+                c.post(&format!("/api/deploy/apps/{name}/rollback"), body).await
+            }
+            DeployCmd::Health => c.get("/api/deploy/health").await,
+            DeployCmd::Project { cmd } => match cmd {
+                DeployProjectCmd::List => c.get("/api/deploy/projects").await,
+                DeployProjectCmd::Get { name } => {
+                    c.get(&format!("/api/deploy/projects/{name}")).await
+                }
+                DeployProjectCmd::Delete { name } => {
+                    c.delete(&format!("/api/deploy/projects/{name}")).await
+                }
+            },
         },
         Commands::Dns { cmd } => match cmd {
             DnsCmd::Zones => c.get("/api/dns/zones").await,
@@ -4689,12 +4740,6 @@ source_root = "src"
             LlmGwCmd::Routes => c.get("/api/llm-gateway/routes").await,
             LlmGwCmd::Usage => c.get("/api/llm-gateway/usage").await,
             LlmGwCmd::Limits => c.get("/api/llm-gateway/limits").await,
-            LlmGwCmd::Providers => c.get("/api/llm-gateway/providers").await,
-            LlmGwCmd::Health => c.get("/api/llm-gateway/health").await,
-            LlmGwCmd::Capabilities => c.get("/api/llm-gateway/capabilities").await,
-            LlmGwCmd::Cost => c.get("/api/llm-gateway/cost").await,
-            LlmGwCmd::Cache => c.get("/api/llm-gateway/cache/stats").await,
-            LlmGwCmd::Bench => c.post("/api/llm-gateway/bench", json!({})).await,
         },
         Commands::Logs { cmd } => match cmd {
             LogsCmd::Streams => c.get("/api/logs/streams").await,
