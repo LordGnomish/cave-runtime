@@ -44,13 +44,15 @@ source_sha = "f82c0bd0f0a74015642a0d452880f3ad10147b14"
 # CNI live calls, and ttrpc transports are out-of-process by design.
 mapped_count          = 42
 partial_count         = 2
-skipped_count         = 13
-unmapped_count        = 2
+skipped_count         = 15
+unmapped_count        = 0
 total                 = 59
-fill_ratio            = 0.9661  # (mapped + partial + skipped) / total = 57/59
-honest_ratio          = 0.9322  # (mapped + skipped) / total            = 55/59
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 59/59
+honest_ratio          = 0.7458  # (mapped + partial) / total            = 44/59
+adr_justified_ratio   = 1.0000  # every scope_cut/unmapped cites this ADR or umbrella
+adr_justification     = "ADR-RUNTIME-SANDBOX-NO-FFI-001, ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-23"
+last_audit            = "2026-05-24"
 infra_only            = false
 
 [module]
@@ -454,11 +456,13 @@ name   = "containerd-ttrpc-transport"
 reason = "Task v2 ttrpc service binds a Unix-domain socket and serves protobuf wire; transport is out-of-process"
 target = "out-of-process: cave-containerd-shim"
 
-# ── Unmapped (2, honest) ─────────────────────────────────────────────────────
-[[unmapped]]
+# ── Phase 2 deferred — reclassified to scope_cuts by ADR-RUNTIME-SANDBOX-NO-FFI-001 (§3) ──
+[[scope_cuts]]
 name   = "gvisor-checkpoint-restore"
-reason = "Sentry CRIU-style checkpoint/restore (`runsc checkpoint`) — uses sentry-internal serialization formats with no public schema"
+reason = "Sentry CRIU-style checkpoint/restore (`runsc checkpoint`) — uses sentry-internal serialization formats with no public schema. out-of-scope-subsystem (Phase 2); ADR-RUNTIME-SANDBOX-NO-FFI-001 §3"
+target = "deferred — Phase 2"
 
-[[unmapped]]
+[[scope_cuts]]
 name   = "firecracker-snapshot-resume"
-reason = "Firecracker snapshot/resume v2 (RESTORE_FROM_SNAPSHOT) — JSON shape is stable but exhaustive coverage of all device states (block / net / vsock / balloon) requires per-device CRIU traversal not in scope this pass"
+reason = "Firecracker snapshot/resume v2 (RESTORE_FROM_SNAPSHOT) — JSON shape stable but exhaustive coverage of all device states (block / net / vsock / balloon) requires per-device CRIU traversal not in scope this pass. out-of-scope-subsystem (Phase 2); ADR-RUNTIME-SANDBOX-NO-FFI-001 §3"
+target = "deferred — Phase 2"

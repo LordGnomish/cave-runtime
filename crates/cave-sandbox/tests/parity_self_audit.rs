@@ -59,8 +59,8 @@ fn gate_2_source_sha_pinned_three_upstreams() {
 fn gate_3_last_audit_today() {
     let m = read_manifest();
     assert!(
-        has_kv(&m, "last_audit", "\"2026-05-23\""),
-        "last_audit must be 2026-05-23"
+        has_kv(&m, "last_audit", "\"2026-05-24\""),
+        "last_audit must be 2026-05-24 (re-stamped by ADR-RUNTIME-SANDBOX-NO-FFI-001)"
     );
 }
 
