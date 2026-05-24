@@ -16,7 +16,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-05-24";
 const FLOOR_FILL_RATIO: f64 = 0.45;
 const PINNED_VERSION: &str = "knative-v1.22.0";
 

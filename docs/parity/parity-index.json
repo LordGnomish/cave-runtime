@@ -912,9 +912,9 @@
     "cave-knative": {
       "cave_src_loc": 1167,
       "honest_ratio": 1.0,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
-      "mapped_count": 26,
+      "mapped_count": 30,
       "note": null,
       "parity_ratio": 1.0,
       "parity_ratio_source": "manifest",
@@ -922,7 +922,7 @@
       "skipped_count": 4,
       "stubs": null,
       "tier": "C",
-      "total_count": 30,
+      "total_count": 34,
       "unmapped_count": 0,
       "upstream": "knative/serving",
       "upstream_version": "v1.12.0"

@@ -45,13 +45,24 @@ source_sha  = "knative-v1.22.0"
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
 honest_ratio        = 1.0
-last_audit          = "2026-05-19"
+last_audit          = "2026-05-24"
 infra_only          = false
-mapped_count        = 26
+mapped_count        = 30
 partial_count       = 0
 skipped_count       = 4
 unmapped_count      = 0
-total               = 30
+total               = 34
+
+# 2026-05-24 Argo Events module extension — claude/cave-knative-argo-events-2026-05-24:
+#   * cave-knative now also covers argoproj/argo-events v1.9.10
+#     (source_sha 3de38ac2501f80427e052a2c0d174366a9c81c8b — deref of tag
+#     071d4125d33ef2a696addf3747e1af431a670f98) as src/argo_events.rs.
+#   * +4 mapped subsystems: argo-events-eventsource-crd /
+#     argo-events-sensor-crd / argo-events-trigger-templates /
+#     argo-events-eventbus-crd.
+#   * +12 lib tests; module-only extension since [parity] already at 1.0.
+#   * Total: 30m + 0p + 4s + 0u / 34 — fill 1.0 preserved.
+
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
 #   * Added 7 new mapped subsystems (PingSource / ApiServerSource /
@@ -342,6 +353,28 @@ upstream = "pkg/reconciler/channel/in_memory"
 note = "IMC dispatcher — per-subscriber queue + retry with linear/exponential backoff + dead-letter accumulator + addressable URI. Wave-2 close-out 2026-05-19 via src/in_memory_channel.rs."
 
 # ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
+
+# ─── Argo Events module extension (2026-05-24) — argoproj/argo-events v1.9.10 ──
+
+[[mapped]]
+name = "argo-events-eventsource-crd"
+upstream = "argoproj/argo-events pkg/apis/eventsource/v1alpha1/types.go"
+note = "EventSource CRD with 7 source families: webhook / kafka / github / generic / k8s-resource / pulsar / sqs; src/argo_events.rs::EventSourceSpec."
+
+[[mapped]]
+name = "argo-events-sensor-crd"
+upstream = "argoproj/argo-events pkg/apis/sensor/v1alpha1/types.go"
+note = "Sensor + EventDependency + Filters (TimeFilter + ContextFilter + DataFilter with JSON pointer + comparator); matches_filters + evaluate_sensor reducers; src/argo_events.rs."
+
+[[mapped]]
+name = "argo-events-trigger-templates"
+upstream = "argoproj/argo-events pkg/apis/sensor/v1alpha1/triggers.go"
+note = "6 TriggerTemplate variants: K8s / Http / ArgoWorkflow / Kafka / Slack / Pulsar + TriggerRetry (steps + duration + factor); src/argo_events.rs."
+
+[[mapped]]
+name = "argo-events-eventbus-crd"
+upstream = "argoproj/argo-events pkg/apis/eventbus/v1alpha1/types.go"
+note = "EventBus CRD with JetStream (version + replicas) + Kafka (brokers + topic prefix) backends; Event envelope (CloudEvents-compatible); src/argo_events.rs."
 
 [[skipped]]
 name = "queue-proxy"
