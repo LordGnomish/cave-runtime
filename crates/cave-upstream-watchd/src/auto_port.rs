@@ -598,6 +598,19 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+    /// `scan_honours_kill_switch_env_var` mutates the process-wide
+    /// CAVE_AUTOPORT_DISABLE env var. The dispatcher reads it inside
+    /// scan_and_dispatch / verify_completed, so any concurrent test that
+    /// calls those methods can observe the pollution. Every test in this
+    /// module takes this lock for its whole body to serialise.
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        use std::sync::{Mutex, OnceLock};
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+    }
+
     fn ts(offset_min: i64) -> DateTime<Utc> {
         Utc::now() - ChronoDuration::minutes(60) + ChronoDuration::minutes(offset_min)
     }
@@ -760,6 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn scan_dispatches_one_per_event_and_is_idempotent() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x"), sample_event("b", "cave-y")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
@@ -779,6 +793,7 @@ mod tests {
 
     #[tokio::test]
     async fn scan_honours_kill_switch_env_var() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
@@ -800,6 +815,7 @@ mod tests {
 
     #[tokio::test]
     async fn scan_enforces_max_concurrent_rate_limit() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![
             sample_event("a", "cave-1"),
@@ -831,6 +847,7 @@ mod tests {
 
     #[tokio::test]
     async fn scan_respects_cooldown_after_charter_fail() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
@@ -859,6 +876,7 @@ mod tests {
 
     #[tokio::test]
     async fn verify_flips_to_merged_when_charter_passes() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
@@ -883,6 +901,7 @@ mod tests {
 
     #[tokio::test]
     async fn verify_flips_to_backend_fail_on_task_failure() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
@@ -906,6 +925,7 @@ mod tests {
 
     #[tokio::test]
     async fn verify_keeps_running_status_when_task_still_pending() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new("scripted", vec![TaskStatus::Running]));
@@ -925,6 +945,7 @@ mod tests {
 
     #[tokio::test]
     async fn state_survives_boot_round_trip() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
@@ -946,6 +967,7 @@ mod tests {
 
     #[tokio::test]
     async fn audit_log_records_dispatched_and_merged_actions() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
@@ -971,6 +993,7 @@ mod tests {
 
     #[tokio::test]
     async fn latest_for_module_returns_most_recent_record() {
+        let _g = env_lock();
         let dir = tempfile::TempDir::new().unwrap();
         let e1 = sample_event("a", "cave-x");
         let e2 = sample_event("b", "cave-x");
