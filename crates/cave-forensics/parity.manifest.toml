@@ -1,124 +1,346 @@
 # parity.manifest.toml — cave-forensics
-# Function-based name (ADR-147): "forensics" describes the role
-# (runtime forensic evidence + chain-of-custody + case management),
-# not the upstream tool. Per ADR-090 the runtime stack is
-# Tetragon (syscall) + Hubble (network) + K8s audit + Loki (app),
-# all funneled into WORM storage. Cave-forensics is the consumer:
-# it owns case state, evidence cataloguing, and severity triage.
+# Charter v2 deep-port close 2026-05-23.
 #
-# Primary upstream: cilium/tetragon  https://github.com/cilium/tetragon
-# Secondary: cilium/hubble (flow correlation)  https://github.com/cilium/hubble
+# Upstream: cilium/tetragon  https://github.com/cilium/tetragon  pinned v1.7.0
+# License: Apache-2.0  (compatible with cave-runtime AGPL-3.0-or-later)
+#
+# cave-forensics implements the Tetragon TracingPolicy data model + kernel
+# event taxonomy + policy filter (matchPIDs/Namespaces/Capabilities/
+# Binaries/Args/Actions) + an enforcement state machine, plus a JSON/gRPC
+# event exporter and a chain-of-custody case-management layer on top.
+#
+# Per ADR-090 the cave-runtime runtime stack is Tetragon (syscall) +
+# Hubble (network) + K8s audit + Loki (app), all funneled into WORM
+# storage. cave-forensics is the consumer that owns case state, evidence
+# cataloguing, and severity triage.
 
 [upstream]
-org     = "cilium"
-repo    = "tetragon"
-version = "v1.2.0"
-name    = "Tetragon"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/cilium/tetragon"
+org           = "cilium"
+repo          = "tetragon"
+version       = "v1.7.0"
+name          = "Tetragon"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/cilium/tetragon"
+source_sha    = "1de2ed8ebea18e56257dc59597aa13bf8f0e471e"
+
+[module]
+name          = "cave-forensics"
+description   = "Tetragon v1.7.0 deep-port — TracingPolicy + kernel hooks + filter + enforcer + evidence chain-of-custody"
+source_root   = "src"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
-[module]
-name        = "cave-forensics"
-description = "Runtime forensics — Tetragon-compatible evidence model with case + chain-of-custody management"
-source_root = "src"
+fill_ratio            = 0.9545
+honest_ratio          = 0.6818
+mapped_count          = 30
+partial_count         = 0
+skipped_count         = 12
+unmapped_count        = 2
+total                 = 44
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-23"
+infra_only            = false
 
-# ── File mappings ────────────────────────────────────────────────────────────
+# ─── MAPPED subsystems (30) ─────────────────────────────────────────────────
+
+[[mapped]]
+name = "tracing_policy_crd"
+upstream = "pkg/tracingpolicy/types.go + pkg/k8s/apis/cilium.io/v1alpha1/tracing_policy_types.go"
+local_files = ["src/tracing_policy.rs"]
+note = "TracingPolicy + TracingPolicyNamespaced kind + spec parser + validate()."
+
+[[mapped]]
+name = "tracing_policy_kprobe_spec"
+upstream = "pkg/k8s/apis/cilium.io/v1alpha1/types.go::KProbeSpec"
+local_files = ["src/tracing_policy.rs"]
+note = "KProbeSpec call/syscall/return_/args/selectors fields."
+
+[[mapped]]
+name = "tracing_policy_uprobe_spec"
+upstream = "pkg/sensors/tracing/genericUprobeSensor.go"
+local_files = ["src/tracing_policy.rs"]
+note = "UProbeSpec path + symbols + selectors."
+
+[[mapped]]
+name = "tracing_policy_tracepoint_spec"
+upstream = "pkg/sensors/tracing/genericTracepointSensor.go"
+local_files = ["src/tracing_policy.rs"]
+note = "TracepointSpec subsystem+event+args+selectors."
+
+[[mapped]]
+name = "tracing_policy_lsm_hook_spec"
+upstream = "pkg/sensors/tracing/genericLsmSensor.go"
+local_files = ["src/tracing_policy.rs"]
+note = "LsmHookSpec hook+args+selectors."
+
+[[mapped]]
+name = "policy_mode_enforce_monitor"
+upstream = "pkg/tracingpolicy/policy.go::Mode"
+local_files = ["src/tracing_policy.rs"]
+note = "PolicyMode::{Enforce,Monitor} + is_monitor()."
+
+[[mapped]]
+name = "pod_selector"
+upstream = "pkg/k8s/apis/cilium.io/v1alpha1/selector_types.go"
+local_files = ["src/selectors.rs"]
+note = "PodSelector match_labels + namespaces + matchExpressions (In/NotIn/Exists/DoesNotExist)."
+
+[[mapped]]
+name = "container_selector"
+upstream = "pkg/podhooks/podhooks.go"
+local_files = ["src/selectors.rs"]
+note = "ContainerSelector names + image_globs with `*`-glob matcher."
+
+[[mapped]]
+name = "namespace_selector"
+upstream = "pkg/k8s/watcher/namespace_watcher.go"
+local_files = ["src/selectors.rs"]
+note = "PodSelector.namespaces list filter."
+
+[[mapped]]
+name = "process_credentials"
+upstream = "pkg/reader/exec/proc.go + pkg/reader/caps/caps.go"
+local_files = ["src/process.rs"]
+note = "Credentials struct: uid/gid + 4 cap bitmasks + secureBits + 8-namespace inode set."
+
+[[mapped]]
+name = "process_namespaces"
+upstream = "pkg/reader/namespace/ns.go"
+local_files = ["src/process.rs"]
+note = "Namespaces: pid/net/mnt/uts/ipc/cgroup/user/time inode IDs."
+
+[[mapped]]
+name = "process_tree_reaping"
+upstream = "pkg/process/process.go"
+local_files = ["src/process.rs"]
+note = "ProcessTree insert/get/children/ancestors/reap with O(1) by-exec-id map."
+
+[[mapped]]
+name = "capability_constants"
+upstream = "include/uapi/linux/capability.h + pkg/reader/caps/caps.go"
+local_files = ["src/process.rs"]
+note = "16 cap:: bit constants matching Linux uapi."
+
+[[mapped]]
+name = "event_process_exec"
+upstream = "pkg/grpc/exec/exec.go + api/v1/tetragon/tetragon.proto::ProcessExec"
+local_files = ["src/events/process_exec.rs"]
+note = "ProcessExecEvent w/ ancestors[] + is_shell() detector."
+
+[[mapped]]
+name = "event_process_exit"
+upstream = "pkg/grpc/exec/exec.go::ProcessExit"
+local_files = ["src/events/process_exec.rs"]
+note = "ProcessExitEvent w/ status + signal + killed_by_signal()."
+
+[[mapped]]
+name = "event_file_op"
+upstream = "pkg/tracingpolicy/standardlib/file.go"
+local_files = ["src/events/file.rs"]
+note = "FileEvent {Open,Read,Write,Unlink,Rename,Chmod,Chown,Mmap,Truncate} + OpenFlags + sensitive-path heuristic."
+
+[[mapped]]
+name = "event_network"
+upstream = "pkg/tracingpolicy/standardlib/network.go"
+local_files = ["src/events/network.rs"]
+note = "NetworkEvent {Connect,Accept,Sendmsg,Recvmsg,Listen,Bind,Close} + L4 proto + IPv4/v6 + private-CIDR classifier."
+
+[[mapped]]
+name = "event_capability"
+upstream = "pkg/grpc/tracing/kprobe.go security_capable probe"
+local_files = ["src/events/capability.rs"]
+note = "CapabilityCheckEvent + dangerous-mask + capability_name() lookup."
+
+[[mapped]]
+name = "event_bpf_load"
+upstream = "pkg/sensors/tracing/genericbpf.go"
+local_files = ["src/events/bpf.rs"]
+note = "BpfLoadEvent prog_type/prog_id/insn_count/tag/license + GPL detector + privileged-type detector."
+
+[[mapped]]
+name = "event_kprobe_uprobe_meta"
+upstream = "pkg/sensors/tracing/genericKprobeSensor.go + genericUprobeSensor.go"
+local_files = ["src/events/kprobe.rs"]
+note = "Generic KprobeEvent + UprobeEvent with args[] + syscall/crypto-lib heuristics."
+
+[[mapped]]
+name = "filter_match_pids"
+upstream = "pkg/selectors/kernel_selectors.go::matchPIDs"
+local_files = ["src/filter.rs"]
+note = "MatchPid {In,NotIn,Equal,NotEqual} + is_namespace_pid + follow_forks."
+
+[[mapped]]
+name = "filter_match_namespaces"
+upstream = "pkg/selectors/kernel_selectors.go::matchNamespaces"
+local_files = ["src/filter.rs"]
+note = "MatchNamespace across 8 NamespaceKind variants with In/NotIn/Equal/NotEqual."
+
+[[mapped]]
+name = "filter_match_capabilities"
+upstream = "pkg/selectors/kernel_selectors.go::matchCapabilities"
+local_files = ["src/filter.rs"]
+note = "MatchCapability across {Effective,Permitted,Inheritable} sets + Mask/In/NotIn/Equal/NotEqual."
+
+[[mapped]]
+name = "filter_match_binaries"
+upstream = "pkg/selectors/kernel_selectors.go::matchBinaries"
+local_files = ["src/filter.rs"]
+note = "MatchBinary In/NotIn/Equal/NotEqual/Prefix/Postfix."
+
+[[mapped]]
+name = "filter_match_args"
+upstream = "pkg/selectors/kernel_selectors.go::matchArgs"
+local_files = ["src/filter.rs"]
+note = "MatchArg by index + op against kprobe/uprobe/file/network/exec arg projection."
+
+[[mapped]]
+name = "filter_match_actions"
+upstream = "pkg/selectors/kernel_selectors.go::matchActions"
+local_files = ["src/filter.rs"]
+note = "MatchAction with ActionKind {Post,Override,Sigkill,FollowFd,Signal,NoPost,UnfollowFd,GetUrl,DnsLookup,NotifyEnforcer}."
+
+[[mapped]]
+name = "enforcer_state_machine"
+upstream = "pkg/enforcer/enforcer.go + pkg/sensors/tracing/genericKprobeSensor.go::doAction*"
+local_files = ["src/enforcer.rs"]
+note = "Enforcer w/ monitor-only override + FollowFdMap (DashMap-backed) + EnforcementDecision emitter."
+
+[[mapped]]
+name = "policy_store"
+upstream = "pkg/policyfilter/policyfilter.go + pkg/sensors/manager.go"
+local_files = ["src/store.rs"]
+note = "PolicyStore install/remove/list/matching(pod) + matching_groups() entry point for observer loop."
+
+[[mapped]]
+name = "export_grpc_codec"
+upstream = "pkg/exporter/exporter.go + gRPC frame format"
+local_files = ["src/export/grpc_codec.rs"]
+note = "1-byte flag + 4-byte BE length + JSON payload encode/decode + multi-frame stream."
+
+[[mapped]]
+name = "export_json_stream"
+upstream = "pkg/encoder/json_encoder.go"
+local_files = ["src/export/json_stream.rs"]
+note = "NDJSON encode/decode + streaming NdjsonWriter."
+
+# ─── SKIPPED subsystems (scope_cut to Phase 2 or sibling crate) ─────────────
+
+[[skipped]]
+name = "ebpf_kernel_loader"
+reason = "Kernel-side eBPF C generation + libbpf-rs requires linux headers and root; out of pure-Rust OSS runtime scope."
+scope_cut_target = "cave-runtime host-preflight"
+
+[[skipped]]
+name = "ebpf_perf_buffer_reader"
+reason = "Requires libbpf-rs + privileged container; consumed by cave-runtime host agent."
+scope_cut_target = "cave-runtime host-preflight"
+
+[[skipped]]
+name = "ringbuf_consumer"
+reason = "Same as perf_buffer_reader — kernel-side BPF map consumer."
+scope_cut_target = "cave-runtime host-preflight"
+
+[[skipped]]
+name = "tetragon_grpc_server"
+reason = "tonic-based gRPC server; codec is mapped, transport is a separate crate."
+scope_cut_target = "cave-portal-api"
+
+[[skipped]]
+name = "tetragon_cli_tetra"
+reason = "Standalone Go CLI; replaced by `cavectl forensics` (mapped via src/cli.rs)."
+scope_cut_target = "cave-cli"
+
+[[skipped]]
+name = "fileexport_rate_limiter"
+reason = "Token-bucket file-export rate limiter; portal-side concern."
+scope_cut_target = "cave-portal-api"
+
+[[skipped]]
+name = "hubble_flow_correlation"
+reason = "Hubble network-flow merge; lives in cave-net (Hubble role)."
+scope_cut_target = "cave-net"
+
+[[skipped]]
+name = "loki_log_correlation"
+reason = "Loki app-log correlation; lives in cave-logs."
+scope_cut_target = "cave-logs"
+
+[[skipped]]
+name = "k8s_audit_correlation"
+reason = "K8s audit-log merge; lives in cave-k8s."
+scope_cut_target = "cave-k8s"
+
+[[skipped]]
+name = "fgs_runtime_metrics_otel"
+reason = "OTel exporter for runtime metrics; cave-metrics already covers."
+scope_cut_target = "cave-metrics"
+
+[[skipped]]
+name = "worm_storage_backend"
+reason = "WORM evidence storage (S3 object-lock); cave-artifacts owns."
+scope_cut_target = "cave-artifacts"
+
+[[skipped]]
+name = "policyfilter_cgroup_v1"
+reason = "cgroup-v1 path matcher; cave-runtime targets v2-only hosts."
+scope_cut_target = "cave-runtime"
+
+# ─── UNMAPPED (honest gaps) ────────────────────────────────────────────────
+
+[[unmapped]]
+name = "btf_relocation_resolver"
+reason = "BTF (BPF Type Format) relocation requires kernel BTF + libbpf — pure-Rust BTF reader is non-trivial and outside MVP; tracked as future cave-bpf-btf crate."
+
+[[unmapped]]
+name = "tetragon_helm_chart_install"
+reason = "Helm chart install/upgrade is operator-deployment glue; not a runtime feature, but no clean owner yet (cave-deploy handles ArgoCD, not Helm)."
+
+# ─── Legacy file/function/test/surface mappings (kept for backwards-compat) ─
 
 [[files]]
 upstream = "pkg/tracingpolicy/types.go"
-local    = "src/models.rs"
+local    = "src/tracing_policy.rs"
 
 [[files]]
 upstream = "pkg/observer/observer.go"
-local    = "src/engine.rs"
-
-[[files]]
-upstream = "pkg/api/eventchecker/severity.go"
-local    = "src/engine.rs"
+local    = "src/store.rs"
 
 [[files]]
 upstream = "pkg/exporter/exporter.go"
-local    = "src/routes.rs"
+local    = "src/export/grpc_codec.rs"
 
 [[files]]
 upstream = "pkg/encoder/json_encoder.go"
-local    = "src/models.rs"
+local    = "src/export/json_stream.rs"
 
-# ── Function mappings ────────────────────────────────────────────────────────
-
-[[functions]]
-upstream_name = "Severity#Compare"
-local_name    = "severity_rank"
-file          = "src/engine.rs"
+[[files]]
+upstream = "pkg/selectors/kernel_selectors.go"
+local    = "src/filter.rs"
 
 [[functions]]
-upstream_name = "Observer#Filter"
-local_name    = "open_cases"
-file          = "src/engine.rs"
+upstream_name = "TracingPolicy.Validate"
+local_name    = "TracingPolicy::validate"
+file          = "src/tracing_policy.rs"
 
 [[functions]]
-upstream_name = "EventChecker#Highest"
-local_name    = "highest_severity"
-file          = "src/engine.rs"
+upstream_name = "kernelSelectorEval"
+local_name    = "FilterGroup::matches"
+file          = "src/filter.rs"
 
 [[functions]]
-upstream_name = "Exporter#CountEvidence"
-local_name    = "evidence_count"
-file          = "src/engine.rs"
+upstream_name = "Enforcer.Decide"
+local_name    = "Enforcer::decide"
+file          = "src/enforcer.rs"
 
 [[functions]]
-upstream_name = "Exporter#ValidateHash"
-local_name    = "has_valid_evidence"
-file          = "src/engine.rs"
+upstream_name = "encoder.JSONEncode"
+local_name    = "encode_ndjson"
+file          = "src/export/json_stream.rs"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
-
-[[tests]]
-upstream_test = "TestSeverityOrdering"
-local_test    = "test_severity_rank_ordering"
-
-[[tests]]
-upstream_test = "TestObserverFilter"
-local_test    = "test_open_cases_filter"
-
-[[tests]]
-upstream_test = "TestEventChecker_Highest"
-local_test    = "test_highest_severity"
-
-[[tests]]
-upstream_test = "TestExporter_EvidenceCount"
-local_test    = "test_evidence_count"
-
-[[tests]]
-upstream_test = "TestExporter_ValidHash"
-local_test    = "test_has_valid_evidence_valid_hash"
-
-[[tests]]
-upstream_test = "TestExporter_NoHash"
-local_test    = "test_has_valid_evidence_no_hash"
-
-[[tests]]
-upstream_test = "TestEvidence_Serde"
-local_test    = "test_evidence_item_serde_roundtrip"
-
-[[tests]]
-upstream_test = "TestCase_Serde"
-local_test    = "test_forensic_case_serde_roundtrip"
-
-[[tests]]
-upstream_test = "TestEvidenceType_Serde"
-local_test    = "test_evidence_type_all_variants_serde"
-
-[[tests]]
-upstream_test = "TestCaseStatus_Transitions"
-local_test    = "test_case_status_transitions_serde"
-
-# ── Surface mappings ─────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "exporter.GRPCFrame"
+local_name    = "encode_event"
+file          = "src/export/grpc_codec.rs"
 
 [[surfaces]]
 kind          = "http"
@@ -132,14 +354,19 @@ local_path    = "/api/forensics/cases"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/v1/events/evidence"
-local_path    = "/api/forensics/cases/{id}/evidence"
+upstream_path = "/v1/policies"
+local_path    = "/api/forensics/policies"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "tetra"
+local_path    = "cavectl forensics"
 
 [portal_ui]
-upstream_ui  = "Tetragon (CLI)"
+upstream_ui  = "Tetragon (CLI + Grafana panels)"
 upstream_url = "https://tetragon.io/"
 status       = "scaffold"
 loc          = 75
 priority     = "P2"
-notes        = "CLI-first"
-last_audit   = "2026-05-11"
+notes        = "CLI-first; portal panel JSON shipped via src/observability.rs"
+last_audit   = "2026-05-23"
