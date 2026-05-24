@@ -476,9 +476,11 @@
       "upstream_version": "v2.14.0"
     },
     "cave-datafusion": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 1921,
       "honest_ratio": 0.4848,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 16,
       "note": "needs manifest; likely upstream: apache/arrow-datafusion",
@@ -789,9 +791,11 @@
       "upstream_version": null
     },
     "cave-iceberg": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 1986,
       "honest_ratio": 0.6667,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 16,
       "note": "needs manifest; likely upstream: apache/iceberg",
