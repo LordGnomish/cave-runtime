@@ -505,6 +505,23 @@ enum Commands {
         #[command(subcommand)]
         cmd: FluxCmd,
     },
+
+    // ── eksik-sweep 2026-05-24: SPIRE identity + CIS bench wiring ────────────
+    /// cave-identity (SPIRE) CLI parity — workload SPIFFE IDs, trust bundle, federation.
+    Identity {
+        #[command(subcommand)]
+        cmd: IdentityCmd,
+    },
+    /// cave-bench (kube-bench + kubescape) CLI parity — CIS/NSA/MITRE scans (in-process).
+    Bench {
+        #[command(subcommand)]
+        cmd: BenchCmd,
+    },
+    /// cave-falco (runtime security) CLI parity — rule pack parse + observability (in-process).
+    Falco {
+        #[command(subcommand)]
+        cmd: FalcoCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -856,6 +873,62 @@ enum FluxCmd {
     Images,
     /// Notification provider + alert CRs.
     Notifications,
+}
+
+// ── eksik-sweep 2026-05-24: SPIRE identity + CIS bench subcommands ─────────────
+
+#[derive(Subcommand)]
+enum IdentityCmd {
+    /// List registration entries (SPIRE `/api/identity/entries`).
+    Entries,
+    /// List attested agents.
+    Agents,
+    /// Fetch own trust bundle (JWKS doc).
+    Bundle,
+    /// List federation relationships.
+    Federation,
+    /// OIDC JWKS keys (for JWT-SVID verifiers).
+    OidcKeys,
+}
+
+#[derive(Subcommand)]
+enum BenchCmd {
+    /// List built-in profiles (CIS / NSA / MITRE).
+    Profiles,
+    /// List checks within a framework (cis | nsa | mitre).
+    Checks {
+        #[arg(long)]
+        framework: String,
+    },
+    /// Run a scan profile against a host (in-process).
+    Scan {
+        #[arg(long)]
+        profile: String,
+        #[arg(long)]
+        host: String,
+        /// markdown | json | sarif
+        #[arg(long, default_value = "markdown")]
+        format: String,
+    },
+    /// Print scheduled scans.
+    Schedules,
+    /// Print observability dashboards + alert rules.
+    Observability,
+}
+
+#[derive(Subcommand)]
+enum FalcoCmd {
+    /// Parse a Falco rule pack YAML and print rule/macro/list counts.
+    RulesParse {
+        #[arg(long)]
+        path: String,
+    },
+    /// List built-in rules shipped by cave-falco (none — packs loaded at runtime).
+    RulesListBuiltin,
+    /// Print observability dashboards + alert YAML.
+    Observability,
+    /// Print cave-falco upstream version.
+    Version,
 }
 #[derive(Subcommand)]
 enum CrossplaneCmd {
@@ -4879,6 +4952,48 @@ source_root = "src"
             FluxCmd::Images         => c.get("/api/flux/images").await,
             FluxCmd::Notifications  => c.get("/api/flux/notifications").await,
         },
+
+        // ── eksik-sweep 2026-05-24: SPIRE identity (HTTP) + CIS bench (in-process)
+        Commands::Identity { cmd } => match cmd {
+            IdentityCmd::Entries    => c.get("/api/identity/entries").await,
+            IdentityCmd::Agents     => c.get("/api/identity/agents").await,
+            IdentityCmd::Bundle     => c.get("/api/identity/bundle").await,
+            IdentityCmd::Federation => c.get("/api/identity/federation").await,
+            IdentityCmd::OidcKeys   => c.get("/api/identity/oidc/keys").await,
+        },
+        Commands::Bench { cmd } => {
+            use cave_bench::cli::{BenchSubcommand, dispatch as bench_dispatch};
+            use cave_bench::report::Format as BenchFormat;
+            let sub = match cmd {
+                BenchCmd::Profiles => BenchSubcommand::Profiles,
+                BenchCmd::Checks { framework } => BenchSubcommand::Checks { framework },
+                BenchCmd::Scan { profile, host, format } => {
+                    let fmt = match format.as_str() {
+                        "json" => BenchFormat::Json,
+                        "sarif" => BenchFormat::Sarif,
+                        _ => BenchFormat::Markdown,
+                    };
+                    BenchSubcommand::Scan { profile_id: profile, host, format: fmt }
+                }
+                BenchCmd::Schedules => BenchSubcommand::Schedules,
+                BenchCmd::Observability => BenchSubcommand::Observability,
+            };
+            let out = bench_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-bench: {e}"))?;
+            print!("{out}");
+            Ok(())
+        }
+        Commands::Falco { cmd } => {
+            use cave_falco::cli::{FalcoSubcommand, dispatch as falco_dispatch};
+            let sub = match cmd {
+                FalcoCmd::RulesParse { path } => FalcoSubcommand::RulesParse { path },
+                FalcoCmd::RulesListBuiltin => FalcoSubcommand::RulesListBuiltin,
+                FalcoCmd::Observability => FalcoSubcommand::Observability,
+                FalcoCmd::Version => FalcoSubcommand::Version,
+            };
+            let out = falco_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-falco: {e}"))?;
+            print!("{out}");
+            Ok(())
+        }
 
         Commands::Keda { cmd } => match cmd {
             KedaCmd::ScaledObjects => c.get("/api/keda/scaledobjects").await,

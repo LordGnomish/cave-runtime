@@ -14,7 +14,7 @@ pub const KUBESCAPE_VERSION: &str = "v4.0.8";
 pub const KUBESCAPE_SHA: &str = "d7539c2264560a8685f59e89a731d6de833258a6";
 pub const FLOOR_FILL_RATIO: f64 = 0.95;
 pub const FLOOR_HONEST_RATIO: f64 = 0.50;
-pub const TODAY: &str = "2026-05-23";
+pub const TODAY: &str = "2026-05-24";
 
 pub fn manifest_path() -> PathBuf {
     [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"].iter().collect()

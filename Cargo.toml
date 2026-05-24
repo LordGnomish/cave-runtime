@@ -152,6 +152,8 @@ members = [
     "crates/cave-bench",
     # === Sandbox runtime triumvirate (gVisor + Kata + Firecracker) ===
     "crates/cave-sandbox",
+    # === Runtime security userspace (Falco userspace surface; kernel-out-of-process) ===
+    "crates/cave-falco",
 ]
 
 [workspace.package]
