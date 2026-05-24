@@ -1,0 +1,108 @@
+# observability.toml — cave-vault (Charter v2 G6)
+#
+# Backs the Cave Portal `/dashboards/vault` panel set and cave-oncall route
+# group `vault.*`.
+
+[meta]
+crate            = "cave-vault"
+generated_for    = "Charter v2 triumvirate close 2026-05-23"
+upstream_openbao = "openbao/openbao@v2.5.4"
+upstream_eso     = "external-secrets/external-secrets@v2.5.0"
+upstream_ss      = "bitnami-labs/sealed-secrets@v0.37.0"
+
+# ─── Panels (9) ─────────────────────────────────────────────────────────────
+
+[[panels]]
+id          = "vault.requests.rate"
+title       = "Vault request rate (req/s)"
+metric      = "cave_vault_requests_total"
+kind        = "graph"
+description = "All /v1/* requests (KV, transit, PKI, auth, sys)."
+
+[[panels]]
+id          = "vault.seal.status"
+title       = "Seal status (sealed=1)"
+metric      = "cave_vault_sealed"
+kind        = "stat"
+description = "Boolean: vault is currently sealed."
+
+[[panels]]
+id          = "vault.token.renewals"
+title       = "Token renewals + revocations"
+metric      = "cave_vault_token_total{op=~\"renew|revoke\"}"
+kind        = "graph"
+description = "Token lifecycle pressure."
+
+[[panels]]
+id          = "vault.engine.kv2.ops"
+title       = "KV-v2 ops by verb"
+metric      = "cave_vault_kv2_total{op=~\"read|write|delete|destroy|undelete\"}"
+kind        = "table"
+description = "Per-verb counts."
+
+[[panels]]
+id          = "vault.transit.encryptions"
+title       = "Transit encrypt/decrypt rate"
+metric      = "cave_vault_transit_total{op=~\"encrypt|decrypt|sign|verify\"}"
+kind        = "graph"
+description = "Encryption engine throughput."
+
+[[panels]]
+id          = "vault.pki.issuance"
+title       = "PKI cert issuance"
+metric      = "cave_vault_pki_issued_total"
+kind        = "graph"
+description = "Certificates issued by role."
+
+[[panels]]
+id          = "vault.external_secrets.sync"
+title       = "ESO sync calls per ExternalSecret (p95)"
+metric      = "cave_vault_eso_sync_count"
+kind        = "heatmap"
+description = "ExternalSecret refresh activity (one bucket per refresh interval)."
+
+[[panels]]
+id          = "vault.external_secrets.failures"
+title       = "ESO sync failures"
+metric      = "cave_vault_eso_sync_failures_total{reason=~\"NotFound|ProviderUnreachable|Invalid\"}"
+kind        = "graph"
+description = "Failures by provider error class."
+
+[[panels]]
+id          = "vault.sealed_secrets.unseal"
+title       = "SealedSecret unseal outcomes"
+metric      = "cave_vault_sealed_secret_unseal_total{outcome=~\"ok|key-mismatch|envelope-corrupt\"}"
+kind        = "graph"
+description = "Unseal attempts by outcome; key-mismatch spikes indicate rotation drift."
+
+# ─── Alerts (5) ─────────────────────────────────────────────────────────────
+
+[[alerts]]
+id          = "vault.seal.unexpected"
+expr        = "cave_vault_sealed == 1"
+severity    = "critical"
+description = "Vault is sealed — secrets unreachable."
+
+[[alerts]]
+id          = "vault.eso.sync_storm"
+expr        = "rate(cave_vault_eso_sync_failures_total[5m]) > 5"
+severity    = "warning"
+description = "ESO sync failures spiking — provider endpoint or auth broken?"
+
+[[alerts]]
+id          = "vault.sealed.key_mismatch"
+expr        = "increase(cave_vault_sealed_secret_unseal_total{outcome=\"key-mismatch\"}[15m]) > 10"
+severity    = "warning"
+description = "SealedSecret key-mismatch — rotation may have outpaced kubeseal clients."
+
+[[alerts]]
+id          = "vault.pki.crl_stale"
+expr        = "cave_vault_pki_crl_age_s > 3600"
+severity    = "warning"
+description = "PKI CRL not refreshed within last hour."
+
+[[alerts]]
+id          = "vault.transit.error_rate"
+expr        = "rate(cave_vault_transit_errors_total[5m]) > 1"
+severity    = "warning"
+description = "Transit engine error rate elevated."
