@@ -31,7 +31,9 @@ source_sha  = "v2.16.1"
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9545  # mapped / (mapped + partial + unmapped) = 21/22
 honest_ratio        = 0.7500  # mapped / total = 21/28
-last_audit          = "2026-05-19"
+adr_justified_ratio = 1.0      # 6 skipped (newrelic+splunk+dynatrace vendor niches, wasm-scaler needs wasmtime (Ambient-only mandate removed it), hpa-direct→cave-controller-manager, cloudevents-source→cave-knative) + 1 partial (CEL → reuses cave-apiserver CEL engine when it lands) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 21
 partial_count       = 1
