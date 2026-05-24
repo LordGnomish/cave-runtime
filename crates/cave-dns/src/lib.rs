@@ -9,8 +9,11 @@
 //!           23 built-in plugins matching the CoreDNS plugin ecosystem.
 
 pub mod api;
+pub mod cli;
 pub mod config;
+pub mod dnssec;
 pub mod error;
+pub mod observability;
 pub mod plugins;
 pub mod protocol;
 pub mod routes;

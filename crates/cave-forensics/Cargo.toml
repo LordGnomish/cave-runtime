@@ -1,13 +1,27 @@
 [package]
 name = "cave-forensics"
-description = "Runtime forensics — consumes Tetragon eBPF data"
+description = "Runtime forensics — Tetragon v1.7.0 deep-port (TracingPolicy + kernel hooks + process credentials + policy filter + enforcer + evidence chain-of-custody)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../cave-db" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+regex = { workspace = true }
+bytes = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
