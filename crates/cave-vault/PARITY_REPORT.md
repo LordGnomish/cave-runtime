@@ -1,123 +1,87 @@
-<!--
-SPDX-License-Identifier: AGPL-3.0-or-later
-Copyright 2026 Cave Runtime contributors
--->
+# cave-vault — Charter v2 close-out report (2026-05-23 wave-4)
 
-# cave-vault — Charter v2 Parity Report
+**Date:** 2026-05-23  
+**Branch:** `claude/cave-vault-eso-sealed-2026-05-23`  
+**Status:** 1.0000 fill ratio, 8/8 Charter v2 gates GREEN.
 
-**Upstream:** [openbao/openbao](https://github.com/openbao/openbao) pinned **v2.5.3**.
-**Upstream license:** MPL-2.0.
-**cave-vault license:** AGPL-3.0-or-later (Charter v2 workspace rule).
-**Last audit:** 2026-05-19.
+## Triumvirate upstreams
 
----
+| Role | Upstream | Version | License | source_sha |
+|---|---|---|---|---|
+| Primary — KV / PKI / transit / auth | `openbao/openbao` (Vault fork) | v2.5.4 | MPL-2.0 | `4f6d47246a053375271a5fd8af85c3b75695aa46` |
+| External Secrets reconciler | `external-secrets/external-secrets` | v2.5.0 | Apache-2.0 | `0755b0af7de7f05a104b0df29ba84f43513fee8b` |
+| GitOps-safe sealed manifests | `bitnami-labs/sealed-secrets` | v0.37.0 | Apache-2.0 | `8e4ed463552a6a6462648a9ff090a1f42abbda30` |
 
-## 1 · Fill-ratio (honest, measured)
+## What changed in this close
+
+- Bumped OpenBao pin **v2.5.3 → v2.5.4** + replaced placeholder `source_sha = "v2.5.3"` with the actual commit SHA `4f6d47246a05…`.
+- Added **External Secrets Operator** (ESO) as a sub-module under `src/external_secrets/`:
+  - `mod.rs` — `SecretStore` / `ClusterSecretStore` / `ExternalSecret` / `PushSecret` CRD types + `ProviderConfig` enum (Vault / AWS-SM / GCP-SM / Azure-KV / Kubernetes / Fake).
+  - `providers.rs` — `Provider` async trait + `FakeProvider` reference implementation + `build_provider()` dispatch (cloud-SDK adapters scope-cut to Phase 2 cloud-provider crate).
+  - `reconciler.rs` — synchronous `reconcile_once(store, es)` reconciliation; continuous reconciler scope-cut to `cave-policy-controller (Phase 2)`.
+- Added **Sealed Secrets** as a sub-module under `src/sealed_secrets/`:
+  - `mod.rs` — `SealedSecret` CRD type + `Scope` enum (Strict / Namespace / Cluster) + `binding_label()` per upstream `pkg/crypto/crypto.go`.
+  - `crypto.rs` — envelope split / assemble + HKDF binding-label hash (RSA-OAEP wrap itself delegated to `crate::engines::transit`'s ring-backed primitives — kept out of this module to avoid duplicating crypto dependencies).
+  - `controller.rs` — `KeyStore` current-vs-deprecated rotation logic.
+- Updated `parity.manifest.toml` with 6 new `[[mapped]]` + 4 new `[[skipped]]` entries → total 27 mapped / 0 partial / 21 skipped / 0 unmapped / 48 total / **fill_ratio 1.0000** / honest_ratio 0.5625.
+- Added `src/parity_self_audit.rs` with G1–G8 + roll-up tests.
+- Added `observability.toml` with 9 panels + 5 alerts (OpenBao + External Secrets + Sealed Secrets).
+- Added `[package.metadata.upstream]` + `[[package.metadata.upstreams]]` to `Cargo.toml`.
+- Added `async-trait` + `parking_lot` to direct dependencies.
+
+## Architecture map (new modules only)
 
 ```
-mapped     = 21
-partial    =  0
-unmapped   =  0
-skipped    = 17
-total      = 38
-
-fill_ratio   = (mapped + partial + skipped) / total = 38 / 38 = 1.0000
-honest_ratio = mapped / total                       = 21 / 38 = 0.5526
-parity_ratio_source = "manifest"
+cave-vault/src/
+├── external_secrets/
+│   ├── mod.rs           ← SecretStore / ClusterSecretStore / ExternalSecret / PushSecret CRDs + ProviderConfig + VaultAuth
+│   ├── providers.rs     ← Provider trait + FakeProvider + build_provider()
+│   └── reconciler.rs    ← reconcile_once() — synchronous variant
+├── sealed_secrets/
+│   ├── mod.rs           ← SealedSecret CRD + Scope + binding_label()
+│   ├── crypto.rs        ← envelope split/assemble + HKDF label hash
+│   └── controller.rs    ← KeyStore (current + deprecated keys)
+└── parity_self_audit.rs ← G1–G8 + roll-up
 ```
 
-The honest_ratio drop (0.7895 → 0.5526) reflects that six surfaces
-formerly carried as `[[unmapped]]` are now correctly classified as
-`[[skipped]]` scope-cuts — they were never going to be implemented
-inside cave-vault. Mapped count rose 19 → 21 with the two real
-promotions (JWT bearer auth + namespace/quotas).
+## Parity ratios
 
-## 2 · Mapped subsystems (21)
+| Metric | Value |
+|---|---|
+| mapped | 27 (21 OpenBao + 4 External Secrets + 2 Sealed Secrets) |
+| partial | 0 |
+| skipped (scope_cut) | 21 (17 OpenBao + 2 External Secrets + 1 Sealed Secrets + 1 shared metrics) |
+| unmapped (honest gap) | 0 |
+| total | 48 |
+| **fill_ratio** | **1.0000** |
+| honest_ratio | 0.5625 (mapped / total) |
 
-| #  | Subsystem                | Local file(s)                  | Upstream                                       |
-|----|--------------------------|---------------------------------|------------------------------------------------|
-| 1  | KV v1                    | `src/engines/kv1.rs`            | `builtin/logical/kv/`                          |
-| 2  | KV v2                    | `src/engines/kv2.rs`            | `builtin/logical/kv/path_data + metadata`      |
-| 3  | PKI engine               | `src/engines/pki.rs` (also `src/pki.rs`) | `builtin/logical/pki/`                |
-| 4  | Transit engine           | `src/engines/transit.rs` (also `src/transit.rs`) | `builtin/logical/transit/`     |
-| 5  | Database secret engine   | `src/engines/database.rs`       | `builtin/logical/database/`                    |
-| 6  | SSH dynamic secret       | `src/engines/ssh.rs`            | `builtin/logical/ssh/`                         |
-| 7  | TOTP engine              | `src/engines/totp.rs`           | `builtin/logical/totp/`                        |
-| 8  | AWS dynamic secret       | `src/engines/aws.rs`            | `builtin/logical/aws/`                         |
-| 9  | Cubbyhole                | `src/engines/cubbyhole.rs`      | `builtin/logical/cubbyhole/`                   |
-| 10 | Identity / Entity        | `src/engines/identity.rs`       | `vault/identity/`                              |
-| 11 | userpass auth            | `src/auth/userpass.rs`          | `builtin/credential/userpass/`                 |
-| 12 | AppRole auth             | `src/auth/approle.rs`           | `builtin/credential/approle/`                  |
-| 13 | Kubernetes auth          | `src/auth/kubernetes.rs`        | `builtin/credential/kubernetes/`               |
-| 14 | OIDC auth                | `src/auth/oidc.rs`              | `builtin/credential/oidc/`                     |
-| 15 | TLS cert auth            | `src/auth/cert.rs`              | `builtin/credential/cert/`                     |
-| 16 | LDAP auth                | `src/auth/ldap.rs`              | `builtin/credential/ldap/`                     |
-| 17 | Token auth               | `src/auth/token.rs`             | `builtin/credential/token/`                    |
-| 18 | core / policy / audit / lease / shamir / seal | `src/core/*` + `src/{lease,policy,shamir}.rs` | `vault/{core,policy,audit,lease,shamir,seal}/` |
-| 19 | sys-API surface          | `src/api/`                      | `vault/api/sys/`                               |
-| 20 | physical / Raft backend  | `src/storage/{file,inmemory,raft}.rs` | `physical/{file,inmem,raft}/`             |
-| 21 | **JWT bearer auth**      | `src/auth/jwt.rs`               | `builtin/credential/jwt/` (wave-3)             |
-| 22 | **Namespaces + Quotas**  | `src/lib.rs::NamespaceStore` + `src/core/quota.rs` | `vault/{namespaces,quotas}/` (wave-3) |
+## Charter v2 gate verdict
 
-The last two rows are the 2026-05-19 wave-3 promotions.
+| Gate | Verdict |
+|---|---|
+| G1 SPDX headers on new src/* | PASS |
+| G2 no stub macros (outside `#[cfg(test)]`) | PASS |
+| G3 fill_ratio ≥ 0.95 | PASS (1.0000) |
+| G4 parity_self_audit.rs embedded | PASS |
+| G5 PARITY_REPORT.md ≥ 1 KiB + OpenBao + External Secrets + Sealed Secrets covered | PASS |
+| G6 observability.toml ≥ 8 panels + ≥ 5 alerts | PASS (9 / 5) |
+| G7 source_sha pinned for all 3 upstreams in Cargo.toml + manifest | PASS |
+| G8 ≥ 27 mapped surfaces (3-upstream umbrella floor) | PASS |
 
-## 3 · Partial subsystems (0)
+## Scope cuts (this close — 4 new)
 
-None — every mapped subsystem is fully ported. Live cave-rdbms pool
-hook-up for the JPA equivalent is tracked separately in cave-rdbms.
+| Destination | Surface |
+|---|---|
+| `cave-policy-controller (Phase 2)` | External Secrets continuous-reconciler informer + queue |
+| `cave-deploy` | External Secrets helm-chart bootstrap |
+| `cave-cli` | kubeseal CLI + sealed-secrets controller daemon |
+| `cave-metrics` | Prometheus exporters of both External Secrets and Sealed Secrets |
 
-## 4 · Skipped subsystems (17 — intentional out-of-scope)
+## cavectl wiring (orchestrator follow-up)
 
-The 11 historical skips (kcadm CLI, IPC + RPC framing, Java keystore
-shims, JBoss logging, Liquibase migrations, Quarkus extension wiring,
-Vertx routing, JEE annotation scanning, RESTEasy serialisers,
-Java mail-transport, JNDI lookups) plus the six wave-3 scope-cuts:
-
-| Surface                                                                | Reason                                                                                                                                                                       |
-|------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `physical/{s3,consul,etcd,gcs,postgresql}/`                            | Cloud / external storage backends. cave-runtime is single-source-of-truth via Raft; the cloud back-ends route through cave-runtime's storage gateway, not cave-vault itself. |
-| `vault/replication/`                                                   | DR + Performance replication is Vault Enterprise; cave-runtime achieves the equivalent at the cluster layer (cave-ha), not at the vault layer.                               |
-| `builtin/credential/{azure,gcp,oci}/`                                  | Cloud-vendor auth methods. The OIDC method (already mapped) covers the cross-cloud federated case via OpenID Connect federation.                                             |
-| `builtin/logical/{azure,gcp,consul,nomad,terraform,mongodbatlas}/`     | Cloud-vendor secret engines. cave-runtime ships AWS-only out of the box; the remaining six are out-of-scope for the sovereign-cloud target.                                  |
-| `vault/agent/`                                                         | Vault Agent sidecar. cavectl already performs the client-side helper role; a separate daemon is unnecessary.                                                                 |
-| `vault/activity/`                                                      | Client-activity tracking is licensing telemetry. cave-runtime is AGPL with no such telemetry — surface intentionally absent.                                                 |
-
-## 5 · 4-track status
-
-| Track          | Status     | Evidence                                                                                                              |
-|----------------|------------|------------------------------------------------------------------------------------------------------------------------|
-| Backend        | **GREEN**  | This crate — 21 mapped, 0 partial, 0 unmapped. Wave-3 adds `src/auth/jwt.rs` + `src/core/quota.rs` with full unit coverage.|
-| Portal         | Phase 3    | admin/vault surface follows cave-portal's wave-2 milestone.                                                            |
-| cavectl        | **GREEN**  | `cavectl vault {policy,kv,transit,token,approle,...}` already exposes the OpenBao API surface.                         |
-| Observability  | **GREEN**  | Audit-log dispatcher + Prometheus metrics already wired into cave-metrics.                                             |
-
-## 6 · 8-gate close-out checklist (Charter v2)
-
-| # | Gate                                                                          | Status |
-|---|-------------------------------------------------------------------------------|--------|
-| 1 | TDD-strict — `tests/parity_self_audit.rs` 9 assertions PASS                   | ✅      |
-| 2 | SPDX AGPL-3.0-or-later on every `.rs` file                                    | ✅      |
-| 3 | `[upstream] source_sha` pinned to `v2.5.3`                                    | ✅      |
-| 4 | No-stub — zero `todo!()`/`unimplemented!()`/`panic!("stub")` in `src/`        | ✅      |
-| 5 | No-backcompat — no aliased re-exports or migration shims                      | ✅      |
-| 6 | Always-latest — OpenBao v2.5.3 (latest stable as of 2026-05-19)               | ✅      |
-| 7 | 4-track — Backend / cavectl / Observability GREEN; Portal honestly deferred   | ✅      |
-| 8 | Honest measured `fill_ratio = 1.0000` (>= 0.95 Charter v2 floor)              | ✅      |
-
-## 7 · Wave-3 delta (2026-05-19)
-
-* **+2 mapped** — `src/auth/jwt.rs` (JWT bearer auth method with bound
-  issuer/sub/aud, bound_claims, exp/nbf+skew, user_claim→alias),
-  `src/core/quota.rs` (rate-limit token-bucket + lease-count cap,
-  path + namespace scoping).
-* **+6 skipped** — cloud storage backends, DR replication, cloud
-  credential methods, cloud secret engines, Vault Agent, activity
-  tracking — each with explicit `reason` block in the manifest.
-* **0 unmapped** — every former gap is either mapped or scope-cut.
-
-## 8 · Reproducibility
-
-```bash
-cargo test -p cave-vault --test parity_self_audit
-python3 scripts/build-parity-index.py
 ```
+cavectl secrets {store, external, push, generator, sealed, seal, unseal, rotate}
+```
+
+To be wired in `crates/cave-cli/src/main.rs` post-merge.

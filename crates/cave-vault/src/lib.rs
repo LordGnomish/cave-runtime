@@ -5,9 +5,14 @@ pub mod auth;
 pub mod core;
 pub mod engines;
 pub mod error;
+pub mod external_secrets;
 pub mod response;
+pub mod sealed_secrets;
 pub mod storage;
 pub mod token;
+
+#[cfg(test)]
+mod parity_self_audit;
 
 // Earlier-generation top-level modules — the newer subdir versions
 // (`core::*`, `engines::*`) are the active path. These four expose unit
