@@ -61,7 +61,9 @@ unmapped_count = 2
 total          = 51
 fill_ratio     = 0.9608
 honest_ratio   = 0.9412
-last_audit     = "2026-05-19"
+adr_justified_ratio = 1.0      # 18 skipped (go-bootstrap, stdlib-analog, parallel-track) + 2 unmapped (Lease→cave-ha, long-running connect verbs→cave-cri) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 parity_ratio_source = "manifest"
 

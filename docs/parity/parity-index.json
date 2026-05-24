@@ -54,6 +54,8 @@
       "upstream_version": "v0.26.0"
     },
     "cave-apiserver": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "labels/selector + fields/selector + namespacelifecycle + admission chain + limitranger + resourcequota (v1.36.0)",
       "behavioral_missing": 2,
@@ -63,7 +65,7 @@
       "behavioral_total": 31,
       "cave_src_loc": null,
       "honest_ratio": 0.9412,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 30,
       "note": null,
@@ -313,6 +315,8 @@
       "upstream_version": "v0.48.0"
     },
     "cave-controller-manager": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-14",
       "behavioral_audit_scope": "deployment + replicaset + job + cronjob + daemonset (kubernetes v1.36.0)",
       "behavioral_missing": 0,
@@ -322,7 +326,7 @@
       "behavioral_total": 42,
       "cave_src_loc": null,
       "honest_ratio": 0.9556,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 33,
       "note": "10/10 files only, **3 stubs** in src",
@@ -379,6 +383,8 @@
       "upstream_version": "v1.108.0"
     },
     "cave-cri": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-14",
       "behavioral_audit_scope": "content/local + diff/walking + leases + digest (containerd v1.7.20)",
       "behavioral_missing": 3,
@@ -388,7 +394,7 @@
       "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.9118,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 20,
       "note": null,
@@ -959,6 +965,8 @@
       "upstream_version": "v1.28.0"
     },
     "cave-kubelet": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "prober/{worker,results} + preemption + lifecycle (v1.36.0)",
       "behavioral_missing": 2,
@@ -968,7 +976,7 @@
       "behavioral_total": 48,
       "cave_src_loc": null,
       "honest_ratio": 0.9487,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 28,
       "note": null,
