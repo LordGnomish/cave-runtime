@@ -1,6 +1,6 @@
 [package]
 name = "cave-vault"
-description = "HashiCorp Vault-compatible secrets engine — full API parity"
+description = "Secrets triumvirate — OpenBao v2.5.4 (Vault fork) + External Secrets Operator v2.5.0 + Sealed Secrets v0.37.0"
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -12,6 +12,28 @@ categories = ["api-bindings", "cryptography", "authentication"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+
+# Primary upstream + companion upstreams (Charter v2 G7).
+[package.metadata.upstream]
+org           = "openbao"
+repo          = "openbao"
+version       = "v2.5.4"
+source_sha    = "4f6d47246a053375271a5fd8af85c3b75695aa46"
+license       = "MPL-2.0"
+
+[[package.metadata.upstreams]]
+org           = "external-secrets"
+repo          = "external-secrets"
+version       = "v2.5.0"
+source_sha    = "0755b0af7de7f05a104b0df29ba84f43513fee8b"
+license       = "Apache-2.0"
+
+[[package.metadata.upstreams]]
+org           = "bitnami-labs"
+repo          = "sealed-secrets"
+version       = "v0.37.0"
+source_sha    = "8e4ed463552a6a6462648a9ff090a1f42abbda30"
+license       = "Apache-2.0"
 
 [dependencies]
 axum = { workspace = true }
@@ -30,6 +52,10 @@ time = { version = "0.3", features = ["std"] }
 base64 = "0.22"
 hex = "0.4"
 rand = "0.8"
+rsa = { version = "0.9", features = ["sha2"] }
+sha2 = "0.10"
+async-trait = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
