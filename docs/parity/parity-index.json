@@ -656,6 +656,8 @@
       "upstream_version": "v15.0.0"
     },
     "cave-etcd": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only \u2014 raft joint-consensus preserved as honest unmapped per \u00a75 exception), ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 0.9859,
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "mvcc/kvstore + etcdserver/txn + lessor + wal (v3.6.10)",
       "behavioral_missing": 3,
@@ -665,7 +667,7 @@
       "behavioral_total": 16,
       "cave_src_loc": null,
       "honest_ratio": 0.9296,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 30,
       "note": null,
@@ -1559,6 +1561,8 @@
       "upstream_version": null
     },
     "cave-scheduler": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only \u2014 preemption-victim-recovery preserved as honest unmapped per \u00a75 exception), ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 0.9655,
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "imagelocality + tainttoleration + nodeaffinity + nodename + nodeunschedulable + noderesources/least_allocated (v1.36.0)",
       "behavioral_missing": 3,
@@ -1568,7 +1572,7 @@
       "behavioral_total": 31,
       "cave_src_loc": null,
       "honest_ratio": 0.9655,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 21,
       "note": null,
