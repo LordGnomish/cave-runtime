@@ -36,9 +36,11 @@ unmapped_count = 1
 total          = 30
 fill_ratio     = 0.9667
 honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded
+adr_justified_ratio = 1.0        # 8 skipped (vendor/SDK-specific scrape targets + alertmanager bits scope_cut to obs-stack-ray-2) + 2 partials (discovery: static+file SD covered, K8s/Consul/AWS/GCE/Azure SDK plumbing deferred; remote_read: responder scaffolded, backend block-streaming deferred) + 1 unmapped (alertmanager peer-mesh HA via memberlist gossip — cave-runtime uses cave-etcd Raft for HA state, deferred to obs-stack-ray-2) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30"  # v3.3.0 tag sha (prometheus/prometheus)
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
