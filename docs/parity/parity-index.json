@@ -1757,6 +1757,8 @@
       "upstream_version": null
     },
     "cave-streams": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STREAMING-CONSOLIDATION-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "UnifiedLog + ProducerStateManager + GroupCoordinator/range+roundrobin (kafka 4.2.0)",
       "behavioral_missing": 6,
