@@ -16,7 +16,7 @@ pub enum SandboxState {
     Stopped,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Sandbox {
     pub id: String,
     pub runtime: Runtime,
