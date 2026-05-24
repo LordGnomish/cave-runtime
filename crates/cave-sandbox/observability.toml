@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cave-sandbox observability — Charter v2 G6 (≥8 panels + ≥5 alerts).
+# Companion to src/observability.rs (constants + render fns).
+
+[meta]
+name        = "cave-sandbox"
+description = "Sandbox triumvirate dashboard — gVisor + Kata + Firecracker"
+revision    = "2026-05-23"
+
+# ── Panels (9) ──────────────────────────────────────────────────────────────
+
+[[panel]]
+title  = "Sandbox create rate (by runtime)"
+metric = "cave_sandbox_create_total"
+query  = "sum by (runtime) (rate(cave_sandbox_create_total[1m]))"
+
+[[panel]]
+title  = "Running sandboxes by runtime"
+metric = "cave_sandbox_running"
+query  = "sum by (runtime) (cave_sandbox_running)"
+
+[[panel]]
+title  = "Hypervisor CPU usage (per-VM)"
+metric = "cave_sandbox_hypervisor_cpu_usage"
+query  = "avg by (vmid) (cave_sandbox_hypervisor_cpu_usage)"
+
+[[panel]]
+title  = "Hypervisor memory usage"
+metric = "cave_sandbox_hypervisor_mem_usage_bytes"
+query  = "sum by (vmid) (cave_sandbox_hypervisor_mem_usage_bytes)"
+
+[[panel]]
+title  = "gVisor syscall denies / second (by syscall)"
+metric = "cave_sandbox_gvisor_syscall_deny_total"
+query  = "sum by (syscall) (rate(cave_sandbox_gvisor_syscall_deny_total[1m]))"
+
+[[panel]]
+title  = "Kata shim crashes (1h)"
+metric = "cave_sandbox_kata_shim_crashes_total"
+query  = "increase(cave_sandbox_kata_shim_crashes_total[1h])"
+
+[[panel]]
+title  = "Firecracker jailer denials (5m)"
+metric = "cave_sandbox_firecracker_jailer_denies_total"
+query  = "rate(cave_sandbox_firecracker_jailer_denies_total[5m])"
+
+[[panel]]
+title  = "Sandbox uptime distribution (p95)"
+metric = "cave_sandbox_uptime_seconds"
+query  = "histogram_quantile(0.95, cave_sandbox_uptime_seconds)"
+
+[[panel]]
+title  = "OCI bundle size (avg)"
+metric = "cave_sandbox_oci_bundle_bytes"
+query  = "avg (cave_sandbox_oci_bundle_bytes)"
+
+# ── Alerts (5) ──────────────────────────────────────────────────────────────
+
+[[alert]]
+name     = "SandboxCreateFailing"
+expr     = 'rate(cave_sandbox_create_total{result="error"}[5m]) > 0.1'
+for      = "5m"
+severity = "warning"
+summary  = "cave-sandbox create error rate > 0.1/s for 5m"
+
+[[alert]]
+name     = "GvisorSyscallDenialsSurge"
+expr     = "sum(rate(cave_sandbox_gvisor_syscall_deny_total[5m])) > 100"
+for      = "10m"
+severity = "warning"
+summary  = "gVisor denying > 100 syscalls/s — possible escape attempt"
+
+[[alert]]
+name     = "KataShimCrashLoop"
+expr     = "increase(cave_sandbox_kata_shim_crashes_total[5m]) > 3"
+for      = "5m"
+severity = "critical"
+summary  = "Kata shim crashing > 3 times in 5m — sandbox pool degraded"
+
+[[alert]]
+name     = "FirecrackerJailerDenials"
+expr     = "rate(cave_sandbox_firecracker_jailer_denies_total[5m]) > 0"
+for      = "1m"
+severity = "warning"
+summary  = "Firecracker jailer denying syscalls — seccomp violation"
+
+[[alert]]
+name     = "HypervisorMemoryPressure"
+expr     = "avg(cave_sandbox_hypervisor_mem_usage_bytes) > 8e9"
+for      = "10m"
+severity = "warning"
+summary  = "Hypervisor average memory > 8GiB — review limits"

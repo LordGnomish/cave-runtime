@@ -132,6 +132,17 @@
       "upstream": "vmware-tanzu/velero",
       "upstream_version": "v1.12.0"
     },
+    "cave-bench": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "parity_ratio_source": "none",
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-cache": {
       "behavioral_audit_at": "2026-05-14",
       "behavioral_audit_scope": "t_string + t_list + t_hash + t_set + t_zset (redis 7.4.0)",
@@ -779,6 +790,17 @@
       "upstream": null,
       "upstream_version": null
     },
+    "cave-identity": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "parity_ratio_source": "none",
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-incidents": {
       "cave_src_loc": 836,
       "honest_ratio": 0.0,
@@ -1387,6 +1409,24 @@
       "upstream": null,
       "upstream_version": null
     },
+    "cave-sandbox": {
+      "cave_src_loc": null,
+      "honest_ratio": 0.9322,
+      "last_audit_disk": "2026-05-23",
+      "manifest_filled": true,
+      "mapped_count": 42,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.9661,
+      "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 13,
+      "stubs": null,
+      "tier": "C",
+      "total_count": 59,
+      "unmapped_count": 2,
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-sbom": {
       "behavioral_missing": 0,
       "behavioral_parity": 1.0,
@@ -1781,11 +1821,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 95,
-    "injected": 10,
-    "new_filled": 95,
+    "flipped": 96,
+    "injected": 13,
+    "new_filled": 96,
     "phantoms": 0,
-    "ratio_overrides": 62
+    "ratio_overrides": 63
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
