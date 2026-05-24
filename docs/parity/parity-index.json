@@ -1909,6 +1909,8 @@
       "upstream_version": "v1.15.0"
     },
     "cave-vulns": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_missing": 1,
       "behavioral_parity": 0.9565217391304348,
       "behavioral_partial": 0,

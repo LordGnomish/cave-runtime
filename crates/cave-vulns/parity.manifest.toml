@@ -30,6 +30,8 @@ total          = 20
 ratio          = 0.95
 fill_ratio     = 0.95
 honest_ratio   = 0.90
+adr_justified_ratio = 1.0      # 1 skipped (Cisco/Mattermost fan-out → cave-noti = parallel-track) + 1 unmapped (JIRA bidirectional sync = out-of-launch-scope Phase 2) + 1 scope_cut (Slack/Teams fan-out → cave-noti = parallel-track) all architecturally justified.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
