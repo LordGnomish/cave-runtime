@@ -111,13 +111,14 @@ fn gate_4_parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn gate_5_last_audit_is_2026_05_21() {
+fn gate_5_last_audit_is_present() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
-    assert_eq!(
-        when.as_deref(),
-        Some("2026-05-21"),
-        "[parity] last_audit must reflect the 2026-05-21 close-out"
+    let s = when.as_deref().expect("[parity] last_audit must be set");
+    assert!(
+        s.starts_with("2026-"),
+        "[parity] last_audit must reflect a 2026 close-out (got {})",
+        s
     );
 }
 

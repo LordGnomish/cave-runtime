@@ -34,7 +34,9 @@ source_sha  = { huggingface_api = "2026-05-21:api/models", ollama_library = "202
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
 honest_ratio        = 0.6471
-last_audit          = "2026-05-21"
+adr_justified_ratio = 1.00
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-152"
+last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 11
 partial_count       = 0
@@ -43,10 +45,14 @@ unmapped_count      = 0
 total               = 17
 
 # fill_ratio derivation (Charter v2 honest measurement, workspace formula):
-#   fill_ratio   = (mapped + partial + skipped) / total
-#                = (11 + 0 + 6) / 17 = 17/17 = 1.0000
-#   honest_ratio = mapped / total
-#                = 11 / 17 = 0.6471
+#   fill_ratio          = (mapped + partial + skipped) / total
+#                       = (11 + 0 + 6) / 17 = 17/17 = 1.0000
+#   honest_ratio        = mapped / total
+#                       = 11 / 17 = 0.6471
+#   adr_justified_ratio = 1.00 — every [[skipped]] cites one of the 8
+#                         standard categories from ADR-RUNTIME-PARITY-100-PCT-001
+#                         (out-of-scope-subsystem, parallel-track) or
+#                         ADR-152 (Phase-0 mandate: report-only).
 #
 # Every subsystem is *explicitly classified* — either ported (mapped)
 # or documented as out-of-scope (skipped). Nothing is left in the
@@ -113,30 +119,30 @@ upstream  = "clap CLI with --mode {report,poll,bench,select}, --output, --config
 
 [[skipped]]
 name      = "auto_swap_orchestration"
-reason    = "Phase 0 mandate: report-only. config.selection.auto_swap is hard-validated to false in TrackerConfig::validate(); Phase 1 unlocks via cavectl llm-tracker apply."
+reason    = "Phase 0 mandate: report-only. config.selection.auto_swap is hard-validated to false in TrackerConfig::validate(); Phase 1 unlocks via cavectl llm-tracker apply. [out-of-launch-scope per ADR-152]"
 defer_to  = "Phase 1 — cave-llm-tracker-phase-1"
 
 [[skipped]]
 name      = "portal_admin_page"
-reason    = "Charter v2 4-track Portal slice deferred per PARITY_REPORT.md §7; daily-<date>.json schema_version=1 stays stable so the portal can read it later without coordination."
+reason    = "Charter v2 4-track Portal slice deferred per PARITY_REPORT.md §7; daily-<date>.json schema_version=1 stays stable so the portal can read it later without coordination. [parallel-track: owned by cave-portal-api]"
 defer_to  = "cave-portal phase-2 llm-tracker tile"
 
 [[skipped]]
 name      = "observability_dashboard"
-reason    = "Charter v2 4-track Obs slice deferred per PARITY_REPORT.md §7; the JSON report is already structured for Prometheus textfile + Grafana table ingestion."
+reason    = "Charter v2 4-track Obs slice deferred per PARITY_REPORT.md §7; the JSON report is already structured for Prometheus textfile + Grafana table ingestion. [parallel-track: owned by cave-metrics + cave-dashboard]"
 defer_to  = "cave-metrics + cave-dashboard phase-2"
 
 [[skipped]]
 name      = "multi_tier_bench_cpu_gpu_split"
-reason    = "Bench runs against the local Ollama endpoint as configured; CPU-only / GPU-only matrix doubling the runtime is out of Phase 0 scope."
+reason    = "Bench runs against the local Ollama endpoint as configured; CPU-only / GPU-only matrix doubling the runtime is out of Phase 0 scope. [out-of-launch-scope per ADR-152]"
 defer_to  = "Phase 1 — bench matrix"
 
 [[skipped]]
 name      = "vram_disk_auto_probing"
-reason    = "VRAM/disk estimates today come from the seed catalog and the HF model card; live probing via system_profiler / nvidia-smi is out of Phase 0 scope."
+reason    = "VRAM/disk estimates today come from the seed catalog and the HF model card; live probing via system_profiler / nvidia-smi is out of Phase 0 scope. [host-preflight: cave-runtime owns hardware probing]"
 defer_to  = "Phase 1 — cave-llm-tracker-probes"
 
 [[skipped]]
 name      = "multi_day_signal_trending"
-reason    = "Each daily-<date>.json is independent; rolling 7-day / 30-day trend lines are out of Phase 0 scope (the report files already carry every input needed for a Phase 1 trender)."
+reason    = "Each daily-<date>.json is independent; rolling 7-day / 30-day trend lines are out of Phase 0 scope (the report files already carry every input needed for a Phase 1 trender). [out-of-launch-scope per ADR-152]"
 defer_to  = "Phase 1 — cave-llm-tracker-trend"

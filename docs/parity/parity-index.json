@@ -1123,9 +1123,11 @@
       "upstream_version": "v1.0.0"
     },
     "cave-llm-tracker": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-152",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.6471,
-      "last_audit_disk": "2026-05-21",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 11,
       "note": "added by disk-overlay; not in audit doc",
