@@ -16,6 +16,8 @@ source_sha = "838d4e792be666ec11bd0c80331e0c5511b5010e"
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9677
 honest_ratio        = 0.7097
+adr_justified_ratio = 1.0      # 8 scope_cuts + 1 unmapped (pod-event-stream → parallel-track to cave-controller-manager) all ADR-justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 22
@@ -172,6 +174,8 @@ upstream = "rollout/pods.go (PodController + WatchPodsForRollout)"
 note = "Live Kubernetes pod-event watch (used to surface CrashLoopBackOff / OOMKilled in the dashboard mid-flight) is unimplemented — cave-rollouts ships the reducer side; the watch is Phase 2 (cave-controller-manager wiring)."
 next_pass_needed  = true
 deferred_reason   = "Requires cave-controller-manager K8s watch infrastructure (Informer + EventBroadcaster) to land first; reopen when that arrives. Marked 2026-05-24 by eksik-sweep pt2."
+category          = "parallel-track"   # ADR-RUNTIME-PARITY-100-PCT-001 §1: K8s watch infrastructure owned by sibling crate cave-controller-manager
+adr_justified     = true
 
 [portal_ui]
 upstream_ui  = "Argo Rollouts UI"
