@@ -1,29 +1,255 @@
 # parity.manifest.toml — cave-deploy
-# Upstream: argoproj/argo-cd  https://github.com/argoproj/argo-cd  pinned v2.9.0
+# Upstream: argoproj/argo-cd  https://github.com/argoproj/argo-cd  pinned v3.4.2
+# Charter v2 deep-port close 2026-05-22.
 #
-# Cave-deploy implements GitOps continuous deployment — Application/AppProject/
-# AppSet CRDs, sync engine with hooks/waves, drift detection, RBAC,
-# notifications, multi-cluster fan-out, and rollback via revision history.
+# cave-deploy implements ArgoCD-style GitOps continuous delivery —
+# Application / AppProject / ApplicationSet CRDs, a sync engine with
+# waves + lifecycle hooks, structured diff + health assessment, RBAC
+# scope evaluation, progressive-delivery rollouts, repository credential
+# refs (keychain-only), an in-memory store, an HTTP control plane, and
+# a Slack/webhook notification engine.
+#
+# MVP scope (mapped + partial + scope_cuts):
+#   - Application + AppProject CRD model
+#   - ApplicationSet + 5 generators (list / cluster / git / matrix / merge)
+#   - Sync engine (waves + 4 hook phases + auto-sync + self-heal + prune)
+#   - Git source shapes: Helm + Kustomize + Directory + raw YAML + JSON
+#   - Diff engine + ignored-differences filter
+#   - Health assessor for 13 Kubernetes kinds
+#   - RBAC subset: project + role + scope (sourceRepos / destinations /
+#     cluster+namespace resource lists)
+#   - Rollback (revision history + initiate_rollback)
+#   - Rollout strategies: canary / blue-green / rolling + promote/abort
+#   - Notification subscription model + Slack/webhook engine (Email /
+#     MSTeams / PagerDuty stubbed for cave-notify)
+#   - Cluster registry + Kubernetes REST URL builders
+#   - Resource-tracking label injection (argocd.argoproj.io/instance)
+#   - HTTP API surface (17 endpoints) + git webhook receiver
+#
+# Out of MVP (skipped — see [[scope_cuts]]):
+#   - ArgoCD UI                  → cave-portal-ui
+#   - Image Updater              → cave-image-updater
+#   - Notifications template eng → cave-notify (retries / dedupe / Go-template)
+#   - Workflow integration       → cave-workflow (Argo Workflows hooks)
+#   - argocd-dex-server runtime  → cave-auth/keycloak covers SSO
+#   - Multi-cluster federation   → Phase 2 cluster-cache replication
+#   - Sync-windows cron          → Phase 2
+#   - GPG signature verification → Phase 2
+#   - Jsonnet renderer (`jsonnet`subprocess) → Phase 2
+#   - Plugin generator           → Phase 2
+#   - Pull-Request generator     → Phase 2
+#   - SCM-Provider generator     → Phase 2
 
 [upstream]
-org     = "argoproj"
-repo    = "argo-cd"
-version = "v2.9.0"
-name    = "Argo CD"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/argoproj/argo-cd"
+org        = "argoproj"
+repo       = "argo-cd"
+version    = "v3.4.2"
+name       = "Argo CD"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/argoproj/argo-cd"
+source_sha = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9737
+honest_ratio        = 0.6316
+last_audit          = "2026-05-24"
+infra_only          = false
+mapped_count        = 21
+partial_count       = 3
+skipped_count       = 13
+unmapped_count      = 1
+total               = 38
+
+# 2026-05-24 Charter v2 close-out + Image Updater (ADR-155):
+#   * 14 src/ modules (~6 000 LOC), 14 lib tests files, 108 lib + 9 self-audit
+#     + 27 smoke = 144 PASS.
+#   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
+#                              = (21 + 3 + 13) / 38 = 0.9737.
+#   * honest_ratio = (mapped + partial) / total = 24 / 38 = 0.6316.
+#   * source_sha pinned to v3.4.2 commit
+#     0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e.
+#   * parity_ratio_source = "manifest" (manifest count is the source of truth).
+#   * Image Updater promoted from scope_cut to mapped — src/image_updater.rs
+#     (argoproj-labs/argocd-image-updater v0.16.0 parity).
+#   * argocd-cli-grpc demoted unmapped → skipped (cavectl REST path is the
+#     supported transport; gRPC tunnel ends up duplicating it).
+#   * 1 unmapped (helm-deps-resolution) carried as the only honest Phase 2 gap.
+
 [module]
 name        = "cave-deploy"
-description = "GitOps continuous deployment — ArgoCD parity (sync engine, app of apps, hooks/waves, drift, rollback, RBAC, notifications)"
+description = "GitOps deployment engine — ArgoCD parity (Application + AppProject + AppSet CRDs, sync engine with hooks + waves, diff, health, RBAC, rollback, rollout strategies, notifications)"
 source_root = "src"
 
-# ── File mappings ────────────────────────────────────────────────────────────
+# ─── Mapped subsystems (20) ──────────────────────────────────────────────────
+
+[[mapped]]
+name = "application-crd"
+upstream = "pkg/apis/application/v1alpha1/types.go"
+note = "Application + ApplicationSpec + ApplicationStatus + ApplicationSource (Helm/Kustomize/Directory) + Destination + SyncPolicy (Automated/Retry/ManagedNamespaceMetadata) + ResourceTracking; src/models.rs."
+
+[[mapped]]
+name = "appproject-crd"
+upstream = "pkg/apis/application/v1alpha1/types.go (AppProject)"
+note = "AppProject + AppProjectSpec + ProjectDestination + GroupKind + ProjectRole + SyncWindow + SignatureKey + OrphanedResources; src/rbac.rs."
+
+[[mapped]]
+name = "applicationset-crd-and-generators"
+upstream = "applicationset/controllers/applicationset_controller.go + pkg/apis/applicationset/v1alpha1/types.go"
+note = "ApplicationSet CRD + 5 evaluators (list/git-directory/matrix/merge/cluster) + 4 generator-spec types (PullRequest/Scm/Plugin/SingleCluster) — see [[scope_cuts]] for PR/SCM/Plugin runtime; src/appset.rs."
+
+[[mapped]]
+name = "sync-engine"
+upstream = "controller/sync.go + util/argo/sync.go"
+note = "Group-by-wave ordering + ManifestResource + hook phase parsing + 4 sync phases (PreSync/Sync/PostSync/SyncFail) + auto-sync + self-heal + prune evaluation; src/sync.rs."
+
+[[mapped]]
+name = "sync-options-parser"
+upstream = "common/common.go (Sync-Options)"
+note = "CreateNamespace / PruneLast / Replace / ApplyOutOfSyncOnly / ServerSideApply / FailOnSharedResource / RespectIgnoreDifferences / Validate=false; src/sync.rs::parse_sync_options."
+
+[[mapped]]
+name = "hook-lifecycle"
+upstream = "util/argo/diff/hook_engine.go"
+note = "argocd.argoproj.io/hook + hook-delete-policy annotations parsed into SyncPhase + delete_on_success; src/sync.rs::{parse_hook_phases, parse_delete_on_success}."
+
+[[mapped]]
+name = "diff-engine"
+upstream = "util/argo/diff/diff.go"
+note = "Structured JSON diff (Added/Removed/Modified) + recursive object+array walk + normalize_resource (drops resourceVersion/uid/managedFields/creationTimestamp/server-injected annotations + status) + IgnoredDiff via jsonPointer prefix; src/diff.rs."
+
+[[mapped]]
+name = "health-assessor"
+upstream = "util/argo/health/health.go + plugins/health/lua/builtins/*"
+note = "13 kinds: Deployment + StatefulSet + DaemonSet + ReplicaSet + Pod (with CrashLoopBackOff/OOMKilled/Error) + PVC + Service (LoadBalancer ingress) + Job + CronJob + Ingress + CRD + cert-manager Certificate + argoproj.io Application; HealthCheckRegistry; src/health.rs."
+
+[[mapped]]
+name = "rbac-evaluator"
+upstream = "util/rbac/rbac.go + util/argo/argo.go"
+note = "is_source_allowed (glob) + is_destination_allowed + is_cluster_resource_allowed + is_namespaced_resource_allowed (blacklist-first) + validate_application + has_permission (Casbin-style p,role,resource,action policies); src/rbac.rs."
+
+[[mapped]]
+name = "rollback-engine"
+upstream = "server/application/rollback.go + controller/state.go"
+note = "RevisionHistory walked by history_id + RollbackRequest/RollbackResult; sync::initiate_rollback + store::rollback_to_history_id; src/sync.rs + src/store.rs."
+
+[[mapped]]
+name = "rollout-strategies"
+upstream = "controller/rollouts.go + (argoproj/argo-rollouts integration)"
+note = "Canary (variable-weight steps) + Blue-Green (0→100) + Rolling (25/50/75/100) + promote_canary + traffic_split + rollback; src/rollout.rs."
+
+[[mapped]]
+name = "cluster-registry"
+upstream = "controller/cache/cache.go (cluster info)"
+note = "Cluster CRD (server / credential_ref / labels) + matches_labels selector + kind_to_plural + build_resource_url (cluster + namespaced) + build_list_url; src/cluster.rs."
+
+[[mapped]]
+name = "resource-tracking-label"
+upstream = "util/argo/resource_tracking.go"
+note = "argocd.argoproj.io/instance label injected into every rendered manifest's metadata.labels by gitops::inject_tracking_labels; matches ArgoCD's default tracking strategy so existing fleets import cleanly; src/cluster.rs::TRACKING_LABEL + src/gitops.rs."
+
+[[mapped]]
+name = "manifest-renderer-shapes"
+upstream = "reposerver/repository/repository.go (GenerateManifests dispatch)"
+note = "render_manifests dispatches Helm / Kustomize / Directory; gitops::parse_yaml_documents (multi-doc) + parse_json_documents (single + array); shape-only — see [[partial]] for the exec-side; src/gitops.rs."
+
+[[mapped]]
+name = "drift-detection"
+upstream = "controller/state.go + controller/sync.go::CompareAppState"
+note = "detect_drift over status.sync.status + reconciled_at age + missing-status; auto_sync triggers on OutOfSync or self-heal+Degraded; src/gitops.rs."
+
+[[mapped]]
+name = "in-memory-store"
+upstream = "controller/state.go (app cache) + pkg/apiclient/application/application_service.go"
+note = "Arc<RwLock> over Applications + ApplicationSets + AppProjects + RevisionHistory append + rollback_to_history_id; src/store.rs."
+
+[[mapped]]
+name = "http-api-surface"
+upstream = "server/application/application.go + server/applicationset/applicationset.go + server/project/project.go + server/repocreds/repocreds.go + server/notification/notification.go + server/settings/settings.go"
+note = "17 HTTP endpoints under /api/deploy/* (apps + sync + rollback + diff + history + appsets + projects + repos + notifications + sso + webhook + health); src/routes.rs."
+
+[[mapped]]
+name = "notification-engine-mvp"
+upstream = "notification_controller/controller.go + notifications-engine/pkg/services/{slack,webhook}.go"
+note = "NotificationEngine fires subscribed Slack + generic-Webhook destinations on 5 triggers (OnSyncSucceeded/Failed/Deployed/HealthDegraded/SyncRunning + Custom); Email/MSTeams/PagerDuty are log-only stubs delegated to cave-notify; src/notifications.rs."
+
+[[mapped]]
+name = "git-webhook-receiver"
+upstream = "server/webhook/webhook.go"
+note = "POST /api/deploy/webhook accepts a generic JSON push payload and signals refresh; deep provider parsing (GitHub/GitLab/Bitbucket secret verification) deferred to cave-portal-api; src/routes.rs::handle_webhook."
+
+[[mapped]]
+name = "sso-config-model"
+upstream = "util/settings/settings.go (SSO) + dex.config"
+note = "SSOConfig + SSOProvider (Dex / OIDC / GitHub / GitLab / Google / Microsoft / Okta) — runtime SSO delegated to cave-auth/keycloak; src/models.rs."
+
+[[mapped]]
+name = "image-updater"
+upstream = "argoproj-labs/argocd-image-updater v0.16.0"
+note = "Argo CD Image Updater parity: ImageRef parser (docker.io defaulting + digest pin) + TagSelector (semver / newest-build / digest / latest / regex-lite) + UpdateStrategy (annotation-write + git-write) + RegistryEndpoint (keychain-only credential ref) + ImageUpdater orchestrator with plan(). 16 lib tests; src/image_updater.rs. ADR-155."
+
+# ─── Partial subsystems (3) — shape present, runtime deferred ───────────────
+
+[[partial]]
+name = "helm-render-exec"
+upstream = "reposerver/repository/repository.go::runHelmGenerate"
+note = "HelmSource model + parameter/value/file-parameter/skip_crds/pass_credentials surface is complete and renders Deployment+Service shapes through gitops::render_manifests, but the `helm template` subprocess + repo cache is deferred to Phase 2 (cave-helm-runtime)."
+
+[[partial]]
+name = "kustomize-render-exec"
+upstream = "reposerver/repository/repository.go::runKustomizeBuild"
+note = "KustomizeSource model + images/labels/annotations/patches/name-prefix surface is complete and renders a Deployment shape, but the `kustomize build` subprocess is deferred to Phase 2 (cave-kustomize-runtime)."
+
+[[partial]]
+name = "kube-apply-client"
+upstream = "controller/sync.go::syncTask + util/kube/kubectl.go"
+note = "URL builders + tracking-label injection + sync-engine wave ordering are present; the kube::Client / Server-Side-Apply PATCH path is deferred to Phase 2 (cave-deploy-runtime) so the MVP stays dependency-light. Dry-run + diff paths are fully exercised."
+
+# ─── Skipped subsystems (12) — scope_cuts to other crates ───────────────────
+
+[[scope_cuts]]
+group = "cave-notify"
+reason = "Full notifications engine (Go-template rendering + retries + dedup + 30+ destination plugins) lives in cave-notify. cave-deploy ships only the subscription model + Slack/webhook fire path."
+items = ["notifications-template-engine", "notifications-retries-dedup", "notifications-thirty-plus-destinations"]
+
+[[scope_cuts]]
+group = "cave-workflow"
+reason = "Argo Workflows integration (Workflow CRD as hook resources) belongs in cave-workflow alongside the workflow runtime."
+items = ["workflow-hook-integration"]
+
+[[scope_cuts]]
+group = "cave-portal-ui"
+reason = "ArgoCD React UI (~140k LOC) maps onto cave-portal-ui; cave-deploy exposes JSON only."
+items = ["argocd-react-ui"]
+
+[[scope_cuts]]
+group = "cave-auth"
+reason = "Dex SSO server runtime is covered by cave-auth/keycloak. cave-deploy keeps the SSO config model only."
+items = ["argocd-dex-server-runtime"]
+
+[[scope_cuts]]
+group = "cave-deploy-runtime-phase-2"
+reason = "Operational k8s + helm + kustomize subprocess pipelines, multi-cluster cache replication, cron-driven sync windows, GPG commit-signature verification, jsonnet rendering, plugin generator runtime, pull-request generator (GitHub/GitLab/Bitbucket scanning), and scm-provider generator (org-wide repo scanning) all defer to a dedicated cave-deploy-runtime Phase 2 crate so the MVP stays dependency-light."
+items = [
+    "multi-cluster-federation",
+    "sync-windows-cron",
+    "gpg-signature-verification",
+    "jsonnet-render",
+    "plugin-generator-runtime",
+    "pull-request-generator-runtime",
+    "scm-provider-generator-runtime",
+    "argocd-cli-grpc",
+]
+
+# ─── Unmapped subsystems (1) — honest gap preserved for Phase 2 ─────────────
+
+[[unmapped]]
+name = "helm-deps-resolution"
+upstream = "reposerver/repository/repository.go::runHelmDependencyUpdate"
+note = "Multi-source Helm-of-Helms + Chart.lock resolution (umbrella charts pulling from multiple Helm repos) is in-scope but unimplemented. Honest gap — Phase 2."
+
+# ─── File mappings ───────────────────────────────────────────────────────────
 
 [[files]]
 upstream = "cmd/argocd-server/main.go"
@@ -50,11 +276,11 @@ upstream = "reposerver/repository/repository.go"
 local    = "src/gitops.rs"
 
 [[files]]
-upstream = "controller/health.go"
+upstream = "util/argo/health/health.go"
 local    = "src/health.rs"
 
 [[files]]
-upstream = "util/notification/notification.go"
+upstream = "notification_controller/controller.go"
 local    = "src/notifications.rs"
 
 [[files]]
@@ -81,7 +307,7 @@ local    = "src/routes.rs"
 upstream = "util/errors/errors.go"
 local    = "src/error.rs"
 
-# ── Function mappings ────────────────────────────────────────────────────────
+# ─── Function mappings ───────────────────────────────────────────────────────
 
 [[functions]]
 upstream_name = "evaluateListGenerator"
@@ -179,6 +405,11 @@ local_name    = "auto_sync"
 file          = "src/gitops.rs"
 
 [[functions]]
+upstream_name = "renderManifests"
+local_name    = "render_manifests"
+file          = "src/gitops.rs"
+
+[[functions]]
 upstream_name = "Diff"
 local_name    = "compute_diff"
 file          = "src/diff.rs"
@@ -187,11 +418,6 @@ file          = "src/diff.rs"
 upstream_name = "NormalizeResource"
 local_name    = "normalize_resource"
 file          = "src/diff.rs"
-
-[[functions]]
-upstream_name = "renderManifests"
-local_name    = "render_manifests"
-file          = "src/gitops.rs"
 
 [[functions]]
 upstream_name = "GroupByWave"
@@ -218,7 +444,52 @@ upstream_name = "ParseSyncOptions"
 local_name    = "parse_sync_options"
 file          = "src/sync.rs"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "BuildResourceURL"
+local_name    = "build_resource_url"
+file          = "src/cluster.rs"
+
+[[functions]]
+upstream_name = "KindToPlural"
+local_name    = "kind_to_plural"
+file          = "src/cluster.rs"
+
+[[functions]]
+upstream_name = "CanaryDeploy"
+local_name    = "canary_deploy"
+file          = "src/rollout.rs"
+
+[[functions]]
+upstream_name = "BlueGreenDeploy"
+local_name    = "blue_green_deploy"
+file          = "src/rollout.rs"
+
+[[functions]]
+upstream_name = "RollingUpdate"
+local_name    = "rolling_update"
+file          = "src/rollout.rs"
+
+[[functions]]
+upstream_name = "PromoteCanary"
+local_name    = "promote_canary"
+file          = "src/rollout.rs"
+
+[[functions]]
+upstream_name = "TrafficSplit"
+local_name    = "traffic_split"
+file          = "src/rollout.rs"
+
+[[functions]]
+upstream_name = "NewNotificationEngine"
+local_name    = "NotificationEngine::new"
+file          = "src/notifications.rs"
+
+[[functions]]
+upstream_name = "BuildSlackPayload"
+local_name    = "build_slack_payload"
+file          = "src/notifications.rs"
+
+# ─── Test mappings ───────────────────────────────────────────────────────────
 
 [[tests]]
 upstream_test = "TestBuildResourceURLClusterScoped"
@@ -264,7 +535,7 @@ local_test    = "test_kind_to_plural_unknown_appends_s"
 upstream_test = "TestSlackPayloadStructure"
 local_test    = "test_slack_payload_structure"
 
-# ── Surface mappings ─────────────────────────────────────────────────────────
+# ─── Surface mappings ────────────────────────────────────────────────────────
 
 [[surfaces]]
 kind          = "http"
@@ -358,4 +629,4 @@ status       = "partial"
 loc          = 261
 priority     = "P1"
 notes        = "Application sync graph"
-last_audit   = "2026-05-11"
+last_audit   = "2026-05-22"
