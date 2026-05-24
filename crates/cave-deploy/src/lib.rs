@@ -23,6 +23,7 @@ pub mod diff;
 pub mod error;
 pub mod gitops;
 pub mod health;
+pub mod helm_deps;
 pub mod image_updater;
 pub mod models;
 pub mod notifications;

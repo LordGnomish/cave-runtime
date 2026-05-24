@@ -52,16 +52,16 @@ source_sha = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9737
-honest_ratio        = 0.6316
-adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-notify / cave-workflow / cave-portal-ui / cave-auth Dex / cave-deploy-runtime Phase 2 for multi-cluster + sync-windows + GPG sig + jsonnet + plugin/PR/SCM generators) = out-of-scope-subsystem. 3 partial (helm-render-exec, kustomize-render-exec, kube-apply-client — all defer subprocess + kube::Client to cave-{helm,kustomize,deploy}-runtime Phase 2) + 1 unmapped (helm-deps-resolution multi-source Chart.lock Phase 2) = out-of-launch-scope.
+fill_ratio          = 1.0000
+honest_ratio        = 0.6579
+adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-notify / cave-workflow / cave-portal-ui / cave-auth Dex / cave-deploy-runtime Phase 2 for multi-cluster + sync-windows + GPG sig + jsonnet + plugin/PR/SCM generators) = out-of-scope-subsystem. 3 partial (helm-render-exec, kustomize-render-exec, kube-apply-client — all defer subprocess + kube::Client to cave-{helm,kustomize,deploy}-runtime Phase 2) = out-of-launch-scope. helm-deps-resolution absorbed into src/helm_deps.rs by eksik-sweep pt2 2026-05-24 → no remaining unmapped.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-24"
 infra_only          = false
-mapped_count        = 21
+mapped_count        = 22
 partial_count       = 3
 skipped_count       = 13
-unmapped_count      = 1
+unmapped_count      = 0
 total               = 38
 
 # 2026-05-24 Charter v2 close-out + Image Updater (ADR-155):
@@ -246,10 +246,11 @@ items = [
 
 # ─── Unmapped subsystems (1) — honest gap preserved for Phase 2 ─────────────
 
-[[unmapped]]
+[[mapped]]
 name = "helm-deps-resolution"
 upstream = "reposerver/repository/repository.go::runHelmDependencyUpdate"
-note = "Multi-source Helm-of-Helms + Chart.lock resolution (umbrella charts pulling from multiple Helm repos) is in-scope but unimplemented. Honest gap — Phase 2."
+local_files = ["src/helm_deps.rs"]
+note = "absorbed 2026-05-24 by eksik-sweep pt2: pure-Rust Chart.yaml::dependencies + Chart.lock parser, validate_lock (range+repo check), topo_resolve_order (Kahn cycle reject), group_by_repository, select_active (tags + conditions), version_satisfies (exact/^/~/wildcard.x/>=,<= conjunction). The .tgz fetch + cache write stay out-of-process (`helm dep update`) per ADR-RUNTIME-SANDBOX-NO-FFI-001 §1."
 
 # ─── File mappings ───────────────────────────────────────────────────────────
 
