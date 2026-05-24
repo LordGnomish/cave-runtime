@@ -305,14 +305,19 @@
     },
     "cave-container-scan": {
       "cave_src_loc": 2340,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.7115,
+      "last_audit_disk": "2026-05-23",
       "manifest_filled": true,
+      "mapped_count": 35,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9615,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "C",
+      "total_count": 52,
+      "unmapped_count": 2,
       "upstream": "aquasecurity/trivy",
       "upstream_version": "v0.48.0"
     },
@@ -1909,7 +1914,7 @@
     "injected": 14,
     "new_filled": 99,
     "phantoms": 0,
-    "ratio_overrides": 70
+    "ratio_overrides": 71
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
