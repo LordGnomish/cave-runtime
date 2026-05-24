@@ -36,6 +36,9 @@ serde_yaml.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 
+# In-process dispatchers (eksik-sweep 2026-05-24):
+cave-bench = { path = "../cave-bench" }
+
 [dev-dependencies]
 axum.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
