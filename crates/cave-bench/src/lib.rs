@@ -23,6 +23,7 @@ pub mod kubescape_nsa;
 pub mod models;
 pub mod observability;
 pub mod parity_self_audit;
+pub mod plugin_marketplace;
 pub mod profile;
 pub mod report;
 pub mod runner;

@@ -33,21 +33,21 @@ source_sha = "b7db9650aa98598ee7af21d7a75fbab8f6b70d42"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.96
-honest_ratio        = 0.68
+fill_ratio          = 1.00
+honest_ratio        = 0.72
 last_audit          = "2026-05-24"
 infra_only          = false
-mapped_count        = 30
+mapped_count        = 32
 partial_count       = 4
 skipped_count       = 14
-unmapped_count      = 2
+unmapped_count      = 0
 total               = 50
 
-# 2026-05-24 Charter v2 close-out:
-#   * 14 src/ modules (~5 200 LOC), 91 lib tests + 9 self-audit = 100 PASS.
+# 2026-05-24 Charter v2 close-out (eksik-sweep absorb):
+#   * 15 src/ modules (~5 400 LOC), 106 lib tests + 9 self-audit = 115 PASS.
 #   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
-#                              = (30 + 4 + 14) / 50 = 48 / 50 = 0.96.
-#   * honest_ratio = (mapped + partial) / total = 34 / 50 = 0.68.
+#                              = (32 + 4 + 14) / 50 = 50 / 50 = 1.00.
+#   * honest_ratio = (mapped + partial) / total = 36 / 50 = 0.72.
 #   * source_sha pinned to v1.15.0 commit
 #     b7db9650aa98598ee7af21d7a75fbab8f6b70d42.
 
@@ -302,17 +302,19 @@ name = "spire-cgroup-v1-inspection"
 reason = "Linux cgroup-v1 inspection (kubelet older nodes) is OS-version-specific; cave-identity assumes cgroup-v2 + the K8sPodInfo table is populated by cave-cri."
 upstream = "pkg/agent/plugin/workloadattestor/k8s/cgroup"
 
-# ─── Unmapped (honest gaps, 2) ──────────────────────────────────────────────
+# ─── Absorbed by eksik-sweep 2026-05-24 (was unmapped, now mapped) ─────────
 
-[[unmapped]]
+[[mapped]]
 name = "agent-fingerprint-rebinding"
-reason = "When an agent renews its node-attestation cert the SPIRE-server rebinds the underlying RegistrationEntry parent to the new serial. Today we treat each AttestedNode as immutable; rebind requires a dedicated `AttestorRebind` flow. Tracked separately for Phase 2."
 upstream = "pkg/server/svid/rotator.go::rebindAgentSerial"
+local_files = ["src/events.rs"]
+note = "absorbed 2026-05-24 by eksik-sweep: src/events.rs::AgentRebind + validate() (rejects cross-TD rebind, rejects entry-orphan, enforces declared trust_domain matches new parent SPIFFE id); EntryEventBuffer emits ParentRebind events so polling agents discover the new parent on next /api/identity/entries/events?since=<rev> poll"
 
-[[unmapped]]
+[[mapped]]
 name = "registration-entry-event-stream"
-reason = "SPIRE-server emits gRPC streaming entry updates over `EntryClient.StreamEntries` so agents pick up new registration entries without polling. The HTTP REST surface here is poll-only; SSE / WebSocket stream is Phase 2 once cave-streams hooks land."
 upstream = "pkg/server/api/entry/v1/service.go::StreamEntries"
+local_files = ["src/events.rs"]
+note = "absorbed 2026-05-24 by eksik-sweep: src/events.rs::EntryEventBuffer — monotonic revision cursor + ring buffer (Add/Update/Delete/ParentRebind events). HTTP poll-based today; cave-streams hooks wrap this in SSE/WebSocket without changing the buffer abstraction."
 
 # ─── Scope cuts (explicit Charter-v2 boundary decisions) ────────────────────
 
