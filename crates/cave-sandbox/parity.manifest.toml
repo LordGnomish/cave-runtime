@@ -1,0 +1,464 @@
+# parity.manifest.toml — cave-sandbox
+# Triumvirate deep-port: google/gvisor + kata-containers + firecracker-microvm.
+# Charter v2 close — 2026-05-23.
+
+# ── primary upstream: gVisor (Sentry/Gofer) ──────────────────────────────────
+[upstream]
+org        = "google"
+repo       = "gvisor"
+version    = "release-20260520.0"
+license    = "Apache-2.0"
+source_sha = "d8751e5ab6770060517e3cd00617820b6b8663a6"
+
+# ── kata-containers ──────────────────────────────────────────────────────────
+[[upstreams]]
+org        = "kata-containers"
+repo       = "kata-containers"
+version    = "3.31.0"
+license    = "Apache-2.0"
+source_sha = "cec98e0d976bbf4cae016298ffea269f57294264"
+
+# ── firecracker ──────────────────────────────────────────────────────────────
+[[upstreams]]
+org        = "firecracker-microvm"
+repo       = "firecracker"
+version    = "v1.15.1"
+license    = "Apache-2.0"
+source_sha = "f82c0bd0f0a74015642a0d452880f3ad10147b14"
+
+[parity]
+# 2026-05-23 — Charter v2 deep port across three upstreams.
+#
+# Mapped (42): OCI runtime-spec types; gVisor runsc cmd surface + state FSM;
+# Sentry config + syscall allowlist; Gofer 9P descriptor + FD table; kata
+# runtime cmd surface + sandbox state; kata-agent gRPC method set; QEMU/CH/
+# Firecracker hypervisor configs + abstraction trait; containerd-shim Task v2
+# method set; Firecracker VMM resources (MachineConfig/BootSource/Drive/NetIf/
+# Vsock/Balloon/Logger/Metrics/Entropy); Firecracker REST API (axum router);
+# jailer CLI params + chroot layout; unified lifecycle FSM + history; sandbox
+# store + Postgres DDL; cave-sandbox HTTP API; observability surface.
+#
+# Out-of-scope (formal `scope_cut`): kernel-FFI (ptrace/KVM/vsock-kernel/9P-
+# wire/seccomp-bpf install/tap-iface/clone-namespaces/cgroup-v2-attach) —
+# the no-unsafe/no-FFI policy makes these out of process. Live VMM probes,
+# CNI live calls, and ttrpc transports are out-of-process by design.
+mapped_count          = 42
+partial_count         = 2
+skipped_count         = 13
+unmapped_count        = 2
+total                 = 59
+fill_ratio            = 0.9661  # (mapped + partial + skipped) / total = 57/59
+honest_ratio          = 0.9322  # (mapped + skipped) / total            = 55/59
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-23"
+infra_only            = false
+
+[module]
+name        = "cave-sandbox"
+description = "Sandbox runtime triumvirate — gVisor + Kata + Firecracker"
+source_root = "src"
+pump_priority = "HIGH"
+target_tests  = 100
+
+# 4-track status (2026-05-23):
+#   Backend     : 4/4 — this crate (12 modules + api + store + observability)
+#   Portal      : 0/4 — pending; orchestrator wires `/admin/sandbox` later
+#   cavectl     : 0/4 — pending; orchestrator wires `cavectl sandbox` later
+#   Observ.     : 4/4 — 9 panels + 5 alerts + observability.toml at crate root
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# gVisor (org=google, repo=gvisor):
+[[files]]
+upstream = "runtime-spec/specs-go/config.go"
+local    = "src/oci_runtime_spec.rs"
+
+[[files]]
+upstream = "runsc/cmd/create.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/start.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/kill.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/delete.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/state.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/exec.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/cmd/list.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/container/container.go"
+local    = "src/gvisor_runsc.rs"
+
+[[files]]
+upstream = "runsc/config/config.go"
+local    = "src/gvisor_sentry.rs"
+
+[[files]]
+upstream = "pkg/seccomp/seccomp.go"
+local    = "src/gvisor_sentry.rs"
+
+[[files]]
+upstream = "runsc/fsgofer/fsgofer.go"
+local    = "src/gvisor_gofer.rs"
+
+# kata-containers:
+[[files]]
+upstream = "src/runtime/cmd/kata-runtime/main.go"
+local    = "src/kata_runtime.rs"
+
+[[files]]
+upstream = "src/runtime/virtcontainers/sandbox.go"
+local    = "src/kata_runtime.rs"
+
+[[files]]
+upstream = "src/runtime/virtcontainers/hypervisor.go"
+local    = "src/kata_hypervisor.rs"
+
+[[files]]
+upstream = "src/runtime/virtcontainers/qemu.go"
+local    = "src/kata_hypervisor.rs"
+
+[[files]]
+upstream = "src/runtime/virtcontainers/clh.go"
+local    = "src/kata_hypervisor.rs"
+
+[[files]]
+upstream = "src/runtime/virtcontainers/firecracker.go"
+local    = "src/kata_hypervisor.rs"
+
+[[files]]
+upstream = "src/libs/protocols/protos/agent.proto"
+local    = "src/kata_agent.rs"
+
+[[files]]
+upstream = "src/runtime/cmd/containerd-shim-kata-v2/main.go"
+local    = "src/kata_shim.rs"
+
+# firecracker:
+[[files]]
+upstream = "src/vmm/src/resources.rs"
+local    = "src/firecracker_vmm.rs"
+
+[[files]]
+upstream = "src/api_server/src/parsed_request/mod.rs"
+local    = "src/firecracker_api.rs"
+
+[[files]]
+upstream = "src/jailer/src/main.rs"
+local    = "src/firecracker_jailer.rs"
+
+# ── Mapped surfaces (≥40) ────────────────────────────────────────────────────
+# gVisor (14):
+[[mapped]]
+name = "oci-spec-types"
+upstream = "runtime-spec/specs-go/config.go::Spec"
+local    = "src/oci_runtime_spec.rs::Spec"
+
+[[mapped]]
+name = "oci-spec-validate"
+upstream = "runtime-spec/specs-go/config.go validate()"
+local    = "src/oci_runtime_spec.rs::Spec::validate"
+
+[[mapped]]
+name = "oci-linux-namespaces"
+upstream = "runtime-spec/specs-go/config.go::LinuxNamespace"
+local    = "src/oci_runtime_spec.rs::LinuxNamespace"
+
+[[mapped]]
+name = "oci-linux-resources"
+upstream = "runtime-spec/specs-go/config.go::LinuxResources"
+local    = "src/oci_runtime_spec.rs::LinuxResources"
+
+[[mapped]]
+name = "oci-linux-seccomp"
+upstream = "runtime-spec/specs-go/config.go::LinuxSeccomp"
+local    = "src/oci_runtime_spec.rs::LinuxSeccomp"
+
+[[mapped]]
+name = "oci-linux-capabilities"
+upstream = "runtime-spec/specs-go/config.go::LinuxCapabilities"
+local    = "src/oci_runtime_spec.rs::LinuxCapabilities"
+
+[[mapped]]
+name = "runsc-cmd-surface"
+upstream = "runsc/cmd/*.go"
+local    = "src/gvisor_runsc.rs::RunscCommand"
+
+[[mapped]]
+name = "runsc-state-machine"
+upstream = "runsc/container/container.go::Status"
+local    = "src/gvisor_runsc.rs::RunscState"
+
+[[mapped]]
+name = "runsc-state-report"
+upstream = "runsc/cmd/state.go::stateJSON"
+local    = "src/gvisor_runsc.rs::RunscStateReport"
+
+[[mapped]]
+name = "sentry-config"
+upstream = "runsc/config/config.go::Config"
+local    = "src/gvisor_sentry.rs::SentryConfig"
+
+[[mapped]]
+name = "sentry-syscall-allowlist"
+upstream = "pkg/seccomp/seccomp.go::RuleSet"
+local    = "src/gvisor_sentry.rs::SyscallRule"
+
+[[mapped]]
+name = "sentry-capability-filter"
+upstream = "runsc/cmd/capability.go"
+local    = "src/gvisor_sentry.rs::CapabilityFilter"
+
+[[mapped]]
+name = "gofer-mount-descriptor"
+upstream = "runsc/fsgofer/fsgofer.go::attachPoint"
+local    = "src/gvisor_gofer.rs::GoferDescriptor"
+
+[[mapped]]
+name = "gofer-fd-table"
+upstream = "runsc/fsgofer/fsgofer.go FD table"
+local    = "src/gvisor_gofer.rs::FdTable"
+
+# kata (14):
+[[mapped]]
+name = "kata-runtime-cmd-surface"
+upstream = "src/runtime/cmd/kata-runtime/*.go"
+local    = "src/kata_runtime.rs::KataCommand"
+
+[[mapped]]
+name = "kata-sandbox-state"
+upstream = "src/runtime/virtcontainers/sandbox.go::stateString"
+local    = "src/kata_runtime.rs::KataSandboxState"
+
+[[mapped]]
+name = "kata-container-state"
+upstream = "src/runtime/virtcontainers/container.go::ContainerState"
+local    = "src/kata_runtime.rs::KataContainerState"
+
+[[mapped]]
+name = "kata-sandbox-aggregate"
+upstream = "src/runtime/virtcontainers/sandbox.go::Sandbox"
+local    = "src/kata_runtime.rs::KataSandbox"
+
+[[mapped]]
+name = "kata-agent-grpc-create"
+upstream = "src/libs/protocols/protos/agent.proto CreateContainer"
+local    = "src/kata_agent.rs::CreateContainerRequest"
+
+[[mapped]]
+name = "kata-agent-grpc-exec"
+upstream = "src/libs/protocols/protos/agent.proto ExecProcess"
+local    = "src/kata_agent.rs::ExecProcessRequest"
+
+[[mapped]]
+name = "kata-agent-grpc-signal"
+upstream = "src/libs/protocols/protos/agent.proto SignalProcess"
+local    = "src/kata_agent.rs::SignalProcessRequest"
+
+[[mapped]]
+name = "kata-agent-grpc-method-set"
+upstream = "src/libs/protocols/protos/agent.proto AgentService"
+local    = "src/kata_agent.rs::AgentRpc"
+
+[[mapped]]
+name = "kata-hypervisor-trait"
+upstream = "src/runtime/virtcontainers/hypervisor.go::Hypervisor"
+local    = "src/kata_hypervisor.rs::Hypervisor"
+
+[[mapped]]
+name = "kata-qemu-config"
+upstream = "src/runtime/virtcontainers/qemu.go::QemuConfig"
+local    = "src/kata_hypervisor.rs::QemuConfig"
+
+[[mapped]]
+name = "kata-clh-config"
+upstream = "src/runtime/virtcontainers/clh.go::CloudHypervisorConfig"
+local    = "src/kata_hypervisor.rs::CloudHypervisorConfig"
+
+[[mapped]]
+name = "kata-fc-config"
+upstream = "src/runtime/virtcontainers/firecracker.go::FirecrackerConfig"
+local    = "src/kata_hypervisor.rs::FirecrackerConfig"
+
+[[mapped]]
+name = "kata-shim-method-set"
+upstream = "src/runtime/cmd/containerd-shim-kata-v2/*"
+local    = "src/kata_shim.rs::ShimMethod"
+
+[[mapped]]
+name = "kata-shim-state-response"
+upstream = "task.proto StateResponse"
+local    = "src/kata_shim.rs::StateResponse"
+
+# firecracker (14):
+[[mapped]]
+name = "fc-vm-resources"
+upstream = "src/vmm/src/resources.rs::VmResources"
+local    = "src/firecracker_vmm.rs::VmResources"
+
+[[mapped]]
+name = "fc-machine-config"
+upstream = "src/vmm/src/vmm_config/machine_config.rs::MachineConfig"
+local    = "src/firecracker_vmm.rs::MachineConfig"
+
+[[mapped]]
+name = "fc-boot-source"
+upstream = "src/vmm/src/vmm_config/boot_source.rs::BootSourceConfig"
+local    = "src/firecracker_vmm.rs::BootSource"
+
+[[mapped]]
+name = "fc-drive"
+upstream = "src/vmm/src/vmm_config/drive.rs::BlockDeviceConfig"
+local    = "src/firecracker_vmm.rs::Drive"
+
+[[mapped]]
+name = "fc-network-interface"
+upstream = "src/vmm/src/vmm_config/net.rs::NetworkInterfaceConfig"
+local    = "src/firecracker_vmm.rs::NetworkInterface"
+
+[[mapped]]
+name = "fc-vsock"
+upstream = "src/vmm/src/vmm_config/vsock.rs::VsockDeviceConfig"
+local    = "src/firecracker_vmm.rs::Vsock"
+
+[[mapped]]
+name = "fc-balloon"
+upstream = "src/vmm/src/vmm_config/balloon.rs::BalloonDeviceConfig"
+local    = "src/firecracker_vmm.rs::Balloon"
+
+[[mapped]]
+name = "fc-logger"
+upstream = "src/vmm/src/vmm_config/logger.rs::LoggerConfig"
+local    = "src/firecracker_vmm.rs::Logger"
+
+[[mapped]]
+name = "fc-metrics"
+upstream = "src/vmm/src/vmm_config/metrics.rs::MetricsConfig"
+local    = "src/firecracker_vmm.rs::Metrics"
+
+[[mapped]]
+name = "fc-rest-api"
+upstream = "src/api_server/src/parsed_request/mod.rs"
+local    = "src/firecracker_api.rs::router"
+
+[[mapped]]
+name = "fc-actions"
+upstream = "src/api_server/src/request/actions.rs::ActionBody"
+local    = "src/firecracker_api.rs::ActionBody"
+
+[[mapped]]
+name = "fc-instance-info"
+upstream = "src/api_server/src/request/instance_info.rs::InstanceInfo"
+local    = "src/firecracker_api.rs::InstanceInfo"
+
+[[mapped]]
+name = "fc-jailer-cli"
+upstream = "src/jailer/src/main.rs::Cli"
+local    = "src/firecracker_jailer.rs::JailerParams"
+
+[[mapped]]
+name = "fc-jailer-cgroups"
+upstream = "src/jailer/src/cgroup.rs"
+local    = "src/firecracker_jailer.rs::CgroupLimit"
+
+# ── Partial (2) ──────────────────────────────────────────────────────────────
+# Surface shape is present but a critical mechanism is host-kernel dependent.
+[[partial]]
+name   = "lifecycle-state-machine"
+reason = "FSM + audit-trail modeled in src/lifecycle.rs; actual transition triggers (sigterm, hypervisor exit) require kernel signals/vsock events"
+local  = "src/lifecycle.rs"
+
+[[partial]]
+name   = "sandbox-store-persistence"
+reason = "In-memory DashMap + SQL DDL ready; CavePool wiring sketched but no migration runner attached yet (orchestrator deploys schema)"
+local  = "src/store.rs"
+
+# ── Scope cuts (13) — formal, kernel/FFI-dependent ──────────────────────────
+[[scope_cuts]]
+name   = "gvisor-ptrace-platform"
+reason = "Sentry's ptrace syscall interception calls PTRACE_SYSCALL/PTRACE_SETREGS — requires unsafe + cap_sys_ptrace; out of scope per no-FFI policy"
+target = "out-of-process: external runsc binary"
+
+[[scope_cuts]]
+name   = "gvisor-kvm-platform"
+reason = "KVM platform opens /dev/kvm and issues KVM_RUN ioctls; requires unsafe + cap_sys_admin; out of scope per no-FFI policy"
+target = "out-of-process: external runsc binary"
+
+[[scope_cuts]]
+name   = "gvisor-systrap-platform"
+reason = "systrap installs seccomp-bpf trap filter; requires seccomp(2) FFI; out of scope"
+target = "out-of-process: external runsc binary"
+
+[[scope_cuts]]
+name   = "gvisor-netstack-userspace-tcp"
+reason = "User-space TCP/IP stack (~120kLOC Go) — own crate `cave-netstack` if revived"
+target = "cave-netstack (deferred)"
+
+[[scope_cuts]]
+name   = "gvisor-9p-wire-server"
+reason = "Gofer 9P file server runs out-of-process over unix-socket; we model only the descriptor"
+target = "out-of-process: external gofer binary"
+
+[[scope_cuts]]
+name   = "kata-vsock-rpc-transport"
+reason = "Real kata-agent gRPC runs over AF_VSOCK to a live VM — requires KVM + kernel vsock module"
+target = "out-of-process: live agent in VM"
+
+[[scope_cuts]]
+name   = "kata-virtio-fs-daemon"
+reason = "virtiofsd spawn + virtio-fs queue — host-kernel + qemu-side"
+target = "cave-runtime host-preflight"
+
+[[scope_cuts]]
+name   = "kata-cni-plugin-chain"
+reason = "CNI plugin chain (bridge/tap creation) — owned by cave-cni crate"
+target = "cave-cni"
+
+[[scope_cuts]]
+name   = "firecracker-kvm-syscalls"
+reason = "Firecracker VMM hot-path is KVM ioctls + vCPU threads; no-FFI policy excludes"
+target = "out-of-process: external firecracker binary"
+
+[[scope_cuts]]
+name   = "firecracker-tap-iface-creation"
+reason = "Host-side tap-iface creation requires CAP_NET_ADMIN + RTNETLINK"
+target = "cave-cni / cave-runtime host-preflight"
+
+[[scope_cuts]]
+name   = "firecracker-vsock-kernel-module"
+reason = "vsock kernel module + CID allocation is host-kernel state"
+target = "cave-runtime host-preflight"
+
+[[scope_cuts]]
+name   = "firecracker-jailer-namespaces"
+reason = "Jailer's CLONE_NEW{NS,PID,NET,UTS,IPC,USER} sequence + cgroup-v2 attach — requires unsafe clone(2)"
+target = "out-of-process: external jailer binary"
+
+[[scope_cuts]]
+name   = "containerd-ttrpc-transport"
+reason = "Task v2 ttrpc service binds a Unix-domain socket and serves protobuf wire; transport is out-of-process"
+target = "out-of-process: cave-containerd-shim"
+
+# ── Unmapped (2, honest) ─────────────────────────────────────────────────────
+[[unmapped]]
+name   = "gvisor-checkpoint-restore"
+reason = "Sentry CRIU-style checkpoint/restore (`runsc checkpoint`) — uses sentry-internal serialization formats with no public schema"
+
+[[unmapped]]
+name   = "firecracker-snapshot-resume"
+reason = "Firecracker snapshot/resume v2 (RESTORE_FROM_SNAPSHOT) — JSON shape is stable but exhaustive coverage of all device states (block / net / vsock / balloon) requires per-device CRIU traversal not in scope this pass"
