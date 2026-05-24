@@ -529,6 +529,8 @@
       "upstream_version": null
     },
     "cave-deploy": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 4743,
       "honest_ratio": 0.6316,
       "last_audit_disk": "2026-05-24",

@@ -54,6 +54,8 @@ source_sha = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e"
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9737
 honest_ratio        = 0.6316
+adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-notify / cave-workflow / cave-portal-ui / cave-auth Dex / cave-deploy-runtime Phase 2 for multi-cluster + sync-windows + GPG sig + jsonnet + plugin/PR/SCM generators) = out-of-scope-subsystem. 3 partial (helm-render-exec, kustomize-render-exec, kube-apply-client — all defer subprocess + kube::Client to cave-{helm,kustomize,deploy}-runtime Phase 2) + 1 unmapped (helm-deps-resolution multi-source Chart.lock Phase 2) = out-of-launch-scope.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 21
