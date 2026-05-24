@@ -4,19 +4,23 @@
 //! STAGED MODULE — ready to drop into `crates/cave-cli/src/cmd/auth.rs`
 //! once the cave-runtime workspace re-mounts. Wire-up steps in cave-cli/main.rs:
 //!
-//!     mod auth;
-//!     use auth::AuthCmd;
+//! ```text
+//! mod auth;
+//! use auth::AuthCmd;
 //!
-//!     #[derive(Subcommand)]
-//!     enum Commands {
-//!         // …existing variants…
-//!         /// Authentication & authorization
-//!         Auth { #[command(subcommand)] cmd: AuthCmd },
-//!     }
+//! #[derive(Subcommand)]
+//! enum Commands {
+//!     // …existing variants…
+//!     /// Authentication & authorization
+//!     Auth { #[command(subcommand)] cmd: AuthCmd },
+//! }
+//! ```
 //!
 //! Then in the dispatch match arm:
 //!
-//!     Commands::Auth { cmd } => auth::run(cmd, &client).await?,
+//! ```text
+//! Commands::Auth { cmd } => auth::run(cmd, &client).await?,
+//! ```
 //!
 //! Backend assumed: cave-auth crate's keycloak module from
 //! `feat/cave-auth-keycloak-mvp` (commit 33992e4..722fed9). Endpoints used:

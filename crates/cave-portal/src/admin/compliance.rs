@@ -3615,8 +3615,11 @@ version = "7.2.0"
         // re-audit pass (later 2026-05-13) self-healed a stale
         // unmapped_count in the manifest (declared 7, real count 8),
         // landing on 0.7895 = (19 mapped + 11 skipped) / 38 total.
+        // 2026-05-19 parity-wave3 added +jwt + quota mapped and absorbed
+        // the 6 cloud unmapped → skipped, taking the ratio to 1.0. The
+        // upper bound is now inclusive.
         assert!(
-            vault.parity_ratio.unwrap() > 0.78 && vault.parity_ratio.unwrap() < 0.83,
+            (0.78..=1.0).contains(&vault.parity_ratio.unwrap()),
             "got vault parity {:?}",
             vault.parity_ratio
         );
@@ -3624,14 +3627,16 @@ version = "7.2.0"
         // but the on-disk manifest now carries an honest `fill_ratio`
         // (the 2026-05-13 audit demoted 11 breadcrumb-only mappings to
         // unmapped, bringing the ratio down from 1.0 to 0.9179). The
-        // disk-overlay propagates the live value to the index so the
-        // dashboard reflects the honest state.
+        // 2026-05-19 parity-wave3 then lifted it again to 0.9851
+        // (paperwork: 9 of 11 unmapped → skipped). The disk-overlay
+        // propagates the live value to the index so the dashboard
+        // reflects the honest state.
         let net = m.get("cave-net").unwrap();
         assert_eq!(net.tier, "C");
         let net_ratio = net.parity_ratio.expect("cave-net has a measured ratio");
         assert!(
-            net_ratio > 0.90 && net_ratio < 0.95,
-            "expected cave-net ratio ~0.917, got {net_ratio:?}"
+            (0.90..=1.0).contains(&net_ratio),
+            "expected cave-net ratio in 0.90..=1.0, got {net_ratio:?}"
         );
         assert_eq!(net.manifest_filled, Some(true));
     }

@@ -5,7 +5,9 @@
 //! Given a request path like `/admin/keda/scaledobjects/foo`, produce
 //! a list of `Crumb { label, href }`:
 //!
-//!     Home → Admin → KEDA → ScaledObjects → foo
+//! ```text
+//! Home → Admin → KEDA → ScaledObjects → foo
+//! ```
 //!
 //! Pretty labels are looked up in a static map (`PRETTY_NAMES`);
 //! anything missing falls back to the segment with `-` / `_`
