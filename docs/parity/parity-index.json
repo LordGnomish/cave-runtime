@@ -134,12 +134,19 @@
     },
     "cave-bench": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "honest_ratio": 0.697,
+      "last_audit_disk": "2026-05-23",
+      "manifest_filled": true,
+      "mapped_count": 23,
       "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
+      "parity_ratio": 0.9697,
+      "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 9,
       "stubs": null,
       "tier": "C",
+      "total_count": 33,
+      "unmapped_count": 1,
       "upstream": null,
       "upstream_version": null
     },
@@ -1831,11 +1838,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 96,
+    "flipped": 97,
     "injected": 13,
-    "new_filled": 96,
+    "new_filled": 97,
     "phantoms": 0,
-    "ratio_overrides": 65
+    "ratio_overrides": 66
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
