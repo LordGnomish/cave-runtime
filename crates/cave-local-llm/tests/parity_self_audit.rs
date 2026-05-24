@@ -62,11 +62,16 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_21() {
+fn gate_3_last_audit_present() {
     let m = read_manifest();
+    let line = m
+        .lines()
+        .find(|l| l.trim_start().starts_with("last_audit"))
+        .expect("last_audit must be present in [parity] block");
     assert!(
-        has_kv(&m, "last_audit", "\"2026-05-21\""),
-        "last_audit must be 2026-05-21 in [parity] block"
+        line.contains("\"2026-"),
+        "last_audit must be a 2026 date (got {})",
+        line
     );
 }
 

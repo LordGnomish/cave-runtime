@@ -1143,9 +1143,11 @@
       "upstream_version": null
     },
     "cave-local-llm": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.9259,
-      "last_audit_disk": "2026-05-21",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 13,
       "note": "5/5 fn, 3/3 surf \u2014 **3 stubs** in src; needs file + test mappings",

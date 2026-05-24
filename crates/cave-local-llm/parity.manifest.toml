@@ -38,9 +38,24 @@ unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + conc
 total                 = 27
 fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 27/27
 honest_ratio          = 0.9259  # (mapped + skipped) / total            = 25/27
+adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-21"
+last_audit            = "2026-05-24"
 infra_only            = false
+
+# adr_justified_ratio breakdown (2026-05-24):
+#   * daemon graceful shutdown partial   → host-preflight: cave-runtime owns signal handling
+#   * OpenAI-compat streaming partial    → parallel-track: cave-llm-gateway owns the OpenAI wire-format streaming layer; this crate keeps the InferenceBackend trait open for streaming adapters
+#   * 12 [[skipped]] subsystems          → categorised inline in [parity] comment block above
+#     - /api/pull, /api/push, /api/create, /api/blobs    → out-of-scope-subsystem (model authoring deferred)
+#     - server-side /v1 hosting                          → parallel-track (cave-portal-api + cave-llm-gateway)
+#     - llama.cpp / vLLM concrete adapters               → vendor-adapter (cave-llm-gateway)
+#     - embedding-recall RAG store                       → parallel-track (cave-hermes)
+#     - multimodal images, tool-calling in chat          → out-of-scope-subsystem
+#     - KV-cache eviction state machine                  → out-of-scope-subsystem
+#     - JSON-mode response validation                    → out-of-scope-subsystem
+#     - /api/version surface in extras                   → stdlib-analog (handled by clap --version)
 
 # 2026-05-21 scope_cuts — both delegated to higher layers; trait remains open.
 [[scope_cuts]]
