@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-bench — K8s security benchmarks.
 //!
 //! Dual deep-port:
@@ -7,8 +8,15 @@
 //!
 //! Both upstreams Apache-2.0.
 
+pub mod cis_control_plane;
+pub mod cis_engine;
+pub mod cis_etcd;
+pub mod cis_master;
+pub mod cis_node;
 pub mod error;
 pub mod models;
 
 pub use error::BenchError;
 pub use models::*;
+
+pub const MODULE_NAME: &str = "bench";
