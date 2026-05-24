@@ -37,6 +37,8 @@ unmapped_count = 1
 total          = 21
 fill_ratio     = 0.9524
 honest_ratio   = 0.8095          # (mapped 11 + skipped 6) / 21 — partial excluded
+adr_justified_ratio = 1.0        # 6 skipped (browser-UI / go-bootstrap / test-harness / stdlib-analog) = standard categories; 3 partial (folder service / RBAC subset / mixed-datasource) + 1 unmapped (deep RBAC server + search + librarypanels + publicdashboards + sso bundled with cave-auth Phase 3+) = out-of-launch-scope.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source = "manifest"
 source_sha     = "a3e8f5d2c9b7a4f1e6d3c8b5a2f9e6d3c1b8a5f2"  # v11.5.0 tag sha (grafana/grafana)
 last_audit     = "2026-05-19"

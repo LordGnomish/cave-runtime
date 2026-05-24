@@ -453,6 +453,8 @@
       "upstream_version": "v1.14.0"
     },
     "cave-dashboard": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 8092,
       "honest_ratio": 0.8095,
       "last_audit_disk": "2026-05-19",
@@ -852,8 +854,6 @@
       "upstream_version": null
     },
     "cave-identity": {
-      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
-      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.72,
       "last_audit_disk": "2026-05-24",
