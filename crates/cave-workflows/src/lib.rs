@@ -1,14 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Event-driven automation — compatible with n8n
+//! cave-workflows — Argo Workflows parity.
 //!
-//! Compatible with: n8n
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Mirrors `argoproj/argo-workflows v4.0.5`:
+//! * Workflow + WorkflowSpec + Template CRDs
+//! * Six template variants (Container / Script / Resource / Suspend / DAG / Steps)
+//! * Parameter + Artifact pipelines (7 first-party repositories: S3 / GCS /
+//!   HTTP / Git / OSS / Raw / HDFS)
+//! * RetryStrategy with Always / OnFailure / OnError / OnTransientError + backoff
+//! * Pure-function executor — emits NodeAction (Schedule / Retry / Suspend /
+//!   Complete) the downstream `cave-cri` runtime applies.
+//! * In-memory CRUD store + axum HTTP control plane.
 
 use std::sync::Arc;
+
 pub mod engine;
+pub mod executor;
 pub mod models;
 pub mod routes;
+pub mod store;
+pub mod workflow_crd;
 
 use axum::Router;
 

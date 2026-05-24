@@ -1831,14 +1831,19 @@
     },
     "cave-workflows": {
       "cave_src_loc": 666,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.6667,
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
+      "mapped_count": 16,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9583,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 7,
       "stubs": null,
       "tier": "C",
+      "total_count": 24,
+      "unmapped_count": 1,
       "upstream": "n8n-io/n8n",
       "upstream_version": "v1.0.0"
     }
@@ -1849,7 +1854,7 @@
     "injected": 13,
     "new_filled": 98,
     "phantoms": 0,
-    "ratio_overrides": 67
+    "ratio_overrides": 68
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
