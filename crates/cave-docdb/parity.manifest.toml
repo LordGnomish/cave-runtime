@@ -42,8 +42,10 @@ unmapped_count        = 1
 total                 = 52
 fill_ratio            = 0.9808   # (mapped + partial + skipped) / total = 51/52
 honest_ratio          = 0.9231   # (mapped + skipped) / total = 48/52 — partial excluded
+adr_justified_ratio   = 1.0      # 25 skipped (FerretDB/MongoDB out-of-scope features) + 1 unmapped all architecturally justified
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-24"
 infra_only            = false
 [module]
 name        = "cave-docdb"

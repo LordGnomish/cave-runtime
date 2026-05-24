@@ -5,7 +5,7 @@
 // Asserts that the close-out invariants for this crate hold:
 //   * SPDX coverage 100% of src/*.rs
 //   * source_sha pinned in manifest
-//   * last_audit = 2026-05-19
+//   * last_audit = 2026-05-24
 //   * parity_ratio_source = "manifest"
 //   * fill_ratio >= 0.90  (honest measured against PostgreSQL 16.0 in-scope inventory)
 //   * mapped + partial + skipped + unmapped == total
@@ -59,11 +59,11 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_19() {
+fn gate_3_last_audit_2026_05_24() {
     let m = read_manifest();
     assert!(
-        has_kv(&m, "last_audit", "\"2026-05-19\""),
-        "last_audit must be 2026-05-19 in [parity] block"
+        has_kv(&m, "last_audit", "\"2026-05-24\""),
+        "last_audit must be 2026-05-24 in [parity] block (bumped by line-by-line uplift ray)"
     );
 }
 

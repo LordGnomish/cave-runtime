@@ -33,8 +33,10 @@ unmapped_count        = 2
 total                 = 69
 fill_ratio            = 0.9710   # (mapped + partial + skipped) / total = 67/69
 honest_ratio          = 0.9130   # (mapped + skipped) / total            = 63/69
+adr_justified_ratio   = 1.0      # 30 skipped (out-of-scope subsystems) + 2 unmapped (Lease→cave-ha, connect-verbs→cave-cri) all architecturally justified
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-24"
 infra_only            = false
 [module]
 name        = "cave-rdbms"

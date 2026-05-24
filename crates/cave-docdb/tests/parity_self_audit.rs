@@ -6,7 +6,7 @@
 // Asserts that the close-out invariants for this crate hold:
 //   * SPDX coverage 100% of src/*.rs
 //   * source_sha pinned in manifest (FerretDB clean-room reference + mongodb wire pin)
-//   * last_audit = 2026-05-19
+//   * last_audit = 2026-05-24
 //   * parity_ratio_source = "manifest"
 //   * fill_ratio >= 0.90  (honest measured against the in-scope inventory)
 //   * mapped + partial + skipped + unmapped == total
@@ -49,8 +49,8 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_19() {
-    assert!(has_kv(&read_manifest(), "last_audit", "\"2026-05-19\""));
+fn gate_3_last_audit_2026_05_24() {
+    assert!(has_kv(&read_manifest(), "last_audit", "\"2026-05-24\""));
 }
 
 #[test]

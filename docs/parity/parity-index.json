@@ -571,9 +571,11 @@
       "upstream_version": "v1.11.0"
     },
     "cave-docdb": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 3622,
       "honest_ratio": 0.9231,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 23,
       "note": null,
@@ -1345,9 +1347,11 @@
       "upstream_version": "v1.3.0"
     },
     "cave-rdbms": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 5073,
       "honest_ratio": 0.913,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 33,
       "note": null,
