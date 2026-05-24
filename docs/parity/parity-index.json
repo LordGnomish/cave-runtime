@@ -258,9 +258,11 @@
       "upstream_version": null
     },
     "cave-cloud-controller-manager": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, KEP-2395",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.9565,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 13,
       "note": "6 fn missing, **0 tests / 0 surfaces declared**",
@@ -947,9 +949,11 @@
       "upstream_version": "v1.12.0"
     },
     "cave-kube-proxy": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": null,
       "honest_ratio": 0.9412,
-      "last_audit_disk": "2026-05-21",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 18,
       "note": "10/10 files; **8 fn missing, 4 surfaces missing**",
@@ -1171,6 +1175,8 @@
       "upstream_version": "v2.48.0"
     },
     "cave-net": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_audit_at": "2026-05-14",
       "behavioral_audit_scope": "identity/cache + endpoint/endpoint + policy/{api,cidr,l4,distillery} + L7 HTTP + lxc/ctmap/policymap via ebpf_sim userspace simulation (cilium v1.19.3)",
       "behavioral_missing": 5,
@@ -1180,7 +1186,7 @@
       "behavioral_total": 31,
       "cave_src_loc": 36645,
       "honest_ratio": 0.9851,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 42,
       "note": null,

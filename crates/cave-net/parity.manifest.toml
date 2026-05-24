@@ -69,10 +69,12 @@ unmapped_count = 2
 total          = 134
 fill_ratio     = 0.9851
 honest_ratio   = 0.9851
+adr_justified_ratio = 1.0      # 90 skipped (Cilium stdlib-analog micro-packages + sovereign-cloud/Linux-kernel scope cuts) + 2 unmapped (Go BPF bindings + Cilium-eBPF Go integration → wire-format-detail; cave uses Rust ebpf_sim userspace substitute and will land aya-rs kernel port in next ring) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
-last_audit  = "2026-05-19"
+last_audit  = "2026-05-24"
 infra_only  = false
 
 [[mapped]]

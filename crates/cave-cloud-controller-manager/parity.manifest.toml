@@ -29,7 +29,9 @@ unmapped_count      = 0
 total               = 23
 fill_ratio          = 1.0000
 honest_ratio        = 0.9565
-last_audit          = "2026-05-19"
+adr_justified_ratio = 1.0      # 9 skipped: 4 out-of-launch-scope (AWS/GCP/OpenStack/vSphere — Hetzner+Azure only); 5 architectural (fake test scaffolding, credentialconfig stubs, names const list, api types from k8s.io/api, in-tree legacy providers removed by KEP-2395)
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, KEP-2395"
+last_audit          = "2026-05-24"
 parity_ratio_source = "manifest"
 infra_only          = false
 
