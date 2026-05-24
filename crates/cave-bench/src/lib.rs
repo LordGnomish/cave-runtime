@@ -14,6 +14,8 @@ pub mod cis_etcd;
 pub mod cis_master;
 pub mod cis_node;
 pub mod error;
+pub mod kubescape_mitre;
+pub mod kubescape_nsa;
 pub mod models;
 
 pub use error::BenchError;
