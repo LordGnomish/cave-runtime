@@ -1579,6 +1579,8 @@
       "upstream_version": "v1.20.0"
     },
     "cave-scan": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "behavioral_missing": 0,
       "behavioral_parity": 0.9523809523809523,
       "behavioral_partial": 1,
@@ -1586,7 +1588,7 @@
       "behavioral_total": 21,
       "cave_src_loc": 1189,
       "honest_ratio": 0.9171,
-      "last_audit_disk": "2026-05-19",
+      "last_audit_disk": "2026-05-24",
       "manifest_filled": true,
       "mapped_count": 177,
       "note": null,
