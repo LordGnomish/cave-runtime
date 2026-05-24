@@ -3,7 +3,7 @@
 //
 //! Charter v2 self-audit — cave-gateway must carry an honest, measured
 //! `fill_ratio` against upstream Kong 3.9.1 + Gravitee 4.11.7, pinned
-//! `source_sha`s for reproducibility, the 2026-05-23 close-out audit date,
+//! `source_sha`s for reproducibility, the 2026-05-24 close-out audit date,
 //! `parity_ratio_source = "manifest"`, 100% AGPL SPDX header coverage,
 //! no stub macros in `src/`, mapped+partial+skipped+unmapped summing to
 //! total, and the Kong admin / proxy / plugin chain + Gravitee management
@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const TODAY: &str = "2026-05-23";
+const TODAY: &str = "2026-05-24";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const KONG_VERSION: &str = "3.9.1";
 const KONG_SHA: &str = "b724fc7154de3a9971e33490097d5ea2c1bae93b";

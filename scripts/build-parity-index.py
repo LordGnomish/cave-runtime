@@ -442,6 +442,19 @@ def disk_manifest_state(crate: str) -> dict:
     # compliance dashboard.
     hm = re.search(r'^\s*honest_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
     honest_ratio = float(hm.group(1)) if hm else None
+    # NEW 2026-05-24: adr_justified_ratio surfaces the ratio that includes
+    # scope_cuts which are formally ADR-justified (architectural decision,
+    # owned by another cave-* crate, or out of OSS-launch scope). Per
+    # ADR-RUNTIME-PARITY-100-PCT-001 the eight standard category labels
+    # (go-bootstrap, stdlib-analog, parallel-track, wire-format-detail,
+    # host-preflight, out-of-scope-subsystem, out-of-launch-scope,
+    # vendor-adapter) are justified by that umbrella ADR alone; other
+    # cuts must cite a per-crate ADR id. `adr_justification` carries the
+    # comma-separated list of ADR ids the ratio leans on.
+    aj = re.search(r'^\s*adr_justified_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    adr_justified_ratio = float(aj.group(1)) if aj else None
+    ajn = re.search(r'^\s*adr_justification\s*=\s*"([^"]+)"', block, flags=re.MULTILINE)
+    adr_justification = ajn.group(1) if ajn else None
     # Per-class counts (added 2026-05-13 alongside [[partial]]).
     def _int_field(name: str) -> int | None:
         m = re.search(rf'^\s*{re.escape(name)}\s*=\s*([0-9]+)', block, flags=re.MULTILINE)
@@ -475,6 +488,8 @@ def disk_manifest_state(crate: str) -> dict:
         "manifest_filled": filled,
         "parity_ratio_disk": ratio,
         "honest_ratio_disk": honest_ratio,
+        "adr_justified_ratio_disk": adr_justified_ratio,
+        "adr_justification_disk": adr_justification,
         "infra_only_disk": infra,
         "last_audit_disk": last_audit,
         "mapped_count": mapped_count,
@@ -568,6 +583,16 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
             # No manifest [[partial]] block authored yet — honest ratio
             # is conservatively the same as the standard one.
             entry["honest_ratio"] = disk_ratio
+        # ADR-justified-parity axis (added 2026-05-24, line-by-line uplift
+        # ray). When the manifest declares an `adr_justified_ratio`,
+        # surface it alongside the honest ratio so reviewers can see the
+        # delta (`1.00 − adr_justified_ratio = un-justified honest gap`).
+        aj_disk = disk.get("adr_justified_ratio_disk")
+        if aj_disk is not None:
+            entry["adr_justified_ratio"] = aj_disk
+        aj_just = disk.get("adr_justification_disk")
+        if aj_just:
+            entry["adr_justification"] = aj_just
         # Per-class counts, when the manifest carries them.
         for k in ("mapped_count", "partial_count", "skipped_count",
                   "unmapped_count", "total_count"):
