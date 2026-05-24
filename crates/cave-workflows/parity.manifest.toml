@@ -152,6 +152,8 @@ items = ["completed-workflow-gc"]
 name = "workflow-suspend-resume-persist"
 upstream = "workflow/controller/operator.go (Suspend + Resume durable state)"
 note = "Suspend / Resume currently survives the executor reducer only — durable persistence (cave-db wiring so a Suspended workflow can resume across restarts) is Phase 2."
+next_pass_needed  = true
+deferred_reason   = "Requires cave-db schema for workflow snapshots (workflow_id, state JSON, suspended_at, resume_token) + cave-controller-manager wakeup signal. Marked 2026-05-24 by eksik-sweep pt2."
 
 [portal_ui]
 upstream_ui  = "Argo Workflows UI"

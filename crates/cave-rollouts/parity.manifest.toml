@@ -170,6 +170,8 @@ items = ["traefik-traffic-provider", "contour-traffic-provider", "ambassador-tra
 name = "pod-event-stream"
 upstream = "rollout/pods.go (PodController + WatchPodsForRollout)"
 note = "Live Kubernetes pod-event watch (used to surface CrashLoopBackOff / OOMKilled in the dashboard mid-flight) is unimplemented — cave-rollouts ships the reducer side; the watch is Phase 2 (cave-controller-manager wiring)."
+next_pass_needed  = true
+deferred_reason   = "Requires cave-controller-manager K8s watch infrastructure (Informer + EventBroadcaster) to land first; reopen when that arrives. Marked 2026-05-24 by eksik-sweep pt2."
 
 [portal_ui]
 upstream_ui  = "Argo Rollouts UI"
