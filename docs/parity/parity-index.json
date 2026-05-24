@@ -708,6 +708,8 @@
       "upstream_version": null
     },
     "cave-flags": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 2948,
       "honest_ratio": 0.9231,
       "last_audit_disk": "2026-05-19",
