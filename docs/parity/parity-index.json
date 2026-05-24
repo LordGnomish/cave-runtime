@@ -568,6 +568,8 @@
       "upstream_version": "v0.19.0"
     },
     "cave-dns": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 7796,
       "honest_ratio": 0.75,
       "last_audit_disk": "2026-05-23",

@@ -65,6 +65,8 @@ source_sha = "vendored-by-coredns-v1.14.3"
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9583
 honest_ratio        = 0.7500
+adr_justified_ratio = 1.0   # 10 skipped scope_cut to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) = out-of-scope-subsystem; 3 partial (DoQ 0-RTT, Caddyfile lexer, TSIG HMAC) + 2 unmapped (fuzz harness, DNSSEC key-rollover Phase 2) = out-of-launch-scope.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-23"
 infra_only          = false
 mapped_count        = 33
