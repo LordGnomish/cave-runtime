@@ -236,11 +236,24 @@ mod tests {
     use axum::http::{Method, Request};
     use http_body_util::BodyExt;
     use jsonwebtoken::{DecodingKey, Validation, decode};
+    use std::sync::{Mutex, MutexGuard, OnceLock};
     use tower::ServiceExt;
 
+    /// All tests in this module mutate process-wide CAVE_DEV_MODE and need to
+    /// observe their own value across an async oneshot. cargo test's
+    /// default multi-thread runner races those writes, so each test takes
+    /// this lock for its whole body. Held across `.await` because the env
+    /// var is read inside the handler, not just at setup time.
+    fn env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+    }
+
     fn set_env() {
-        // SAFETY: tests within this module run sequentially in the same binary;
-        // edition 2024 marks env mutators unsafe but the contract here holds.
+        // SAFETY: callers hold env_lock() for the rest of the test, so no
+        // other test in this module reads/writes CAVE_DEV_MODE concurrently.
         unsafe {
             std::env::set_var("CAVE_JWT_SECRET", "test-secret");
             std::env::set_var("CAVE_DEV_MODE", "true");
@@ -249,6 +262,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_page_is_public_html() {
+        let _g = env_lock();
         set_env();
         let app = router();
         let resp = app
@@ -270,6 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_sets_cookie_and_jwt_decodes() {
+        let _g = env_lock();
         set_env();
         let app = router();
         let body = "username=admin%40platform&password=admin";
@@ -313,6 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_rejects_bad_password() {
+        let _g = env_lock();
         set_env();
         let app = router();
         let body = "username=admin%40platform&password=wrong";
@@ -332,6 +348,7 @@ mod tests {
 
     #[tokio::test]
     async fn logout_clears_cookie() {
+        let _g = env_lock();
         set_env();
         let app = router();
         let resp = app
@@ -355,9 +372,9 @@ mod tests {
 
     #[tokio::test]
     async fn login_disabled_when_not_dev_mode() {
-        // SAFETY: see set_env() above. Force the var rather than just removing
-        // it — sibling tests in this module set CAVE_DEV_MODE=true, and tokio
-        // reuses the process across tests.
+        let _g = env_lock();
+        // SAFETY: env_lock() above prevents sibling tests in this module
+        // from observing or mutating CAVE_DEV_MODE while this test runs.
         unsafe {
             std::env::set_var("CAVE_JWT_SECRET", "test-secret");
             std::env::set_var("CAVE_DEV_MODE", "false");
@@ -400,6 +417,7 @@ mod tests {
 
     #[tokio::test]
     async fn whoami_decodes_session_cookie_directly() {
+        let _g = env_lock();
         set_env();
         let app = router();
         // Issue a real JWT for admin@platform via the dev path.
