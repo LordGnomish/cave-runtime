@@ -47,6 +47,7 @@ tracing = { workspace = true }
 bytes = "1"
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
 axum-test = "20"
 tempfile = "3"
