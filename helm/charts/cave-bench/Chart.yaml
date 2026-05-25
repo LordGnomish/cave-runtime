@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cave-bench
+description: Cave Runtime — cave-bench (port of kube-bench v0.15.5 + kubescape v4.0.8)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/LordGnomish/cave-runtime
+sources:
+  - https://github.com/LordGnomish/cave-runtime
+maintainers:
+  - name: Burak Tartan
+    email: btartan@gmail.com
+keywords:
+  - cave-runtime
+  - cave-bench
