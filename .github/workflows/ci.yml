@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Default to read-only token. Individual jobs that need more (e.g.
+# uploading artifacts via id-token, commenting on PRs) opt in explicitly.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

@@ -23,6 +23,15 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+
+# Don't cancel an in-flight tracker run when a new tick fires — they're
+# idempotent and we'd rather skip overlap than truncate the prior one.
+concurrency:
+  group: upstream-tracker
+  cancel-in-progress: false
+
 jobs:
   watch:
     name: cave-upstream-watchd --once

@@ -23,6 +23,13 @@ on:
       - "docs/parity/parity-index.json"
       - "scripts/build-parity-index.py"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: parity-index-sync-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify-in-sync:
     runs-on: ubuntu-latest
