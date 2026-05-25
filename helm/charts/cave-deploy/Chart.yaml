@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cave-deploy
+description: Cave Runtime — cave-deploy (port of ArgoCD v3.4.2)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/LordGnomish/cave-runtime
+sources:
+  - https://github.com/LordGnomish/cave-runtime
+maintainers:
+  - name: Burak Tartan
+    email: btartan@gmail.com
+keywords:
+  - cave-runtime
+  - cave-deploy
