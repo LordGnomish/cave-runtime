@@ -1,0 +1,33 @@
+# observability.toml — cave-sbom
+# Charter v2 G8 minimum scaffold (alerts + dashboard stub).
+# Deep observability surface arrives with the upstream-aligned
+# dashboards when the consuming portal page exists. For now this
+# file pins the self-audit pulse + a parity-drift watchdog so the
+# 4-track gate passes for cave-sbom (backend + manifest + obs +
+# cavectl-or-portal future track).
+
+[[panels]]
+title  = "cave-sbom parity self-audit pulse"
+metric = "cave_sbom_self_audit_passes_total"
+type   = "stat"
+description = "Counts successful runs of cave-sbom::parity_self_audit; flat-line means the self-audit fixture stopped firing."
+
+[[panels]]
+title  = "cave-sbom fill_ratio drift"
+metric = "cave_sbom_parity_fill_ratio"
+type   = "gauge"
+description = "Emitted by build-parity-index.py; alerts on drift > 0.05 from the manifest-declared ratio."
+
+[[alerts]]
+name     = "cave_sbom_self_audit_failing"
+expr     = "rate(cave_sbom_self_audit_failures_total[5m]) > 0"
+severity = "warning"
+summary  = "cave-sbom self-audit gate failing — Charter v2 invariant broken"
+runbook  = "docs/runbooks/cave-sbom-self-audit.md"
+
+[[alerts]]
+name     = "cave_sbom_parity_drift"
+expr     = "abs(cave_sbom_parity_fill_ratio - cave_sbom_parity_fill_ratio_declared) > 0.05"
+severity = "info"
+summary  = "cave-sbom fill_ratio drifted >0.05 from manifest declaration"
+runbook  = "docs/runbooks/cave-sbom-parity-drift.md"
