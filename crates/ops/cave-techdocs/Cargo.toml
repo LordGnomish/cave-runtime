@@ -16,6 +16,7 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tower = { version = "0.5", features = ["util"] }
 tokio = { workspace = true, features = ["full"] }
 tempfile = "3"
