@@ -28,6 +28,7 @@ toml = { workspace = true }
 dirs = "5"
 
 [dev-dependencies]
+proptest = "1"
 mockito = "1"
 tempfile = "3"
 tokio = { workspace = true, features = ["full", "test-util", "macros"] }
