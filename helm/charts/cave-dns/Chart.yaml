@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cave-dns
+description: Cave Runtime — cave-dns (port of CoreDNS v1.14.3)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/LordGnomish/cave-runtime
+sources:
+  - https://github.com/LordGnomish/cave-runtime
+maintainers:
+  - name: Burak Tartan
+    email: btartan@gmail.com
+keywords:
+  - cave-runtime
+  - cave-dns
