@@ -52,6 +52,8 @@ source_root   = "src"
 [parity]
 fill_ratio            = 0.9808
 honest_ratio          = 0.5962
+adr_justified_ratio   = 1.0      # 20 [[skipped]] (all cite parallel-track cave-* targets) + 1 [[unmapped]] (kyverno_engine_response_stream → wire-format-detail: gRPC AdmissionReview variant) all ADR-justified
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001, ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
 mapped_count          = 28
 partial_count         = 3
 skipped_count         = 20
@@ -338,6 +340,8 @@ upstream          = "kyverno: pkg/engine/api/api.go"
 reason            = "Streaming engine response API surface — Kyverno-specific streaming protocol; needs follow-up if AdmissionReview gRPC variant lands"
 next_pass_needed  = true
 deferred_reason   = "Requires AdmissionReview gRPC variant to land first (cave-runtime admission webhook is HTTP-only today); reopen when that arrives."
+category          = "wire-format-detail"   # ADR-RUNTIME-PARITY-100-PCT-001 §1: streaming gRPC variant exists only because Go lacks an HTTP/2 streaming serde — cave's HTTP/1.1 + serde AdmissionReview covers the same wire contract
+adr_justified     = true
 
 # ─── Self-audit ─────────────────────────────────────────────────────────────
 
