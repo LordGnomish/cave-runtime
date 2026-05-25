@@ -42,6 +42,7 @@ tokio-util = { workspace = true }
 fs2 = "0.4"
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
 axum = { workspace = true }
 serde_json = { workspace = true }
