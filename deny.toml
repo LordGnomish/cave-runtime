@@ -67,6 +67,43 @@ version = 2
 # vulnerability + unmaintained advisories surface in CI as warnings;
 # OSS-launch hygiene focuses on the license gate first.
 yanked = "warn"
+# Each ignored advisory MUST carry a rationale comment. Reviewed
+# 2026-05-25 during sec-audit ray. Reassess at next quarterly bump.
+ignore = [
+    # rsa 0.9.10 — Marvin Attack timing sidechannel. No safe upgrade
+    # available; transitive via sqlx/oauth2/jwt across the ecosystem.
+    # We don't expose private-key crypto over untrusted timing channels
+    # in any cave-* crate; ring/sigstore-rs handle production signing.
+    "RUSTSEC-2023-0071",
+    # instant — unmaintained, transitive via parking_lot_core/older deps.
+    # Upstream migration path is web-time; no direct cave-* usage.
+    "RUSTSEC-2024-0384",
+    # paste 1.0.15 — unmaintained. Pure proc-macro; transitive via many
+    # crates. No CVE, no upstream replacement gained traction yet.
+    "RUSTSEC-2024-0436",
+    # backoff — unmaintained. We use it via transitive deps only;
+    # exponential-backoff retry logic, no security surface.
+    "RUSTSEC-2025-0012",
+    # async-std — discontinued. Transitive only; cave-* code is tokio.
+    "RUSTSEC-2025-0052",
+    # fxhash — unmaintained. Non-cryptographic hash; transitive.
+    "RUSTSEC-2025-0057",
+    # rustls-pemfile 2.2.0 — unmaintained. Upstream says migrate to
+    # rustls-pki-types PemObject. kube-client + axum-server pull it in;
+    # waiting on upstream migration. No CVE.
+    "RUSTSEC-2025-0134",
+    # buf-* — IterMut soundness issue in a transitive dep. Not exercised
+    # by cave-* code paths (we don't construct the unsound iterator).
+    "RUSTSEC-2026-0002",
+    # Buf::new()/default() NULL deref soundness. Transitive only; our
+    # call sites never deref a freshly-constructed empty Buf.
+    "RUSTSEC-2026-0008",
+    # hickory-proto 0.24.4 — O(n²) name compression CPU exhaustion.
+    # Upgrade to 0.26.1 requires breaking-change refactor across cave-dns;
+    # tracked for next major bump. Mitigation: cave-dns runs behind
+    # network ACLs in production, not exposed to untrusted senders.
+    "RUSTSEC-2026-0119",
+]
 
 [sources]
 unknown-registry = "deny"
