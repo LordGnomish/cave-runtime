@@ -31,4 +31,5 @@ zstd = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
