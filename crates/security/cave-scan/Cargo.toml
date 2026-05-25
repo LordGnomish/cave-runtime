@@ -31,3 +31,6 @@ toml = { workspace = true }
 # hcl-rs is imported as `hcl` (crate rename); machete misses that — ignore.
 [package.metadata.cargo-machete]
 ignored = ["hcl-rs"]
+
+[dev-dependencies]
+proptest = "1"
