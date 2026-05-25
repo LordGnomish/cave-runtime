@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cave-llm-gateway
+description: Cave Runtime — cave-llm-gateway (port of LiteLLM v1.85.1 multi-provider)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/LordGnomish/cave-runtime
+sources:
+  - https://github.com/LordGnomish/cave-runtime
+maintainers:
+  - name: Burak Tartan
+    email: btartan@gmail.com
+keywords:
+  - cave-runtime
+  - cave-llm-gateway
