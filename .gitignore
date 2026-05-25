@@ -2,9 +2,11 @@
 /target
 **/target/
 **/*.rs.bk
-Cargo.lock
 *.rlib
 *.rmeta
+# Note: Cargo.lock IS committed for reproducible binary builds (workspace
+# ships binaries via cavectl + cave-runtime). cargo-deny + cargo-audit
+# gates depend on it. Do NOT add Cargo.lock to this ignore list.
 
 # Secrets and credentials (never commit)
 .env
