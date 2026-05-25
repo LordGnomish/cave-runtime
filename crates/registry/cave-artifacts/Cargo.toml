@@ -33,4 +33,5 @@ p256 = { workspace = true }
 rand = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tower = { workspace = true }
