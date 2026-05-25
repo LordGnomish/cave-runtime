@@ -14,3 +14,6 @@ thiserror = { workspace = true }
 cave-kernel = { path = "../../core/cave-kernel" }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
