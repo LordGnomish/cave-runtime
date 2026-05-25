@@ -9,6 +9,7 @@
 org     = "frappe"
 repo    = "erpnext"
 version = "v16.16.0"
+source_sha = "v16.16.0"  # G1: tag-based pin (deep-port may override)
 name    = "ERPNext"
 license = "GPL-3.0"
 language= "Python"

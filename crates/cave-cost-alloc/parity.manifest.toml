@@ -6,6 +6,7 @@
 org     = "opencost"
 repo    = "opencost"
 version = "v1.108.0"
+source_sha = "v1.108.0"  # G1: tag-based pin (deep-port may override)
 name    = "OpenCost"
 license = "Apache-2.0"
 language= "Go"

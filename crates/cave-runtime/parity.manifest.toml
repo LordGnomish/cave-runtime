@@ -11,6 +11,7 @@
 org     = "cave-runtime"
 repo    = "cave-runtime"
 version = "v0.1.0"
+source_sha = "v0.1.0"  # G1: tag-based pin (deep-port may override)
 
 [module]
 name        = "cave-runtime"

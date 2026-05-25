@@ -10,6 +10,7 @@
 org     = "tektoncd"
 repo    = "pipeline"
 version = "v0.55.0"
+source_sha = "v0.55.0"  # G1: tag-based pin (deep-port may override)
 name    = "Tekton Pipelines"
 license = "Apache-2.0"
 language= "Go"

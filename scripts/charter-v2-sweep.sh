@@ -40,11 +40,13 @@ for d in crates/cave-*/; do
     total=$((total + 1))
     manifest="$d/parity.manifest.toml"
 
-    # G1 source_sha
-    if [ -f "$manifest" ] && grep -q "^source_sha" "$manifest"; then
+    # G1 source_sha: pin required UNLESS the crate is a Cave-internal types
+    # crate (infra_only = true AND no [upstream] block declared).
+    if [ -f "$manifest" ] && grep -qE "source_sha\s*=" "$manifest"; then
         g1="✔"
-    elif [ -f "$manifest" ] && grep -qE "source_sha\s*=" "$manifest"; then
-        g1="✔"
+    elif [ -f "$manifest" ] && grep -qE '^infra_only\s*=\s*true' "$manifest" \
+                         && ! grep -q "^\[upstream\]" "$manifest"; then
+        g1="✔ (internal)"
     else
         g1="✖"; bad_g1=$((bad_g1 + 1))
     fi

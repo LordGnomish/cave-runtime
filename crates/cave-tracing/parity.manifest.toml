@@ -12,6 +12,7 @@
 org     = "jaegertracing"
 repo    = "jaeger"
 version = "v2.17.0"
+source_sha = "v2.17.0"  # G1: tag-based pin (deep-port may override)
 name    = "Jaeger"
 license = "Apache-2.0"
 language= "Go"

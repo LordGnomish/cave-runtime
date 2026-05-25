@@ -6,6 +6,7 @@
 org     = "grafana"
 repo    = "oncall"
 version = "v1.4.0"
+source_sha = "v1.4.0"  # G1: tag-based pin (deep-port may override)
 name    = "Grafana OnCall"
 license = "AGPL-3.0"
 language= "Python"

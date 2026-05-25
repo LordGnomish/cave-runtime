@@ -11,6 +11,7 @@
 org     = "falcosecurity"
 repo    = "falco"
 version = "v0.36.0"
+source_sha = "v0.36.0"  # G1: tag-based pin (deep-port may override)
 name    = "Falco"
 license = "Apache-2.0"
 language= "C++"

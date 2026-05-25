@@ -6,6 +6,7 @@
 org     = "langfuse"
 repo    = "langfuse"
 version = "v2.0.0"
+source_sha = "v2.0.0"  # G1: tag-based pin (deep-port may override)
 name    = "Langfuse"
 license = "MIT"
 language= "TypeScript"

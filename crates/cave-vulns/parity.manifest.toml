@@ -9,6 +9,7 @@
 org      = "DefectDojo"
 repo     = "django-DefectDojo"
 version  = "v2.58.2"
+source_sha  = "v2.58.2"  # G1: tag-based pin (deep-port may override)
 name     = "DefectDojo"
 license  = "BSD-3-Clause"
 language = "Python"

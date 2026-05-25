@@ -10,6 +10,7 @@
 org     = "etcd-io"
 repo    = "etcd"
 version = "v3.5.13"
+source_sha = "v3.5.13"  # G1: tag-based pin (deep-port may override)
 name    = "etcd"
 license = "Apache-2.0"
 language= "Go"

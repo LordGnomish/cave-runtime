@@ -6,6 +6,7 @@
 org     = "gravitational"
 repo    = "teleport"
 version = "v14.0.0"
+source_sha = "v14.0.0"  # G1: tag-based pin (deep-port may override)
 name    = "Teleport"
 license = "AGPL-3.0"
 language= "Go"

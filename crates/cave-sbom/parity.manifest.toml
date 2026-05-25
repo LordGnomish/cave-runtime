@@ -5,6 +5,7 @@
 org     = "DependencyTrack"
 repo    = "dependency-track"
 version = "v4.11.6"
+source_sha = "v4.11.6"  # G1: tag-based pin (deep-port may override)
 sha     = "128fd0fa01bed9fcb57abffa3b30047c45941415"
 name    = "Dependency-Track"
 license = "Apache-2.0"

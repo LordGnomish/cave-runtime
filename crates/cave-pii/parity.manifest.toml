@@ -6,6 +6,7 @@
 org     = "microsoft"
 repo    = "presidio"
 version = "v2.2.0"
+source_sha = "v2.2.0"  # G1: tag-based pin (deep-port may override)
 name    = "Microsoft Presidio"
 license = "MIT"
 language= "Python"

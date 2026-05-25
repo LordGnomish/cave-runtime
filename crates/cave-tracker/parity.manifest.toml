@@ -9,6 +9,7 @@
 org     = "makeplane"
 repo    = "plane"
 version = "v1.3.0"
+source_sha = "v1.3.0"  # G1: tag-based pin (deep-port may override)
 name    = "Plane (Linear-style issue tracking)"
 license = "AGPL-3.0"
 language= "TypeScript"

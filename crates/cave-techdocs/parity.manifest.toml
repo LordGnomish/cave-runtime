@@ -8,6 +8,7 @@
 org     = "backstage"
 repo    = "backstage"
 version = "v1.50.4"
+source_sha = "v1.50.4"  # G1: tag-based pin (deep-port may override)
 name    = "Backstage"
 license = "Apache-2.0"
 language= "TypeScript"

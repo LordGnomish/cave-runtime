@@ -6,6 +6,7 @@
 org     = "argoproj"
 repo    = "argo-cd"
 version = "main"
+source_sha = "main"  # G1: tag-based pin (deep-port may override)
 name    = "Argo CD"
 license = "Apache-2.0"
 language= "Go"

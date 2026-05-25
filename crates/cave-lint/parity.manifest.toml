@@ -6,6 +6,7 @@
 org     = "SonarSource"
 repo    = "sonarqube"
 version = "v10.3.0"
+source_sha = "v10.3.0"  # G1: tag-based pin (deep-port may override)
 name    = "SonarQube"
 license = "LGPL-3.0"
 language= "Java"

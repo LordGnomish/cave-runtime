@@ -6,6 +6,7 @@
 org     = "chaos-mesh"
 repo    = "chaos-mesh"
 version = "v2.6.0"
+source_sha = "v2.6.0"  # G1: tag-based pin (deep-port may override)
 name    = "Chaos Mesh"
 license = "Apache-2.0"
 language= "Go"

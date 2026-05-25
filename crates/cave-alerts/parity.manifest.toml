@@ -10,6 +10,7 @@
 org     = "prometheus"
 repo    = "alertmanager"
 version = "v0.26.0"
+source_sha = "v0.26.0"  # G1: tag-based pin (deep-port may override)
 name    = "Alertmanager"
 license = "Apache-2.0"
 language= "Go"

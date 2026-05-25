@@ -9,6 +9,7 @@
 org     = "kubernetes-sigs"
 repo    = "cluster-api"
 version = "v1.6.0"
+source_sha = "v1.6.0"  # G1: tag-based pin (deep-port may override)
 name    = "Cluster API"
 license = "Apache-2.0"
 language= "Go"

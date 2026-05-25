@@ -6,6 +6,7 @@
 org     = "louislam"
 repo    = "uptime-kuma"
 version = "v1.23.0"
+source_sha = "v1.23.0"  # G1: tag-based pin (deep-port may override)
 name    = "Uptime Kuma"
 license = "MIT"
 language= "JavaScript"

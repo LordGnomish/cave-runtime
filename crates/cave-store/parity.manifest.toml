@@ -10,6 +10,7 @@
 org     = "minio"
 repo    = "minio"
 version = "RELEASE.2024-01-01"
+source_sha = "RELEASE.2024-01-01"  # G1: tag-based pin (deep-port may override)
 name    = "MinIO"
 license = "AGPL-3.0"
 language= "Go"

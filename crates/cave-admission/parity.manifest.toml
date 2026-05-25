@@ -6,6 +6,7 @@
 org     = "kubernetes"
 repo    = "kubernetes"
 version = "v1.28.0"
+source_sha = "v1.28.0"  # G1: tag-based pin (deep-port may override)
 name    = "Kubernetes"
 license = "Apache-2.0"
 language= "Go"

@@ -10,6 +10,7 @@
 org     = "hashicorp"
 repo    = "terraform"
 version = "v1.6.0"
+source_sha = "v1.6.0"  # G1: tag-based pin (deep-port may override)
 name    = "HashiCorp Terraform"
 license = "BSL-1.1"
 language= "Go"

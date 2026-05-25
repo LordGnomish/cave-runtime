@@ -13,6 +13,7 @@
 org     = "casbin"
 repo    = "casbin"
 version = "v3.10.0"
+source_sha = "v3.10.0"  # G1: tag-based pin (deep-port may override)
 name    = "Casbin"
 license = "Apache-2.0"
 language= "Go"

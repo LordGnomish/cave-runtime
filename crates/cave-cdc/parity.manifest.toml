@@ -13,6 +13,7 @@
 org     = "debezium"
 repo    = "debezium-server"
 version = "v3.5.0.Final"
+source_sha = "v3.5.0.Final"  # G1: tag-based pin (deep-port may override)
 name    = "Debezium Server"
 license = "Apache-2.0"
 language= "Java"
