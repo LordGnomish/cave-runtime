@@ -41,6 +41,7 @@ cave-bench = { path = "../../security/cave-bench" }
 cave-falco = { path = "../../security/cave-falco" }
 
 [dev-dependencies]
+proptest = "1"
 axum.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
 httpmock = "0.7"
