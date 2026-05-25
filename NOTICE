@@ -42,7 +42,7 @@ canonical machine-readable list lives in
 `crates/cave-upstream/src/projects.rs` and is exposed at runtime via
 `/api/portal/upstream`.
 
-Total upstreams: 101
+Total upstreams: 107
 
 AGPL-3.0:
   - grafana/grafana          (cave-dashboard; v11.5.0; formerly cave-grafana)
@@ -70,6 +70,7 @@ Apache-2.0:
   - apache/incubator-devlake
   - apache/kafka             (cave-streams; v4.2.0)
   - apache/pulsar            (cave-streams; v4.2.0)
+  - aquasecurity/kube-bench  (cave-bench; v0.15.5)
   - aquasecurity/trivy
   - argoproj/argo-cd
   - argoproj/argo-rollouts
@@ -92,9 +93,12 @@ Apache-2.0:
   - etcd-io/etcd
   - external-secrets/external-secrets
   - falcosecurity/falco
+  - firecracker-microvm/firecracker (cave-sandbox; tertiary upstream)
   - goharbor/harbor          (cave-registry; v2.10)
+  - google/gvisor            (cave-sandbox; primary upstream)
   - istio/istio              (cave-mesh; 1.30.0, ambient-only)
   - jaegertracing/jaeger    (cave-trace; v1.52.0)
+  - kata-containers/kata-containers (cave-sandbox; secondary upstream)
   - kedacore/keda            (cave-keda; v2.16.1)
   - keycloak/keycloak        (cave-auth; v26.0.0)
   - knative/serving          (cave-knative; v1.22.0)
@@ -102,6 +106,7 @@ Apache-2.0:
   - kubernetes-sigs/karpenter (cave-karpenter; v1.4.0)
   - kubernetes/cloud-provider
   - kubernetes/kubernetes
+  - kubescape/kubescape      (cave-bench; v4.0.8)
   - kubevirt/kubevirt
   - minio/minio
   - mlflow/mlflow
@@ -117,6 +122,7 @@ Apache-2.0:
   - sigstore/policy-controller
   - sigstore/sigstore
   - smallstep/certificates
+  - spiffe/spire             (cave-identity; v1.15.0)
   - strimzi/strimzi-kafka-operator
   - tektoncd/pipeline
   - thanos-io/thanos
