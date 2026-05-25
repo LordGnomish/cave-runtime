@@ -13,5 +13,6 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true, features = ["full"] }
 tower = { version = "0.5", features = ["util"] }
