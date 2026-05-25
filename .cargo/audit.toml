@@ -1,0 +1,29 @@
+# cargo-audit configuration
+# Mirror of [advisories.ignore] in deny.toml. Keep the two lists in sync.
+# Each ignored advisory MUST carry a rationale comment in deny.toml.
+# Reviewed 2026-05-25 during sec-audit ray. Reassess at next quarterly bump.
+
+[advisories]
+ignore = [
+    # rsa 0.9.10 — Marvin Attack timing sidechannel. No safe upgrade.
+    "RUSTSEC-2023-0071",
+    # instant — unmaintained, transitive only.
+    "RUSTSEC-2024-0384",
+    # paste 1.0.15 — unmaintained proc-macro. No upstream replacement yet.
+    "RUSTSEC-2024-0436",
+    # backoff — unmaintained, transitive only, no security surface.
+    "RUSTSEC-2025-0012",
+    # async-std — discontinued, transitive only (cave-* is tokio).
+    "RUSTSEC-2025-0052",
+    # fxhash — unmaintained, non-crypto hash, transitive.
+    "RUSTSEC-2025-0057",
+    # rustls-pemfile 2.2.0 — unmaintained, upstream migration pending.
+    "RUSTSEC-2025-0134",
+    # lru 0.12.5 — IterMut soundness. Not exercised by cave-* code paths.
+    "RUSTSEC-2026-0002",
+    # git2 0.19.0 — Buf::new()/default() NULL deref soundness; transitive.
+    "RUSTSEC-2026-0008",
+    # hickory-proto 0.24.4 — O(n²) name compression CPU exhaustion.
+    # cave-dns runs behind network ACLs; tracked for next major bump.
+    "RUSTSEC-2026-0119",
+]
