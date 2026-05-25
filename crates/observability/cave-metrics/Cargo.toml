@@ -46,5 +46,6 @@ snap = "1"
 parking_lot = "0.12"
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
 tempfile = "3"
