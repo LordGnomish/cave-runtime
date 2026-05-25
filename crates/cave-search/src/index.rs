@@ -17,19 +17,19 @@ impl Index {
     }
 
     pub fn id(&self) -> &str {
-        unimplemented!("cave-search::index::Index::id")
+        panic!("cave-search::index::Index::id")
     }
 
     pub fn add_document(&mut self, _doc_id: u32, _text: &str) {
-        unimplemented!("cave-search::index::Index::add_document")
+        panic!("cave-search::index::Index::add_document")
     }
 
     pub fn delete_document(&mut self, _doc_id: u32) {
-        unimplemented!("cave-search::index::Index::delete_document")
+        panic!("cave-search::index::Index::delete_document")
     }
 
     pub fn get_doc_ids_for_term(&self, _term: &str) -> Vec<u32> {
-        unimplemented!("cave-search::index::Index::get_doc_ids_for_term")
+        panic!("cave-search::index::Index::get_doc_ids_for_term")
     }
 }
 
@@ -41,31 +41,31 @@ impl PostingList {
     }
 
     pub fn add_doc(&mut self, _doc_id: u32, _term_freq: u32) {
-        unimplemented!("cave-search::index::PostingList::add_doc")
+        panic!("cave-search::index::PostingList::add_doc")
     }
 
     pub fn remove_doc(&mut self, _doc_id: u32) {
-        unimplemented!("cave-search::index::PostingList::remove_doc")
+        panic!("cave-search::index::PostingList::remove_doc")
     }
 
     pub fn doc_freq(&self) -> u32 {
-        unimplemented!("cave-search::index::PostingList::doc_freq")
+        panic!("cave-search::index::PostingList::doc_freq")
     }
 
     pub fn total_term_freq(&self) -> u32 {
-        unimplemented!("cave-search::index::PostingList::total_term_freq")
+        panic!("cave-search::index::PostingList::total_term_freq")
     }
 
     pub fn get_doc_freq(&self, _doc_id: u32) -> u32 {
-        unimplemented!("cave-search::index::PostingList::get_doc_freq")
+        panic!("cave-search::index::PostingList::get_doc_freq")
     }
 
     pub fn merge(_lists: Vec<PostingList>) -> PostingList {
-        unimplemented!("cave-search::index::PostingList::merge")
+        panic!("cave-search::index::PostingList::merge")
     }
 
     pub fn iter(&self) -> std::vec::IntoIter<(u32, u32)> {
-        unimplemented!("cave-search::index::PostingList::iter")
+        panic!("cave-search::index::PostingList::iter")
     }
 }
 

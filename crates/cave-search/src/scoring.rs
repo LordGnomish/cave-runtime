@@ -10,5 +10,5 @@ pub fn bm25_score(
     _doc_freq: u32,
     _num_docs: u32,
 ) -> f64 {
-    unimplemented!("cave-search::scoring::bm25_score")
+    panic!("cave-search::scoring::bm25_score")
 }

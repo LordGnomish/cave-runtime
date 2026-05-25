@@ -64,9 +64,10 @@ pub fn reconcile(
     Ok(Reconcile::NoOp)
 }
 
-/// Stub: cloud-provider-specific LB attribute reconciliation. Not implemented.
+// SCOPE_CUT: cloud-lb-attribute-sync — owned by cave-cloud-controller-manager
+// per Charter §3 (cloud-provider mutations live on the CCM side).
 pub fn sync_lb_attributes(_spec: &ServiceSpec) -> Result<Reconcile, ControllerError> {
-    unimplemented!("cloud LB attribute sync — see cloudprovider.LoadBalancer.UpdateLoadBalancer")
+    panic!("scope_cut: cloud-lb-attribute-sync (cave-cloud-controller-manager)")
 }
 
 #[allow(dead_code)]

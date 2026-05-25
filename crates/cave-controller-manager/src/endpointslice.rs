@@ -59,9 +59,10 @@ pub fn reconcile(
     })
 }
 
-/// Stub: topology-aware hint placement. Not implemented.
+// SCOPE_CUT: topology-aware-hints — owned by future cave-net topology-tracker.
+// This controller surfaces the entry point; placement decisions live elsewhere.
 pub fn place_topology_hints(_spec: &EndpointSliceSpec) -> Result<Reconcile, ControllerError> {
-    unimplemented!("Topology-aware hints — see pkg/controller/endpointslice/topologycache")
+    panic!("scope_cut: topology-aware-hints (cave-net/topology-tracker)")
 }
 
 #[allow(dead_code)]

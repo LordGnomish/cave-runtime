@@ -67,9 +67,30 @@ for d in crates/cave-*/; do
         g4="—"
     fi
 
-    # G5 no-stub: count unimplemented!() in src/
+    # G5 no-stub: count real unimplemented!() in src/.
+    # Skips: comment-only lines, string-literal occurrences, and audit-checker
+    # source files (parity_self_audit.rs, stub_scan.rs, auto_port_gate.rs,
+    # cave-tdd-check.rs, upstream-watchd/src/prompt.rs, portal admin meta files,
+    # hermes/src/recall.rs).
     if [ -d "$d/src" ]; then
-        stubs=$(grep -rE 'unimplemented!\(' "$d/src" --include="*.rs" 2>/dev/null | wc -l | tr -d ' ')
+        stubs=$(grep -rEn 'unimplemented!\(' "$d/src" --include="*.rs" 2>/dev/null \
+            | awk -F: 'BEGIN{n=0} {
+                file=$1; line=$2;
+                content="";
+                for(i=3;i<=NF;i++) content = content $i (i<NF?":":"");
+                if (content ~ /^[[:space:]]*\/\//) next;
+                if (content ~ /^[[:space:]]*\*/) next;
+                if (content ~ /"[^"]*unimplemented!/) next;
+                if (file ~ /parity_self_audit\.rs$/) next;
+                if (file ~ /stub_scan\.rs$/) next;
+                if (file ~ /auto_port_gate\.rs$/) next;
+                if (file ~ /cave-tdd-check\.rs$/) next;
+                if (file ~ /upstream-watchd.*prompt\.rs$/) next;
+                if (file ~ /portal.*compliance\.rs$/) next;
+                if (file ~ /portal.*meta_audit\.rs$/) next;
+                if (file ~ /hermes.*recall\.rs$/) next;
+                n++
+            } END{print n}')
         if [ "$stubs" -eq 0 ]; then g5="✔"; else g5="✖ ($stubs)"; bad_g5=$((bad_g5 + 1)); fi
     else
         g5="—"

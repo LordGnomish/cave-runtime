@@ -9,18 +9,27 @@
 # Stubbed 2026-05-02.
 
 [upstream]
-org     = "manticoresoftware"
-repo    = "manticoresearch"
-version = "25.8.2"
-name    = "Manticore Search"
-license = "GPL-2.0"
-language= "C++"
-url     = "https://github.com/manticoresoftware/manticoresearch"
+org        = "manticoresoftware"
+repo       = "manticoresearch"
+version    = "25.8.2"
+source_sha = "25.8.2"
+name       = "Manticore Search"
+license    = "GPL-2.0"
+language   = "C++"
+url        = "https://github.com/manticoresoftware/manticoresearch"
 
 [parity]
 ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-25"
 infra_only  = false
+
+# Charter v2 G5 — every public function in src/{analyzer,scoring,query,index,embeddings}.rs
+# is currently a panic-marker scope_cut deferred to the Manticore deep-port (Phase 2).
+[[scope_cuts]]
+name        = "search-deep-port"
+reason      = "Manticore v25.8.2 surface deferred to Phase 2; scaffold only"
+owner       = "cave-search Phase 2"
+adr         = "ADR-RUNTIME-PARITY-100-PCT-001"
 [module]
 name        = "cave-search"
 description = "Full-text + analytics search — Manticore reimplementation"

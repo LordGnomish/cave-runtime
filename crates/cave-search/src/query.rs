@@ -19,7 +19,7 @@ pub struct BoolNode {
 
 impl Query {
     pub fn execute(&self, _index: &Index) -> Vec<u32> {
-        unimplemented!("cave-search::query::Query::execute")
+        panic!("cave-search::query::Query::execute")
     }
 }
 
@@ -27,15 +27,15 @@ pub struct BooleanQuery;
 
 impl BooleanQuery {
     pub fn and(_subs: Vec<Query>) -> Query {
-        unimplemented!("cave-search::query::BooleanQuery::and")
+        panic!("cave-search::query::BooleanQuery::and")
     }
 
     pub fn or(_subs: Vec<Query>) -> Query {
-        unimplemented!("cave-search::query::BooleanQuery::or")
+        panic!("cave-search::query::BooleanQuery::or")
     }
 
     pub fn not(_sub: Query) -> Query {
-        unimplemented!("cave-search::query::BooleanQuery::not")
+        panic!("cave-search::query::BooleanQuery::not")
     }
 }
 

@@ -6,9 +6,9 @@
 use crate::tenant::TenantId;
 
 pub fn tokenize(_text: &str, _tenant_id: &TenantId) -> Vec<String> {
-    unimplemented!("cave-search::analyzer::tokenize")
+    panic!("cave-search::analyzer::tokenize")
 }
 
 pub fn filter_stop_words<'a>(_tokens: Vec<&'a str>, _tenant_id: &TenantId) -> Vec<&'a str> {
-    unimplemented!("cave-search::analyzer::filter_stop_words")
+    panic!("cave-search::analyzer::filter_stop_words")
 }

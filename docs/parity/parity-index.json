@@ -1657,7 +1657,7 @@
     "cave-search": {
       "cave_src_loc": 172,
       "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "last_audit_disk": "2026-05-25",
       "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely opensearch-project/OpenSearch",
       "parity_ratio": 0.0,
