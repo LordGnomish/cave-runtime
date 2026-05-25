@@ -1,0 +1,24 @@
+[package]
+name = "cave-ha"
+description = "CAVE HA/DR — production-grade Raft consensus, automatic failover, cross-region DR"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-kernel = { path = "../../core/cave-kernel" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+prometheus-client = { workspace = true }
+async-trait = "0.1"
+rand = "0.8"
+
+[dev-dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }

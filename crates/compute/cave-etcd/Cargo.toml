@@ -1,0 +1,26 @@
+[package]
+name = "cave-etcd"
+version = "0.1.0"
+edition = "2021"
+description = "Distributed key-value store — etcd reimplementation built on cave-ha Raft consensus"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+cave-kernel = { path = "../../core/cave-kernel" }
+axum = "0.8"
+bcrypt = "0.15"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+dashmap = "6"
+async-trait = "0.1"
+base64 = "0.22"
+tokio-stream = { version = "0.1", features = ["sync"] }
+crc32fast = "1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"

@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-sandbox"
+description = "Sandbox runtimes — gVisor (release-20260520.0) + Kata Containers (3.31.0) + Firecracker (v1.15.1) triumvirate deep-port"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[package.metadata.upstream]
+# Triumvirate: gVisor (Sentry/Gofer), Kata (QEMU/cloud-hypervisor/Firecracker shim), Firecracker (microVM).
+gvisor_org           = "google"
+gvisor_repo          = "gvisor"
+gvisor_version       = "release-20260520.0"
+gvisor_source_sha    = "d8751e5ab6770060517e3cd00617820b6b8663a6"
+gvisor_license       = "Apache-2.0"
+kata_org             = "kata-containers"
+kata_repo            = "kata-containers"
+kata_version         = "3.31.0"
+kata_source_sha      = "cec98e0d976bbf4cae016298ffea269f57294264"
+kata_license         = "Apache-2.0"
+firecracker_org      = "firecracker-microvm"
+firecracker_repo     = "firecracker"
+firecracker_version  = "v1.15.1"
+firecracker_source_sha = "f82c0bd0f0a74015642a0d452880f3ad10147b14"
+firecracker_license  = "Apache-2.0"
+
+[dependencies]
+cave-core = { path = "../../core/cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../../data/cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+regex = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+parking_lot = { workspace = true }
+bytes = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tower = { workspace = true }

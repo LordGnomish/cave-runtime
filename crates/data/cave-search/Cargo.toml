@@ -1,0 +1,16 @@
+[package]
+name = "cave-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-search"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["search", "cave", "cli", "utility", "tool"]
+categories = ["command-line-utilities", "api-bindings"]
+
+[dependencies]
+cave-kernel = { path = "../../core/cave-kernel" }

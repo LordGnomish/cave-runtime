@@ -1,0 +1,54 @@
+[package]
+name = "cave-policy"
+description = "Policy triumvirate — OPA v1.16.2 (Rego + REST) + Gatekeeper v3.22.2 (ConstraintTemplate/Constraint) + Kyverno v1.18.1 (validate/mutate/generate/verifyImages)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-policy"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["policy", "opa", "gatekeeper", "kyverno", "security"]
+categories = ["api-bindings", "authentication", "development-tools"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Primary upstream + companion upstreams (Charter v2 G7).
+[package.metadata.upstream]
+org           = "open-policy-agent"
+repo          = "opa"
+version       = "v1.16.2"
+source_sha    = "85f6d990d19094da38e829561813e7da7fbae272"
+license       = "Apache-2.0"
+
+[[package.metadata.upstreams]]
+org           = "open-policy-agent"
+repo          = "gatekeeper"
+version       = "v3.22.2"
+source_sha    = "eda110bdaf2510288dccd73a1be4dd0c6442a4aa"
+license       = "Apache-2.0"
+
+[[package.metadata.upstreams]]
+org           = "kyverno"
+repo          = "kyverno"
+version       = "v1.18.1"
+source_sha    = "ec14520a11cc25432482bfc0baa6a61d3c309524"
+license       = "Apache-2.0"
+
+[dependencies]
+cave-db = { path = "../../data/cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+regex = { workspace = true }
+ring = { workspace = true }
+base64 = "0.22"
+hex = "0.4"
+tokio-postgres = { workspace = true }
+
+[dev-dependencies]

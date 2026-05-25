@@ -1,0 +1,28 @@
+[package]
+name = "cave-rdbms"
+description = "PostgreSQL-wire-protocol compatible SQL database — pure Rust, Apache-2.0"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-rdbms"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["database", "postgresql", "sql", "rdbms", "wire-protocol"]
+categories = ["database-implementations", "api-bindings", "network-programming"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-kernel = { path = "../../core/cave-kernel" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+bytes = "1"
+regex = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

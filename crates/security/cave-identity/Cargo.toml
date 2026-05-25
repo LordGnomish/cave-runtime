@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-identity"
+description = "Workload identity — SPIRE v1.15.0 deep-port (server + agent + X.509-SVID + JWT-SVID + federation + OIDC discovery + k8s workload attestor)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[package.metadata.upstream]
+org = "spiffe"
+repo = "spire"
+version = "v1.15.0"
+source_sha = "b7db9650aa98598ee7af21d7a75fbab8f6b70d42"
+license = "Apache-2.0"
+
+[dependencies]
+cave-core = { path = "../../core/cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../../data/cave-db" }
+cave-certs = { path = "../cave-certs" }
+cave-pki = { path = "../cave-pki" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+regex = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+ring = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+p256 = { workspace = true }
+jsonwebtoken = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

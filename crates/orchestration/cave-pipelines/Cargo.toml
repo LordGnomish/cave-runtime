@@ -1,0 +1,19 @@
+[package]
+name = "cave-pipelines"
+description = "CI/CD pipeline engine — compatible with Tekton + Jenkins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-db = { path = "../../data/cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }

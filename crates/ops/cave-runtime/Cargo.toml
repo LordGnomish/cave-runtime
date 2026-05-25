@@ -1,0 +1,153 @@
+[package]
+name = "cave-runtime"
+description = "CAVE Unified Runtime — single binary hosting all platform modules"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-runtime"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["runtime", "kubernetes", "platform", "unified", "binary"]
+categories = ["api-bindings", "command-line-utilities", "network-programming"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-runtime"
+path = "src/main.rs"
+
+[dependencies]
+# Shared infrastructure
+cave-etcd = { path = "../../compute/cave-etcd" }
+cave-apiserver = { path = "../../compute/cave-apiserver" }
+cave-net = { path = "../../networking/cave-net" }
+cave-kubelet = { path = "../../compute/cave-kubelet" }
+cave-scheduler = { path = "../../compute/cave-scheduler" }
+cave-controller-manager = { path = "../../compute/cave-controller-manager" }
+cave-cloud-controller-manager = { path = "../../compute/cave-cloud-controller-manager" }
+cave-cri = { path = "../../compute/cave-cri" }
+cave-kernel = { path = "../../core/cave-kernel" }
+cave-auth = { path = "../../security/cave-auth" }
+cave-upstream = { path = "../cave-upstream" }
+# GitOps
+cave-deploy = { path = "../../orchestration/cave-deploy" }
+# Platform modules
+cave-cluster = { path = "../../compute/cave-cluster" }
+# Vault / Secrets Management
+cave-vault = { path = "../../security/cave-vault" }
+# Infrastructure-as-Code
+cave-infra = { path = "../cave-infra" }
+# Data services
+cave-cache = { path = "../../data/cave-cache" }
+cave-store = { path = "../../data/cave-store" }
+# Platform API
+cave-gitops-config = { path = "../cave-gitops-config" }
+# Phase 4 modules
+cave-tracker = { path = "../cave-tracker" }
+# Service mesh
+cave-mesh = { path = "../../networking/cave-mesh" }
+# Metrics
+cave-metrics = { path = "../../observability/cave-metrics" }
+# FinOps
+cave-cost-alloc = { path = "../cave-cost-alloc" }
+# Phase 1 modules
+cave-trace = { path = "../../observability/cave-trace" }
+cave-compliance = { path = "../../security/cave-compliance" }
+cave-flags = { path = "../cave-flags" }
+# Phase 5 modules
+cave-docs-site = { path = "../cave-docs-site" }
+cave-dns = { path = "../../networking/cave-dns" }
+# Observability stack (Prometheus / Loki / OTLP compat)
+cave-logs     = { path = "../../observability/cave-logs" }
+# Phase 3 modules
+cave-llm-gateway = { path = "../../ai/cave-llm-gateway" }
+cave-secrets = { path = "../../security/cave-secrets" }
+cave-lint = { path = "../cave-lint" }
+cave-docs = { path = "../cave-docs" }
+cave-status = { path = "../../observability/cave-status" }
+cave-changelog = { path = "../cave-changelog" }
+cave-certs = { path = "../../security/cave-certs" }
+# Phase 2 modules
+cave-vulns = { path = "../../security/cave-vulns" }
+cave-sbom = { path = "../../security/cave-sbom" }
+cave-uptime = { path = "../../observability/cave-uptime" }
+cave-cost = { path = "../cave-cost" }
+cave-sign = { path = "../../security/cave-sign" }
+cave-forensics = { path = "../../security/cave-forensics" }
+# Phase 3 modules
+cave-devlake = { path = "../cave-devlake" }
+cave-ai-obs = { path = "../../observability/cave-ai-obs" }
+cave-pii = { path = "../../security/cave-pii" }
+cave-incidents = { path = "../../observability/cave-incidents" }
+cave-chat = { path = "../cave-chat" }
+cave-slo = { path = "../../observability/cave-slo" }
+cave-alerts = { path = "../../observability/cave-alerts" }
+cave-profiler = { path = "../../observability/cave-profiler" }
+# Phase 4 modules
+cave-workflows = { path = "../../orchestration/cave-workflows" }
+cave-scan = { path = "../../security/cave-scan" }
+cave-portal = { path = "../cave-portal" }
+cave-scaffold = { path = "../cave-scaffold" }
+cave-chaos = { path = "../../orchestration/cave-chaos" }
+cave-policy = { path = "../../security/cave-policy" }
+cave-dast = { path = "../../security/cave-dast" }
+cave-backup = { path = "../../data/cave-backup" }
+cave-pam = { path = "../../security/cave-pam" }
+# LLM Gateway
+# Infrastructure & Networking
+cave-gateway = { path = "../../networking/cave-gateway" }
+# Data & Storage
+cave-rdbms-operator = { path = "../../data/cave-rdbms-operator" }
+cave-streams = { path = "../../data/cave-streams" }
+# Observability
+# Security & Admission
+cave-admission = { path = "../../security/cave-admission" }
+cave-security = { path = "../../security/cave-security" }
+# Developer Experience
+cave-dashboard = { path = "../../observability/cave-dashboard" }
+cave-pipelines = { path = "../../orchestration/cave-pipelines" }
+cave-rollouts = { path = "../../orchestration/cave-rollouts" }
+# Asset Management
+cave-artifacts = { path = "../../registry/cave-artifacts" }
+# Governance
+cave-runbook = { path = "../cave-runbook" }
+# New crates (this session)
+cave-oncall = { path = "../../observability/cave-oncall" }
+cave-container-scan = { path = "../../security/cave-container-scan" }
+cave-erp = { path = "../cave-erp" }
+cave-crm = { path = "../cave-crm" }
+cave-docdb = { path = "../../data/cave-docdb" }
+cave-rdbms = { path = "../../data/cave-rdbms" }
+cave-kamaji = { path = "../../compute/cave-kamaji" }
+# Framework
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+jsonwebtoken = { workspace = true }
+pulldown-cmark = { workspace = true }
+uuid = { workspace = true }
+# Cluster init plumbing
+rcgen = { version = "0.13", features = ["x509-parser"] }
+time = "0.3"
+reqwest = { workspace = true }
+base64 = { workspace = true }
+axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+dashmap = "6"
+thiserror = "1"
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }
+http-body-util = "0.1"
+tempfile = "3"

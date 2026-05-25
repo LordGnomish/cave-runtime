@@ -1,0 +1,50 @@
+[package]
+name = "cave-metrics"
+description = "Prometheus + VictoriaMetrics parity — TSDB, PromQL, remote_write, alerting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../../core/cave-core" }
+
+# HTTP framework
+axum        = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging / tracing
+tracing = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Regex (label matcher =~)
+regex = { workspace = true }
+
+# HTTP client (scraping, federation, alertmanager push)
+reqwest = { workspace = true }
+
+# Protobuf (remote_write / remote_read / OTLP)
+prost = "0.13"
+
+# Snappy compression (remote_write)
+snap = "1"
+
+# Concurrency
+parking_lot = "0.12"
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = "3"

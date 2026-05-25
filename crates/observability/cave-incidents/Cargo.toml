@@ -1,0 +1,16 @@
+[package]
+name = "cave-incidents"
+description = "Incident management — compatible with Grafana OnCall (partial)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-db = { path = "../../data/cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
