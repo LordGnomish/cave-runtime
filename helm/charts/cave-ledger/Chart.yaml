@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cave-ledger
+description: Cave Runtime — cave-ledger (port of Append-only ledger service)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/LordGnomish/cave-runtime
+sources:
+  - https://github.com/LordGnomish/cave-runtime
+maintainers:
+  - name: Burak Tartan
+    email: btartan@gmail.com
+keywords:
+  - cave-runtime
+  - cave-ledger
