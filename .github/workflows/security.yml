@@ -1,0 +1,89 @@
+name: Security
+
+# Security audit pass — runs on every PR, weekly on Mondays, and on
+# demand. Three independent gates:
+#
+#   1. cargo-deny check advisories   → RUSTSEC advisories
+#   2. cargo-audit                   → second opinion vs. cargo-deny
+#   3. Trivy filesystem scan         → secrets, misconfig, vulns
+#
+# license.yml owns SPDX + cargo-deny `licenses sources` and runs on the
+# same triggers — they share zero overlap here so the two workflows
+# remain decoupled.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Mondays 04:00 UTC — outside the parity-audit (03:00) and
+    # upstream-tracker (every 15m) windows.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  cargo-deny-advisories:
+    name: cargo-deny check advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # Only the advisories track — licenses/sources are owned by
+          # license.yml.
+          command: check advisories
+
+  cargo-audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-1.85
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: Run cargo-audit
+        # `--deny warnings` so any unfixed advisory blocks merge.
+        run: cargo audit --deny warnings
+
+  trivy-fs:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          # secret + misconfig + vuln in one pass; SARIF for code scanning.
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          # Exit non-zero on any CRITICAL/HIGH finding.
+          exit-code: "1"
+          # Ignore known false-positives or accepted risks via
+          # .trivyignore at repo root if/when that file is added.
+          ignore-unfixed: true
+      - name: Upload Trivy SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs

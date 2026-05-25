@@ -1,0 +1,91 @@
+name: Docs
+
+# Markdown hygiene for the docs/ tree + repo-root README.
+#
+# Two passes:
+#   1. markdownlint  — style/structure (heading levels, list indent,
+#                       trailing whitespace, etc.). Soft gate: warnings
+#                       surface in the job log but don't fail PRs.
+#   2. lychee        — broken link checker. Hard gate on PR-touched
+#                       docs only (avoid flaky failures from upstream
+#                       links rotting in unrelated files).
+#
+# The Rust `cargo doc -- -D warnings` gate lives in ci.yml's `doc` job;
+# this workflow is markdown-only.
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".github/workflows/docs.yml"
+      - ".markdownlint.json"
+      - ".lycheeignore"
+  push:
+    branches: [main]
+    paths:
+      - "**/*.md"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  markdownlint:
+    name: markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          # If .markdownlint.json doesn't exist the action uses defaults;
+          # we lint the docs/ tree and top-level README.
+          globs: |
+            docs/**/*.md
+            README.md
+            CHANGELOG.md
+        continue-on-error: true
+
+  lychee-links:
+    name: lychee link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve changed markdown files
+        id: changed
+        # On PR: only check files this PR actually touched. On
+        # push/dispatch: check everything under docs/.
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            git fetch --no-tags --depth=50 origin "$BASE" || true
+            FILES=$(git diff --name-only --diff-filter=AM "$BASE" "$HEAD" -- '*.md' | tr '\n' ' ')
+          else
+            FILES=$(git ls-files 'docs/*.md' 'docs/**/*.md' 'README.md' | tr '\n' ' ')
+          fi
+          if [ -z "${FILES// /}" ]; then
+            echo "no markdown files to scan"
+            echo "files=" >> "$GITHUB_OUTPUT"
+          else
+            echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run lychee
+        if: steps.changed.outputs.files != ''
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: |
+            --no-progress
+            --max-concurrency 4
+            --timeout 30
+            --accept 200,206,429
+            ${{ steps.changed.outputs.files }}
+          fail: true

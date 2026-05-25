@@ -1,0 +1,125 @@
+name: Release
+
+# Tag-push release workflow. Triggers on annotated tags matching
+# `v*.*.*` (e.g. v0.1.0, v1.4.2-rc1) on main.
+#
+# What this DOES:
+#   1. Builds release binaries for cavectl + cave-portal-web on
+#      ubuntu-latest and macos-latest.
+#   2. Drafts a GitHub release with the binaries attached.
+#
+# What this does NOT do:
+#   - cargo publish: cave-* crates are workspace-internal and not
+#     published to crates.io.
+#   - Docker image push: handled separately by infra once the registry
+#     layout is settled.
+#   - Homebrew tap update: deferred until v0.2.0.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.1). Must already exist on main."
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # One release at a time per tag.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.target }}
+
+      - name: Build release binaries
+        run: |
+          cargo build --release --target ${{ matrix.target }} \
+            -p cave-cli \
+            -p cave-portal-web
+
+      - name: Package
+        id: package
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          if [ "$TAG" = "" ] || [ "$TAG" = "release.yml" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          OUT="cave-runtime-${TAG}-${{ matrix.target }}"
+          mkdir -p "dist/$OUT"
+          cp target/${{ matrix.target }}/release/cavectl       "dist/$OUT/" || true
+          cp target/${{ matrix.target }}/release/cave-portal-web "dist/$OUT/" || true
+          cp README.md LICENSE "dist/$OUT/" || true
+          tar -C dist -czf "dist/$OUT.tar.gz" "$OUT"
+          sha256sum "dist/$OUT.tar.gz" > "dist/$OUT.tar.gz.sha256"
+          {
+            echo "archive=dist/$OUT.tar.gz"
+            echo "sha256=dist/$OUT.tar.gz.sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cave-runtime-${{ matrix.target }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.sha256 }}
+          retention-days: 30
+
+  draft-release:
+    name: Draft GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          if [ "$TAG" = "release.yml" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.sha256
