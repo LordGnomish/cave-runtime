@@ -1701,6 +1701,8 @@
       "upstream_version": "v0.36.0"
     },
     "cave-sign": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 183,
       "honest_ratio": 0.5385,
       "last_audit_disk": "2026-05-22",
