@@ -29,4 +29,5 @@ hex = "0.4"
 sha2 = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true, features = ["macros", "rt"] }
