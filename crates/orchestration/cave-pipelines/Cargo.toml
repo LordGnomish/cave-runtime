@@ -17,3 +17,6 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
