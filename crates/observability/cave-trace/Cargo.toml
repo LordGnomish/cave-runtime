@@ -27,4 +27,5 @@ tracing = { workspace = true }
 base64 = "0.22"
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
