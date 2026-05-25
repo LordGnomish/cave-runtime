@@ -1,0 +1,42 @@
+# Cave Runtime — code owners
+#
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/about-codeowners
+#
+# Anyone in a section's owner list is auto-requested for review on PRs
+# that touch matching paths. Later entries override earlier ones.
+#
+# Until a co-maintainer joins, @LordGnomish is the single owner of
+# everything. Sub-area rules are intentionally explicit so the file
+# doubles as a map of who-cares-about-what once the team grows.
+
+# Default — every path.
+* @LordGnomish
+
+# CI / GitHub config — review carefully, can break the whole repo.
+/.github/                @LordGnomish
+/.github/workflows/      @LordGnomish
+/.github/CODEOWNERS      @LordGnomish
+
+# Charter & ADRs — governance documents, immutable history.
+/docs/charter*           @LordGnomish
+/docs/adr/               @LordGnomish
+
+# Parity & compliance scaffolding — touched by automation, but humans
+# review the schema. (Crates moved to themed subdirs in 9c15b3fb;
+# patterns below use the post-reorg paths.)
+/crates/ops/cave-upstream/         @LordGnomish
+/crates/ops/cave-upstream-watchd/  @LordGnomish
+/docs/parity/                       @LordGnomish
+/scripts/build-parity-index.py      @LordGnomish
+
+# Security-sensitive crates — extra scrutiny.
+/crates/security/cave-vault/     @LordGnomish
+/crates/security/cave-identity/  @LordGnomish
+/crates/security/cave-policy/    @LordGnomish
+/crates/security/cave-sign/      @LordGnomish
+/crates/security/cave-trivy/     @LordGnomish
+
+# Licensing & legal headers — every .rs file enforces SPDX via CI.
+LICENSE                  @LordGnomish
+deny.toml                @LordGnomish
+/scripts/check-spdx.sh   @LordGnomish

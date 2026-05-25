@@ -1,0 +1,63 @@
+# Dependabot configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Two ecosystems:
+#   1. cargo            — Rust dependency updates. Grouped by semver
+#                          level so minor/patch updates land as one PR
+#                          per week instead of dozens.
+#   2. github-actions   — Action version bumps for everything under
+#                          .github/workflows/. Critical for supply-chain
+#                          hygiene; cargo-deny advisories track Rust
+#                          deps but actions are out of band.
+
+version: 2
+
+updates:
+  # Rust workspace.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - rust
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      # Minor + patch updates collapse into a single weekly PR — saves
+      # noise on each tokio/serde/tracing tick.
+      cargo-minor-patch:
+        update-types:
+          - minor
+          - patch
+      # Security advisories ride alone so reviewers see them quickly.
+      cargo-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions in .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
+      include: scope
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch
