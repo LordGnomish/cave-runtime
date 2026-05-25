@@ -21,4 +21,5 @@ bytes = { workspace = true }
 prometheus-client = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
