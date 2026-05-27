@@ -87,3 +87,6 @@ tmp/
 queue/*.lock
 queue/*.bak
 **/runtime-tasks.yaml.lock
+
+# tools/night-pump generates its own Cargo.lock
+tools/night-pump/Cargo.lock

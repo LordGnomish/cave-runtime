@@ -52,7 +52,6 @@ time = { version = "0.3", features = ["std"] }
 base64 = "0.22"
 hex = "0.4"
 rand = "0.8"
-rsa = { version = "0.9", features = ["sha2"] }
 sha2 = "0.10"
 async-trait = { workspace = true }
 parking_lot = { workspace = true }
