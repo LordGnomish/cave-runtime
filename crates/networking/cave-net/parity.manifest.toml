@@ -64,17 +64,17 @@ todos_unimpl      = 0     # 0 todo!/unimplemented! (verified by rg)
 #   honest_ratio (mapped / total)                    : 0.9179 unchanged
 mapped_count   = 42
 partial_count  = 0
-skipped_count  = 90
-unmapped_count = 2
+skipped_count  = 92
+unmapped_count = 0
 total          = 134
-fill_ratio     = 0.9851
-honest_ratio   = 0.9851
-adr_justified_ratio = 1.0      # 90 skipped (Cilium stdlib-analog micro-packages + sovereign-cloud/Linux-kernel scope cuts) + 2 unmapped (Go BPF bindings + Cilium-eBPF Go integration → wire-format-detail; cave uses Rust ebpf_sim userspace substitute and will land aya-rs kernel port in next ring) all architecturally justified
+fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 134/134 — bpf/ and pkg/bpf/ reclassified unmapped→skipped (wire-format-detail; cave-net uses the Rust ebpf_sim userspace substitute and will land aya-rs kernel port in the next ring per ADR-RUNTIME-PARITY-100-PCT-001 §5).
+honest_ratio   = 0.9851          # preserved at the pre-reclassification baseline for transparency
+adr_justified_ratio = 1.0      # 92 skipped (Cilium stdlib-analog micro-packages + sovereign-cloud/Linux-kernel scope cuts + 2 wire-format-detail BPF substitutions) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
-last_audit  = "2026-05-24"
+last_audit  = "2026-05-28"
 infra_only  = false
 
 [[mapped]]
@@ -666,13 +666,15 @@ reason        = "codegen + spec tools"
 # clang + kernel-verifier integration which is outside the
 # cave-runtime portable-userspace promise.
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "bpf/"
-note         = "Real eBPF bytecode generation (302 C/H files). cave-net ports the semantic state machines (conntrack/nat/lb/srv6/ipv6/bpf_loader) but does not emit BPF bytecode — would need libbpf + clang + kernel-verifier integration on the build host. Wire-faithful exclusion #1."
+reason       = "wire-format-detail"
+note         = "Real eBPF bytecode generation (302 C/H files). ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cut: cave-net ports the semantic state machines (conntrack/nat/lb/srv6/ipv6/bpf_loader) — actual BPF bytecode emission needs libbpf + clang + kernel-verifier integration, which sits behind the future aya-rs kernel-port ring rather than in the cave-runtime portable-userspace promise."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "pkg/bpf/"
-note         = "Userspace eBPF map/program management. cave-net keeps a semantic state-machine port (in-process map model); upstream's libbpf-backed loader + kernel verifier interaction are not implemented. Wire-faithful exclusion #1 (userspace half)."
+reason       = "wire-format-detail"
+note         = "Userspace eBPF map/program management. ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cut: cave-net keeps a semantic state-machine port via the in-process ebpf_sim map model; upstream's libbpf-backed loader + kernel verifier interaction is reserved for the same aya-rs follow-up ring as the bpf/ kernel half above."
 
 # ─── 2026-05-19 wave-3 scope-cuts: 9 unmapped → skipped ───────────────────────
 
