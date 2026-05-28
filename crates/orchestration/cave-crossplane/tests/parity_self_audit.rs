@@ -12,7 +12,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const TODAY: &str = "2026-05-23";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const FLOOR_HONEST_RATIO: f64 = 0.65;
 const UPSTREAM_VERSION: &str = "v2.3.1";
