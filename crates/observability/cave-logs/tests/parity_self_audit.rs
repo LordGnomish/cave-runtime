@@ -21,12 +21,16 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.45;
 const CRATE_NAME: &str = "cave-logs";
 
 fn workspace_root() -> PathBuf {
+    // Crate now lives at crates/<theme>/<crate>/ after the 2026-05-25 theme
+    // reorg — pop three components (crate, theme, crates) to reach the
+    // workspace root instead of two.
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+    p.pop();
     p.pop();
     p.pop();
     p
@@ -117,9 +121,14 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_crate_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // Post-theme-reorg, workspace.members uses the glob "crates/*/*" rather
+    // than per-crate entries — accept either form so the assertion survives
+    // the change.
+    let themed_glob = cargo.contains("\"crates/*/*\"");
+    let flat_member = cargo.contains(&format!("\"crates/{}\"", CRATE_NAME));
     assert!(
-        cargo.contains(&format!("\"crates/{}\"", CRATE_NAME)),
-        "root Cargo.toml [workspace.members] must list \"crates/{}\"",
+        themed_glob || flat_member,
+        "root Cargo.toml [workspace.members] must enumerate crates/{} or use the themed glob crates/*/*",
         CRATE_NAME
     );
 }
