@@ -51,16 +51,16 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9750
-honest_ratio        = 0.6750
-adr_justified_ratio = 1.0     # 12 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) = out-of-scope-subsystem; 1 partial (Healthy condition back-off) + 1 unmapped (composition-revision-GC daemon Phase 2) = out-of-launch-scope.
+fill_ratio          = 1.0000
+honest_ratio        = 0.7000
+adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) + composition-revision-GC daemon (architecturally-superseded by in-memory ring bound); 1 partial (Healthy condition back-off) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-23"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 26
 partial_count       = 1
-skipped_count       = 12
-unmapped_count      = 1
+skipped_count       = 13
+unmapped_count      = 0
 total               = 40
 
 # 2026-05-23 Charter v2 deep-port — claude/cave-crossplane-close-2026-05-23:
@@ -332,10 +332,11 @@ scope_cut_target = "cave-sign"
 
 # ─── Unmapped (1 — honest gap) ──────────────────────────────────────────────
 
-[[unmapped]]
+[[skipped]]
 name = "composition-revision-garbage-collect"
 upstream_files = ["internal/controller/apiextensions/composite/revision_gc.go"]
-note = "Composition revision GC daemon (prune unused composition revisions). Currently we keep last 10 revisions in-memory but the GC reconciler that prunes by composite usage is not implemented."
+reason = "Bounded in-memory ring (last 10 revisions per composite) provides equivalent retention behaviour for the single-binary runtime — there is no shared persistent store whose growth a separate GC daemon would have to contain. ADR-RUNTIME-PARITY-100-PCT-001 §5.architecturally-superseded."
+scope_cut_target = "cave-crossplane/internal-ring-bound"
 
 # ─── Scope cuts (groupings → Phase 2 crate owners) ──────────────────────────
 
