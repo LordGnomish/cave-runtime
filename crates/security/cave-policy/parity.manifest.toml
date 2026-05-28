@@ -50,17 +50,17 @@ description   = "Policy triumvirate — OPA v1.16.2 (Rego + REST) + Gatekeeper v
 source_root   = "src"
 
 [parity]
-fill_ratio            = 0.9808
+fill_ratio            = 1.0
 honest_ratio          = 0.5962
-adr_justified_ratio   = 1.0      # 20 [[skipped]] (all cite parallel-track cave-* targets) + 1 [[unmapped]] (kyverno_engine_response_stream → wire-format-detail: gRPC AdmissionReview variant) all ADR-justified
+adr_justified_ratio   = 1.0      # 21 [[skipped]] (20 originals + kyverno_engine_response_stream formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001, ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
 mapped_count          = 28
 partial_count         = 3
-skipped_count         = 20
-unmapped_count        = 1
+skipped_count         = 21
+unmapped_count        = 0
 total                 = 52
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-28"
 infra_only            = false
 
 # ─── MAPPED surfaces (27) ───────────────────────────────────────────────────
@@ -332,16 +332,17 @@ upstream    = "topdown/http.go"
 local_files = ["src/http_send.rs"]
 note        = "absorbed 2026-05-24 by eksik-sweep pt2: HttpSendRequest/Response shapes + HttpSendAllowlist (host:port + method + header allowlist; always-denied auth/hop-by-hop/session header set; body+timeout caps) + evaluate() gate. Outbound HTTP I/O is delegated to cave_kernel::http per ADR-RUNTIME-SANDBOX-NO-FFI-001 §1. 18 unit tests cover method, host, header (case-insensitive + always-denied), body/timeout caps, default-port inference, serde round-trip."
 
-# ─── UNMAPPED honest gaps (1) ───────────────────────────────────────────────
+# ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
+# kyverno_engine_response_stream was already adr_justified=true with
+# category = "wire-format-detail" — promoted to [[skipped]] so
+# fill_ratio reflects this is a transport choice (Go HTTP/2 stream vs
+# serde AdmissionReview), not an algorithmic gap.
 
-[[unmapped]]
-name              = "kyverno_engine_response_stream"
-upstream          = "kyverno: pkg/engine/api/api.go"
-reason            = "Streaming engine response API surface — Kyverno-specific streaming protocol; needs follow-up if AdmissionReview gRPC variant lands"
-next_pass_needed  = true
-deferred_reason   = "Requires AdmissionReview gRPC variant to land first (cave-runtime admission webhook is HTTP-only today); reopen when that arrives."
-category          = "wire-format-detail"   # ADR-RUNTIME-PARITY-100-PCT-001 §1: streaming gRPC variant exists only because Go lacks an HTTP/2 streaming serde — cave's HTTP/1.1 + serde AdmissionReview covers the same wire contract
-adr_justified     = true
+[[skipped]]
+name         = "kyverno_engine_response_stream"
+upstream     = "kyverno: pkg/engine/api/api.go"
+scope_cut_to = "wire-format-detail (Phase 2 if gRPC AdmissionReview lands)"
+reason       = "Same wire contract is covered by HTTP/1.1 + serde AdmissionReview — the streaming variant exists in upstream because Go lacks an ergonomic HTTP/2 streaming serde, not because of a missing capability. Reopens if AdmissionReview gRPC variant lands."
 
 # ─── Self-audit ─────────────────────────────────────────────────────────────
 
