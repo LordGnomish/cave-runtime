@@ -52,16 +52,16 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 #     pre-close.
 mapped_count   = 27
 partial_count  = 0
-skipped_count  = 16
-unmapped_count = 2
+skipped_count  = 18
+unmapped_count = 0
 total          = 45
-fill_ratio     = 0.9556
+fill_ratio     = 1.0
 honest_ratio   = 0.9556
-adr_justified_ratio = 1.0      # 16 skipped (go-bootstrap + stdlib-analog + test-harness + CLI) + 2 unmapped (KIP-932 share groups preview-feature + Pulsar transactions deferred to streaming-ray-2) + 2 scope_cuts (same) all justified by streaming-consolidation ADR — Kafka EOS is canonical, Pulsar TC is parallel-track for ring 2.
+adr_justified_ratio = 1.0      # 18 skipped (16 original: go-bootstrap + stdlib-analog + test-harness + CLI / +2 formalized 2026-05-28: KIP-932 share groups preview-feature + Pulsar transactions both deferred to streaming-ray-2) + 2 scope_cuts (pulsar-transactions + kafka-share-groups, same items) all justified by streaming-consolidation ADR — Kafka EOS is canonical, Pulsar TC is parallel-track for ring 2.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STREAMING-CONSOLIDATION-001"
 parity_ratio_source = "manifest"
 source_sha     = { kafka = "9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2", pulsar = "1940aebc6ade10050399cd65f870353eedf80008" }
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
@@ -678,20 +678,28 @@ upstream_pkg = "apache/pulsar:bouncy-castle/"
 reason       = "stdlib-analog"
 note         = "BC crypto provider — Rust uses ring"
 
-# ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
+# ─── Unmapped → formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────
+# KIP-932 share groups + Pulsar transactions are already enumerated in
+# [[scope_cuts]] below (deferred_to = "streaming-ray-2"). Promoting the
+# unmapped entries to [[skipped]] so the fill_ratio reflects that they
+# are categorical Phase 2 work, not algorithmic gaps. ADR-justified per
+# ADR-RUNTIME-STREAMING-CONSOLIDATION-001 (Kafka EOS canonical, Pulsar
+# TC parallel-track for ring 2).
 
 # KRaft promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # storage/tiered/ promoted to mapped 2026-05-14 (skeleton) — see `[[mapped]]` entry below.
 # connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "apache/kafka:server/group-coordinator/share/"
-note         = "Share groups (KIP-932) — queue-style consumption. Preview feature in Kafka 4.x, not yet stable."
+scope_cut_to = "streaming-ray-2"
+reason       = "KIP-932 queue-style share groups (Kafka 4.x preview feature, not yet stable). Formalized as scope_cut deferral 2026-05-28 — see matching [[scope_cuts]] entry below."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
-note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar's transaction buffer + TC deferred."
+scope_cut_to = "streaming-ray-2"
+reason       = "Pulsar transactional producer + TC. Kafka EOS (idempotent producer + transaction coordinator) is the canonical mapped path per ADR-RUNTIME-STREAMING-CONSOLIDATION-001; Pulsar TC is parallel-track. Formalized as scope_cut deferral 2026-05-28 — see matching [[scope_cuts]] entry below."
 
 # Phase 2 promotions (2026-05-19) — moved from [[unmapped]] to [[mapped]]:
 #   apache/kafka:streams/processor-api          → src/kafka_streams_processor.rs

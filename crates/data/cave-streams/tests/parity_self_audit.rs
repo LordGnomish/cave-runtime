@@ -18,15 +18,22 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.0;
 
 fn workspace_root() -> PathBuf {
+    // Walk up from CARGO_MANIFEST_DIR until we find a directory containing
+    // both `Cargo.toml` and `docs/` — theme-reorg-safe (crates/<theme>/<crate>).
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
-    // CARGO_MANIFEST_DIR -> crates/cave-streams, parent twice = repo root
-    p.pop();
-    p.pop();
-    p
+    for _ in 0..6 {
+        if p.join("Cargo.toml").exists() && p.join("docs").is_dir() {
+            return p;
+        }
+        if !p.pop() {
+            break;
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
 fn manifest_text() -> String {
@@ -126,8 +133,8 @@ fn assertion_5_cave_streams_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
     assert!(
-        cargo.contains("\"crates/cave-streams\""),
-        "root Cargo.toml [workspace.members] must list \"crates/cave-streams\""
+        cargo.contains("\"crates/*/*\"") || cargo.contains("\"crates/cave-streams\""),
+        "root Cargo.toml [workspace.members] must cover cave-streams (themed glob or explicit)"
     );
 }
 
