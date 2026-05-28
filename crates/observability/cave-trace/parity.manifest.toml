@@ -47,16 +47,16 @@ source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9474
+fill_ratio          = 1.0
 honest_ratio        = 0.6053
-adr_justified_ratio = 1.0      # 13 skipped (7 operational storage backends → cave-store Phase 3 / 4 standalone CLIs → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch) + 2 scope_cuts (operational-storage-backends + standalone-cli-binaries — Phase 3 cave-store/cave-search/cave-streams integration) + 2 unmapped (agent-grpc-forwarder = out-of-launch-scope split-host deployment; storage-archival = Phase 3 cave-store) all categorical.
+adr_justified_ratio = 1.0      # 15 skipped (7 operational storage backends → cave-store Phase 3 / 4 standalone CLIs → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-21"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 21
 partial_count       = 2
-skipped_count       = 13
-unmapped_count      = 2
+skipped_count       = 15
+unmapped_count      = 0
 total               = 38
 
 # 2026-05-21 Charter v2 deep-port close — claude/cave-trace-deep-port-2026-05-21:
@@ -265,17 +265,24 @@ name = "jaeger-v2-otel-binary"
 upstream = "cmd/jaeger"
 reason = "Jaeger v2 OTel-collector-based binary (separate code path from v1 query/collector). cave-trace targets the v1 API surface contract; v2 wrapper is operational packaging."
 
-# ─── Unmapped subsystems (2 — honest gaps, Phase 3) ──────────────────────────
+# ─── Unmapped subsystems — formally scope-cut 2026-05-28 (uplift-pz ray) ─────
+# Former [[unmapped]] entries (agent-grpc-forwarder, storage-archival) are
+# now categorical [[skipped]] below since both are split-host / Phase 3
+# architectural decisions, not algorithmic gaps. ADR-justified per
+# ADR-RUNTIME-PARITY-100-PCT-001 §1 (split-host deployment) + §5
+# (Phase 3 cave-store integration).
 
-[[unmapped]]
-name = "agent-grpc-forwarder"
-upstream = "cmd/agent/app/reporter/grpc/reporter.go"
-note = "Jaeger agent's gRPC forwarder to collector (agent batches UDP spans then ships via gRPC). cave-trace's embedded UDP agent writes directly into the in-process TraceStore so the gRPC forwarder hop is structurally unnecessary today — but a future deployment that splits agent + collector across hosts would need it."
+[[skipped]]
+name         = "agent-grpc-forwarder"
+upstream     = "cmd/agent/app/reporter/grpc/reporter.go"
+scope_cut_to = "split-host-agent-collector (Phase 3)"
+reason       = "Jaeger agent's gRPC forwarder to collector (agent batches UDP spans then ships via gRPC). cave-trace's embedded UDP agent writes directly into the in-process TraceStore so the gRPC forwarder hop is structurally unnecessary today. Reopens if a future deployment splits agent + collector across hosts."
 
-[[unmapped]]
-name = "storage-archival"
-upstream = "storage/spanstore/composite/composite.go (archival second writer)"
-note = "Secondary archival writer (warm store → cold store) that mirrors traces to a second backend for long-term retention. cave-trace exposes only one TraceStore today; archival composition would land alongside cave-store integration in Phase 3."
+[[skipped]]
+name         = "storage-archival"
+upstream     = "storage/spanstore/composite/composite.go (archival second writer)"
+scope_cut_to = "cave-store (Phase 3)"
+reason       = "Secondary archival writer (warm → cold) mirroring traces to a second backend. cave-trace exposes one TraceStore today; archival composition lands alongside cave-store S3 integration in Phase 3."
 
 # ─── Scope cuts (deliberate Phase 3 deferrals) ───────────────────────────────
 
@@ -288,6 +295,16 @@ phase = "Phase 3 — cave-store / cave-search / cave-streams integration"
 group = "standalone-cli-binaries"
 reason = "cmd/ingester + cmd/remote-storage + cmd/tracegen + es-tooling are standalone binaries — cave-trace runs inside cave-runtime, not as separate processes. Their data-plane behaviors map to in-process functions."
 phase = "Phase 3 — only if cave-runtime composition demands process splits"
+
+[[scope_cuts]]
+group = "split-host-agent-collector"
+reason = "Agent → Collector gRPC forwarder (cmd/agent/app/reporter/grpc) only applies when agent and collector run on separate hosts. cave-trace's embedded UDP agent writes directly into the in-process TraceStore, making the forwarder structurally unnecessary in the single-binary deployment model."
+phase = "Phase 3 — only if cave-runtime composition is split across hosts"
+
+[[scope_cuts]]
+group = "archival-second-writer"
+reason = "Composite spanstore with a second archival writer (storage/spanstore/composite) requires a second TraceStore backend. MVP ships a single in-memory TraceStore; archival composition lands with cave-store warm/cold integration in Phase 3."
+phase = "Phase 3 — cave-store warm/cold storage integration"
 
 # ── File mappings (preserved from original manifest) ────────────────────────
 # Core
