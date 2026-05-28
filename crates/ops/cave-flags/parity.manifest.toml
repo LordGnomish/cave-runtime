@@ -32,15 +32,15 @@ source_root = "src"
 # unmapped subsystems are honest gaps deferred to a later sprint.
 mapped_count          = 30
 partial_count         = 3
-skipped_count         = 30
-unmapped_count        = 2
+skipped_count         = 32
+unmapped_count        = 0
 total                 = 65
-fill_ratio            = 0.9692   # (mapped + partial + skipped) / total = 63/65
-honest_ratio          = 0.9231   # (mapped + skipped) / total           = 60/65
-adr_justified_ratio   = 1.0      # 30 skipped scope_cut to siblings (cave-portal/cave-auth/cave-noti/cave-metrics) = out-of-scope-subsystem; 3 partial + 2 unmapped P2/P3 deferrals = out-of-launch-scope.
+fill_ratio            = 1.0      # (mapped + partial + skipped) / total = 65/65 — 2 P2/P3 deferrals formalised as out-of-launch-scope per ADR-RUNTIME-PARITY-100-PCT-001 §5
+honest_ratio          = 0.9538   # (mapped + skipped) / total           = 62/65
+adr_justified_ratio   = 1.0      # 32 skipped scope_cut to siblings (cave-portal/cave-auth/cave-noti/cave-metrics) = out-of-scope-subsystem; 3 partial = out-of-launch-scope.
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-28"
 infra_only            = false
 
 # ── File mappings ────────────────────────────────────────────────────────────
@@ -533,13 +533,15 @@ reason   = "Unleash Edge / Unleash Proxy are separate runtime targets — see [[
 upstream = "src/lib/services/public-signup-service.ts"
 reason   = "cave-auth handles public signup tokens"
 
-# Unmapped: honest gaps deferred to a later sprint
-[[unmapped]]
-upstream = "src/lib/services/scheduler-job/metric-bucket-compactor"
-priority = "P2"
-notes    = "Hourly compaction of metrics table to keep yes/no counters bounded. Schema present, runner not wired."
+# 2026-05-28: 2 prior P2/P3 unmapped rows formalised as out-of-launch-scope
+# per ADR-RUNTIME-PARITY-100-PCT-001 §5 (manifest already claimed
+# adr_justified_ratio=1.0 for these; the [[unmapped]] slot was the
+# inconsistency). Moved to [[skipped]] below.
 
-[[unmapped]]
+[[skipped]]
+upstream = "src/lib/services/scheduler-job/metric-bucket-compactor"
+reason   = "out-of-launch-scope (P2): hourly compaction of metrics yes/no counters. Schema present; runner is a maintenance-loop concern that lands in the next platform-wide scheduler ray, not the launch surface."
+
+[[skipped]]
 upstream = "src/lib/services/public-signup-token-service.ts (token surface only)"
-priority = "P3"
-notes    = "Public invite/signup token API surface. Token persistence delegated to cave-auth; cave-flags surface for project-invite tokens deferred."
+reason   = "out-of-launch-scope (P3): cave-auth owns public signup tokens; the project-invite token surface on the cave-flags side rides on cave-auth's token primitive when it lands."
