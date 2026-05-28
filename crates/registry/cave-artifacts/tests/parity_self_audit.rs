@@ -105,13 +105,13 @@ fn parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_19() {
+fn parity_last_audit_is_2026_05_28() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-19"),
-        "[parity] last_audit must reflect the 2026-05-19 Charter v2 close-out"
+        Some("2026-05-28"),
+        "[parity] last_audit must reflect the 2026-05-28 fill-ratio-to-1.0 uplift close"
     );
 }
 
