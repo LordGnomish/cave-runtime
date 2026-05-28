@@ -37,15 +37,15 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 # as `skipped`. Items declared in-scope but not yet built are `unmapped`.
 mapped_count          = 23
 partial_count         = 3
-skipped_count         = 25
-unmapped_count        = 1
+skipped_count         = 26
+unmapped_count        = 0
 total                 = 52
-fill_ratio            = 0.9808   # (mapped + partial + skipped) / total = 51/52
-honest_ratio          = 0.9231   # (mapped + skipped) / total = 48/52 — partial excluded
-adr_justified_ratio   = 1.0      # 25 skipped (FerretDB/MongoDB out-of-scope features) + 1 unmapped all architecturally justified
+fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 52/52
+honest_ratio          = 0.9423   # (mapped + skipped) / total = 49/52 — partial excluded
+adr_justified_ratio   = 1.0      # 26 skipped (FerretDB/MongoDB out-of-scope features + formerly-tracked CSFLE/range-encryption deferral via persistence-consolidation ADR) all architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5.persistence-consolidation
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-28"
 infra_only            = false
 [module]
 name        = "cave-docdb"

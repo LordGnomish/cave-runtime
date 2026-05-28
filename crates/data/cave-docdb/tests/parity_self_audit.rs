@@ -49,8 +49,8 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_24() {
-    assert!(has_kv(&read_manifest(), "last_audit", "\"2026-05-24\""));
+fn gate_3_last_audit_2026_05_28() {
+    assert!(has_kv(&read_manifest(), "last_audit", "\"2026-05-28\""));
 }
 
 #[test]
