@@ -656,29 +656,32 @@ async fn api_cloud_controller_manager_parity() -> axum::Json<serde_json::Value> 
     }
 }
 
-/// Middleware that forces `Cache-Control: no-store` on every `/api/*`
-/// response so browsers (and intermediaries) re-fetch live data instead
-/// of replaying a cached snapshot. The portal compliance/parity views
+/// Middleware that forces `Cache-Control: no-store` on every response so
+/// browsers (and intermediaries) re-fetch live HTML and JSON instead of
+/// replaying a cached snapshot. The portal compliance/parity views
 /// re-render on every navigation and stale rows from a 5-minute-old
 /// cache confused operators during the 2026-05-26 deep-audit-refactor
-/// ray.
+/// ray. The 2026-05-27 portal-v3 fix scoped this to `/api/*` only, which
+/// left the HTML portal_index + per-module SSR pages unprotected — back
+/// button / bfcache then replayed pre-restart renders. portal-v4 extends
+/// the policy to every path. Cost is zero: there are no static assets
+/// (no ServeDir/bundle), the only sizeable response is the 82KB
+/// self-contained `portal_index.html`, and Compression+TraceLayer still
+/// run upstream.
 async fn api_no_cache_layer(
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     use axum::http::{HeaderValue, header};
 
-    let is_api = req.uri().path().starts_with("/api/");
     let mut response = next.run(req).await;
-    if is_api {
-        let h = response.headers_mut();
-        h.insert(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
-        );
-        h.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
-        h.insert(header::EXPIRES, HeaderValue::from_static("0"));
-    }
+    let h = response.headers_mut();
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
+    );
+    h.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    h.insert(header::EXPIRES, HeaderValue::from_static("0"));
     response
 }
 
