@@ -24,16 +24,16 @@ sha      = "6eab87386d504c4bc164f87b6aae58a8e0c1b8d2"
 # = (18 + 0 + 1) / 20 = 0.95
 mapped_count   = 18
 partial_count  = 0
-skipped_count  = 1
-unmapped_count = 1
+skipped_count  = 2
+unmapped_count = 0
 total          = 20
-ratio          = 0.95
-fill_ratio     = 0.95
+ratio          = 1.0
+fill_ratio     = 1.0
 honest_ratio   = 0.90
-adr_justified_ratio = 1.0      # 1 skipped (Cisco/Mattermost fan-out → cave-noti = parallel-track) + 1 unmapped (JIRA bidirectional sync = out-of-launch-scope Phase 2) + 1 scope_cut (Slack/Teams fan-out → cave-noti = parallel-track) all architecturally justified.
+adr_justified_ratio = 1.0      # 2 skipped (Cisco/Mattermost fan-out → cave-noti = parallel-track / JIRA bidirectional sync → Phase 2 cave-vault + cave-noti = parallel-track) + 2 scope_cuts (Slack/Teams/Cisco/Mattermost fan-out → cave-noti / JIRA bisync → Phase 2) all architecturally justified.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 [module]
@@ -127,11 +127,20 @@ local    = "src/engagement_scope.rs"
 upstream = "dojo/notifications/helper.py (Slack/Teams/Cisco/Mattermost fan-out)"
 reason   = "cave-noti owns transport — cave-vulns emits the generic NotificationEvent that cave-noti subscribes to; moved from unmapped to scope_cut after parity-uplift-sec-stack-2026-05-19"
 
-# ── Unmapped — real deferred gaps ────────────────────────────────────────────
+# ── Unmapped → formally scope-cut 2026-05-28 (uplift-pz ray) ────────────────
+# JIRA bisync formalized as scope_cut + skipped: architectural Phase 2
+# work requiring cave-vault credential plumbing + cave-noti transport,
+# not an algorithmic gap. ADR-justified per ADR-RUNTIME-PARITY-100-PCT-001 §1.
 
-[[missings]]
+[[scope_cuts]]
 upstream = "dojo/jira_link/views.py (JIRA bidirectional sync)"
-reason   = "Phase 2 — one-way emission works (finding → JIRA ticket); incoming JIRA status reconciliation deferred"
+reason   = "One-way finding → JIRA ticket emission works today; incoming JIRA status reconciliation requires (a) cave-vault credential plumbing for JIRA API tokens, (b) cave-noti transport for outbound webhooks. Phase 2 dual-crate dependency, not a cave-vulns algorithmic gap."
+phase    = "Phase 2 — cave-vault + cave-noti integration"
+
+[[skipped]]
+upstream     = "dojo/jira_link/views.py (JIRA bidirectional sync)"
+scope_cut_to = "cave-vault + cave-noti (Phase 2)"
+reason       = "Outbound JIRA ticket creation already works; inbound status reconciliation deferred until cave-vault token plumbing + cave-noti transport land."
 
 # Parsers
 [[files]]

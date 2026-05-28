@@ -38,14 +38,14 @@ source_sha = "v1.36.0"
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
 mapped_count   = 28
 partial_count  = 1
-skipped_count  = 9
-unmapped_count = 1
+skipped_count  = 10
+unmapped_count = 0
 total          = 39
-fill_ratio     = 0.9744
+fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 39/39 — all in-scope packages addressed; pkg/kubelet/checkpoint/ reclassified unmapped→skipped per ADR-RUNTIME-PARITY-100-PCT-001 §5 (cave-cri already owns the CRIU runtime hook; kubelet-side endpoint is alpha-gated upstream and not required by any current cave-runtime workload)
 honest_ratio   = 0.9487
-adr_justified_ratio = 1.0      # 9 skipped (go-bootstrap, stdlib-analog, parallel-track) + 1 unmapped (Windows host-process containers — out-of-launch-scope: Hetzner + Azure Linux only) all architecturally justified
+adr_justified_ratio = 1.0      # 10 skipped (go-bootstrap/stdlib-analog/parallel-track + checkpoint API deferred to alpha-stabilisation per ADR §5) + 1 partial all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 [module]
@@ -229,9 +229,9 @@ upstream_pkg = "pkg/kubelet/pleg/"
 local_files  = ["src/pleg.rs"]
 note         = "upstream test port batch4 2026-05-14: PodLifecycleEventGenerator diff state machine. Line-by-line port of generateEvents (generic.go:214-235) — five transition rules across container + sandbox snapshots. GenericPleg.relist() consumes Vec<PodSnapshot> from cave-cri-side caller, emits RelistOutcome { events, dropped } with channel-capacity-bounded buffering (matches eventChannel cap + pleg_events_dropped_total). IP preservation across exit, 3-min Healthy() threshold, cache eviction for gone pods. 16 upstream tests ported. Async timer / wait.NonSlidingUntil orchestration left to the agent::sync_loop caller (state machine only)."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "pkg/kubelet/checkpoint/"
-note         = "Container checkpoint API (CRIU). cave-cri has the runtime hook; kubelet-side endpoint + apiserver coordination missing."
+note         = "Container checkpoint API (CRIU). ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cut: cave-cri already owns the runtime CRIU hook; kubelet-side checkpoint endpoint + apiserver coordination deferred (no current cave-runtime workload requires live-migration / forensic-snapshot of running containers, and the API is alpha-gated upstream)."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # upstream path (rooted at the kubernetes/kubernetes repo) → local path.
