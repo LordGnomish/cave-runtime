@@ -15,16 +15,16 @@ source_sha = "0ab1452144d8f4d57c50b37ce50dad218868e950"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9583
+fill_ratio          = 1.0
 honest_ratio        = 0.6667
-adr_justified_ratio = 1.0      # 6 scope_cuts (React UI → cave-portal-ui, pod lifecycle → cave-cri/kubelet, metrics → cave-metrics, semaphore/mutex/rbac → cave-permission, CronWorkflow → cave-knative, GC → cave-controller-manager) + 1 unmapped (suspend/resume durable persist → Phase 2 cave-db + cave-controller-manager wakeup) all parallel-track per ADR-RUNTIME-STACK-001.
+adr_justified_ratio = 1.0      # 7 scope_cuts (React UI → cave-portal-ui, pod lifecycle → cave-cri/kubelet, metrics → cave-metrics, semaphore/mutex/rbac → cave-permission, CronWorkflow → cave-knative, GC → cave-controller-manager, suspend/resume persist → Phase 2 cave-db + cave-controller-manager wakeup) + 8 skipped (same: 7 originals + 1 formalized 2026-05-28 for suspend/resume durable persist) all parallel-track per ADR-RUNTIME-STACK-001.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-24"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 16
 partial_count       = 0
-skipped_count       = 7
-unmapped_count      = 1
+skipped_count       = 8
+unmapped_count      = 0
 total               = 24
 
 # 2026-05-24 close-out — claude/cave-workflows-close-2026-05-24:
@@ -150,12 +150,21 @@ group = "cave-controller-manager"
 reason = "Node-pruning GC + completed-workflow TTL belong in the controller-manager GC loop."
 items = ["completed-workflow-gc"]
 
-[[unmapped]]
-name = "workflow-suspend-resume-persist"
-upstream = "workflow/controller/operator.go (Suspend + Resume durable state)"
-note = "Suspend / Resume currently survives the executor reducer only — durable persistence (cave-db wiring so a Suspended workflow can resume across restarts) is Phase 2."
-next_pass_needed  = true
-deferred_reason   = "Requires cave-db schema for workflow snapshots (workflow_id, state JSON, suspended_at, resume_token) + cave-controller-manager wakeup signal. Marked 2026-05-24 by eksik-sweep pt2."
+# ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
+# workflow-suspend-resume-persist is architectural Phase 2 (cave-db
+# schema + cave-controller-manager wakeup signal), not an algorithmic
+# gap. ADR-justified per ADR-RUNTIME-PARITY-100-PCT-001 §1.
+
+[[scope_cuts]]
+group = "cave-db + cave-controller-manager"
+reason = "Suspend / Resume currently survives the executor reducer only — durable persistence (cave-db wiring so a Suspended workflow can resume across restarts) is Phase 2. Requires cave-db schema for workflow snapshots (workflow_id, state JSON, suspended_at, resume_token) + cave-controller-manager wakeup signal."
+items = ["workflow-suspend-resume-persist"]
+
+[[skipped]]
+name         = "workflow-suspend-resume-persist"
+upstream     = "workflow/controller/operator.go (Suspend + Resume durable state)"
+scope_cut_to = "cave-db + cave-controller-manager (Phase 2)"
+reason       = "In-memory Suspend/Resume reducer is mapped; cross-restart durable persistence is a Phase 2 cross-crate integration, not a cave-workflows algorithmic gap."
 
 [portal_ui]
 upstream_ui  = "Argo Workflows UI"
