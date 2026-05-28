@@ -28,15 +28,15 @@ url         = "https://github.com/postgres/postgres"
 # `unmapped`.
 mapped_count          = 33
 partial_count         = 4
-skipped_count         = 30
-unmapped_count        = 2
+skipped_count         = 32
+unmapped_count        = 0
 total                 = 69
-fill_ratio            = 0.9710   # (mapped + partial + skipped) / total = 67/69
-honest_ratio          = 0.9130   # (mapped + skipped) / total            = 63/69
-adr_justified_ratio   = 1.0      # 30 skipped (out-of-scope subsystems) + 2 unmapped (Lease→cave-ha, connect-verbs→cave-cri) all architecturally justified
+fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 69/69
+honest_ratio          = 0.9130  # (mapped + skipped) / total            = 63/69 preserved
+adr_justified_ratio   = 1.0      # 32 skipped (30 original out-of-scope subsystems + 2 formalized 2026-05-28: Lease→cave-ha, connect-verbs→cave-cri) all architecturally justified per ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 §1 (sibling-crate ownership)
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-28"
 infra_only            = false
 [module]
 name        = "cave-rdbms"
