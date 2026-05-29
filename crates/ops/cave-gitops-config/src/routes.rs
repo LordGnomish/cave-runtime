@@ -6,7 +6,7 @@ use crate::engine::PipelineEngine;
 use crate::models::{
     ClusterDestination, ClusterStatus, CreatePromiseRequest, CreateResourceRequestRequest, Promise,
     PromiseStatus, RegisterClusterRequest, ResourceRequest, ResourceRequestStatus, StateStoreEntry,
-    SyncStatus,
+    compare_state,
 };
 use crate::store::GitOpsStore;
 use axum::{
@@ -239,19 +239,28 @@ async fn create_request(
             &stored.namespace,
             &stored.name,
         );
+        let desired = format!(
+            "apiVersion: cave.dev/v1\nkind: {}\nmetadata:\n  name: {}\n  namespace: {}",
+            stored.promise_name, stored.name, stored.namespace
+        );
+        // Reconcile against any existing live entry at this path. A freshly
+        // written desired manifest with no live counterpart, or one that drifts
+        // from the live state, is OutOfSync (ArgoCD CompareAppState semantics).
+        let live = state
+            .store
+            .get_state_entry(&path)
+            .map(|e| e.content);
+        let sync_status = compare_state(&desired, live.as_deref());
         state.store.upsert_state_entry(StateStoreEntry {
             id: Uuid::new_v4(),
             path,
             cluster: cluster.clone(),
-            content: format!(
-                "apiVersion: cave.dev/v1\nkind: {}\nmetadata:\n  name: {}\n  namespace: {}",
-                stored.promise_name, stored.name, stored.namespace
-            ),
+            content: desired,
             checksum: format!("{:x}", stored.id.as_u128()),
             promise_name: stored.promise_name.clone(),
             resource_request_id: stored.id,
             last_synced: Some(Utc::now()),
-            sync_status: SyncStatus::Synced,
+            sync_status,
         });
     }
 
