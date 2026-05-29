@@ -19,7 +19,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{Path, State as AxumState},
+    extract::{Path, Query, State as AxumState},
     http::StatusCode,
     routing::{delete, get, post, put},
 };
@@ -81,11 +81,36 @@ async fn create_slo(
     (StatusCode::CREATED, Json(json))
 }
 
+/// Optional query parameter for the list endpoint.
+#[derive(Debug, Deserialize)]
+struct ListSlosQuery {
+    /// Filter SLOs by status: ok | at_risk | breaching | breached | unknown
+    status: Option<String>,
+}
+
 async fn list_slos(
     AxumState(state): AxumState<Arc<State>>,
-) -> Json<serde_json::Value> {
-    let slos = state.store.list();
-    Json(serde_json::to_value(slos).unwrap())
+    Query(params): Query<ListSlosQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let slos = if let Some(raw) = params.status {
+        let status = parse_slo_status(&raw).ok_or(StatusCode::BAD_REQUEST)?;
+        state.store.list_by_status(status)
+    } else {
+        state.store.list()
+    };
+    Ok(Json(serde_json::to_value(slos).unwrap()))
+}
+
+/// Parse a snake_case status string into [`SloStatus`].
+fn parse_slo_status(s: &str) -> Option<SloStatus> {
+    match s {
+        "ok" => Some(SloStatus::Ok),
+        "at_risk" => Some(SloStatus::AtRisk),
+        "breaching" => Some(SloStatus::Breaching),
+        "breached" => Some(SloStatus::Breached),
+        "unknown" => Some(SloStatus::Unknown),
+        _ => None,
+    }
 }
 
 async fn get_slo(
