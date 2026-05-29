@@ -21,24 +21,24 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/devlake/dora", get(dora_report))
         // Deployments
         .route("/api/devlake/deployments", get(list_deployments))
-        .route("/api/devlake/deployments/:id", get(get_deployment))
+        .route("/api/devlake/deployments/{id}", get(get_deployment))
         // Pipelines
         .route("/api/devlake/pipelines", get(list_pipelines))
-        .route("/api/devlake/pipelines/:id", get(get_pipeline))
+        .route("/api/devlake/pipelines/{id}", get(get_pipeline))
         // Incidents
         .route("/api/devlake/incidents", get(list_incidents))
-        .route("/api/devlake/incidents/:id", get(get_incident))
+        .route("/api/devlake/incidents/{id}", get(get_incident))
         // Pull Requests
         .route("/api/devlake/prs", get(list_prs))
-        .route("/api/devlake/prs/:id", get(get_pr))
+        .route("/api/devlake/prs/{id}", get(get_pr))
         // Commits
         .route("/api/devlake/commits", get(list_commits))
         // Issues
         .route("/api/devlake/issues", get(list_issues))
-        .route("/api/devlake/issues/:id", get(get_issue))
+        .route("/api/devlake/issues/{id}", get(get_issue))
         // Sprints
         .route("/api/devlake/sprints", get(list_sprints))
-        .route("/api/devlake/sprints/:id", get(get_sprint))
+        .route("/api/devlake/sprints/{id}", get(get_sprint))
         .with_state(state)
 }
 
