@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Tests for BM25 relevance scoring.
+//! Tests for BM25 relevance scoring — formula correctness, ranking, multi-term search.
 
 use cave_search::scoring::{bm25_score, BM25Params, rank_results, ScoredDoc};
 use cave_search::index::Index;
