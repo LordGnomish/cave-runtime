@@ -3,7 +3,7 @@
 //! Tests for trace/span/generation ingestion core.
 
 use cave_ai_obs::trace_store::{TraceStore, TraceStatus};
-use cave_ai_obs::trace_models::{Trace, Span, Generation, Score, Session, PromptTemplate};
+use cave_ai_obs::trace_models::{Trace, Span, Generation, Score, PromptTemplate};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -132,7 +132,7 @@ fn test_span_parent_child() {
 fn test_create_generation() {
     let store = TraceStore::new();
     let trace_id = Uuid::new_v4();
-    let gen = Generation {
+    let generation = Generation {
         id: Uuid::new_v4(),
         trace_id,
         parent_span_id: None,
@@ -150,7 +150,7 @@ fn test_create_generation() {
         end_time: None,
         metadata: serde_json::Value::Null,
     };
-    store.upsert_generation(gen.clone());
+    store.upsert_generation(generation.clone());
     let gens = store.get_generations_for_trace(&trace_id);
     assert_eq!(gens.len(), 1);
     assert_eq!(gens[0].model, "gpt-4o");
@@ -162,7 +162,7 @@ fn test_generation_cost_accuracy() {
     let store = TraceStore::new();
     let trace_id = Uuid::new_v4();
     for _ in 0..3 {
-        let gen = Generation {
+        let generation = Generation {
             id: Uuid::new_v4(),
             trace_id,
             parent_span_id: None,
@@ -180,7 +180,7 @@ fn test_generation_cost_accuracy() {
             end_time: None,
             metadata: serde_json::Value::Null,
         };
-        store.upsert_generation(gen);
+        store.upsert_generation(generation);
     }
     let gens = store.get_generations_for_trace(&trace_id);
     let total_cost: f64 = gens.iter().map(|g| g.cost_usd).sum();

@@ -8,13 +8,18 @@
 use std::sync::Arc;
 pub mod engine;
 pub mod models;
+pub mod prompt;
 pub mod routes;
+pub mod trace_models;
+pub mod trace_store;
 
 use axum::Router;
 
 /// Module state.
 #[derive(Default)]
-pub struct State {}
+pub struct State {
+    pub store: trace_store::TraceStore,
+}
 
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {
