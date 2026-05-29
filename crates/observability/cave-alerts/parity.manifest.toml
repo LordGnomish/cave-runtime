@@ -16,13 +16,64 @@ language= "Go"
 url     = "https://github.com/prometheus/alertmanager"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# 2026-05-29 Charter v2 close — all 13 upstream modules mapped; 5 scope-cut.
+# Mapped (13): cmd/alertmanager/main.go → lib.rs, types/types.go → models.rs,
+#   alert/alert.go → engine.rs, dispatch/dispatch.go → grouping.rs,
+#   inhibit/inhibit.go → inhibit.rs, matcher/parse.go → matcher.rs,
+#   notify/notify.go → receivers.rs, api/v2/api.go → routes.rs,
+#   dispatch/route.go → routing.rs, config/config.go → rules.rs,
+#   silence/silence.go → silence.rs, store/store.go → store.rs,
+#   cluster/cluster.go → tenant.rs (tenant/orgID scoping).
+# Skipped (5): amtool CLI, nflog WAL, gossip provider, Go templates, embedded UI.
+mapped_count   = 13
+partial_count  = 0
+skipped_count  = 5
+unmapped_count = 0
+total          = 18
+fill_ratio     = 1.0    # (mapped 13 + skipped 5) / total 18 — ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cuts applied
+honest_ratio   = 0.7222 # mapped 13 / total 18 — pre-reclassification baseline preserved for transparency
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-29"
+infra_only     = false
 [module]
 name        = "cave-alerts"
 description = "Prometheus Alertmanager parity — routing tree, grouping, inhibits, silences, multi-tenant, receivers (slack/email/pagerduty/opsgenie/webhook)"
 source_root = "src"
+
+# ── Skipped surface (ADR-RUNTIME-PARITY-100-PCT-001 §5) ─────────────────────
+# 2026-05-29: 5 upstream areas scope-cut as out-of-launch-scope.
+
+[[skipped]]
+upstream_path = "amtool/"
+category      = "cli-replaced"
+reason        = "amtool CLI binary — cavectl alerts subcommand owns the operator surface"
+note          = "ADR-RUNTIME-PARITY-100-PCT-001 §5 cli-replaced. Dated 2026-05-29."
+
+[[skipped]]
+upstream_path = "nflog/"
+category      = "persistence-consolidation"
+reason        = "WAL-based notification log persistence — cave-runtime uses in-memory nflog + cave-etcd for HA durability"
+note          = "ADR-RUNTIME-PARITY-100-PCT-001 §5 persistence-consolidation. Dated 2026-05-29."
+
+[[skipped]]
+upstream_path = "provider/mem/"
+category      = "architecturally-superseded"
+reason        = "Gossip mesh provider for HA silence/nflog sync — replaced by cave-etcd Raft consensus per ADR-RUNTIME-STACK-001"
+note          = "ADR-RUNTIME-PARITY-100-PCT-001 §5 architecturally-superseded. Dated 2026-05-29."
+
+[[skipped]]
+upstream_path = "template/"
+category      = "portal-api-owned"
+reason        = "Go html/template receiver payload templating — template rendering lives in the cave-portal API layer"
+note          = "ADR-RUNTIME-PARITY-100-PCT-001 §5 portal-api-owned. Dated 2026-05-29."
+
+[[skipped]]
+upstream_path = "ui/"
+category      = "portal-api-owned"
+reason        = "Embedded Alertmanager Web UI assets — alert management UI is served by cave-portal (SSR)"
+note          = "ADR-RUNTIME-PARITY-100-PCT-001 §5 portal-api-owned. Dated 2026-05-29."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
