@@ -15,8 +15,10 @@
 //!           /api/v1/reports, /api/v1/violations
 
 pub mod engine;
+pub mod evaluator;
 pub mod models;
 pub mod routes;
+pub mod store;
 
 use axum::Router;
 use engine::builtin_policies;
