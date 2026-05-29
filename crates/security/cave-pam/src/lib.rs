@@ -12,6 +12,7 @@ pub mod cert_authority;
 pub mod engine;
 pub mod models;
 pub mod node_inventory;
+pub mod proxy_tunnel;
 pub mod rbac;
 pub mod routes;
 pub mod session_recorder;
