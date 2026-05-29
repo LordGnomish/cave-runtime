@@ -2,6 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for the text analyzer: tokenization and stop-word filtering.
 
+use std::str::FromStr;
 use cave_search::analyzer::{tokenize, filter_stop_words, stem, normalize_token};
 use cave_search::tenant::TenantId;
 
