@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! GitHub integration: commit status updates and PR check runs.
 
-use crate::models::RunStatus;
+use crate::models::RunPhase;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -36,14 +36,12 @@ pub enum CommitState {
     Error,
 }
 
-impl From<&RunStatus> for CommitState {
-    fn from(s: &RunStatus) -> Self {
+impl From<&RunPhase> for CommitState {
+    fn from(s: &RunPhase) -> Self {
         match s {
-            RunStatus::Pending | RunStatus::Running | RunStatus::WaitingApproval => {
-                CommitState::Pending
-            }
-            RunStatus::Succeeded | RunStatus::Skipped => CommitState::Success,
-            RunStatus::Failed | RunStatus::Cancelled => CommitState::Failure,
+            RunPhase::Pending | RunPhase::Running => CommitState::Pending,
+            RunPhase::Succeeded | RunPhase::Skipped => CommitState::Success,
+            RunPhase::Failed | RunPhase::Cancelled => CommitState::Failure,
         }
     }
 }
@@ -107,7 +105,7 @@ impl GitHubClient {
         &self,
         name: &str,
         sha: &str,
-        status: &RunStatus,
+        status: &RunPhase,
         run_id: Uuid,
     ) -> Result<(), GitHubError> {
         let url = format!(
@@ -117,10 +115,10 @@ impl GitHubClient {
             self.config.repo,
         );
         let conclusion: Option<&str> = match status {
-            RunStatus::Succeeded => Some("success"),
-            RunStatus::Failed => Some("failure"),
-            RunStatus::Cancelled => Some("cancelled"),
-            RunStatus::Skipped => Some("skipped"),
+            RunPhase::Succeeded => Some("success"),
+            RunPhase::Failed => Some("failure"),
+            RunPhase::Cancelled => Some("cancelled"),
+            RunPhase::Skipped => Some("skipped"),
             _ => None,
         };
         let mut payload = serde_json::json!({
@@ -176,21 +174,21 @@ mod tests {
 
     #[test]
     fn test_commit_state_pending_statuses() {
-        for s in [RunStatus::Pending, RunStatus::Running, RunStatus::WaitingApproval] {
+        for s in [RunPhase::Pending, RunPhase::Running] {
             assert_eq!(CommitState::from(&s), CommitState::Pending);
         }
     }
 
     #[test]
     fn test_commit_state_success_statuses() {
-        assert_eq!(CommitState::from(&RunStatus::Succeeded), CommitState::Success);
-        assert_eq!(CommitState::from(&RunStatus::Skipped), CommitState::Success);
+        assert_eq!(CommitState::from(&RunPhase::Succeeded), CommitState::Success);
+        assert_eq!(CommitState::from(&RunPhase::Skipped), CommitState::Success);
     }
 
     #[test]
     fn test_commit_state_failure_statuses() {
-        assert_eq!(CommitState::from(&RunStatus::Failed), CommitState::Failure);
-        assert_eq!(CommitState::from(&RunStatus::Cancelled), CommitState::Failure);
+        assert_eq!(CommitState::from(&RunPhase::Failed), CommitState::Failure);
+        assert_eq!(CommitState::from(&RunPhase::Cancelled), CommitState::Failure);
     }
 
     #[test]

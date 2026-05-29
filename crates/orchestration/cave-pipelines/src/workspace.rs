@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //! Workspace management: shared volumes between tasks.
+//!
+//! Ports: pkg/workspace/workspace.go (Tekton Pipelines v0.55.0)
+//!
 //! Supports EmptyDir, PVC, ConfigMap, Secret, and HostPath bindings.
+//! WorkspaceManager resolves workspace bindings to on-disk paths for
+//! in-process execution.
 
-use crate::models::{WorkspaceBinding, WorkspaceKind};
+use crate::models::{WorkspaceAssignment, WorkspaceBinding};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -31,7 +36,6 @@ pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 pub struct ResolvedWorkspace {
     pub name: String,
     pub path: PathBuf,
-    pub kind: WorkspaceKind,
 }
 
 // ---------------------------------------------------------------------------
@@ -52,41 +56,44 @@ impl WorkspaceManager {
         Self { run_id, workspaces: HashMap::new(), base_dir }
     }
 
-    /// Bind a slice of workspace declarations for a pipeline run.
+    /// Bind a slice of workspace assignments for a pipeline run.
     pub async fn bind_workspaces(
         &mut self,
-        bindings: &[WorkspaceBinding],
+        assignments: &[WorkspaceAssignment],
     ) -> WorkspaceResult<()> {
-        for binding in bindings {
-            let resolved = self.resolve_binding(binding).await?;
-            self.workspaces.insert(binding.name.clone(), resolved);
+        for ws in assignments {
+            let resolved = self.resolve_binding(&ws.name, &ws.binding).await?;
+            self.workspaces.insert(ws.name.clone(), resolved);
         }
         Ok(())
     }
 
     async fn resolve_binding(
         &self,
+        name: &str,
         binding: &WorkspaceBinding,
     ) -> WorkspaceResult<ResolvedWorkspace> {
-        let path = match &binding.kind {
-            WorkspaceKind::EmptyDir => {
-                let dir = self.base_dir.join(&binding.name);
+        let path = match binding {
+            WorkspaceBinding::EmptyDir { .. } => {
+                let dir = self.base_dir.join(name);
                 tokio::fs::create_dir_all(&dir).await?;
                 dir
             }
-            WorkspaceKind::HostPath { path } => PathBuf::from(path),
-            WorkspaceKind::Pvc { claim_name } => {
+            WorkspaceBinding::PersistentVolumeClaim { claim_name, .. } => {
                 self.base_dir.join(format!("pvc-{claim_name}"))
             }
-            WorkspaceKind::ConfigMap { name } => {
-                self.base_dir.join(format!("cm-{name}"))
+            WorkspaceBinding::ConfigMap { name: cm_name, .. } => {
+                self.base_dir.join(format!("cm-{cm_name}"))
             }
-            WorkspaceKind::Secret { secret_name } => {
+            WorkspaceBinding::Secret { secret_name, .. } => {
                 self.base_dir.join(format!("secret-{secret_name}"))
+            }
+            WorkspaceBinding::Projected { .. } => {
+                self.base_dir.join(format!("projected-{name}"))
             }
         };
 
-        Ok(ResolvedWorkspace { name: binding.name.clone(), path, kind: binding.kind.clone() })
+        Ok(ResolvedWorkspace { name: name.to_string(), path })
     }
 
     pub fn get_path(&self, name: &str) -> WorkspaceResult<&PathBuf> {
@@ -112,6 +119,7 @@ impl WorkspaceManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{WorkspaceAssignment, WorkspaceBinding};
 
     #[test]
     fn test_manager_starts_empty() {
@@ -132,11 +140,11 @@ mod tests {
     async fn test_bind_empty_dir_creates_directory() {
         let id = Uuid::new_v4();
         let mut mgr = WorkspaceManager::new(id);
-        let bindings = vec![WorkspaceBinding {
+        let assignments = vec![WorkspaceAssignment {
             name: "source".to_string(),
-            kind: WorkspaceKind::EmptyDir,
+            binding: WorkspaceBinding::EmptyDir { medium: None, size_limit: None },
         }];
-        mgr.bind_workspaces(&bindings).await.unwrap();
+        mgr.bind_workspaces(&assignments).await.unwrap();
         let path = mgr.get_path("source").unwrap();
         assert!(path.exists());
         mgr.cleanup().await.ok();
@@ -146,14 +154,20 @@ mod tests {
     async fn test_bind_multiple_workspaces() {
         let id = Uuid::new_v4();
         let mut mgr = WorkspaceManager::new(id);
-        let bindings = vec![
-            WorkspaceBinding { name: "src".to_string(), kind: WorkspaceKind::EmptyDir },
-            WorkspaceBinding {
+        let assignments = vec![
+            WorkspaceAssignment {
+                name: "src".to_string(),
+                binding: WorkspaceBinding::EmptyDir { medium: None, size_limit: None },
+            },
+            WorkspaceAssignment {
                 name: "cache".to_string(),
-                kind: WorkspaceKind::Pvc { claim_name: "build-cache".to_string() },
+                binding: WorkspaceBinding::PersistentVolumeClaim {
+                    claim_name: "build-cache".to_string(),
+                    read_only: false,
+                },
             },
         ];
-        mgr.bind_workspaces(&bindings).await.unwrap();
+        mgr.bind_workspaces(&assignments).await.unwrap();
         assert!(mgr.get_path("src").is_ok());
         assert!(mgr.get_path("cache").is_ok());
         mgr.cleanup().await.ok();
@@ -161,16 +175,10 @@ mod tests {
 
     #[test]
     fn test_hostpath_binding_resolves_as_given() {
-        // HostPath doesn't create dirs – just captures the path.
-        // Use synchronous resolution by constructing the path directly.
+        // Verify the base_dir embeds the run_id (structural check without HostPath variant).
         let id = Uuid::new_v4();
         let mgr = WorkspaceManager::new(id);
         let base = mgr.base_dir.clone();
-        let path = PathBuf::from("/tmp/host-data");
-        // Verify the base_dir embeds the run_id
         assert!(base.to_str().unwrap().contains(&id.to_string()));
-        // And that a HostPath binding would produce that exact path
-        let expected = PathBuf::from("/tmp/host-data");
-        assert_eq!(path, expected);
     }
 }

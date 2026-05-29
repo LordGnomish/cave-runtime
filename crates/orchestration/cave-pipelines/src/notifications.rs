@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! Notification system: webhook, Slack, email on pipeline status change.
 
-use crate::models::RunStatus;
+use crate::models::RunPhase;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -51,7 +51,7 @@ pub struct NotificationRule {
 pub struct PipelineEvent {
     pub pipeline_run_id: Uuid,
     pub pipeline_name: String,
-    pub status: RunStatus,
+    pub status: RunPhase,
     pub message: Option<String>,
 }
 
@@ -66,16 +66,16 @@ pub enum NotificationError {
 // ---------------------------------------------------------------------------
 
 impl NotifyOn {
-    pub fn matches(&self, status: &RunStatus) -> bool {
+    pub fn matches(&self, status: &RunPhase) -> bool {
         match self {
             NotifyOn::Always => true,
-            NotifyOn::OnSuccess => matches!(status, RunStatus::Succeeded),
+            NotifyOn::OnSuccess => matches!(status, RunPhase::Succeeded),
             NotifyOn::OnFailure => {
-                matches!(status, RunStatus::Failed | RunStatus::Cancelled)
+                matches!(status, RunPhase::Failed | RunPhase::Cancelled)
             }
             NotifyOn::OnComplete => matches!(
                 status,
-                RunStatus::Succeeded | RunStatus::Failed | RunStatus::Cancelled
+                RunPhase::Succeeded | RunPhase::Failed | RunPhase::Cancelled
             ),
         }
     }
@@ -108,15 +108,15 @@ pub async fn send_notification(
         NotificationConfig::Slack { webhook_url, channel } => {
             info!(channel = ?channel, "sending Slack notification");
             let emoji = match event.status {
-                RunStatus::Succeeded => ":white_check_mark:",
-                RunStatus::Failed => ":x:",
-                RunStatus::Cancelled => ":no_entry:",
+                RunPhase::Succeeded => ":white_check_mark:",
+                RunPhase::Failed => ":x:",
+                RunPhase::Cancelled => ":no_entry:",
                 _ => ":information_source:",
             };
             let verb = match event.status {
-                RunStatus::Succeeded => "succeeded",
-                RunStatus::Failed => "failed",
-                RunStatus::Cancelled => "was cancelled",
+                RunPhase::Succeeded => "succeeded",
+                RunPhase::Failed => "failed",
+                RunPhase::Cancelled => "was cancelled",
                 _ => "updated",
             };
             let text = format!(
@@ -156,30 +156,29 @@ mod tests {
 
     #[test]
     fn test_on_success_matches_only_succeeded() {
-        assert!(NotifyOn::OnSuccess.matches(&RunStatus::Succeeded));
-        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Failed));
-        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Running));
-        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Cancelled));
+        assert!(NotifyOn::OnSuccess.matches(&RunPhase::Succeeded));
+        assert!(!NotifyOn::OnSuccess.matches(&RunPhase::Failed));
+        assert!(!NotifyOn::OnSuccess.matches(&RunPhase::Running));
+        assert!(!NotifyOn::OnSuccess.matches(&RunPhase::Cancelled));
     }
 
     #[test]
     fn test_on_failure_matches_failed_and_cancelled() {
-        assert!(NotifyOn::OnFailure.matches(&RunStatus::Failed));
-        assert!(NotifyOn::OnFailure.matches(&RunStatus::Cancelled));
-        assert!(!NotifyOn::OnFailure.matches(&RunStatus::Succeeded));
-        assert!(!NotifyOn::OnFailure.matches(&RunStatus::Running));
+        assert!(NotifyOn::OnFailure.matches(&RunPhase::Failed));
+        assert!(NotifyOn::OnFailure.matches(&RunPhase::Cancelled));
+        assert!(!NotifyOn::OnFailure.matches(&RunPhase::Succeeded));
+        assert!(!NotifyOn::OnFailure.matches(&RunPhase::Running));
     }
 
     #[test]
     fn test_always_matches_every_status() {
         for status in [
-            RunStatus::Pending,
-            RunStatus::Running,
-            RunStatus::Succeeded,
-            RunStatus::Failed,
-            RunStatus::Cancelled,
-            RunStatus::Skipped,
-            RunStatus::WaitingApproval,
+            RunPhase::Pending,
+            RunPhase::Running,
+            RunPhase::Succeeded,
+            RunPhase::Failed,
+            RunPhase::Cancelled,
+            RunPhase::Skipped,
         ] {
             assert!(NotifyOn::Always.matches(&status), "Always should match {status:?}");
         }
@@ -187,12 +186,11 @@ mod tests {
 
     #[test]
     fn test_on_complete_matches_terminal_states() {
-        assert!(NotifyOn::OnComplete.matches(&RunStatus::Succeeded));
-        assert!(NotifyOn::OnComplete.matches(&RunStatus::Failed));
-        assert!(NotifyOn::OnComplete.matches(&RunStatus::Cancelled));
-        assert!(!NotifyOn::OnComplete.matches(&RunStatus::Running));
-        assert!(!NotifyOn::OnComplete.matches(&RunStatus::Pending));
-        assert!(!NotifyOn::OnComplete.matches(&RunStatus::WaitingApproval));
+        assert!(NotifyOn::OnComplete.matches(&RunPhase::Succeeded));
+        assert!(NotifyOn::OnComplete.matches(&RunPhase::Failed));
+        assert!(NotifyOn::OnComplete.matches(&RunPhase::Cancelled));
+        assert!(!NotifyOn::OnComplete.matches(&RunPhase::Running));
+        assert!(!NotifyOn::OnComplete.matches(&RunPhase::Pending));
     }
 
     #[test]
@@ -209,6 +207,6 @@ mod tests {
             notify_on: NotifyOn::OnSuccess,
         };
         // Confirm filter rejects Running
-        assert!(!rule.notify_on.matches(&RunStatus::Running));
+        assert!(!rule.notify_on.matches(&RunPhase::Running));
     }
 }

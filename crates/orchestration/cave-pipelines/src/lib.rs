@@ -6,12 +6,17 @@
 //! Implements: Pipeline/Task CRDs, DAG execution, triggers, catalog,
 //! Jenkins Jenkinsfile compatibility, artifact passing, log streaming.
 
+pub mod build;
 pub mod catalog;
 pub mod engine;
+pub mod executor;
+pub mod github;
 pub mod jenkins;
 pub mod models;
+pub mod notifications;
 pub mod routes;
 pub mod triggers;
+pub mod workspace;
 
 use axum::Router;
 use cave_db::CavePool;
