@@ -51,6 +51,17 @@ impl SloStore {
         self.slos.write().unwrap().remove(&id).is_some()
     }
 
+    /// List SLOs filtered by status.
+    pub fn list_by_status(&self, status: SloStatus) -> Vec<SLO> {
+        self.slos
+            .read()
+            .unwrap()
+            .values()
+            .filter(|slo| slo.status == status)
+            .cloned()
+            .collect()
+    }
+
     /// Compute aggregate statistics across all stored SLOs.
     pub fn compute_stats(&self) -> SloStats {
         let slos = self.slos.read().unwrap();

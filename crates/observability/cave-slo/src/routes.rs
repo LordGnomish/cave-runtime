@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
