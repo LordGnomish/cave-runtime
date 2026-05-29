@@ -6,6 +6,7 @@
 //! Features: ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs
 
 pub mod acme_client;
+pub mod cert_request;
 pub mod crds;
 pub mod engine;
 pub mod models;
