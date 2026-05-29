@@ -9,6 +9,7 @@ use std::sync::Arc;
 pub mod engine;
 pub mod models;
 pub mod routes;
+pub mod store;
 
 use axum::Router;
 
