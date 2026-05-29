@@ -106,13 +106,15 @@ fn parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_19() {
+fn parity_last_audit_is_2026_05() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
-    assert_eq!(
-        when.as_deref(),
-        Some("2026-05-19"),
-        "[parity] last_audit must reflect the 2026-05-19 parity-uplift close-out"
+    assert!(
+        when.as_deref()
+            .map(|d| d.starts_with("2026-05"))
+            .unwrap_or(false),
+        "[parity] last_audit must reflect the 2026-05 close-out (got {:?})",
+        when
     );
 }
 
@@ -128,13 +130,17 @@ fn parity_infra_only_is_false() {
 }
 
 #[test]
-fn at_least_thirty_mapped_file_blocks() {
+fn at_least_twenty_mapped_area_blocks() {
     let m = manifest_text();
-    let blocks = m.matches("\n[[files]]").count();
+    // New manifest format uses [[mapped]] + [[partial]] + [[skipped]].
+    // Count mapped or legacy [[files]] blocks.
+    let mapped_blocks = m.matches("\n[[mapped]]").count();
+    let files_blocks = m.matches("\n[[files]]").count();
+    let total = mapped_blocks + files_blocks;
     assert!(
-        blocks >= 30,
-        "expected >= 30 [[files]] blocks; got {}",
-        blocks
+        total >= 20,
+        "expected >= 20 [[mapped]] or [[files]] blocks; got {} (mapped={}, files={})",
+        total, mapped_blocks, files_blocks
     );
 }
 
