@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+//! In-memory chat store — channels, messages, presence, stats.
+
 use crate::models::{
     Channel, ChatStats, Message, PresenceStatus, Reaction, UserPresence,
 };
@@ -8,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use uuid::Uuid;
 
+/// Thread-safe in-memory store for all chat data.
 #[derive(Default)]
 pub struct ChatStore {
     channels: RwLock<HashMap<Uuid, Channel>>,
@@ -22,6 +25,7 @@ impl ChatStore {
 
     // ── Channels ──────────────────────────────────────────────────────────────
 
+    /// Insert a new channel and return a clone of what was stored.
     pub fn create_channel(&self, channel: Channel) -> Channel {
         let mut channels = self.channels.write().unwrap();
         let c = channel.clone();
@@ -29,14 +33,17 @@ impl ChatStore {
         c
     }
 
+    /// Look up a channel by ID.
     pub fn get_channel(&self, id: &Uuid) -> Option<Channel> {
         self.channels.read().unwrap().get(id).cloned()
     }
 
+    /// Return all channels (order unspecified).
     pub fn list_channels(&self) -> Vec<Channel> {
         self.channels.read().unwrap().values().cloned().collect()
     }
 
+    /// Mark a channel as archived; returns the updated channel or `None` if not found.
     pub fn archive_channel(&self, id: &Uuid) -> Option<Channel> {
         let mut channels = self.channels.write().unwrap();
         if let Some(ch) = channels.get_mut(id) {
@@ -47,6 +54,7 @@ impl ChatStore {
         None
     }
 
+    /// Add `user_id` to the channel member list (idempotent).
     pub fn add_member(&self, channel_id: &Uuid, user_id: String) -> Option<Channel> {
         let mut channels = self.channels.write().unwrap();
         if let Some(ch) = channels.get_mut(channel_id) {
@@ -59,6 +67,7 @@ impl ChatStore {
         None
     }
 
+    /// Remove `user_id` from the channel member list.
     pub fn remove_member(&self, channel_id: &Uuid, user_id: &str) -> Option<Channel> {
         let mut channels = self.channels.write().unwrap();
         if let Some(ch) = channels.get_mut(channel_id) {
@@ -71,34 +80,42 @@ impl ChatStore {
 
     // ── Messages ──────────────────────────────────────────────────────────────
 
+    /// Store a message.  If it has a `thread_root_id`, registers it on the root.
     pub fn create_message(&self, message: Message) -> Message {
-        let mut messages = self.messages.write().unwrap();
+        let thread_root_id = message.thread_root_id;
+        let reply_id = message.id;
         let m = message.clone();
-        // If this is a thread reply, register it with the root
-        if let Some(root_id) = message.thread_root_id {
-            let reply_id = message.id;
-            drop(messages);
-            let mut messages2 = self.messages.write().unwrap();
-            if let Some(root) = messages2.get_mut(&root_id) {
+
+        {
+            let mut messages = self.messages.write().unwrap();
+            messages.insert(m.id, message);
+        }
+
+        // Register as a thread reply on the root message.
+        if let Some(root_id) = thread_root_id {
+            let mut messages = self.messages.write().unwrap();
+            if let Some(root) = messages.get_mut(&root_id) {
                 if !root.thread_replies.contains(&reply_id) {
                     root.thread_replies.push(reply_id);
                 }
             }
-            messages2.insert(m.id, m.clone());
-            return m;
         }
-        messages.insert(message.id, message);
+
         m
     }
 
+    /// Fetch a message by ID.
     pub fn get_message(&self, id: &Uuid) -> Option<Message> {
         self.messages.read().unwrap().get(id).cloned()
     }
 
+    /// Delete a message and return it, or `None` if not found.
     pub fn delete_message(&self, id: &Uuid) -> Option<Message> {
         self.messages.write().unwrap().remove(id)
     }
 
+    /// Return up to `limit` messages in a channel, newest-first.
+    /// If `before` is given, only messages older than that timestamp are included.
     pub fn get_channel_messages(
         &self,
         channel_id: &Uuid,
@@ -114,29 +131,37 @@ impl ChatStore {
             })
             .cloned()
             .collect();
+        // newest-first
         msgs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         msgs.truncate(limit);
         msgs
     }
 
+    /// Return all direct thread replies to `root_message_id`, oldest-first.
     pub fn get_thread(&self, root_message_id: &Uuid) -> Vec<Message> {
+        let reply_ids: Vec<Uuid> = {
+            let messages = self.messages.read().unwrap();
+            match messages.get(root_message_id) {
+                Some(root) => root.thread_replies.clone(),
+                None => return vec![],
+            }
+        };
         let messages = self.messages.read().unwrap();
-        if let Some(root) = messages.get(root_message_id) {
-            let reply_ids = root.thread_replies.clone();
-            drop(messages);
-            let messages2 = self.messages.read().unwrap();
-            let mut replies: Vec<Message> = reply_ids
-                .iter()
-                .filter_map(|id| messages2.get(id).cloned())
-                .collect();
-            replies.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-            replies
-        } else {
-            vec![]
-        }
+        let mut replies: Vec<Message> = reply_ids
+            .iter()
+            .filter_map(|id| messages.get(id).cloned())
+            .collect();
+        replies.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        replies
     }
 
-    pub fn add_reaction(&self, message_id: &Uuid, emoji: String, user: String) -> Option<Message> {
+    /// Add an emoji reaction from `user` to a message (idempotent per user).
+    pub fn add_reaction(
+        &self,
+        message_id: &Uuid,
+        emoji: String,
+        user: String,
+    ) -> Option<Message> {
         let mut messages = self.messages.write().unwrap();
         if let Some(msg) = messages.get_mut(message_id) {
             if let Some(reaction) = msg.reactions.iter_mut().find(|r| r.emoji == emoji) {
@@ -154,6 +179,30 @@ impl ChatStore {
         None
     }
 
+    /// Remove a user's reaction from a message.  Returns the updated message.
+    pub fn remove_reaction(
+        &self,
+        message_id: &Uuid,
+        emoji: &str,
+        user: &str,
+    ) -> Option<Message> {
+        let mut messages = self.messages.write().unwrap();
+        if let Some(msg) = messages.get_mut(message_id) {
+            for reaction in msg.reactions.iter_mut() {
+                if reaction.emoji == emoji {
+                    reaction.users.retain(|u| u != user);
+                    break;
+                }
+            }
+            // Remove empty reaction groups
+            msg.reactions.retain(|r| !r.users.is_empty());
+            return Some(msg.clone());
+        }
+        None
+    }
+
+    /// Full-text search across message content (case-insensitive substring).
+    /// Optionally scoped to a single channel.
     pub fn search_messages(&self, query: &str, channel_id: Option<Uuid>) -> Vec<Message> {
         let messages = self.messages.read().unwrap();
         let lower = query.to_lowercase();
@@ -169,10 +218,12 @@ impl ChatStore {
 
     // ── Presence ──────────────────────────────────────────────────────────────
 
+    /// Look up a user's presence record.
     pub fn get_presence(&self, user_id: &str) -> Option<UserPresence> {
         self.presence.read().unwrap().get(user_id).cloned()
     }
 
+    /// Upsert a user's presence record.
     pub fn set_presence(&self, presence: UserPresence) -> UserPresence {
         let mut p = self.presence.write().unwrap();
         let ret = presence.clone();
@@ -182,6 +233,7 @@ impl ChatStore {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
+    /// Compute aggregate statistics across the current store state.
     pub fn compute_stats(&self) -> ChatStats {
         let channels = self.channels.read().unwrap();
         let messages = self.messages.read().unwrap();
