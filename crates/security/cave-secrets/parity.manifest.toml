@@ -20,13 +20,16 @@ source_sha = "v3.63.7"
 # (per-detector regex registry, Shannon-entropy filter, redacted findings,
 # JSON output, sources hook). Counts measured against `pkg/` tree of
 # upstream at v3.63.7.
-mapped_count   = 14     # see [[files]] — detector framework + 9 builtin + custom_rules + baseline + decoders + precommit + archive
+# 2026-05-29 fresh-impl: ported pkg/detectors/falsepositives.go (was un-enumerated) via strict-TDD
+#   (test 9a615000 RED → impl 6f45cc9e GREEN) — new src/detector.rs::falsepositives module +
+#   scan_filtered(). mapped 14→15, total 32→33. fill_ratio stays 1.0.
+mapped_count   = 15     # see [[files]] — detector framework + 9 builtin + custom_rules + baseline + decoders + precommit + archive + false-positive suppression
 partial_count  = 2      # see [[partials]] — Engine concurrent worker pool, Sources framework (filesystem only)
 skipped_count  = 16     # see [[scope_cuts]] — explicit subsystem deferrals (incl. feature-flag plumbing)
 unmapped_count = 0      # all gaps now ADR-justified scope_cuts
-total          = 32
-fill_ratio     = 1.0000  # (mapped + partial + skipped) / total = (14+2+16)/32 — feature-flag plumbing reclassified as scope_cut
-honest_ratio   = 0.4375  # mapped / total = 14/32
+total          = 33
+fill_ratio     = 1.0000  # (mapped + partial + skipped) / total = (15+2+16)/33 — feature-flag plumbing reclassified as scope_cut
+honest_ratio   = 0.4545  # mapped / total = 15/33
 adr_justified_ratio = 1.0000  # 16 scope_cuts: detector-volume (1, out-of-launch-scope: MVP ships 9 of 1000+) / source integrations 8 (parallel-track: cave-runtime fetcher / cave-portal GitHub / Phase 2 for gitlab/s3/gcs/azure/jenkins/postman) / output formats 2 (out-of-launch-scope: JUnit+SARIF Phase 2) / verifier framework (out-of-launch-scope) / giturl (parallel-track: cave-runtime upstream-fetcher) / sanitizer (absorbed into builtin redact_match) / notifier (parallel-track: cave-noti) / feature-flag plumbing (out-of-launch-scope: gated until experimental detectors land). 2 partials (engine-worker-pool, filesystem-source-only) defer to source integration Phase 2 — out-of-launch-scope.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 ratio          = 0.9688  # legacy alias for parity-index
@@ -124,6 +127,10 @@ source_root = "src"
 [[files]]
 upstream = "pkg/detectors/aws/v2/aws.go"
 local    = "src/detector.rs"
+
+[[files]]
+upstream = "pkg/detectors/falsepositives.go"
+local    = "src/detector.rs"  # falsepositives module: WORDLIST gating + all-same-char + low-entropy floor + scan_filtered() (2026-05-29 fresh-impl)
 
 [[files]]
 upstream = "pkg/detectors/github/v2/github.go"
