@@ -17,6 +17,8 @@ fn make_slo(name: &str, target: f64) -> SLO {
         window_days: 30,
         metric_type: MetricType::Availability,
         created_at: chrono::Utc::now(),
+        current_sli: 0.0,
+        status: SloStatus::Unknown,
     }
 }
 
