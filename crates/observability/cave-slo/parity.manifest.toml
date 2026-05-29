@@ -21,19 +21,19 @@ url        = "https://github.com/nobl9/nobl9-go"
 
 [parity]
 # 2026-05-28 honest close — implemented real SLO/SLI engine (error budget,
-# multi-window burn rate, composite SLO, full CRUD store + HTTP routes);
-# ADR-justified 5 sibling/out-of-scope cuts.
+# multi-window burn rate, composite SLO, full CRUD store + HTTP routes,
+# status-filter query, parity self-audit); ADR-justified 3 sibling cuts.
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.8125
+honest_ratio        = 0.8333
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 13
+mapped_count        = 15
 partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
-total               = 16
-last_audit          = "2026-05-28"
+total               = 18
+last_audit          = "2026-05-29"
 infra_only          = false
 
 # ── Mapped surfaces ───────────────────────────────────────────────────────────
@@ -94,8 +94,18 @@ detail = "SloStore with insert/get/list/update/delete/compute_stats, thread-safe
 file   = "src/store.rs"
 
 [[mapped]]
+area   = "SLO store status filtering"
+detail = "SloStore::list_by_status(SloStatus) — filter stored SLOs by derived status"
+file   = "src/store.rs"
+
+[[mapped]]
 area   = "HTTP SLO CRUD API"
 detail = "POST/GET/PUT/DELETE /api/slo/slos, GET /api/slo/slos/{id}/budget, GET /api/slo/stats"
+file   = "src/routes.rs"
+
+[[mapped]]
+area   = "HTTP SLO list status filter"
+detail = "GET /api/slo/slos?status=<status> — returns only SLOs matching the given status; 400 on invalid value"
 file   = "src/routes.rs"
 
 [[mapped]]
@@ -132,4 +142,4 @@ status       = "skipped"
 loc          = 0
 priority     = "P2"
 notes        = "UI owned by cave-portal / cave-dashboard (parallel-track)"
-last_audit   = "2026-05-28"
+last_audit   = "2026-05-29"
