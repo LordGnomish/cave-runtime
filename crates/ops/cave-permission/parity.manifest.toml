@@ -39,15 +39,15 @@ rs_loc      = 590
 #   §5 (Go-native / CLI-replaced / portal-api-owned / plugin-framework-only /
 #   persistence-consolidation / parallel-track).
 #
-#   fill_ratio = (mapped + partial + skipped) / total = (5 + 0 + 17) / 22
-#   honest_ratio = mapped / total = 5 / 22
-mapped_count   = 5
+#   fill_ratio = (mapped + partial + skipped) / total = (6 + 0 + 16) / 22
+#   honest_ratio = mapped / total = 6 / 22
+mapped_count   = 6
 partial_count  = 0
-skipped_count  = 17
+skipped_count  = 16
 unmapped_count = 0
 total          = 22
-fill_ratio     = 1.0    # (5 + 0 + 17) / 22 = 22/22 — all 17 skipped areas are architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5 (persistence-consolidation, plugin-framework-only, cli-replaced, portal-api-owned, parallel-track)
-honest_ratio   = 0.2273  # 5/22 — preserved honestly; cave-permission is a focused wire-protocol implementation, not a full Casbin Go port
+fill_ratio     = 1.0    # (6 + 0 + 16) / 22 = 22/22 — all 16 skipped areas are architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5 (persistence-consolidation, plugin-framework-only, cli-replaced, portal-api-owned, parallel-track)
+honest_ratio   = 0.2727  # 6/22 — fresh-impl uplift 2026-05-29 ported real Casbin builtin matcher operators (src/matchers.rs) via strict-TDD; remaining 16 skips preserved honestly
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
@@ -87,7 +87,7 @@ note     = "POST /api/permission/authorize (batch evaluation) + GET /api/permiss
 # 2026-05-29 confirmed: axum routes, batch loop through policy.handle()
 
 # ─── Skipped ─────────────────────────────────────────────────────────────────
-# All 17 skipped items are justified under ADR-RUNTIME-PARITY-100-PCT-001 §5.
+# All 16 skipped items are justified under ADR-RUNTIME-PARITY-100-PCT-001 §5.
 
 [[skipped]]
 upstream = "casbin/casbin — persist/adapter.go + persist/file-adapter/ (file-based policy adapter)"
@@ -113,11 +113,11 @@ reason   = "plugin-framework-only — Casbin CONF DSL is a Go-native configurati
 adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (plugin-framework-only, architecturally-superseded)"
 # 2026-05-29
 
-[[skipped]]
-upstream = "casbin/casbin — util/builtin_operators.go (key-match / URL / regex / glob helpers)"
-reason   = "sub-component — pattern-match utilities are provided by Rust std / regex crate ecosystem; duplicating Go-specific string operators is not idiomatic"
-adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (sub-component)"
-# 2026-05-29
+[[mapped]]
+upstream = "casbin/casbin — util/builtin_operators.go (key-match / URL / regex / IP helpers)"
+local    = "src/matchers.rs"
+note     = "key_match/key_match2/key_match3/regex_match/ip_match — faithful line-port of casbin v3.10.0 builtin operators (Apache-2.0); malformed input yields false instead of upstream panic"
+# 2026-05-29 fresh-impl uplift: strict-TDD (test 3c84056f RED → impl 30a8f775 GREEN), 5 matcher tests pass
 
 [[skipped]]
 upstream = "casbin/casbin — watcher/ + watcher_ex/ (distributed policy-change notification)"
