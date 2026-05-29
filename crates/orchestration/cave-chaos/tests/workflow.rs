@@ -109,7 +109,8 @@ fn chaos_workflow_serde_roundtrip() {
 #[test]
 fn sequential_workflow_runs_all_steps() {
     let exp1 = make_exp("staging", ExperimentType::NetworkLatency);
-    let exp2 = make_exp("staging", ExperimentType::CpuStress);
+    let mut exp2 = make_exp("staging", ExperimentType::CpuStress);
+    exp2.parameters.cpu_load_percent = Some(70);
 
     let exp1_id = exp1.id;
     let exp2_id = exp2.id;
@@ -160,7 +161,8 @@ fn sequential_workflow_unknown_experiment_fails() {
 #[test]
 fn parallel_workflow_runs_concurrent_steps() {
     let exp1 = make_exp("staging", ExperimentType::NetworkLatency);
-    let exp2 = make_exp("staging", ExperimentType::CpuStress);
+    let mut exp2 = make_exp("staging", ExperimentType::CpuStress);
+    exp2.parameters.cpu_load_percent = Some(80);
 
     let exp1_id = exp1.id;
     let exp2_id = exp2.id;

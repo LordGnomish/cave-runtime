@@ -7,7 +7,8 @@
 
 use cave_chaos::engine::{actual_duration_secs, is_active, is_high_risk, validate_experiment};
 use cave_chaos::models::{
-    ChaosExperiment, ChaosTarget, ExperimentParams, ExperimentStatus, ExperimentType,
+    BlastRadius, ChaosExperiment, ChaosTarget, ExperimentParams, ExperimentStatus, ExperimentType,
+    SafetyGuard,
 };
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
@@ -29,6 +30,10 @@ fn base_exp(exp_type: ExperimentType, ns: &str, params: ExperimentParams) -> Cha
         started_at: None,
         ended_at: None,
         duration_secs: 60,
+        blast_radius: BlastRadius::default(),
+        safety_guard: SafetyGuard::default(),
+        result: None,
+        annotations: HashMap::new(),
     }
 }
 

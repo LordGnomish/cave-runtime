@@ -7,14 +7,29 @@
 
 use std::sync::Arc;
 pub mod engine;
+pub mod executor;
 pub mod models;
 pub mod routes;
+pub mod store;
+pub mod workflow;
+pub mod schedule;
 
 use axum::Router;
 
-/// Module state.
-#[derive(Default)]
-pub struct State {}
+/// Module state — holds shared store + executor for all HTTP handlers.
+pub struct State {
+    pub store: Arc<store::ChaosStore>,
+    pub executor: Arc<executor::ChaosExecutor>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State {
+            store: Arc::new(store::ChaosStore::new()),
+            executor: Arc::new(executor::ChaosExecutor::new()),
+        }
+    }
+}
 
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {

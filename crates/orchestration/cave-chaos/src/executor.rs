@@ -188,6 +188,10 @@ fn simulate_experiment(
             *metrics_after.get_mut("p50_latency_ms").unwrap() += 50.0;
             *metrics_after.get_mut("p99_latency_ms").unwrap() += 300.0;
         }
+        ExperimentType::NetworkPartition => {
+            *metrics_after.get_mut("error_rate").unwrap() += 0.30;
+            *metrics_after.get_mut("p99_latency_ms").unwrap() += 1000.0;
+        }
         ExperimentType::CpuStress => {
             *metrics_after.get_mut("cpu_util").unwrap() += 0.70;
             let v = metrics_after["cpu_util"].min(1.0_f64);
