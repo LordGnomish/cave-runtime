@@ -49,6 +49,129 @@ pub fn shannon_entropy(s: &str) -> f64 {
         .sum()
 }
 
+/// False-positive suppression ported from TruffleHog
+/// `pkg/detectors/falsepositives.go`.
+///
+/// A candidate secret is dropped when its lowercased form is a known
+/// placeholder word, when it is built from a single repeated character, or
+/// when it otherwise has too little entropy to be a real credential.
+pub mod falsepositives {
+    use super::shannon_entropy;
+
+    /// Common placeholder / dictionary words that frequently produce false
+    /// positives. Mirrors the curated wordlist shipped with TruffleHog's
+    /// `falsepositives.go` (`DefaultFalsePositives`), trimmed to the most
+    /// common entries.
+    pub static WORDLIST: &[&str] = &[
+        "example",
+        "xxxxxx",
+        "aaaaaa",
+        "abcde",
+        "00000",
+        "sample",
+        "test",
+        "testing",
+        "password",
+        "passw0rd",
+        "secret",
+        "changeme",
+        "dummy",
+        "placeholder",
+        "redacted",
+        "your_api_key",
+        "yourapikey",
+        "api_key",
+        "apikey",
+        "token",
+        "123456",
+        "1234567890",
+        "qwerty",
+        "default",
+        "none",
+        "null",
+        "undefined",
+        "foobar",
+        "deadbeef",
+    ];
+
+    /// Returns true when every byte of `s` is identical (e.g. "xxxxxxxx").
+    fn all_same_char(s: &str) -> bool {
+        let mut bytes = s.bytes();
+        match bytes.next() {
+            None => true,
+            Some(first) => bytes.all(|b| b == first),
+        }
+    }
+
+    /// Strip the surrounding decoration of a captured candidate to isolate the
+    /// secret value: trims whitespace, surrounding quotes and a leading
+    /// `key = ` / `key: ` assignment so the wordlist comparison sees only the
+    /// value (matching upstream behaviour, which checks the extracted Raw
+    /// secret rather than the whole line).
+    pub fn extract_candidate(raw: &str) -> &str {
+        let mut s = raw.trim();
+        // Drop a leading "<ident><sep>" assignment prefix.
+        if let Some(pos) = s.find(['=', ':']) {
+            // Only treat as assignment when the LHS looks like an identifier.
+            let (lhs, rhs) = s.split_at(pos);
+            if !lhs.is_empty()
+                && lhs
+                    .trim()
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+            {
+                s = rhs[1..].trim();
+            }
+        }
+        // Strip surrounding matching quotes.
+        let bytes = s.as_bytes();
+        if bytes.len() >= 2 {
+            let first = bytes[0];
+            let last = bytes[bytes.len() - 1];
+            if (first == b'"' || first == b'\'') && first == last {
+                s = &s[1..s.len() - 1];
+            }
+        }
+        s
+    }
+
+    /// Port of TruffleHog `IsKnownFalsePositive`. Returns true when `secret`
+    /// should be suppressed.
+    pub fn is_known_false_positive(secret: &str) -> bool {
+        let candidate = extract_candidate(secret);
+        let lower = candidate.to_ascii_lowercase();
+
+        if candidate.is_empty() {
+            return true;
+        }
+
+        // 1. Wordlist match (substring, case-insensitive) — upstream compares
+        //    the lowered secret against each known false-positive word.
+        for &word in WORDLIST {
+            if lower == word || lower.contains(word) {
+                return true;
+            }
+        }
+
+        // 2. A value built from a single repeated character is never a real
+        //    secret regardless of length.
+        if all_same_char(candidate) {
+            return true;
+        }
+
+        // 3. Low-entropy heuristic: short or low-entropy values are dropped.
+        //    Upstream treats anything below a minimum Shannon entropy as a
+        //    likely placeholder. Use a conservative floor so realistic
+        //    high-entropy credentials survive.
+        let entropy = shannon_entropy(candidate);
+        if candidate.len() >= 6 && entropy < 2.5 {
+            return true;
+        }
+
+        false
+    }
+}
+
 /// Scan content for secrets using all detectors.
 pub fn scan(content: &str, filename: &str, detectors: &[SecretDetector]) -> Vec<Finding> {
     let mut findings = Vec::new();
@@ -86,6 +209,42 @@ pub fn scan(content: &str, filename: &str, detectors: &[SecretDetector]) -> Vec<
         }
     }
     findings
+}
+
+/// Scan content, then drop findings that match the TruffleHog false-positive
+/// filter. For each detector hit the captured secret value is extracted from
+/// the matching line and tested against [`falsepositives::is_known_false_positive`].
+///
+/// This is the recommended entry point for scanning untrusted input: it keeps
+/// the raw [`scan`] available for callers that want every regex hit, while
+/// suppressing obvious placeholders and low-entropy noise.
+pub fn scan_filtered(content: &str, filename: &str, detectors: &[SecretDetector]) -> Vec<Finding> {
+    let lines: Vec<&str> = content.lines().collect();
+    scan(content, filename, detectors)
+        .into_iter()
+        .filter(|f| {
+            // Re-derive the matched secret value from the original line so the
+            // filter inspects the secret rather than the redacted form.
+            let raw_line = lines
+                .get(f.line.saturating_sub(1))
+                .copied()
+                .unwrap_or(f.matched.as_str());
+            let candidate = secret_candidate(&f.detector, raw_line, detectors);
+            !falsepositives::is_known_false_positive(candidate)
+        })
+        .collect()
+}
+
+/// Pull the secret value a detector matched out of `line`. For structured
+/// detectors we use the regex match itself; otherwise the whole line is the
+/// candidate (the extractor in `falsepositives` strips the `key=` prefix).
+fn secret_candidate<'a>(detector: &str, line: &'a str, detectors: &[SecretDetector]) -> &'a str {
+    if let Some(det) = detectors.iter().find(|d| d.name == detector) {
+        if let Some(m) = det.pattern.find(line) {
+            return m.as_str();
+        }
+    }
+    line
 }
 
 fn redact_match(line: &str) -> String {
@@ -454,5 +613,52 @@ mod tests {
     #[test]
     fn test_shannon_entropy_zero_for_empty() {
         assert_eq!(shannon_entropy(""), 0.0);
+    }
+
+    // ---------------------------------------------------------------------
+    // False-positive suppression (TruffleHog falsepositives.go port)
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn test_fp_wordlist_match() {
+        assert!(falsepositives::is_known_false_positive("example"));
+        assert!(falsepositives::is_known_false_positive("PASSWORD"));
+    }
+
+    #[test]
+    fn test_fp_all_same_char() {
+        assert!(falsepositives::is_known_false_positive(
+            "xxxxxxxxxxxxxxxxxxxxxxxx"
+        ));
+    }
+
+    #[test]
+    fn test_fp_realistic_secret_kept() {
+        assert!(!falsepositives::is_known_false_positive(
+            "A7xQ9pL2zR8vK3mN6wT1yB5dF4hG0jUq"
+        ));
+    }
+
+    #[test]
+    fn test_fp_extract_candidate_strips_assignment_and_quotes() {
+        assert_eq!(
+            falsepositives::extract_candidate(r#"API_KEY="example""#),
+            "example"
+        );
+    }
+
+    #[test]
+    fn test_scan_filtered_drops_placeholder() {
+        let detectors = builtin_detectors();
+        let findings = scan_filtered(r#"api_key="example""#, "x.env", &detectors);
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_scan_filtered_keeps_real_secret() {
+        let detectors = builtin_detectors();
+        let findings =
+            scan_filtered(r#"api_key="A7xQ9pL2zR8vK3mN6wT1yB5dF4hG0jUq""#, "x.env", &detectors);
+        assert!(!findings.is_empty());
     }
 }
