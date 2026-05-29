@@ -8,7 +8,9 @@
 pub mod acme_client;
 pub mod cert_request;
 pub mod crds;
+pub mod csr;
 pub mod engine;
+pub mod issuers;
 pub mod models;
 pub mod pqc;
 pub mod renewal;

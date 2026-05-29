@@ -16,6 +16,8 @@ sha2 = { workspace = true }
 ed25519-dalek = { workspace = true }
 thiserror = { workspace = true }
 rand = { workspace = true }
+rcgen = { version = "0.13", features = ["pem", "x509-parser"] }
+time = { version = "0.3", features = ["std"] }
 
 [dev-dependencies]
 proptest = "1"
