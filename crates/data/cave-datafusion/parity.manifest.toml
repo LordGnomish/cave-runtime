@@ -45,6 +45,10 @@ url      = "https://github.com/apache/datafusion"
 # csv/parquet/json/arrow, function registry).
 #
 # Total: 33 subsystems. fill_ratio = (mapped + partial + skipped) / total.
+# 2026-05-29 fresh-impl: correctness fix (strict-TDD test 9e062d2b RED → impl 6b6b9bc2 GREEN) —
+#   SUM accumulator (physical_plan.rs) coerced Int64 inputs to Float64; now preserves Int64 when all
+#   inputs are integral (DataFusion integer-SUM semantics). Bug-fix to the already-mapped aggregate
+#   accumulator entry — honest_ratio unchanged (no new area mapped), mapping now genuinely honest.
 mapped_count   = 16
 partial_count  = 4
 skipped_count  = 13
