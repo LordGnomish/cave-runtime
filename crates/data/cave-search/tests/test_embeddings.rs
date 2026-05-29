@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Tests for cosine similarity (pure vector math) and TF-IDF dense vector representation.
+//! Tests for vector math (cosine similarity, dot product, euclidean) and TF-IDF dense vectors.
 
 use cave_search::embeddings::{cosine_similarity, tfidf_vector, dot_product, euclidean_distance};
 use cave_search::tenant::TenantId;
