@@ -21,6 +21,7 @@ pub mod outbox;
 pub mod postgres;
 pub mod routing;
 pub mod schema;
+pub mod signal;
 pub mod snapshot;
 pub mod streams_sink;
 
@@ -34,6 +35,7 @@ pub use outbox::{OutboxEntry, OutboxEventRouter};
 pub use postgres::{PostgresConnector, ReplicationSlotConfig, WalEvent, WalEventKind};
 pub use routing::{RoutingPolicy, TopicRouter};
 pub use schema::{Compatibility, Schema, SchemaFormat, SchemaRegistry};
+pub use signal::{Signal, SignalKind, SignalTable};
 pub use snapshot::{SnapshotMode, SnapshotProgress};
 pub use streams_sink::{ProduceResult, StreamsSink};
 
