@@ -92,10 +92,18 @@ impl NominatedNodeMap {
 
 /// Eviction queue — upstream issues eviction subresource RPCs; we record the
 /// (pod_uid, node) pair so the rest of cave-runtime can drain it.
+///
+/// Extended for preemption-victim-recovery (upstream
+/// `pkg/scheduler/framework/preemption/preemption.go` §handlePreemptionResult):
+/// the `failed` list records eviction tasks whose apiserver RPC returned a
+/// transient error so the recovery loop can re-admit those victims.
 #[derive(Debug, Default)]
 pub struct AsyncPreemptHandle {
     pending: Mutex<Vec<EvictionTask>>,
     completed: Mutex<Vec<EvictionTask>>,
+    /// Eviction tasks that were attempted but returned a transient error.
+    /// Populated by `mark_failed`; drained by `EvictionRecoveryLoop::drain_failed`.
+    failed: Mutex<Vec<EvictionTask>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,6 +137,37 @@ impl AsyncPreemptHandle {
         Some(task)
     }
 
+    /// Record that the eviction for `victim_uid` failed transiently.
+    ///
+    /// The task is removed from `pending` and appended to the `failed` list so
+    /// `EvictionRecoveryLoop::drain_failed` can re-admit the victim.  If
+    /// `victim_uid` is not found in `pending` (already dequeued or unknown),
+    /// this is a no-op.
+    ///
+    /// Upstream analogue: `pkg/scheduler/framework/preemption/preemption.go`
+    /// error-path inside `evictPod` which calls back into the scheduler to
+    /// clear the nomination and re-queue the victim.
+    pub fn mark_failed(&self, victim_uid: &str) {
+        let mut pending = self.pending.lock().unwrap();
+        if let Some(pos) = pending.iter().position(|t| t.victim_uid == victim_uid) {
+            let task = pending.remove(pos);
+            self.failed.lock().unwrap().push(task);
+        }
+    }
+
+    /// Return the current list of failed-eviction tasks (snapshot, not drained).
+    /// Use `EvictionRecoveryLoop::drain_failed` to atomically drain and clear.
+    pub fn failed_evictions(&self) -> Vec<EvictionTask> {
+        self.failed.lock().unwrap().clone()
+    }
+
+    /// Atomically drain all failed-eviction tasks and return them.
+    /// Called exclusively by `EvictionRecoveryLoop::drain_failed`; callers
+    /// should prefer that API so nomination clearing is included.
+    pub(crate) fn take_failed(&self) -> Vec<EvictionTask> {
+        std::mem::take(&mut self.failed.lock().unwrap())
+    }
+
     pub fn pending_len(&self) -> usize {
         self.pending.lock().unwrap().len()
     }
@@ -137,6 +176,61 @@ impl AsyncPreemptHandle {
     }
     pub fn pending(&self) -> Vec<EvictionTask> {
         self.pending.lock().unwrap().clone()
+    }
+}
+
+// ── Preemption-victim-recovery loop ─────────────────────────────────────────
+//
+// Upstream: pkg/scheduler/framework/preemption/preemption.go
+//   `handlePreemptionResult` / `evictPod` error-path.
+//
+// When the apiserver returns a transient error while evicting a victim pod,
+// the scheduler must:
+//   1. Remove the victim from the "to be evicted" list.
+//   2. Clear the preemptor's nomination (so the next scheduling cycle can
+//      pick a different node rather than waiting forever on a dead nomination).
+//   3. Re-admit the victim so its resources are not silently leaked — i.e.,
+//      return the task descriptor for the caller to re-add the victim pod to
+//      the active queue.
+//
+// `EvictionRecoveryLoop` wraps an `AsyncPreemptHandle` + `NominatedNodeMap`
+// and provides `drain_failed()` which atomically performs steps 1–3.
+
+/// Recovery loop for preemption victims whose eviction failed transiently.
+///
+/// Create one instance per scheduler and call `drain_failed` periodically (or
+/// after every eviction worker error) to re-admit failed victims.
+pub struct EvictionRecoveryLoop {
+    handle: Arc<AsyncPreemptHandle>,
+    nominated: Arc<NominatedNodeMap>,
+}
+
+impl EvictionRecoveryLoop {
+    /// Construct a recovery loop bound to the given handle and nomination map.
+    pub fn new(handle: Arc<AsyncPreemptHandle>, nominated: Arc<NominatedNodeMap>) -> Self {
+        Self { handle, nominated }
+    }
+
+    /// Drain all failed-eviction tasks, clear the preemptor nominations for
+    /// affected pods, and return the tasks for re-admission.
+    ///
+    /// This call is atomic with respect to the `failed` list: after it returns,
+    /// `handle.failed_evictions()` will be empty until the next `mark_failed`.
+    ///
+    /// The caller is responsible for re-adding the returned victim UIDs to the
+    /// active scheduling queue; `EvictionRecoveryLoop` does not itself have a
+    /// reference to the queue (separation of concerns mirrors upstream).
+    pub fn drain_failed(&self) -> Vec<EvictionTask> {
+        let failed = self.handle.take_failed();
+        // For each failed task, clear the preemptor's nomination.
+        // Multiple victims may share the same preemptor — clear once per unique uid.
+        let mut cleared: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for task in &failed {
+            if cleared.insert(task.preemptor_uid.clone()) {
+                self.nominated.clear(&task.preemptor_uid);
+            }
+        }
+        failed
     }
 }
 
