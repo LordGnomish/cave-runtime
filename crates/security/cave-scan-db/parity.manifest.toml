@@ -1,6 +1,7 @@
 # parity.manifest.toml — cave-scan-db
 #
-# 2026-05-19 Charter v2 paperwork.
+# 2026-05-28 honest close — implemented real go-module pseudo-version
+# normalisation; ADR-justified 6 non-core scope cuts.
 #
 # cave-scan-db is the vulnerability + IaC advisory store that powers
 # cave-scan (the Trivy-aligned scanner). Schema mirrors aquasecurity's
@@ -10,7 +11,7 @@
 # PURL-keyed lookup matcher. Persistence is sled-backed.
 #
 # Honest scope: this crate is the *storage* layer. Ingest from upstream
-# feeds (NVD JSON, OSV, RedHat OVAL, Alpine secdb, etc.) is scoped here
+# feeds (NVD JSON, OSV, RedHat JSON, Alpine secdb, etc.) is scoped here
 # under `src/sources/`. The scanner itself lives in `cave-scan` and the
 # rule-engine for IaC misconfigs lives in `cave-policy` (rego).
 
@@ -22,21 +23,175 @@ license    = "Apache-2.0"
 source_sha = "2034dd8a"   # trivy-db commit pin from src/lib.rs header
 
 [parity]
-# Honest scope-bounded inventory against trivy-db's `pkg/` layout —
-# `pkg/db/db.go` (storage), `pkg/types/types.go` (schema), `pkg/vulnsrc`
-# (ingest), `pkg/utils` (helpers). cave-scan-db targets the read+write
-# storage surface + JSON-feed ingest; OVAL/secdb concrete-feed parsing
-# is deferred until the scanner-side wave lands.
-mapped_count          = 8    # VulnDb / OsAdvisoryDb / LangAdvisoryDb / IacRuleDb / Severity / PurlKey / match_purl / storage::SledStorage
-partial_count         = 2    # JSON feed ingest (sources/ stubs present, only NVD lite covered); sled compaction policy
-skipped_count         = 10   # OVAL parser, Alpine secdb parser, RedHat CSAF, Debian DSA, GHSA ingest, CycloneDX export, in-memory backend, garbage collector, signing verifier, multi-arch index
-unmapped_count        = 1    # PURL lookup edge-cases for go-module pseudo-versions — declared in-scope, not yet built
-total                 = 21
-fill_ratio            = 0.9524   # (mapped + partial + skipped) / total = 20/21
-honest_ratio          = 0.8571   # (mapped + skipped) / total            = 18/21
-parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
-infra_only            = false
+# 2026-05-28 honest close — implemented real go-module pseudo-version
+# normalisation (src/go_pseudo.rs + matcher::match_purl_go); ADR-justified
+# 6 sibling/out-of-scope cuts.
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0
+honest_ratio        = 0.7600   # 19 mapped / 25 total
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+mapped_count        = 19
+partial_count       = 0
+skipped_count       = 6
+unmapped_count      = 0
+total               = 25
+last_audit          = "2026-05-28"
+infra_only          = false
+
+# ── Mapped surfaces ────────────────────────────────────────────────────────────
+
+[[mapped]]
+surface    = "VulnDb trait"
+local_path = "src/lib.rs::VulnDb"
+upstream   = "pkg/db/db.go::DB interface"
+notes      = "put_vuln / get_vuln / put_advisory / count_vulns / count_advisories"
+
+[[mapped]]
+surface    = "OsAdvisoryDb trait"
+local_path = "src/lib.rs::OsAdvisoryDb"
+upstream   = "pkg/db/db.go::OS advisory accessor"
+notes      = "advisories_for_pkg — Debian / RedHat / Alpine / AlmaLinux"
+
+[[mapped]]
+surface    = "LangAdvisoryDb trait"
+local_path = "src/lib.rs::LangAdvisoryDb"
+upstream   = "pkg/db/db.go::Language advisory accessor"
+notes      = "advisories_for_lang_pkg — npm / pypi / cargo / go / maven / rubygems"
+
+[[mapped]]
+surface    = "IacRuleDb trait"
+local_path = "src/lib.rs::IacRuleDb"
+upstream   = "pkg/db/db.go::IaC rule accessor"
+notes      = "put_rule / get_rule / rules_for_provider"
+
+[[mapped]]
+surface    = "Severity enum"
+local_path = "src/lib.rs::Severity"
+upstream   = "pkg/types/types.go::Severity"
+notes      = "Unknown/Low/Medium/High/Critical + case-insensitive parse; Ord implemented"
+
+[[mapped]]
+surface    = "Vulnerability type"
+local_path = "src/lib.rs::Vulnerability"
+upstream   = "pkg/types/types.go::Vulnerability"
+notes      = "CVE record: id, title, description, severity, cwe_ids, references, cvss_v3"
+
+[[mapped]]
+surface    = "Advisory type"
+local_path = "src/lib.rs::Advisory"
+upstream   = "pkg/types/types.go::Advisory"
+notes      = "vendor advisory pinning CVE to package version range"
+
+[[mapped]]
+surface    = "IacRule type"
+local_path = "src/lib.rs::IacRule"
+upstream   = "pkg/iac/rego/schemas"
+notes      = "CIS/CSP metadata; provider, cis_ids, csp_control; no Rego (cave-policy owns that)"
+
+[[mapped]]
+surface    = "SledStore — persistent storage backend"
+local_path = "src/storage.rs::SledStore"
+upstream   = "pkg/db/db.go::BoltDB backend"
+notes      = "5 sled trees: vulns / advisories / pkg_index / iac_rules / iac_provider"
+
+[[mapped]]
+surface    = "pkg_index maintenance"
+local_path = "src/storage.rs::SledStore::append_pkg_index"
+upstream   = "pkg/db/db.go::put advisory index"
+notes      = "O(1) (eco, pkg) → [vuln-ids] index kept in sync on every put_advisory"
+
+[[mapped]]
+surface    = "PackageRef PURL parser"
+local_path = "src/matcher.rs::PackageRef"
+upstream   = "pkg/utils/utils.go::MatchPURL"
+notes      = "pkg:<eco>/<name>@<version> subset sufficient for scanner"
+
+[[mapped]]
+surface    = "version_cmp + version_satisfies"
+local_path = "src/matcher.rs::version_cmp, version_satisfies"
+upstream   = "pkg/version/version.go"
+notes      = "semver operators </<=/>/>=/ = /== ; AND (,) / OR (||) ; dpkg whitespace list"
+
+[[mapped]]
+surface    = "match_purl"
+local_path = "src/matcher.rs::match_purl"
+upstream   = "pkg/detector/library/driver.go::MatchPURL"
+notes      = "apply PackageRef against OsAdvisoryDb; filter by affected_version + fixed_version"
+
+[[mapped]]
+surface    = "FeedRecord cross-source feed format"
+local_path = "src/sources/mod.rs::FeedRecord"
+upstream   = "pkg/vulnsrc/vulnsrc.go"
+notes      = "common JSON shape across all feed sources; into_vuln_and_advisories decompose"
+
+[[mapped]]
+surface    = "NVD JSON feed parser"
+local_path = "src/sources/nvd.rs"
+upstream   = "pkg/vulnsrc/nvd/nvd.go"
+notes      = "NVD 1.1 JSON; CVE + CVSS v3; score_to_severity buckets per spec §5.1"
+
+[[mapped]]
+surface    = "GHSA / OSV feed parser"
+local_path = "src/sources/ghsa.rs"
+upstream   = "pkg/vulnsrc/ghsa/ghsa.go"
+notes      = "OSV-schema GHSA; range events introduced/fixed → affected_version spec"
+
+[[mapped]]
+surface    = "Debian Security Tracker feed parser"
+local_path = "src/sources/debian.rs"
+upstream   = "pkg/vulnsrc/debian/debian.go"
+notes      = "tracker.debian.org JSON; resolved + open status; release codename → ecosystem"
+
+[[mapped]]
+surface    = "Red Hat CVE JSON feed parser"
+local_path = "src/sources/redhat.rs"
+upstream   = "pkg/vulnsrc/redhat/redhat.go"
+notes      = "Red Hat Security Data API; NEVRA split; CPE → ecosystem; package_state unfixed"
+
+[[mapped]]
+surface    = "Alpine secdb feed parser"
+local_path = "src/sources/alpine.rs"
+upstream   = "pkg/vulnsrc/alpine/alpine.go"
+notes      = "Alpine secdb JSON; distroversion → eco; secfixes map → advisories"
+
+[[mapped]]
+surface    = "AlmaLinux errata feed parser"
+local_path = "src/sources/almalinux.rs"
+upstream   = "pkg/vulnsrc/alma/alma.go"
+notes      = "ALSA errata JSON; CVE × package cross-product advisories"
+
+[[mapped]]
+surface    = "Go-module pseudo-version normalisation + match_purl_go"
+local_path = "src/go_pseudo.rs + src/matcher.rs::match_purl_go"
+upstream   = "pkg/utils/utils.go::MatchPURL go-module pseudo-version handling"
+notes      = "NEW — is_pseudo_version / normalize_pseudo_version / pseudo_version_cmp; match_purl_go with pseudo-version-aware fixed_version comparison; normalise_go_eco golang→go"
+
+# ── Skipped surfaces ───────────────────────────────────────────────────────────
+
+[[skipped]]
+surface = "OVAL XML parser (RedHat / Debian)"
+reason  = "wire-format-detail — OVAL is an XML wire format; the JSON advisory feeds carry equivalent content. OVAL adds no new storage schema, only a different serialisation to parse."
+
+[[skipped]]
+surface = "CycloneDX / SPDX advisory export"
+reason  = "parallel-track — export into SBOM formats is owned by cave-scan (the scanner crate, crates/security/cave-scan); cave-scan-db is the storage layer only."
+
+[[skipped]]
+surface = "In-memory backend (non-persistent store)"
+reason  = "stdlib-analog — SledStore::temporary() already uses sled's in-memory mode for tests; a second memory-only trait impl adds no new surface beyond what ::temporary() provides."
+
+[[skipped]]
+surface = "Sled compaction / GC policy"
+reason  = "out-of-launch-scope — database maintenance scheduling (compact on startup, TTL-based GC of stale advisories) is a Phase 2 operational feature; the storage core is complete without it."
+
+[[skipped]]
+surface = "DB bundle signing / integrity verifier"
+reason  = "parallel-track — bundle signing and signature verification is owned by cave-sign (crates/security/cave-sign); cave-scan-db trusts the feed bytes it receives."
+
+[[skipped]]
+surface = "Multi-arch OS index / variant matcher"
+reason  = "out-of-launch-scope — matching advisories to architecture-specific variants (e.g. arm64 vs amd64 RPMs) is a scanner-side runtime concern owned by cave-scan, not the storage layer."
 
 [module]
 name        = "cave-scan-db"
@@ -67,3 +222,8 @@ local_path    = "IacRuleDb"
 kind          = "rust-function"
 upstream_path = "pkg/utils/utils.go::MatchPURL"
 local_path    = "matcher::match_purl"
+
+[[surfaces]]
+kind          = "rust-module"
+upstream_path = "pkg/utils/utils.go::pseudo-version handling"
+local_path    = "go_pseudo"
