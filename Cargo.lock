@@ -2728,8 +2728,12 @@ dependencies = [
  "axum 0.8.9",
  "chrono",
  "proptest",
+ "reqwest",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.5.3",
  "uuid",
 ]
 

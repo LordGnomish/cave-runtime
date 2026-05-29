@@ -2528,8 +2528,8 @@
       "honest_ratio": 0.788,
       "last_audit": "2026-05-28",
       "last_audit_disk": "2026-05-28",
-      "last_commit": "dd16b265e9f409b11d9a1e75edffcfd4732000c7",
-      "last_commit_at": "2026-05-29T17:43:11+02:00",
+      "last_commit": "1f767f89526088d1e4893f08678551f57e302ee9",
+      "last_commit_at": "2026-05-29T17:43:14+02:00",
       "manifest_filled": true,
       "mapped_count": 25,
       "note": "needs manifest; likely upstream: likely opensearch-project/OpenSearch",
@@ -2895,8 +2895,8 @@
       "honest_ratio": 0.65,
       "last_audit": "2026-05-28",
       "last_audit_disk": "2026-05-28",
-      "last_commit": "b2bb549e0021fa66fc394d2fe796376010d1e192",
-      "last_commit_at": "2026-05-29T17:42:54+02:00",
+      "last_commit": "7b7d483605abe95553fbbc71b139ce19d572b068",
+      "last_commit_at": "2026-05-29T17:47:43+02:00",
       "manifest_filled": true,
       "mapped_count": 13,
       "note": "skeleton \u2014 needs real impl",
@@ -3024,7 +3024,7 @@
     "injected": 14,
     "new_filled": 99,
     "phantoms": 0,
-    "ratio_overrides": 79
+    "ratio_overrides": 80
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
