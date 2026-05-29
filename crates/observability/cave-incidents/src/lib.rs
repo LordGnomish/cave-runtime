@@ -1,27 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Incident management — compatible with Grafana OnCall (partial)
+//! Incident management — compatible with Grafana OnCall (incident tracking side)
 //!
-//! Compatible with: Grafana OnCall
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Covers: incident CRUD, lifecycle (open→ack→resolve→close), timeline/audit log,
+//! responders, postmortems, incident metrics (MTTA/MTTR), on-call schedule
+//! query (read-only integration — write path lives in cave-oncall).
+//!
+//! Upstream: grafana/oncall v1.10.0
 
 pub mod engine;
 pub mod models;
+pub mod oncall;
 pub mod routes;
+pub mod store;
 
 use axum::Router;
-use cave_db::Storage;
 use std::sync::Arc;
 
-/// Module state.
+/// Module-level shared state.
 pub struct State {
-    pub storage: Arc<dyn Storage>,
+    pub store: Arc<store::IncidentStore>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            storage: Arc::new(cave_db::MemoryStorage::default()),
+            store: Arc::new(store::IncidentStore::new()),
         }
     }
 }

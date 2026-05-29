@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+//! In-memory store for incidents, schedules, policies, and postmortems.
+
 use crate::models::{
     EscalationPolicy, Incident, IncidentMetrics, IncidentSeverity, IncidentStatus, OnCallSchedule,
     OnCallUser, PostMortem, Responder, TimelineEntry,
@@ -32,6 +34,8 @@ impl IncidentStore {
         }
     }
 
+    // ── Incident CRUD ─────────────────────────────────────────────────────────
+
     pub fn create(&self, incident: Incident) {
         let mut map = self.incidents.write().unwrap();
         map.insert(incident.id, incident);
@@ -50,6 +54,11 @@ impl IncidentStore {
         } else {
             false
         }
+    }
+
+    pub fn delete(&self, id: Uuid) -> bool {
+        let mut map = self.incidents.write().unwrap();
+        map.remove(&id).is_some()
     }
 
     pub fn list(&self) -> Vec<Incident> {
@@ -97,11 +106,15 @@ impl IncidentStore {
         }
     }
 
+    // ── Metrics ───────────────────────────────────────────────────────────────
+
     pub fn metrics(&self) -> IncidentMetrics {
         let map = self.incidents.read().unwrap();
         let incidents: Vec<&Incident> = map.values().collect();
         crate::engine::compute_metrics_from_refs(&incidents)
     }
+
+    // ── Schedule CRUD ─────────────────────────────────────────────────────────
 
     pub fn add_schedule(&self, schedule: OnCallSchedule) {
         let mut map = self.schedules.write().unwrap();
@@ -122,10 +135,10 @@ impl IncidentStore {
         let map = self.schedules.read().unwrap();
         let schedule = map.get(&schedule_id)?;
         let engine = crate::oncall::OnCallEngine::new();
-        engine
-            .current_oncall(schedule, Utc::now())
-            .cloned()
+        engine.current_oncall(schedule, Utc::now()).cloned()
     }
+
+    // ── Escalation Policy CRUD ────────────────────────────────────────────────
 
     pub fn add_policy(&self, policy: EscalationPolicy) {
         let mut map = self.policies.write().unwrap();
@@ -141,6 +154,8 @@ impl IncidentStore {
         let map = self.policies.read().unwrap();
         map.values().cloned().collect()
     }
+
+    // ── PostMortem CRUD ───────────────────────────────────────────────────────
 
     pub fn create_postmortem(&self, pm: PostMortem) {
         let mut map = self.postmortems.write().unwrap();
