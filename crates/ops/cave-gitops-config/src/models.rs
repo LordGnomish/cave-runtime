@@ -145,6 +145,44 @@ pub enum SyncStatus {
     Error,
 }
 
+/// Compare desired vs live resource state and compute the [`SyncStatus`].
+///
+/// Ported from ArgoCD `controller/state.go` `CompareAppState`: the controller
+/// diffs the rendered desired manifest against the observed live manifest. When
+/// every desired resource has a matching live counterpart with no diff, the app
+/// is `Synced`; any drift, or a desired resource with no live target, is
+/// `OutOfSync`.
+///
+/// Manifests are normalized before comparison (trailing whitespace / blank
+/// trailing lines stripped) mirroring ArgoCD's normalization step, so cosmetic
+/// formatting differences do not produce false drift.
+///
+/// `live == None` represents a desired resource that has no observed live
+/// target (e.g. not yet applied or pruned) which ArgoCD reports as `OutOfSync`.
+pub fn compare_state(desired: &str, live: Option<&str>) -> SyncStatus {
+    match live {
+        None => SyncStatus::OutOfSync,
+        Some(live) => {
+            if normalize_manifest(desired) == normalize_manifest(live) {
+                SyncStatus::Synced
+            } else {
+                SyncStatus::OutOfSync
+            }
+        }
+    }
+}
+
+/// Normalize a manifest for diffing: strip trailing whitespace from each line
+/// and drop trailing blank lines. Mirrors ArgoCD's pre-diff normalization which
+/// canonicalizes formatting before comparing desired vs live.
+fn normalize_manifest(manifest: &str) -> String {
+    let mut lines: Vec<&str> = manifest.lines().map(|l| l.trim_end()).collect();
+    while matches!(lines.last(), Some(&"")) {
+        lines.pop();
+    }
+    lines.join("\n")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateStoreEntry {
     pub id: Uuid,
