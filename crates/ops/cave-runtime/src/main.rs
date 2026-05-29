@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
     // Phase 2 states
     let vulns_state = Arc::new(cave_vulns::State::default());
     let sbom_state = Arc::new(cave_sbom::State::default());
-    let uptime_state = Arc::new(cave_uptime::State::default());
+    let uptime_state = Arc::new(cave_uptime::AppState::default());
     let cost_state = Arc::new(cave_cost::CostState::default());
     let sign_state = Arc::new(cave_sign::State::default());
     let forensics_state = Arc::new(cave_forensics::State::default());
@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
     let ai_obs_state = Arc::new(cave_ai_obs::State::default());
     let pii_state = Arc::new(cave_pii::State::default());
     let incidents_state = Arc::new(cave_incidents::State::default());
-    let chat_state = Arc::new(cave_chat::State::default());
+    let chat_state = Arc::new(cave_chat::AppState::default());
     let slo_state = Arc::new(cave_slo::State::default());
     let alerts_state = Arc::new(cave_alerts::State::default());
     let profiler_state = Arc::new(cave_profiler::State::default());
