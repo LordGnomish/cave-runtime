@@ -16,6 +16,7 @@ pub mod proxy_tunnel;
 pub mod rbac;
 pub mod routes;
 pub mod session_recorder;
+pub mod trusted_cluster;
 
 use axum::Router;
 
