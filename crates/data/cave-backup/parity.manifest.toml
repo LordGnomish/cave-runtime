@@ -21,13 +21,17 @@ url     = "https://github.com/vmware-tanzu/velero"
 #     persistence-consolidation(2) + architecturally-superseded(1) +
 #     portal-api-owned(1).
 #   honest_ratio = 11/24 preserved — real baseline, not inflated.
-mapped_count          = 11
+# 2026-05-29 fresh-impl: ported Velero schedule_controller.go getNextRunTime via strict-TDD
+#   (test 8b6364a8 RED → impl 8382e416 GREEN) — src/schedule.rs::next_run (hand-rolled 5-field cron
+#   parser, no external dep). Distinct now-implemented piece of the otherwise-skipped controller pkg.
+#   mapped 11→12, total 24→25. fill_ratio stays 1.0.
+mapped_count          = 12
 partial_count         = 0
 skipped_count         = 13
 unmapped_count        = 0
-total                 = 24
-fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 24/24
-honest_ratio          = 0.4583  # mapped / total = 11/24 — preserved honestly
+total                 = 25
+fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 25/25
+honest_ratio          = 0.48    # mapped / total = 12/25 — preserved honestly
 adr_justified_ratio   = 1.0     # all 13 skipped entries architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
@@ -137,6 +141,10 @@ local    = "src/routes.rs"
 [[files]]
 upstream = "internal/schedule.go"
 local    = "src/schedule.rs"
+
+[[files]]
+upstream = "pkg/controller/schedule_controller.go (getNextRunTime)"
+local    = "src/schedule.rs"  # next_run() — 5-field cron next-run computation (2026-05-29 fresh-impl)
 
 [[files]]
 upstream = "internal/storage.go"
