@@ -11,6 +11,7 @@ pub mod engine;
 pub mod models;
 pub mod prompt;
 pub mod routes;
+pub mod store;
 pub mod trace_models;
 pub mod trace_store;
 
