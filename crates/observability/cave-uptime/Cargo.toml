@@ -11,6 +11,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 proptest = "1"
+tokio = { workspace = true, features = ["macros", "rt"] }
