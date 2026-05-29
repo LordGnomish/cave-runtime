@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-22";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.65;
 const COSIGN_VERSION: &str = "v3.0.6";
 const COSIGN_SHA: &str = "f1ad3ee952313be5d74a49d67ba0aa8d0d5e351f";
