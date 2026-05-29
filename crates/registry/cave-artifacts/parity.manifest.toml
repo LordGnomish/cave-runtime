@@ -63,6 +63,11 @@ unmapped_count = 0
 total          = 70
 ratio          = 1.0000  # (23 + 4 + 43) / 70 = 70/70
 fill_ratio     = 1.0000
+# 2026-05-29 fresh-impl: SECURITY FIX (strict-TDD test 725658eb RED → impl 1709cc87 GREEN) —
+#   verify_sha256 (src/pulp/content.rs) previously only validated the digest STRING was 64 lower-hex
+#   chars and never hashed the data, so any content verified against any well-formed digest. Now
+#   computes Sha256::digest(data) and constant-time compares. Bug-fix to existing mapped coverage —
+#   honest_ratio unchanged (no new area mapped), but the existing mapping is now genuinely honest.
 honest_ratio   = 0.3714  # mapped/total = 26/70 (23 mapped + 3 scope_cut absorbed by sibling crates)
 adr_justified_ratio = 1.0 # 43 skipped: 9 Pulp Phase 2 content plugins (rpm/container/python/file/deb/ostree/maven/helm/ansible); Harbor replication/p2p/jobservice/retention/robot/quota/proxy/exporter → cave-replication/cave-runtime-p2p/cave-jobs/cave-auth/cave-obs; Nexus blobstore-file/s3/azure/gcs/search/rapture/firewall → cave-runtime storage + cave-portal + cave-obs; +3 formalized 2026-05-28: Harbor ORM helpers → cave-rdbms, secret rotation → cave-vault, quota middleware → cave-apiserver admission. 4 partial (Cosign verifier, Nexus REST format-coverage, Harbor webhook HMAC, Pulp worker queue) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
