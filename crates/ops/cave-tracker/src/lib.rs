@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //! CAVE Tracker — Issue & project tracking engine.
-//! Compatible with: Jira
-//! Features: Projects, boards, sprints, issues, workflows, custom fields, JQL-like queries.
+//! Compatible with: Plane (makeplane/plane v1.3.0), Jira
+//! Features: Projects, boards, sprints, issues, workflows, custom fields,
+//!           JQL-like queries, automation rules, roadmap/timeline, analytics.
 
+pub mod analytics;
+pub mod automation_engine;
 pub mod board;
 pub mod fields;
+pub mod jql_engine;
 pub mod models;
 pub mod query;
+pub mod roadmap_engine;
 pub mod routes;
 pub mod sprint;
 pub mod workflow;
