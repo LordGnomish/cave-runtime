@@ -36,13 +36,18 @@ source_root = "src"
 #                repo server → runtime-bootstrap; webhook → cave-gateway;
 #                metrics → obs-stack; Helm/Kustomize renderers → NO-helm policy)
 # unmapped = 0
-mapped_count        = 14
+# 2026-05-29 fresh-impl: ported ArgoCD controller/state.go CompareAppState via strict-TDD
+#   (test b1647fc5 RED → impl 9ca0c3a2 GREEN) — src/models.rs::compare_state (desired-vs-live diff
+#   → Synced/OutOfSync, ArgoCD pre-diff normalization), wired into routes.rs create_resource_request
+#   (previously hardcoded Synced). New capability distinct from the state-CRUD mapping. mapped 14→15,
+#   total 30→31. fill_ratio stays 1.0.
+mapped_count        = 15
 partial_count       = 0
 skipped_count       = 16
 unmapped_count      = 0
-total               = 30
-fill_ratio          = 1.0   # (14 mapped + 16 skipped) / 30 — all unmapped reclassified skipped per ADR-RUNTIME-PARITY-100-PCT-001 §5
-honest_ratio        = 0.4667  # 14 mapped / 30 total (low because cave-deploy owns the heavy ArgoCD application CD surface)
+total               = 31
+fill_ratio          = 1.0   # (15 mapped + 16 skipped) / 31 — all unmapped reclassified skipped per ADR-RUNTIME-PARITY-100-PCT-001 §5
+honest_ratio        = 0.4839  # 15 mapped / 31 total (low because cave-deploy owns the heavy ArgoCD application CD surface)
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
@@ -60,6 +65,11 @@ note          = "Promise, ResourceRequest, PipelineRun, StateStoreEntry, Cluster
 upstream_path = "controller/state.go"
 local_path    = "src/store.rs"
 note          = "GitOpsStore: in-memory promise registry + resource request CRUD + pipeline run + state store + cluster management"
+
+[[mapped]]
+upstream_path = "controller/state.go (CompareAppState)"
+local_path    = "src/models.rs"
+note          = "compare_state(desired, live) → Synced/OutOfSync with ArgoCD pre-diff normalization; wired into routes.rs (2026-05-29 fresh-impl, was hardcoded Synced)"
 
 [[mapped]]
 upstream_path = "controller/sync.go"
