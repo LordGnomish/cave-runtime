@@ -18,6 +18,7 @@ use cave_artifacts::pulp::content::{
     DebFilter, PypiFilter, RpmFilter, generate_deb_package_entry, generate_pypi_project_json,
     generate_pypi_simple_page, generate_repomd_xml, verify_artifact_checksums, verify_sha256,
 };
+use sha2::{Digest, Sha256};
 use cave_artifacts::pulp::distribution::{
     DistributionError, find_distribution_by_path, resolve_content_path, validate_distribution,
 };
@@ -419,13 +420,12 @@ fn verify_sha256_rejects_non_hex_chars() {
 
 #[test]
 fn verify_sha256_rejects_uppercase_hex_strict_lower() {
-    // The verifier requires ascii_hexdigit (which accepts both cases).
-    // It accepts uppercase too — assert that explicitly so any tightening
-    // of the contract is caught.
-    let upper = "A".repeat(64);
-    assert!(verify_sha256(b"data", &upper));
+    // The canonical digest form is lower-hex. Uppercase or mixed-case digests
+    // are never accepted, even if they would be the correct value lowercased.
+    let upper = hex::encode(Sha256::digest(b"data")).to_uppercase();
+    assert!(!verify_sha256(b"data", &upper));
     let mixed = "AbCdEf0123456789".repeat(4);
-    assert!(verify_sha256(b"data", &mixed));
+    assert!(!verify_sha256(b"data", &mixed));
 }
 
 #[test]
@@ -443,11 +443,20 @@ fn verify_artifact_checksums_skips_missing_algorithms() {
 
 #[test]
 fn verify_artifact_checksums_emits_sha256_when_set() {
-    let art = make_artifact(1024, Some(&"f".repeat(64)));
-    let results = verify_artifact_checksums(&art, &[0u8; 1024]);
+    let data = [0u8; 1024];
+    // Declared digest is the TRUE sha256 of the data => valid.
+    let expected = hex::encode(Sha256::digest(data));
+    let art = make_artifact(1024, Some(&expected));
+    let results = verify_artifact_checksums(&art, &data);
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].algorithm, "sha256");
     assert!(results[0].valid);
+
+    // A non-matching declared digest => emitted but invalid.
+    let art_bad = make_artifact(1024, Some(&"f".repeat(64)));
+    let results_bad = verify_artifact_checksums(&art_bad, &data);
+    assert_eq!(results_bad.len(), 1);
+    assert!(!results_bad[0].valid);
 }
 
 #[test]
