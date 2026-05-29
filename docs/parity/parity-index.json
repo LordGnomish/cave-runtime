@@ -46,26 +46,34 @@
       "upstream_version": "v1.28.0"
     },
     "cave-ai-obs": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 408,
       "crate_dir": "crates/observability/cave-ai-obs",
-      "fill_ratio": 0.0,
-      "honest_ratio": 0.0,
-      "last_audit": "2026-05-12",
-      "last_audit_disk": "2026-05-12",
-      "last_commit": "ccc5ba70adaf52085992e1956c303279aacc08ff",
-      "last_commit_at": "2026-05-25T08:22:19+02:00",
+      "fill_ratio": 1.0,
+      "honest_ratio": 0.5,
+      "last_audit": "2026-05-29",
+      "last_audit_disk": "2026-05-29",
+      "last_commit": "e024992365a62adc870b41f74d992ad57d3ae133",
+      "last_commit_at": "2026-05-29T18:27:32+02:00",
       "manifest_filled": true,
+      "mapped_count": 6,
       "note": "skeleton \u2014 needs real impl",
-      "parity_ratio": 0.0,
+      "parity_ratio": 1.0,
       "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 9,
+      "source_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
       "stubs": null,
       "tier": "D1",
+      "total_count": 18,
+      "unmapped_count": 0,
       "upstream": "langfuse/langfuse",
       "upstream_language": "TypeScript",
       "upstream_license": "MIT",
       "upstream_name": "Langfuse",
       "upstream_url": "https://github.com/langfuse/langfuse",
-      "upstream_version": "v2.0.0"
+      "upstream_version": "v3.75.1"
     },
     "cave-alerts": {
       "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
@@ -3048,7 +3056,7 @@
     "injected": 14,
     "new_filled": 99,
     "phantoms": 0,
-    "ratio_overrides": 83
+    "ratio_overrides": 84
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
