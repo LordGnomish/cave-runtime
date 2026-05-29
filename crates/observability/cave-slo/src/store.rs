@@ -1,33 +1,42 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{Slo, SloStats, SloStatus};
+//! In-memory SLO store — thread-safe CRUD + aggregate stats.
+//! Mirrors the nobl9-go SDK's Object CRUD surface for SLO resources.
+
+use crate::models::{SLO, SloStats, SloStatus};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
+/// Thread-safe in-memory store for SLO objects.
 #[derive(Default)]
 pub struct SloStore {
-    pub slos: RwLock<HashMap<Uuid, Slo>>,
+    pub slos: RwLock<HashMap<Uuid, SLO>>,
 }
 
 impl SloStore {
+    /// Create a new shared store instance.
     pub fn new() -> Arc<Self> {
         Arc::new(Self::default())
     }
 
-    pub fn insert(&self, slo: Slo) {
+    /// Insert (or overwrite) an SLO.
+    pub fn insert(&self, slo: SLO) {
         self.slos.write().unwrap().insert(slo.id, slo);
     }
 
-    pub fn get(&self, id: Uuid) -> Option<Slo> {
+    /// Retrieve an SLO by ID.
+    pub fn get(&self, id: Uuid) -> Option<SLO> {
         self.slos.read().unwrap().get(&id).cloned()
     }
 
-    pub fn list(&self) -> Vec<Slo> {
+    /// List all SLOs (unordered).
+    pub fn list(&self) -> Vec<SLO> {
         self.slos.read().unwrap().values().cloned().collect()
     }
 
-    pub fn update(&self, slo: Slo) -> bool {
+    /// Update an existing SLO. Returns `true` if the ID existed.
+    pub fn update(&self, slo: SLO) -> bool {
         let mut map = self.slos.write().unwrap();
         if map.contains_key(&slo.id) {
             map.insert(slo.id, slo);
@@ -37,10 +46,12 @@ impl SloStore {
         }
     }
 
+    /// Delete an SLO by ID. Returns `true` if the ID existed.
     pub fn delete(&self, id: Uuid) -> bool {
         self.slos.write().unwrap().remove(&id).is_some()
     }
 
+    /// Compute aggregate statistics across all stored SLOs.
     pub fn compute_stats(&self) -> SloStats {
         let slos = self.slos.read().unwrap();
         let mut stats = SloStats::default();
