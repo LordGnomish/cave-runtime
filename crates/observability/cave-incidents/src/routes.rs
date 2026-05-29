@@ -27,21 +27,21 @@ pub fn create_router(state: Arc<State>) -> Router {
         // Postmortem collection
         .route("/api/incidents/postmortems", post(create_postmortem))
         .route("/api/incidents/postmortems", get(list_postmortems))
-        .route("/api/incidents/postmortems/:pm_id", get(get_postmortem))
+        .route("/api/incidents/postmortems/{pm_id}", get(get_postmortem))
         // Incident collection
         .route("/api/incidents", get(list_incidents))
         .route("/api/incidents", post(create_incident))
         // Incident item
-        .route("/api/incidents/:id", get(get_incident))
-        .route("/api/incidents/:id", delete(delete_incident))
+        .route("/api/incidents/{id}", get(get_incident))
+        .route("/api/incidents/{id}", delete(delete_incident))
         // Lifecycle actions
-        .route("/api/incidents/:id/acknowledge", post(acknowledge_incident))
-        .route("/api/incidents/:id/resolve", post(resolve_incident))
-        .route("/api/incidents/:id/close", post(close_incident))
+        .route("/api/incidents/{id}/acknowledge", post(acknowledge_incident))
+        .route("/api/incidents/{id}/resolve", post(resolve_incident))
+        .route("/api/incidents/{id}/close", post(close_incident))
         // Responders
-        .route("/api/incidents/:id/responders", post(add_responder))
+        .route("/api/incidents/{id}/responders", post(add_responder))
         // Timeline
-        .route("/api/incidents/:id/timeline", get(get_timeline))
+        .route("/api/incidents/{id}/timeline", get(get_timeline))
         .with_state(state)
 }
 
