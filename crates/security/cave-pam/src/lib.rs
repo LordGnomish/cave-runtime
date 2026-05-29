@@ -8,6 +8,7 @@
 use std::sync::Arc;
 pub mod access_request;
 pub mod audit_log;
+pub mod cert_authority;
 pub mod engine;
 pub mod models;
 pub mod node_inventory;
