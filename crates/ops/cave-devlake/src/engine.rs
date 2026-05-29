@@ -1,6 +1,139 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{DeployStatus, DeploymentRecord};
+//! DORA metrics engine — deployment frequency, lead time, CFR, MTTR ratings + analytics.
+
+use crate::models::{
+    Commit, DeployStatus, DeploymentRecord, DoraRating, PullRequest, Sprint,
+};
+
+// ── DORA Deployment Frequency Rating ─────────────────────────────────────────
+// Thresholds (deploys per day):
+//   Elite:  >= 1.0  (multiple deploys per day)
+//   High:   >= 1/7  (at least weekly, ≈ 0.143)
+//   Medium: >= 1/30 (at least monthly, ≈ 0.033)
+//   Low:    < 1/30
+
+pub fn dora_deployment_frequency_rating(deploys_per_day: f64) -> DoraRating {
+    if deploys_per_day >= 1.0 {
+        DoraRating::Elite
+    } else if deploys_per_day >= 1.0 / 7.0 {
+        DoraRating::High
+    } else if deploys_per_day >= 1.0 / 30.0 {
+        DoraRating::Medium
+    } else {
+        DoraRating::Low
+    }
+}
+
+// ── DORA Lead Time Rating ─────────────────────────────────────────────────────
+// Thresholds (seconds):
+//   Elite:  < 1 hour    = 3_600
+//   High:   < 1 day     = 86_400
+//   Medium: < 1 week    = 604_800
+//   Low:    >= 1 week
+
+pub fn dora_lead_time_rating(lead_time_secs: f64) -> DoraRating {
+    if lead_time_secs < 3_600.0 {
+        DoraRating::Elite
+    } else if lead_time_secs < 86_400.0 {
+        DoraRating::High
+    } else if lead_time_secs < 604_800.0 {
+        DoraRating::Medium
+    } else {
+        DoraRating::Low
+    }
+}
+
+// ── DORA Change Failure Rate Rating ──────────────────────────────────────────
+// Thresholds (percentage 0–100):
+//   Elite:  <= 5%
+//   High:   <= 10%
+//   Medium: <= 30%
+//   Low:    > 30%
+
+pub fn dora_cfr_rating(cfr_pct: f64) -> DoraRating {
+    if cfr_pct <= 5.0 {
+        DoraRating::Elite
+    } else if cfr_pct <= 10.0 {
+        DoraRating::High
+    } else if cfr_pct <= 30.0 {
+        DoraRating::Medium
+    } else {
+        DoraRating::Low
+    }
+}
+
+// ── DORA MTTR Rating ──────────────────────────────────────────────────────────
+// Thresholds (seconds):
+//   Elite:  < 1 hour  = 3_600
+//   High:   < 1 day   = 86_400
+//   Medium: < 1 week  = 604_800
+//   Low:    >= 1 week
+
+pub fn dora_mttr_rating(mttr_secs: f64) -> DoraRating {
+    if mttr_secs < 3_600.0 {
+        DoraRating::Elite
+    } else if mttr_secs < 86_400.0 {
+        DoraRating::High
+    } else if mttr_secs < 604_800.0 {
+        DoraRating::Medium
+    } else {
+        DoraRating::Low
+    }
+}
+
+// ── Overall DORA Rating ───────────────────────────────────────────────────────
+// The overall rating is the minimum (worst) across the four metrics.
+
+pub fn overall_dora_rating(ratings: &[DoraRating]) -> DoraRating {
+    ratings
+        .iter()
+        .min()
+        .cloned()
+        .unwrap_or(DoraRating::Low)
+}
+
+// ── PR Cycle Time ─────────────────────────────────────────────────────────────
+
+/// Average cycle time (seconds) across all PRs that have `cycle_time_secs` set.
+pub fn pr_cycle_time_avg_secs(prs: &[PullRequest]) -> f64 {
+    let times: Vec<f64> = prs
+        .iter()
+        .filter_map(|pr| pr.cycle_time_secs)
+        .collect();
+    if times.is_empty() {
+        return 0.0;
+    }
+    times.iter().sum::<f64>() / times.len() as f64
+}
+
+// ── Commit Frequency ─────────────────────────────────────────────────────────
+
+/// Commits-per-day over a rolling `period_days` window.
+pub fn commit_frequency_per_day(commits: &[Commit], period_days: u32) -> f64 {
+    if commits.is_empty() || period_days == 0 {
+        return 0.0;
+    }
+    commits.len() as f64 / period_days as f64
+}
+
+// ── Sprint Velocity ───────────────────────────────────────────────────────────
+
+/// Average completed story-points per sprint (closed sprints only).
+pub fn sprint_velocity_avg(sprints: &[Sprint]) -> f64 {
+    use crate::models::SprintState;
+    let closed: Vec<&Sprint> = sprints
+        .iter()
+        .filter(|s| s.state == SprintState::Closed)
+        .collect();
+    if closed.is_empty() {
+        return 0.0;
+    }
+    let total: f64 = closed.iter().map(|s| s.completed_points as f64).sum();
+    total / closed.len() as f64
+}
+
+// ── Legacy functions (kept for engine.rs backwards compatibility) ─────────────
 
 pub fn deployment_frequency(records: &[DeploymentRecord], days: u32) -> f64 {
     let successful = records
