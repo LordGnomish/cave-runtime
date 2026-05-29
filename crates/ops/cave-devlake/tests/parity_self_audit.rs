@@ -47,16 +47,13 @@ fn g2_spdx_headers_present() {
 fn g3_honest_ratio_present_and_valid() {
     let content = fs::read_to_string(manifest_path()).expect("manifest missing");
     assert!(content.contains("honest_ratio"), "G3: honest_ratio missing");
-    // Extract and validate value
+    // Extract and validate value (strip inline TOML comments)
     for line in content.lines() {
         if line.trim().starts_with("honest_ratio") {
-            let val: f64 = line
-                .split('=')
-                .nth(1)
-                .expect("no value")
-                .trim()
-                .parse()
-                .expect("not a float");
+            let rhs = line.split('=').nth(1).expect("no value");
+            // strip inline comment (everything after '#')
+            let rhs_clean = rhs.split('#').next().unwrap_or(rhs).trim();
+            let val: f64 = rhs_clean.parse().expect("honest_ratio not a float");
             assert!(val >= 0.0 && val <= 1.0, "G3: honest_ratio out of range: {val}");
         }
     }
