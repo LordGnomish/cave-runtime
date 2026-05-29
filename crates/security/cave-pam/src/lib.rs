@@ -11,6 +11,7 @@ pub mod engine;
 pub mod models;
 pub mod rbac;
 pub mod routes;
+pub mod session_recorder;
 
 use axum::Router;
 
