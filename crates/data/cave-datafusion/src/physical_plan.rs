@@ -280,6 +280,12 @@ struct Accumulator {
     kind: AggregateKind,
     count: i64,
     sum: f64,
+    /// Integer running total, kept alongside `sum` so that SUM over an
+    /// all-integer column stays Int64 (DataFusion preserves the integer
+    /// type for integer SUM rather than coercing to Float64).
+    int_sum: i64,
+    /// True while every non-null value seen so far has been an integer.
+    all_int: bool,
     min: Option<Value>,
     max: Option<Value>,
 }
@@ -290,6 +296,8 @@ impl Accumulator {
             kind,
             count: 0,
             sum: 0.0,
+            int_sum: 0,
+            all_int: true,
             min: None,
             max: None,
         }
@@ -303,6 +311,10 @@ impl Accumulator {
             self.count += 1;
             if let Some(f) = v.as_f64() {
                 self.sum += f;
+            }
+            match v.as_i64() {
+                Some(i) if self.all_int => self.int_sum = self.int_sum.wrapping_add(i),
+                _ => self.all_int = false,
             }
             match &self.min {
                 None => self.min = Some(v.clone()),
@@ -329,6 +341,8 @@ impl Accumulator {
             AggregateKind::Sum => {
                 if self.count == 0 {
                     Value::Null
+                } else if self.all_int {
+                    Value::Int64(self.int_sum)
                 } else {
                     Value::Float64(self.sum)
                 }
@@ -479,9 +493,10 @@ mod tests {
         assert_eq!(out.len(), 2);
         // BTreeMap ordering means "x" before "y".
         assert_eq!(out[0].values[0], Value::Utf8("x".into()));
-        assert_eq!(out[0].values[1], Value::Float64(30.0));
+        // SUM over an all-Int64 column preserves Int64 (DataFusion parity).
+        assert_eq!(out[0].values[1], Value::Int64(30));
         assert_eq!(out[0].values[2], Value::Int64(2));
-        assert_eq!(out[1].values[1], Value::Float64(5.0));
+        assert_eq!(out[1].values[1], Value::Int64(5));
     }
 
     #[test]
