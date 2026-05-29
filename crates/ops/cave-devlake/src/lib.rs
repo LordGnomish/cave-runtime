@@ -9,12 +9,22 @@ use std::sync::Arc;
 pub mod engine;
 pub mod models;
 pub mod routes;
+pub mod store;
 
 use axum::Router;
 
-/// Module state.
-#[derive(Default)]
-pub struct State {}
+/// Module state — holds the in-memory DevLake store.
+pub struct State {
+    pub store: store::DevlakeStore,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            store: store::DevlakeStore::new(),
+        }
+    }
+}
 
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {

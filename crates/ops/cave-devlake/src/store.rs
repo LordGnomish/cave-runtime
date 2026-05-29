@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! In-memory store for cave-devlake.
+//! In-memory store for all DevLake entities.
 
 use crate::engine::{
     dora_cfr_rating, dora_deployment_frequency_rating, dora_lead_time_rating, dora_mttr_rating,
     overall_dora_rating,
 };
 use crate::models::{
-    Deployment, DeploymentEnv, DeploymentStatus, DoraReport, Incident, Pipeline,
-    PipelineStatus,
+    Commit, Deployment, DeploymentEnv, DeploymentStatus, DoraReport, Incident, Issue, IssueStatus,
+    Pipeline, PipelineStatus, PrState, PullRequest, Sprint,
 };
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -20,6 +20,10 @@ pub struct DevlakeStore {
     pub pipelines: RwLock<HashMap<Uuid, Pipeline>>,
     pub deployments: RwLock<HashMap<Uuid, Deployment>>,
     pub incidents: RwLock<HashMap<Uuid, Incident>>,
+    pub pull_requests: RwLock<HashMap<Uuid, PullRequest>>,
+    pub commits: RwLock<Vec<Commit>>,
+    pub issues: RwLock<HashMap<Uuid, Issue>>,
+    pub sprints: RwLock<HashMap<Uuid, Sprint>>,
 }
 
 impl DevlakeStore {
@@ -38,12 +42,18 @@ impl DevlakeStore {
     }
 
     pub fn list_pipelines(&self) -> Vec<Pipeline> {
-        let mut pipelines: Vec<Pipeline> = self.pipelines.read().unwrap().values().cloned().collect();
+        let mut pipelines: Vec<Pipeline> =
+            self.pipelines.read().unwrap().values().cloned().collect();
         pipelines.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         pipelines
     }
 
-    pub fn update_pipeline_status(&self, id: Uuid, status: PipelineStatus, duration_secs: Option<f64>) -> Option<Pipeline> {
+    pub fn update_pipeline_status(
+        &self,
+        id: Uuid,
+        status: PipelineStatus,
+        duration_secs: Option<f64>,
+    ) -> Option<Pipeline> {
         let mut pipelines = self.pipelines.write().unwrap();
         if let Some(p) = pipelines.get_mut(&id) {
             p.status = status;
@@ -60,7 +70,10 @@ impl DevlakeStore {
     // ── Deployments ───────────────────────────────────────────────────────────
 
     pub fn insert_deployment(&self, deployment: Deployment) {
-        self.deployments.write().unwrap().insert(deployment.id, deployment);
+        self.deployments
+            .write()
+            .unwrap()
+            .insert(deployment.id, deployment);
     }
 
     pub fn get_deployment(&self, id: Uuid) -> Option<Deployment> {
@@ -68,12 +81,17 @@ impl DevlakeStore {
     }
 
     pub fn list_deployments(&self) -> Vec<Deployment> {
-        let mut deployments: Vec<Deployment> = self.deployments.read().unwrap().values().cloned().collect();
+        let mut deployments: Vec<Deployment> =
+            self.deployments.read().unwrap().values().cloned().collect();
         deployments.sort_by(|a, b| b.deployed_at.cmp(&a.deployed_at));
         deployments
     }
 
-    pub fn recent_deployments(&self, env: Option<&DeploymentEnv>, limit: usize) -> Vec<Deployment> {
+    pub fn recent_deployments(
+        &self,
+        env: Option<&DeploymentEnv>,
+        limit: usize,
+    ) -> Vec<Deployment> {
         let mut deployments = self.list_deployments();
         if let Some(env) = env {
             deployments.retain(|d| &d.environment == env);
@@ -82,7 +100,11 @@ impl DevlakeStore {
         deployments
     }
 
-    pub fn deployments_in_period(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<Deployment> {
+    pub fn deployments_in_period(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Vec<Deployment> {
         self.deployments
             .read()
             .unwrap()
@@ -95,7 +117,10 @@ impl DevlakeStore {
     // ── Incidents ─────────────────────────────────────────────────────────────
 
     pub fn insert_incident(&self, incident: Incident) {
-        self.incidents.write().unwrap().insert(incident.id, incident);
+        self.incidents
+            .write()
+            .unwrap()
+            .insert(incident.id, incident);
     }
 
     pub fn get_incident(&self, id: Uuid) -> Option<Incident> {
@@ -103,12 +128,17 @@ impl DevlakeStore {
     }
 
     pub fn list_incidents(&self) -> Vec<Incident> {
-        let mut incidents: Vec<Incident> = self.incidents.read().unwrap().values().cloned().collect();
+        let mut incidents: Vec<Incident> =
+            self.incidents.read().unwrap().values().cloned().collect();
         incidents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         incidents
     }
 
-    pub fn resolve_incident(&self, id: Uuid, resolved_at: DateTime<Utc>) -> Option<Incident> {
+    pub fn resolve_incident(
+        &self,
+        id: Uuid,
+        resolved_at: DateTime<Utc>,
+    ) -> Option<Incident> {
         let mut incidents = self.incidents.write().unwrap();
         if let Some(inc) = incidents.get_mut(&id) {
             inc.resolved_at = Some(resolved_at);
@@ -116,6 +146,108 @@ impl DevlakeStore {
         } else {
             None
         }
+    }
+
+    // ── Pull Requests ─────────────────────────────────────────────────────────
+
+    pub fn insert_pr(&self, pr: PullRequest) {
+        self.pull_requests.write().unwrap().insert(pr.id, pr);
+    }
+
+    pub fn get_pr(&self, id: Uuid) -> Option<PullRequest> {
+        self.pull_requests.read().unwrap().get(&id).cloned()
+    }
+
+    pub fn list_prs(&self) -> Vec<PullRequest> {
+        let mut prs: Vec<PullRequest> =
+            self.pull_requests.read().unwrap().values().cloned().collect();
+        prs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        prs
+    }
+
+    pub fn prs_by_state(&self, state: &PrState) -> Vec<PullRequest> {
+        self.pull_requests
+            .read()
+            .unwrap()
+            .values()
+            .filter(|pr| &pr.state == state)
+            .cloned()
+            .collect()
+    }
+
+    // ── Commits ───────────────────────────────────────────────────────────────
+
+    pub fn insert_commit(&self, commit: Commit) {
+        self.commits.write().unwrap().push(commit);
+    }
+
+    pub fn list_commits(&self) -> Vec<Commit> {
+        let mut commits = self.commits.read().unwrap().clone();
+        commits.sort_by(|a, b| b.committed_at.cmp(&a.committed_at));
+        commits
+    }
+
+    pub fn recent_commits(&self, limit: usize) -> Vec<Commit> {
+        let mut commits = self.list_commits();
+        commits.truncate(limit);
+        commits
+    }
+
+    // ── Issues ────────────────────────────────────────────────────────────────
+
+    pub fn insert_issue(&self, issue: Issue) {
+        self.issues.write().unwrap().insert(issue.id, issue);
+    }
+
+    pub fn get_issue(&self, id: Uuid) -> Option<Issue> {
+        self.issues.read().unwrap().get(&id).cloned()
+    }
+
+    pub fn list_issues(&self) -> Vec<Issue> {
+        let mut issues: Vec<Issue> =
+            self.issues.read().unwrap().values().cloned().collect();
+        issues.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        issues
+    }
+
+    pub fn issues_by_status(&self, status: &IssueStatus) -> Vec<Issue> {
+        self.issues
+            .read()
+            .unwrap()
+            .values()
+            .filter(|i| &i.status == status)
+            .cloned()
+            .collect()
+    }
+
+    pub fn update_issue_status(&self, id: Uuid, status: IssueStatus) -> Option<Issue> {
+        let mut issues = self.issues.write().unwrap();
+        if let Some(issue) = issues.get_mut(&id) {
+            issue.status = status;
+            if matches!(issue.status, IssueStatus::Done | IssueStatus::Closed) {
+                issue.resolved_at = Some(Utc::now());
+            }
+            Some(issue.clone())
+        } else {
+            None
+        }
+    }
+
+    // ── Sprints ───────────────────────────────────────────────────────────────
+
+    pub fn insert_sprint(&self, sprint: Sprint) {
+        self.sprints.write().unwrap().insert(sprint.id, sprint);
+    }
+
+    pub fn get_sprint(&self, id: Uuid) -> Option<Sprint> {
+        self.sprints.read().unwrap().get(&id).cloned()
+    }
+
+    pub fn list_sprints(&self) -> Vec<Sprint> {
+        let mut sprints: Vec<Sprint> =
+            self.sprints.read().unwrap().values().cloned().collect();
+        sprints.sort_by(|a, b| b.start_date.cmp(&a.start_date));
+        sprints
     }
 
     // ── DORA computation ──────────────────────────────────────────────────────
@@ -142,9 +274,18 @@ impl DevlakeStore {
         // Change failure rate
         let failed = deployments
             .iter()
-            .filter(|d| matches!(d.status, DeploymentStatus::Failed | DeploymentStatus::RolledBack))
+            .filter(|d| {
+                matches!(
+                    d.status,
+                    DeploymentStatus::Failed | DeploymentStatus::RolledBack
+                )
+            })
             .count() as f64;
-        let change_failure_rate_pct = if total > 0.0 { failed / total * 100.0 } else { 0.0 };
+        let change_failure_rate_pct = if total > 0.0 {
+            failed / total * 100.0
+        } else {
+            0.0
+        };
 
         // MTTR: avg (resolved_at - started_at) for resolved incidents in period
         let incidents = self.incidents.read().unwrap();
@@ -164,7 +305,8 @@ impl DevlakeStore {
             mttr_values.iter().sum::<f64>() / mttr_values.len() as f64
         };
 
-        let deployment_frequency_rating = dora_deployment_frequency_rating(deployment_frequency_per_day);
+        let deployment_frequency_rating =
+            dora_deployment_frequency_rating(deployment_frequency_per_day);
         let lead_time_rating = dora_lead_time_rating(lead_time_secs);
         let change_failure_rate_rating = dora_cfr_rating(change_failure_rate_pct);
         let mttr_rating = dora_mttr_rating(mttr_secs);
@@ -190,35 +332,26 @@ impl DevlakeStore {
         }
     }
 
-    pub fn dora_history(&self) -> Vec<DoraReport> {
-        // Return last 12 weekly reports (week 1 = most recent, week 12 = oldest)
-        (0..12)
-            .map(|i| {
-                let period_days = 7u32;
-                let now = Utc::now();
-                let _from = now - chrono::Duration::days(((i + 1) * 7) as i64);
-                let _to = now - chrono::Duration::days((i * 7) as i64);
-                // For simplicity, compute the 7-day report but offset context
-                // A real impl would filter by week window; here we reuse compute_dora_report
-                // approximation: same calculation for all weeks (demo data)
-                let _ = (i, period_days);
-                self.compute_dora_report(7)
-            })
-            .collect()
-    }
-
+    /// Seed deterministic demo data for development and testing.
     pub fn seed_demo_data(&self) {
         use crate::models::{DeploymentEnv, DeploymentStatus, PipelineStage, PipelineStatus};
         use chrono::Duration;
 
         let now = Utc::now();
-        let services = ["api-gateway", "auth-service", "payment-service", "user-service", "notification-service"];
+        let services = [
+            "api-gateway",
+            "auth-service",
+            "payment-service",
+            "user-service",
+            "notification-service",
+        ];
         let users = ["alice", "bob", "carol", "dave"];
 
         for i in 0..20u32 {
             let days_ago = (i * 2) as i64;
-            let deployed_at = now - Duration::days(days_ago) - Duration::hours((i % 8) as i64);
-            let lead_time = Some(1800.0 + (i as f64 * 300.0)); // 30min to several hours
+            let deployed_at =
+                now - Duration::days(days_ago) - Duration::hours((i % 8) as i64);
+            let lead_time = Some(1800.0 + (i as f64 * 300.0));
             let status = if i % 7 == 0 {
                 DeploymentStatus::Failed
             } else if i % 11 == 0 {
@@ -246,15 +379,21 @@ impl DevlakeStore {
             };
             self.insert_deployment(deployment);
 
-            // Create a matching pipeline for every other deployment
             if i % 2 == 0 {
                 let pipeline = Pipeline {
                     id: Uuid::new_v4(),
                     name: format!("build-{}", services[(i as usize) % services.len()]),
                     project: "cave-runtime".to_string(),
-                    repo: format!("github.com/cave/{}", services[(i as usize) % services.len()]),
+                    repo: format!(
+                        "github.com/cave/{}",
+                        services[(i as usize) % services.len()]
+                    ),
                     branch: "main".to_string(),
-                    status: if i % 7 == 0 { PipelineStatus::Failed } else { PipelineStatus::Success },
+                    status: if i % 7 == 0 {
+                        PipelineStatus::Failed
+                    } else {
+                        PipelineStatus::Success
+                    },
                     triggered_by: users[(i as usize) % users.len()].to_string(),
                     started_at: deployed_at - Duration::minutes(30),
                     finished_at: Some(deployed_at),
@@ -278,7 +417,11 @@ impl DevlakeStore {
                         },
                         PipelineStage {
                             name: "deploy".to_string(),
-                            status: if i % 7 == 0 { PipelineStatus::Failed } else { PipelineStatus::Success },
+                            status: if i % 7 == 0 {
+                                PipelineStatus::Failed
+                            } else {
+                                PipelineStatus::Success
+                            },
                             started_at: Some(deployed_at - Duration::minutes(5)),
                             finished_at: Some(deployed_at),
                             duration_secs: Some(300.0),
@@ -292,7 +435,7 @@ impl DevlakeStore {
             }
         }
 
-        // Seed 5 incidents
+        // Seed incidents
         let severities = ["P1", "P2", "P3", "P1", "P2"];
         let titles = [
             "API gateway 5xx spike",
@@ -306,7 +449,7 @@ impl DevlakeStore {
             let resolved_at = if i < 4 {
                 Some(started_at + Duration::hours(2 + i as i64))
             } else {
-                None // one unresolved incident
+                None
             };
             let incident = Incident {
                 id: Uuid::new_v4(),
