@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Tests for the inverted index and posting list data structures.
+//! Tests for the inverted index: PostingList + Index + phrase matching + BM25 corpus stats.
 
 use std::str::FromStr;
 use cave_search::index::{Index, PostingList};
@@ -10,7 +10,7 @@ fn tenant() -> TenantId {
     TenantId::from_str("test-tenant").unwrap()
 }
 
-// --- PostingList tests ---
+// ── PostingList tests ──────────────────────────────────────────────────────────
 
 #[test]
 fn posting_list_starts_empty() {
@@ -70,7 +70,7 @@ fn posting_list_merge_combines_entries() {
     assert_eq!(merged.doc_freq(), 2);
 }
 
-// --- Index tests ---
+// ── Index tests ────────────────────────────────────────────────────────────────
 
 #[test]
 fn index_new_has_correct_id() {
@@ -143,4 +143,43 @@ fn index_term_not_present_returns_empty() {
     let t = tenant();
     let idx = Index::new(&t, "test");
     assert!(idx.get_doc_ids_for_term("nonexistent").is_empty());
+}
+
+#[test]
+fn index_all_doc_ids_sorted() {
+    let t = tenant();
+    let mut idx = Index::new(&t, "test");
+    idx.add_document(3, "c");
+    idx.add_document(1, "a");
+    idx.add_document(2, "b");
+    assert_eq!(idx.all_doc_ids(), vec![1, 2, 3]);
+}
+
+#[test]
+fn index_phrase_candidates_intersects_posting_lists() {
+    let t = tenant();
+    let mut idx = Index::new(&t, "test");
+    idx.add_document(1, "quick brown fox");
+    idx.add_document(2, "slow brown dog");
+    let terms: Vec<String> = vec!["quick".into(), "brown".into()];
+    let candidates = idx.phrase_candidates(&terms);
+    assert!(candidates.contains(&1), "doc 1 has both 'quick' and 'brown'");
+    assert!(!candidates.contains(&2), "doc 2 doesn't have 'quick'");
+}
+
+#[test]
+fn index_check_phrase_exact_order() {
+    let t = tenant();
+    let mut idx = Index::new(&t, "test");
+    idx.add_document(1, "quick brown fox");
+    let terms: Vec<String> = vec!["quick".into(), "brown".into(), "fox".into()];
+    assert!(idx.check_phrase(1, &terms));
+}
+
+#[test]
+fn index_doc_len_returns_token_count() {
+    let t = tenant();
+    let mut idx = Index::new(&t, "test");
+    idx.add_document(1, "one two three");
+    assert_eq!(idx.doc_len(1), 3);
 }
