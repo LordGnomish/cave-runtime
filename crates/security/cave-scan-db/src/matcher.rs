@@ -14,6 +14,7 @@
 //! This is intentionally smaller than upstream `pkg/version/version.go` —
 //! we omit pre-release ordering nuance (the upstream uses go-version per ecosystem).
 
+use crate::go_pseudo::{is_pseudo_version, normalize_pseudo_version, pseudo_version_cmp};
 use crate::{Advisory, OsAdvisoryDb, Result};
 
 /// Minimal pURL parse — `pkg:<eco>/<name>@<version>`.
@@ -148,6 +149,9 @@ fn parse_op(s: &str) -> (Op, &str) {
 
 /// Apply a pkg ref against a DB, returning each Advisory whose
 /// `affected_version` matches and whose `fixed_version` does NOT.
+///
+/// For `go` / `golang` ecosystem PURLs, use [`match_purl_go`] instead, which
+/// applies pseudo-version-aware comparison.
 pub fn match_purl<D: OsAdvisoryDb + ?Sized>(db: &D, purl: &str) -> Result<Vec<Advisory>> {
     let r = match PackageRef::parse_purl(purl) {
         Some(r) => r,
@@ -167,4 +171,73 @@ pub fn match_purl<D: OsAdvisoryDb + ?Sized>(db: &D, purl: &str) -> Result<Vec<Ad
             true
         })
         .collect())
+}
+
+/// Go-module-aware PURL matcher.
+///
+/// Behaves like [`match_purl`] for regular version strings but uses
+/// [`pseudo_version_cmp`] when either the installed version or the advisory's
+/// `fixed_version` is a Go pseudo-version.
+///
+/// Accepts both `pkg:golang/...` and `pkg:go/...` PURLs.
+pub fn match_purl_go<D: OsAdvisoryDb + ?Sized>(db: &D, purl: &str) -> Result<Vec<Advisory>> {
+    let r = match PackageRef::parse_purl(purl) {
+        Some(r) => r,
+        None => return Ok(Vec::new()),
+    };
+
+    // Normalise the ecosystem key: trivy-db stores Go advisories under "go".
+    let eco = normalise_go_eco(&r.ecosystem);
+
+    let all = db.advisories_for_pkg(eco, &r.name)?;
+    Ok(all
+        .into_iter()
+        .filter(|a| {
+            // Affected-version check (semver range).
+            if !a.affected_version.is_empty()
+                && !version_satisfies(&r.version, &a.affected_version)
+            {
+                return false;
+            }
+            // Fixed-version check with pseudo-version awareness.
+            if !a.fixed_version.is_empty() {
+                let cmp = go_version_cmp(&r.version, &a.fixed_version);
+                if cmp >= 0 {
+                    // Installed version >= fixed → already patched.
+                    return false;
+                }
+            }
+            true
+        })
+        .collect())
+}
+
+/// Compare two Go module version strings using pseudo-version-aware ordering.
+///
+/// Delegates to [`pseudo_version_cmp`] if either side is a pseudo-version,
+/// otherwise falls back to the generic [`version_cmp`].
+pub fn go_version_cmp(a: &str, b: &str) -> i8 {
+    if is_pseudo_version(a) || is_pseudo_version(b) {
+        let r = pseudo_version_cmp(a, b);
+        if r < 0 {
+            -1
+        } else if r > 0 {
+            1
+        } else {
+            0
+        }
+    } else {
+        version_cmp(a, b)
+    }
+}
+
+/// Normalise a PURL ecosystem component for the Go module ecosystem.
+///
+/// Both `golang` and `go` are used in the wild; trivy-db keys on `go`.
+fn normalise_go_eco(eco: &str) -> &str {
+    if eco.eq_ignore_ascii_case("golang") {
+        "go"
+    } else {
+        eco
+    }
 }
