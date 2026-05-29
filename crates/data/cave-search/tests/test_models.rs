@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Tests for search request/response models, field mapping, and document store.
+//! Tests for IndexSchema, Document, SearchRequest/Response, highlight_field, paginate.
 
 use std::str::FromStr;
 use cave_search::models::{
@@ -14,7 +14,7 @@ fn tenant() -> TenantId {
     TenantId::from_str("test-tenant").unwrap()
 }
 
-// --- FieldMapping / IndexSchema ---
+// ── FieldMapping / IndexSchema ────────────────────────────────────────────────
 
 #[test]
 fn field_mapping_stores_field_types() {
@@ -45,7 +45,7 @@ fn field_mapping_list_fields() {
     assert!(fields.contains(&"b"));
 }
 
-// --- Document ---
+// ── Document ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn document_stores_fields() {
@@ -64,7 +64,7 @@ fn document_id_is_immutable() {
     assert_eq!(doc.id(), 99);
 }
 
-// --- SearchRequest ---
+// ── SearchRequest ─────────────────────────────────────────────────────────────
 
 #[test]
 fn search_request_default_pagination() {
@@ -89,7 +89,7 @@ fn search_request_with_index() {
     assert_eq!(req.index(), Some("products"));
 }
 
-// --- SearchResponse / HitDocument ---
+// ── SearchResponse / HitDocument ─────────────────────────────────────────────
 
 #[test]
 fn search_response_total_hits() {
@@ -109,7 +109,7 @@ fn search_response_empty() {
     assert!(resp.hits().is_empty());
 }
 
-// --- Highlight ---
+// ── Highlight ─────────────────────────────────────────────────────────────────
 
 #[test]
 fn highlight_wraps_matching_term() {
@@ -129,7 +129,7 @@ fn highlight_no_match_returns_original() {
     assert!(!snippets.iter().any(|s| s.fragment.contains("<b>")));
 }
 
-// --- Pagination ---
+// ── Pagination ────────────────────────────────────────────────────────────────
 
 #[test]
 fn paginate_returns_correct_window() {
