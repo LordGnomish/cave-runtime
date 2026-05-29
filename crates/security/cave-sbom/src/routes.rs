@@ -44,6 +44,8 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/v1/policy", get(list_policies).post(create_policy))
         // Metrics.
         .route("/api/v1/metrics/portfolio", get(portfolio_metrics))
+        // Cross-entity search (SearchResource parity).
+        .route("/api/v1/search", get(keyword_search))
         .with_state(state)
 }
 
@@ -314,6 +316,32 @@ async fn portfolio_metrics(
         &vulns,
         chrono::Utc::now(),
     ))
+}
+
+// ── Cross-entity search ─────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: Option<String>,
+}
+
+/// `GET /api/v1/search?q=<query>` — mirrors DependencyTrack SearchResource.
+///
+/// Returns a JSON array of [`crate::search::SearchResult`] spanning
+/// projects, components, and vulnerabilities.
+async fn keyword_search(
+    AxumState(state): AxumState<Arc<State>>,
+    Query(params): Query<SearchQuery>,
+) -> (StatusCode, Json<Vec<crate::search::SearchResult>>) {
+    let q = params.q.as_deref().unwrap_or("").trim().to_string();
+    if q.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(vec![]));
+    }
+    let projects = state.projects.read().unwrap();
+    let comps = state.components.read().unwrap();
+    let vulns = state.vulnerabilities.read().unwrap();
+    let results = crate::search::search_all(&q, &projects, &comps, &vulns);
+    (StatusCode::OK, Json(results))
 }
 
 #[cfg(test)]
