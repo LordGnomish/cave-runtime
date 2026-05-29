@@ -115,6 +115,7 @@ impl Default for PostingList {
 ///
 /// Maps term strings → PostingList. Tracks per-document token counts
 /// to support accurate BM25 average-document-length computation.
+/// Also stores raw document token sequences for phrase matching.
 pub struct Index {
     /// Index name (e.g. "logs-2026-05", "products").
     name: String,
@@ -124,6 +125,8 @@ pub struct Index {
     postings: HashMap<String, PostingList>,
     /// doc_id → token count (length in tokens).
     doc_lengths: HashMap<u32, u32>,
+    /// doc_id → ordered token list (for phrase matching).
+    doc_tokens: HashMap<u32, Vec<String>>,
 }
 
 impl Index {
@@ -134,6 +137,7 @@ impl Index {
             tenant: tenant_id.clone(),
             postings: HashMap::new(),
             doc_lengths: HashMap::new(),
+            doc_tokens: HashMap::new(),
         }
     }
 
@@ -173,6 +177,8 @@ impl Index {
                 .add_doc(doc_id, tf);
         }
 
+        // Store raw token sequence for phrase matching.
+        self.doc_tokens.insert(doc_id, tokens);
         self.doc_lengths.insert(doc_id, token_count);
     }
 
@@ -186,6 +192,58 @@ impl Index {
             pl.remove_doc(doc_id);
         }
         self.doc_lengths.remove(&doc_id);
+        self.doc_tokens.remove(&doc_id);
+    }
+
+    /// Return all document IDs currently in the index.
+    pub fn all_doc_ids(&self) -> Vec<u32> {
+        let mut ids: Vec<u32> = self.doc_lengths.keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Return candidate doc IDs for a phrase: the intersection of posting lists
+    /// for all phrase terms.
+    pub fn phrase_candidates(&self, terms: &[String]) -> Vec<u32> {
+        if terms.is_empty() {
+            return Vec::new();
+        }
+        let mut iter = terms.iter().map(|t| {
+            self.get_doc_ids_for_term(t)
+                .into_iter()
+                .collect::<std::collections::HashSet<u32>>()
+        });
+        let first = iter.next().unwrap_or_default();
+        let intersection = iter.fold(first, |acc, set| {
+            acc.intersection(&set).copied().collect()
+        });
+        let mut result: Vec<u32> = intersection.into_iter().collect();
+        result.sort_unstable();
+        result
+    }
+
+    /// Check whether `doc_id` contains `terms` as a contiguous ordered phrase.
+    pub fn check_phrase(&self, doc_id: u32, terms: &[String]) -> bool {
+        let doc_toks = match self.doc_tokens.get(&doc_id) {
+            Some(t) => t,
+            None => return false,
+        };
+        if terms.is_empty() || terms.len() > doc_toks.len() {
+            return false;
+        }
+        let first = terms[0].to_lowercase();
+        doc_toks
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| **t == first)
+            .any(|(i, _)| {
+                if i + terms.len() > doc_toks.len() {
+                    return false;
+                }
+                terms.iter().enumerate().all(|(j, term)| {
+                    doc_toks[i + j].to_lowercase() == term.to_lowercase()
+                })
+            })
     }
 
     /// Return doc IDs that contain `term` (after normalization).
