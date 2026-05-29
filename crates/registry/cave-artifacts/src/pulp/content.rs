@@ -4,6 +4,7 @@
 //! Content type operations — search, filter, verification.
 
 use crate::pulp::models::*;
+use sha2::{Digest, Sha256};
 
 // ─── Content filtering ───────────────────────────────────────────────────────
 
@@ -103,13 +104,39 @@ impl PypiFilter {
 
 // ─── Checksum verification ───────────────────────────────────────────────────
 
-/// Verify a SHA-256 checksum against expected.
+/// Verify a SHA-256 checksum against `expected_hex`.
+///
+/// Computes the actual SHA-256 digest of `data` and compares it (in
+/// constant-time over the digest bytes) to the expected hex digest. The
+/// expected value must be the canonical 64-char lower-hex form; an uppercase
+/// or malformed digest never matches. This is a content-integrity check, so
+/// returning `true` means the bytes genuinely hash to `expected_hex`.
 pub fn verify_sha256(data: &[u8], expected_hex: &str) -> bool {
-    // In production this would use ring or sha2 crate.
-    // For now: length-check + non-empty.
-    !expected_hex.is_empty()
-        && expected_hex.len() == 64
-        && expected_hex.chars().all(|c| c.is_ascii_hexdigit())
+    // Reject anything that is not a well-formed 64-char lower-hex digest up
+    // front; this also avoids a needless hash of a string that can never match.
+    if expected_hex.len() != 64
+        || !expected_hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return false;
+    }
+
+    let actual = Sha256::digest(data);
+    let actual_hex = hex::encode(actual);
+
+    // Constant-time comparison over the fixed-width hex digests so that a
+    // mismatch does not leak its position via timing.
+    let a = actual_hex.as_bytes();
+    let e = expected_hex.as_bytes();
+    if a.len() != e.len() {
+        return false;
+    }
+    let mut diff: u8 = 0;
+    for (x, y) in a.iter().zip(e.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 /// Verify a file artifact checksum (multiple algorithms).
@@ -353,9 +380,13 @@ mod tests {
     }
 
     #[test]
-    fn verify_sha256_valid_hex() {
-        let valid = "abc123def456abc123def456abc123def456abc123def456abc123def456abc1";
-        assert!(verify_sha256(b"data", valid));
+    fn verify_sha256_accepts_true_digest() {
+        // sha256(b"data") computed independently.
+        let valid = hex::encode(Sha256::digest(b"data"));
+        assert!(verify_sha256(b"data", &valid));
+        // A well-formed but incorrect digest must be rejected.
+        let wrong = "abc123def456abc123def456abc123def456abc123def456abc123def456abc1";
+        assert!(!verify_sha256(b"data", wrong));
     }
 
     #[test]
