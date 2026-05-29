@@ -898,8 +898,8 @@
       "honest_ratio": 0.6875,
       "last_audit": "2026-05-28",
       "last_audit_disk": "2026-05-28",
-      "last_commit": "4127b2c391de06ffe15cfbe5be48ad0b7b57fa76",
-      "last_commit_at": "2026-05-29T18:22:56+02:00",
+      "last_commit": "c97a8c8c3eafd649ef4cc9aabeb393ec19bb7846",
+      "last_commit_at": "2026-05-29T18:22:59+02:00",
       "manifest_filled": true,
       "mapped_count": 9,
       "note": null,
@@ -1399,8 +1399,8 @@
       "honest_ratio": 0.5714,
       "last_audit": "2026-05-28",
       "last_audit_disk": "2026-05-28",
-      "last_commit": "aa6201a40efe40f338d539049861e35e3ac5ac3e",
-      "last_commit_at": "2026-05-29T18:23:31+02:00",
+      "last_commit": "d3dba607c2893b3249573c447d8ce543bf0e88ca",
+      "last_commit_at": "2026-05-29T18:26:59+02:00",
       "manifest_filled": true,
       "mapped_count": 8,
       "note": null,
@@ -3048,7 +3048,7 @@
     "injected": 14,
     "new_filled": 99,
     "phantoms": 0,
-    "ratio_overrides": 82
+    "ratio_overrides": 83
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
