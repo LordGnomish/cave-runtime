@@ -83,13 +83,13 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/uptime/health", get(health))
         .route("/api/uptime/probes", get(list_probes).post(create_probe))
         .route(
-            "/api/uptime/probes/:id",
+            "/api/uptime/probes/{id}",
             get(get_probe).put(update_probe).delete(delete_probe),
         )
-        .route("/api/uptime/probes/:id/history", get(get_probe_history))
-        .route("/api/uptime/probes/:id/stats", get(get_probe_stats))
+        .route("/api/uptime/probes/{id}/history", get(get_probe_history))
+        .route("/api/uptime/probes/{id}/stats", get(get_probe_stats))
         .route("/api/uptime/status", get(get_status_page))
-        .route("/api/uptime/push/:id", post(push_heartbeat))
+        .route("/api/uptime/push/{id}", post(push_heartbeat))
         .with_state(state)
 }
 
