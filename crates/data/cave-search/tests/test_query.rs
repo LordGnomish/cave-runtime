@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Tests for boolean and phrase query execution.
+//! Tests for boolean query execution (AND/OR/NOT) and phrase query matching.
 
 use std::str::FromStr;
 use cave_search::query::{Query, BooleanQuery, BoolNode};
@@ -21,7 +21,7 @@ fn build_index() -> Index {
     idx
 }
 
-// --- Term query ---
+// ── Term query ─────────────────────────────────────────────────────────────────
 
 #[test]
 fn term_query_finds_matching_docs() {
@@ -41,7 +41,7 @@ fn term_query_missing_term_returns_empty() {
     assert!(results.is_empty());
 }
 
-// --- Boolean AND (must) ---
+// ── Boolean AND (must) ─────────────────────────────────────────────────────────
 
 #[test]
 fn bool_and_query_intersects_results() {
@@ -71,7 +71,7 @@ fn bool_and_query_empty_intersection() {
     assert!(results.contains(&4), "doc 4 has fox and rabbit");
 }
 
-// --- Boolean OR (should) ---
+// ── Boolean OR (should) ────────────────────────────────────────────────────────
 
 #[test]
 fn bool_or_query_unions_results() {
@@ -88,7 +88,7 @@ fn bool_or_query_unions_results() {
     assert!(!results.contains(&3), "doc 3 has neither");
 }
 
-// --- Boolean NOT (must_not) ---
+// ── Boolean NOT (must_not) ─────────────────────────────────────────────────────
 
 #[test]
 fn bool_not_query_excludes_results() {
@@ -102,7 +102,7 @@ fn bool_not_query_excludes_results() {
     assert!(results.contains(&4), "doc 4 has no lazy");
 }
 
-// --- Compound bool (must + must_not) ---
+// ── Compound bool (must + must_not) ───────────────────────────────────────────
 
 #[test]
 fn compound_bool_must_and_must_not() {
@@ -119,7 +119,7 @@ fn compound_bool_must_and_must_not() {
     assert!(!results.contains(&2));
 }
 
-// --- Phrase query ---
+// ── Phrase query ───────────────────────────────────────────────────────────────
 
 #[test]
 fn phrase_query_matches_exact_sequence() {
