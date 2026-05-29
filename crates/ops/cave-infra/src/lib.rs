@@ -15,16 +15,24 @@
 //! - Rollback support
 //! - Infrastructure modules/templates
 
+pub mod approval;
 pub mod drift;
 pub mod error;
+pub mod executor;
 pub mod graph;
+pub mod intent;
 pub mod mcp;
+pub mod mcp_bridge;
+pub mod models;
 pub mod nlp;
 pub mod plan;
+pub mod planner;
 pub mod provider;
+pub mod providers;
 pub mod resource;
 pub mod rollback;
 pub mod routes;
+pub mod state;
 pub mod templates;
 
 use axum::Router;

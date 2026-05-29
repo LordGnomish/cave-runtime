@@ -161,9 +161,14 @@ impl ResourceProvider for MockProvider {
     }
 
     async fn provision(&self, resource: &crate::state::InfraResource) -> ProvisionResult {
+        // Use actual_id (set by InfraResource::new as the logical string id) or fall back to UUID
+        let resource_id = resource
+            .actual_id
+            .clone()
+            .unwrap_or_else(|| resource.id.to_string());
         if self.should_fail {
             ProvisionResult {
-                resource_id: resource.id.clone(),
+                resource_id,
                 provider_id: String::new(),
                 provider: self.provider_name.clone(),
                 actual_state: serde_json::Value::Null,
@@ -172,10 +177,10 @@ impl ResourceProvider for MockProvider {
             }
         } else {
             ProvisionResult {
-                resource_id: resource.id.clone(),
+                resource_id,
                 provider_id: format!("prov-{}", uuid::Uuid::new_v4()),
                 provider: self.provider_name.clone(),
-                actual_state: resource.spec.clone(),
+                actual_state: serde_json::to_value(&resource.config).unwrap_or_default(),
                 success: true,
                 error: None,
             }
