@@ -7,8 +7,10 @@
 //! - `policy`    — PermissionPolicy trait + AllowAllPermissionPolicy (from @backstage/permission-node)
 //! - `routes`    — POST /api/permission/authorize, GET /api/permission/health
 //! - `catalog`   — Catalog permission constants (from @backstage/catalog-backend)
+//! - `matchers`  — Casbin built-in matcher operators (keyMatch/keyMatch2/keyMatch3/regexMatch/ipMatch)
 
 pub mod catalog;
+pub mod matchers;
 pub mod models;
 pub mod policy;
 pub mod routes;
