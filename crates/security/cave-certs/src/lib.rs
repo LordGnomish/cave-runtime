@@ -14,6 +14,7 @@ pub mod pqc;
 pub mod renewal;
 pub mod routes;
 pub mod solvers;
+pub mod store;
 
 use axum::Router;
 
