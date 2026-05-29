@@ -52,6 +52,41 @@ pub struct InfraResource {
     pub updated_at: DateTime<Utc>,
 }
 
+impl InfraResource {
+    /// Convenience constructor used by provider tests and import flows.
+    /// `id` is a string identifier (stored as-is in name for now), `spec` maps to config.
+    pub fn new(
+        id: &str,
+        resource_type: impl std::fmt::Display,
+        provider: &str,
+        name: &str,
+        _tenant_id: &str,
+        spec: serde_json::Value,
+    ) -> Self {
+        let now = chrono::Utc::now();
+        let config = match spec {
+            serde_json::Value::Object(m) => m.into_iter().collect(),
+            other => {
+                let mut m = HashMap::new();
+                m.insert("spec".to_string(), other);
+                m
+            }
+        };
+        Self {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            provider: provider.to_string(),
+            resource_type: resource_type.to_string(),
+            config,
+            state: ResourceState::Pending,
+            dependencies: vec![],
+            actual_id: Some(id.to_string()),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ResourceState {
     Pending,
