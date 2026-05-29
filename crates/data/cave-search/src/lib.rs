@@ -7,6 +7,7 @@
 pub mod analyzer;
 pub mod embeddings;
 pub mod index;
+pub mod models;
 pub mod query;
 pub mod scoring;
 pub mod tenant;
