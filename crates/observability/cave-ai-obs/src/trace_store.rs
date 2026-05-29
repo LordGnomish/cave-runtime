@@ -164,6 +164,11 @@ impl TraceStore {
             .collect()
     }
 
+    /// Return all generations across all traces.
+    pub fn all_generations(&self) -> Vec<Generation> {
+        self.generations.read().unwrap().clone()
+    }
+
     // ─── Scores ───────────────────────────────────────────────────────────
 
     /// Insert or replace a score (upsert by id).
