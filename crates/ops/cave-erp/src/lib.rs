@@ -6,9 +6,11 @@
 //! Modules: HR, Recruitment, CRM, Sales, Purchase, Inventory, Accounting,
 //! Manufacturing, Projects.
 
+pub mod ar;
 pub mod engine;
 pub mod models;
 pub mod modules;
+pub mod payroll;
 pub mod routes;
 pub mod store;
 
