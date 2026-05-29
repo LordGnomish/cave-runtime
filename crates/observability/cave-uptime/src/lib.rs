@@ -12,6 +12,7 @@ pub mod models;
 pub mod probe;
 pub mod retry;
 pub mod routes;
+pub mod scheduler;
 pub mod status;
 pub mod store;
 
