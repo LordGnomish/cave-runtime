@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! cave-search: full-text + semantic search engine (skeleton — impl pending).
+//! cave-search: full-text + semantic search engine.
 //!
-//! upstream: opensearch v3.0/server/src/main/java/org/opensearch/
+//! upstream: manticoresoftware/manticoresearch v25.8.2
+//!   https://github.com/manticoresoftware/manticoresearch
 
 pub mod analyzer;
 pub mod embeddings;
