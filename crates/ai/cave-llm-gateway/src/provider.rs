@@ -50,6 +50,10 @@ pub enum ProviderType {
     Cohere,
     /// Google Gemini / Vertex AI (`generateContent` protocol).
     Google,
+    /// Together AI (OpenAI-compatible SaaS).
+    Together,
+    /// Fireworks AI (OpenAI-compatible SaaS).
+    Fireworks,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -436,6 +440,12 @@ impl ProviderRegistry {
                 }
                 ProviderType::Google => {
                     Arc::new(crate::providers::google::GoogleProvider::new(cfg))
+                }
+                ProviderType::Together => {
+                    Arc::new(crate::providers::together::TogetherProvider::new(cfg))
+                }
+                ProviderType::Fireworks => {
+                    Arc::new(crate::providers::together::TogetherProvider::fireworks(cfg))
                 }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
