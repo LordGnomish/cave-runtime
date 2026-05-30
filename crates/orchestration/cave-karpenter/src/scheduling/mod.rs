@@ -7,6 +7,7 @@
 //! Modules:
 //!   requirement   — complement-based Requirement set-algebra with bounds
 
+pub mod hostport;
 pub mod requirement;
 pub mod requirements;
 
