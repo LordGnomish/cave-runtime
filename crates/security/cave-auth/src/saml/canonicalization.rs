@@ -26,34 +26,27 @@
 //!   inside `<saml:Issuer>` etc.).
 //! * Output is UTF-8.
 //!
+//! * Attribute values are canonicalized per Canonical XML 1.0
+//!   §Processing Model — `&` `<` `"` escaped, `>` left literal,
+//!   and the whitespace characters #x9 / #xA / #xD emitted as
+//!   `&#x9;` / `&#xA;` / `&#xD;` character references.
+//! * Text content escapes `&` `<` `>` and emits a carriage
+//!   return (#xD) as `&#xD;`.
+//! * CDATA sections are reserialised as escaped character data
+//!   (Canonical XML 1.0 §3.4).
+//!
 //! ## Known limitations
 //!
 //! * No DTD / entity resolution. SAML messages don't carry
 //!   either.
-//! * Attribute-value whitespace is not character-by-character
-//!   normalized (the spec's §2.3 step 4 is approximated — only
-//!   `&` `<` `>` `"` are reserialised). Real IdPs almost never
-//!   send messages where this matters.
-//! * Inclusive-namespace-prefix lists (`InclusiveNamespaces` of
-//!   xml-exc-c14n#WithComments) are not parsed; the simple
-//!   visibly-utilised algorithm is used.
-//! * CDATA sections are reserialised as plain text.
-//!
-//! For strict interoperability with third-party IdPs that
-//! produce signatures depending on full c14n, callers still
-//! plug an external implementation through
-//! [`super::signature::SignedDocument::canonicalize_fn`]. The
-//! built-in version provided here is registered as a default
-//! that handles the common case (cave-issued or cave-verified
-//! cave-issued messages).
+//! * `InclusiveNamespaces`-prefix lists are not yet parsed; the
+//!   plain visibly-utilised algorithm is used.
 
 use std::collections::BTreeMap;
-use std::io::Cursor;
 
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::reader::Reader;
-use quick_xml::writer::Writer;
 
 use super::SamlError;
 
@@ -65,8 +58,7 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
     reader.config_mut().trim_text(false);
     reader.config_mut().expand_empty_elements = true;
 
-    let mut buf_out = Cursor::new(Vec::new());
-    let mut w = Writer::new(&mut buf_out);
+    let mut out: Vec<u8> = Vec::new();
 
     let mut ns_stack: Vec<Vec<NsDeclLocal>> = Vec::new();
     let mut buf = Vec::new();
@@ -85,11 +77,11 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
             }
             Event::Start(e) => {
                 let frame = build_frame(&e, &ns_stack)?;
-                emit_start(&mut w, &e, &frame)?;
+                emit_start(&mut out, &e, &frame)?;
                 ns_stack.push(frame.declared);
             }
             Event::End(e) => {
-                emit_end(&mut w, &e)?;
+                emit_end(&mut out, &e)?;
                 ns_stack.pop();
             }
             Event::Empty(e) => {
@@ -102,23 +94,24 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
                 let name_str = std::str::from_utf8(&name_bytes)
                     .map_err(|err| SamlError::Parse(format!("c14n empty name: {err}")))?
                     .to_string();
-                emit_start(&mut w, &e, &frame)?;
-                emit_end(&mut w, &BytesEnd::new(name_str.as_str()))?;
+                emit_start(&mut out, &e, &frame)?;
+                emit_end(&mut out, &BytesEnd::new(name_str.as_str()))?;
             }
             Event::Text(t) => {
                 let txt = t
                     .unescape()
                     .map_err(|e| SamlError::Parse(format!("c14n text: {e}")))?
                     .into_owned();
-                w.write_event(Event::Text(BytesText::new(&txt)))
-                    .map_err(|e| SamlError::Parse(format!("c14n write: {e}")))?;
+                escape_text_into(&mut out, &txt);
             }
             Event::CData(c) => {
+                // A CDATA section's content is *character data* —
+                // canonical XML reserialises it as escaped text
+                // (Canonical XML 1.0 §3.4).
                 let txt = std::str::from_utf8(&c)
                     .map_err(|e| SamlError::Parse(format!("c14n cdata: {e}")))?
                     .to_string();
-                w.write_event(Event::Text(BytesText::new(&txt)))
-                    .map_err(|e| SamlError::Parse(format!("c14n write: {e}")))?;
+                escape_text_into(&mut out, &txt);
             } // Some quick-xml builds emit GeneralRef for `&amp;`
               // etc. — our setup decodes those into Text. Any
               // remaining variants drop through.
@@ -126,7 +119,53 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
         buf.clear();
     }
 
-    Ok(buf_out.into_inner())
+    Ok(out)
+}
+
+/// Append `s` as canonical XML *character data* to `out`.
+///
+/// Canonical XML 1.0 §Processing Model: in text content `&`,
+/// `<`, and `>` are escaped, and a carriage return (#xD) is
+/// emitted as the character reference `&#xD;` so signed bytes
+/// survive line-ending normalization. Tab (#x9) and line-feed
+/// (#xA) are left literal in text.
+fn escape_text_into(out: &mut Vec<u8>, s: &str) {
+    for c in s.chars() {
+        match c {
+            '&' => out.extend_from_slice(b"&amp;"),
+            '<' => out.extend_from_slice(b"&lt;"),
+            '>' => out.extend_from_slice(b"&gt;"),
+            '\r' => out.extend_from_slice(b"&#xD;"),
+            _ => {
+                let mut b = [0u8; 4];
+                out.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
+            }
+        }
+    }
+}
+
+/// Append `s` as a canonical XML *attribute value* to `out`.
+///
+/// Canonical XML 1.0 §Processing Model: attribute values escape
+/// `&`, `<`, and `"`; `>` is left literal. The whitespace
+/// characters #x9 (tab), #xA (LF), and #xD (CR) are emitted as
+/// character references so attribute-value normalization cannot
+/// collapse them after signing.
+fn escape_attr_into(out: &mut Vec<u8>, s: &str) {
+    for c in s.chars() {
+        match c {
+            '&' => out.extend_from_slice(b"&amp;"),
+            '<' => out.extend_from_slice(b"&lt;"),
+            '"' => out.extend_from_slice(b"&quot;"),
+            '\t' => out.extend_from_slice(b"&#x9;"),
+            '\n' => out.extend_from_slice(b"&#xA;"),
+            '\r' => out.extend_from_slice(b"&#xD;"),
+            _ => {
+                let mut b = [0u8; 4];
+                out.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
+            }
+        }
+    }
 }
 
 /// Per-element data computed from the raw start tag — used by
@@ -233,8 +272,8 @@ fn build_frame(
     })
 }
 
-fn emit_start<W: std::io::Write>(
-    w: &mut Writer<W>,
+fn emit_start(
+    out: &mut Vec<u8>,
     e: &BytesStart<'_>,
     frame: &ElementFrame,
 ) -> Result<(), SamlError> {
@@ -242,7 +281,8 @@ fn emit_start<W: std::io::Write>(
     let name = std::str::from_utf8(&name_bytes)
         .map_err(|err| SamlError::Parse(format!("c14n name: {err}")))?
         .to_string();
-    let mut start = BytesStart::new(name.as_str());
+    out.push(b'<');
+    out.extend_from_slice(name.as_bytes());
     // Emit namespaces (default first if present, then by prefix).
     let mut ns_default: Option<&(String, String)> = None;
     let mut ns_prefixed: Vec<&(String, String)> = Vec::new();
@@ -254,27 +294,35 @@ fn emit_start<W: std::io::Write>(
         }
     }
     if let Some((_, uri)) = ns_default {
-        start.push_attribute(("xmlns", uri.as_str()));
+        out.extend_from_slice(b" xmlns=\"");
+        escape_attr_into(out, uri);
+        out.push(b'"');
     }
     for (p, uri) in &ns_prefixed {
-        let key = format!("xmlns:{p}");
-        start.push_attribute((key.as_str(), uri.as_str()));
+        out.extend_from_slice(b" xmlns:");
+        out.extend_from_slice(p.as_bytes());
+        out.extend_from_slice(b"=\"");
+        escape_attr_into(out, uri);
+        out.push(b'"');
     }
     for (k, v) in &frame.attributes {
-        start.push_attribute((k.as_str(), v.as_str()));
+        out.push(b' ');
+        out.extend_from_slice(k.as_bytes());
+        out.extend_from_slice(b"=\"");
+        escape_attr_into(out, v);
+        out.push(b'"');
     }
-    w.write_event(Event::Start(start))
-        .map_err(|e| SamlError::Parse(format!("c14n write start: {e}")))?;
+    out.push(b'>');
     Ok(())
 }
 
-fn emit_end<W: std::io::Write>(w: &mut Writer<W>, e: &BytesEnd<'_>) -> Result<(), SamlError> {
+fn emit_end(out: &mut Vec<u8>, e: &BytesEnd<'_>) -> Result<(), SamlError> {
     let name_bytes = e.name().as_ref().to_vec();
     let name = std::str::from_utf8(&name_bytes)
-        .map_err(|err| SamlError::Parse(format!("c14n end name: {err}")))?
-        .to_string();
-    w.write_event(Event::End(BytesEnd::new(name.as_str())))
-        .map_err(|e| SamlError::Parse(format!("c14n write end: {e}")))?;
+        .map_err(|err| SamlError::Parse(format!("c14n end name: {err}")))?;
+    out.extend_from_slice(b"</");
+    out.extend_from_slice(name.as_bytes());
+    out.push(b'>');
     Ok(())
 }
 
