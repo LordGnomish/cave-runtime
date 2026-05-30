@@ -11,6 +11,8 @@
 pub mod bind;
 // sweep-001 — assume/finish/forget cache (mirrors pkg/scheduler/internal/cache).
 pub mod cache;
+// apis/config/validation — KubeSchedulerConfiguration validation rules.
+pub mod config_validation;
 pub mod cycle_state;
 pub mod default_preemption;
 pub mod dra;
