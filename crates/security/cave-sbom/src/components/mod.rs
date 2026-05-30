@@ -27,6 +27,22 @@ pub struct Project {
     pub classifier: ComponentType,
     pub created_at: DateTime<Utc>,
     pub last_bom_import: Option<DateTime<Utc>>,
+    /// Parent project in the portfolio hierarchy (`PARENT_PROJECT_ID`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<Uuid>,
+    /// Nullable `ACTIVE` flag — serialises as `true` when unset, mirroring
+    /// upstream `BooleanDefaultTrueSerializer`. See [`Project::is_active`].
+    #[serde(default, serialize_with = "serialize_active_default_true")]
+    pub active: Option<bool>,
+}
+
+/// Mirror of `Project.BooleanDefaultTrueSerializer`: a null `active` is written
+/// as `true` so consumers never see a missing/absent active flag.
+fn serialize_active_default_true<S>(active: &Option<bool>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_bool(active.unwrap_or(true))
 }
 
 impl Project {
@@ -42,7 +58,14 @@ impl Project {
             classifier: ComponentType::Application,
             created_at: Utc::now(),
             last_bom_import: None,
+            parent: None,
+            active: None,
         }
+    }
+
+    /// `isActive()` — a null `active` is treated as active (upstream default).
+    pub fn is_active(&self) -> bool {
+        self.active.unwrap_or(true)
     }
 }
 

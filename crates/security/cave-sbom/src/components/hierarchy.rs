@@ -6,6 +6,73 @@
 //
 //! Project parent/children hierarchy — ancestor walk + reparent cycle guard.
 
+use crate::components::Project;
+use uuid::Uuid;
+
+/// Why a reparent was rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HierarchyError {
+    /// The requested parent is the project itself or one of its descendants —
+    /// accepting it would create a cycle in the portfolio tree.
+    Cycle,
+}
+
+/// Read-only view over a set of projects, resolving parent/child relationships
+/// by `uuid`. Mirrors the portfolio-tree traversal helpers backing
+/// `ProjectQueryManager`.
+pub struct ProjectGraph<'a> {
+    projects: &'a [Project],
+}
+
+impl<'a> ProjectGraph<'a> {
+    pub fn new(projects: &'a [Project]) -> Self {
+        Self { projects }
+    }
+
+    fn by_uuid(&self, uuid: Uuid) -> Option<&'a Project> {
+        self.projects.iter().find(|p| p.uuid == uuid)
+    }
+
+    /// Direct children of `uuid` (projects whose `parent` is `uuid`).
+    pub fn children_of(&self, uuid: Uuid) -> Vec<&'a Project> {
+        self.projects
+            .iter()
+            .filter(|p| p.parent == Some(uuid))
+            .collect()
+    }
+
+    /// Ancestors of `uuid`, nearest first, walking the `parent` chain to the
+    /// root. Defensive against malformed cycles via a visited set.
+    pub fn ancestors_of(&self, uuid: Uuid) -> Vec<Uuid> {
+        let mut out = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut cur = self.by_uuid(uuid).and_then(|p| p.parent);
+        while let Some(parent) = cur {
+            if !seen.insert(parent) {
+                break; // cycle guard
+            }
+            out.push(parent);
+            cur = self.by_uuid(parent).and_then(|p| p.parent);
+        }
+        out
+    }
+
+    /// True if `candidate` is `ancestor` itself or a transitive child of it.
+    pub fn is_descendant(&self, candidate: Uuid, ancestor: Uuid) -> bool {
+        self.ancestors_of(candidate).contains(&ancestor)
+    }
+
+    /// Validate moving `child` under `new_parent`. Rejected when `new_parent`
+    /// is `child` itself or a descendant of `child` (would create a cycle).
+    /// Mirrors the upstream reparent guard in `ProjectQueryManager`.
+    pub fn validate_reparent(&self, child: Uuid, new_parent: Uuid) -> Result<(), HierarchyError> {
+        if new_parent == child || self.is_descendant(new_parent, child) {
+            return Err(HierarchyError::Cycle);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::components::Project;
