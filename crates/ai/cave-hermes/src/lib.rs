@@ -28,6 +28,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cli;
 pub mod embedding;
 pub mod error;
 pub mod gateway;
@@ -57,6 +58,24 @@ pub use prompt::{
 };
 pub use recall::{Embedder, EmbeddingRecall, HashEmbedder, HashRecall, RecallEngine, RecallHit};
 pub use router::{ModelRouter, ModelTier, RouteDecision, TaskComplexity};
+
+// OpenJarvis local-first primitives (ADR-RUNTIME-OPENJARVIS-ADOPTION-001).
+pub use openjarvis::agent_state::{AgentState, AgentStateStore};
+pub use openjarvis::backend::{Backend, BackendProfile, BackendRegistry, Device, Endpoint};
+pub use openjarvis::eval::{EvalBudget, EvalHarness, EvalMetrics, ScoreWeights, rank_backends};
+pub use openjarvis::multi_agent::{Message, MessageBus, MessageKind, Orchestrator};
+pub use openjarvis::plan_execute::{ExecutionTrace, PlanExecutor, StepOutcome};
+
+// Self-improvement layer (ADR-SELF-IMPROVE-001).
+pub use self_improve::observe::{
+    Anomaly, LogLevel, ObservationAnalyzer, ObservationWindow, Rule, Severity,
+};
+pub use self_improve::tune::{
+    ApplyMode, ApplyOutcome, ChangeSurface, TuningEngine, TuningSuggestion,
+};
+pub use self_improve::upstream::{
+    BumpKind, ChangelogWatcher, HotPatchQueue, PortProposal, Priority, UpstreamUpdate, Version,
+};
 pub use session::{Event, EventKind, SessionStore};
 pub use tool::{ToolEntry, ToolRegistry, ToolResult};
 pub use workflow::{Checkpoint, Workflow, WorkflowStatus};
