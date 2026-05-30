@@ -46,6 +46,8 @@ pub enum ProviderType {
     Mlx,
     /// Mistral La Plateforme SaaS (OpenAI-compatible).
     Mistral,
+    /// Cohere Command v2 chat API (divergent response shape).
+    Cohere,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -426,6 +428,9 @@ impl ProviderRegistry {
                 ProviderType::Mlx => Arc::new(crate::providers::mlx::MlxProvider::new(cfg)),
                 ProviderType::Mistral => {
                     Arc::new(crate::providers::mistral::MistralProvider::new(cfg))
+                }
+                ProviderType::Cohere => {
+                    Arc::new(crate::providers::cohere::CohereProvider::new(cfg))
                 }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
