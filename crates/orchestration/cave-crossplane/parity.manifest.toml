@@ -52,14 +52,14 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.7000
-adr_justified_ratio = 1.0     # 12 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) + composition-revision-GC daemon (architecturally-superseded by in-memory ring bound); 1 partial (Healthy condition back-off) honestly preserved. (2026-05-30: environment-configs reclassified skipped→mapped — pure in-memory EnvironmentConfig bag + env field-path patch, honestly in-crate not cave-apiserver.)
+honest_ratio        = 0.7250
+adr_justified_ratio = 1.0     # 11 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+usage-finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway grpc-runtime+go-template / cave-cli crank / cave-cloud real providers / cave-sign cosign). All partials closed. (2026-05-30 honest-cont: condition-propagation-healthy partial→mapped — real crossplane-runtime ConditionedStatus.SetConditions / Condition.Equal / observed-generation gating; AND composition-revision-garbage-collect skipped→mapped — real revisionHistoryLimit GC (RevisionGarbageCollector), reversing the prior "in-memory ring bound" scope_cut since the policy is fully in-crate ownable. Prior 2026-05-30: environment-configs skipped→mapped.)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 27
-partial_count       = 1
-skipped_count       = 12
+mapped_count        = 29
+partial_count       = 0
+skipped_count       = 11
 unmapped_count      = 0
 total               = 40
 
@@ -257,14 +257,17 @@ upstream_files = ["apis/apiextensions/v1alpha1/environmentconfig_types.go", "int
 local_files = ["src/environment.rs"]
 note = "EnvironmentConfig key→value data bag + buildEnvironment ordered-override merge (later selected config wins) + FromEnvironmentFieldPath/ToEnvironmentFieldPath field-path patch resolution. Pure in-memory algorithm — no apiserver dependency. (2026-05-30 strict-TDD RED→GREEN: was [[skipped]] env-config no-op stub; converted to real tested mapped — tests/environment_tdd.rs, 6 cases.)"
 
-# ─── Partial subsystems (1) ─────────────────────────────────────────────────
-
-[[partial]]
+[[mapped]]
 name = "condition-propagation-healthy"
-upstream_files = ["pkg/resource/condition.go", "internal/controller/apiextensions/composite/composed.go::PropagateConditions"]
+upstream_files = ["apis/common/v1/condition.go::{Condition.Equal,Condition.WithObservedGeneration,ConditionedStatus.SetConditions,GetCondition}", "internal/controller/apiextensions/composite/composed.go::PropagateConditions"]
 local_files = ["src/conditions.rs"]
-note = "Ready + Synced + Healthy conditions propagated composed → XR → claim. Healthy condition wired but observed-generation gating + Last-Transition jitter back-off are simplified (full back-off matrix Phase 2)."
-gap_reason = "Observed-generation gating + condition transition back-off jitter simplified — full implementation deferred to Phase 2 once cave-apiserver issues generation increments natively."
+note = "Ready + Synced + Healthy conditions propagated composed → XR → claim, with the full crossplane-runtime ConditionedStatus semantics: Condition.observed_generation, Condition::equal (ignoring LastTransitionTime + ObservedGeneration), and SetConditions which is a no-op when Equal (only advancing observedGeneration upward, preserving LastTransitionTime) and replaces wholesale on a real transition. propagate_composed_to_xr now loads prior XR conditions, stamps observedGeneration from metadata.generation, and preserves LastTransitionTime across stable reconciles. (2026-05-30 strict-TDD RED→GREEN: was [[partial]] — observed-generation gating + last-transition back-off were simplified; now a faithful 1:1 port — tests/conditions_tdd.rs, 12 cases.)"
+
+[[mapped]]
+name = "composition-revision-garbage-collect"
+upstream_files = ["internal/controller/pkg/manager/reconciler.go (GC block)", "apis/pkg/v1::RevisionHistoryLimit"]
+local_files = ["src/composition/revision_gc.rs", "src/composition/store.rs"]
+note = "revisionHistoryLimit garbage collection: configurable limit (nil→default 1, 0→keep all / GC disabled, n→keep current + n historical), always preserves the current (highest-numbered) revision, collects the OLDEST (lowest-numbered) when len > limit+1. RevisionGarbageCollector::{plan,plan_one} + CompositionStore::gc_revisions; push_revision is now append-only (retention is an explicit reconcile concern, mirroring upstream). Wired POST /compositions/{name}/revisions/gc + cavectl infra composition gc. (2026-05-30 strict-TDD RED→GREEN: was [[skipped]] scope_cut to internal-ring-bound — reversed since revisionHistoryLimit is a pure in-crate policy, not a sibling-crate concern; the prior hardcoded MAX_REVISIONS=10 drain ring was an oversimplification. tests/revision_gc_tdd.rs, 8 cases.)"
 
 # ─── Skipped subsystems (11 — formalised scope cuts) ────────────────────────
 
@@ -333,14 +336,6 @@ name = "package-signature-verify"
 upstream_files = ["internal/xpkg/sign/sign.go"]
 reason = "XPKG signature verification (cosign) — Phase 2 routed through cave-sign which owns artifact-signing."
 scope_cut_target = "cave-sign"
-
-# ─── Unmapped (1 — honest gap) ──────────────────────────────────────────────
-
-[[skipped]]
-name = "composition-revision-garbage-collect"
-upstream_files = ["internal/controller/apiextensions/composite/revision_gc.go"]
-reason = "Bounded in-memory ring (last 10 revisions per composite) provides equivalent retention behaviour for the single-binary runtime — there is no shared persistent store whose growth a separate GC daemon would have to contain. ADR-RUNTIME-PARITY-100-PCT-001 §5.architecturally-superseded."
-scope_cut_target = "cave-crossplane/internal-ring-bound"
 
 # ─── Scope cuts (groupings → Phase 2 crate owners) ──────────────────────────
 
