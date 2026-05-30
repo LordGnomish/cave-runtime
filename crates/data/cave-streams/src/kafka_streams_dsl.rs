@@ -40,6 +40,11 @@ type ValueFlatMapper = Box<dyn Fn(&[u8]) -> Vec<Vec<u8>>>;
 type RecordFlatMapper = Box<dyn Fn(&Record) -> Vec<Record>>;
 type KeySelector = Box<dyn Fn(&Record) -> Vec<u8>>;
 type Peeker = Box<dyn Fn(&Record)>;
+type Initializer = Box<dyn Fn() -> Vec<u8>>;
+/// `(key, value, current_aggregate) -> new_aggregate`
+type Aggregator = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Vec<u8>>;
+/// `(current_aggregate, new_value) -> new_aggregate`
+type Reducer = Box<dyn Fn(&[u8], &[u8]) -> Vec<u8>>;
 
 enum NodeKind {
     Source { topic: String },
@@ -58,6 +63,16 @@ enum NodeKind {
     Branch(Vec<Predicate>),
     /// Persist the record to an intermediate topic, then continue downstream.
     Through { topic: String },
+    /// Stateful aggregation: `store[key] = agg(key, value, store.get(key)
+    /// .unwrap_or_else(init))`.  Emits the new aggregate as a changelog record.
+    Aggregate {
+        store: String,
+        init: Initializer,
+        agg: Aggregator,
+    },
+    /// Stateful reduce: the first value per key initializes the store; later
+    /// values fold via `reducer(current, value)`.  Emits a changelog record.
+    Reduce { store: String, reducer: Reducer },
     Sink { topic: String },
 }
 
@@ -251,6 +266,118 @@ impl KStream {
             topic: topic.to_string(),
         })
     }
+
+    /// Group by the existing key (`KStream.groupByKey`).
+    pub fn group_by_key(&self) -> KGroupedStream {
+        KGroupedStream {
+            inner: self.inner.clone(),
+            node: self.node,
+        }
+    }
+
+    /// Re-key with `f`, then group by the new key (`KStream.groupBy`).
+    pub fn group_by<F: Fn(&Record) -> Vec<u8> + 'static>(&self, f: F) -> KGroupedStream {
+        let s = self.select_key(f);
+        KGroupedStream {
+            inner: s.inner,
+            node: s.node,
+        }
+    }
+}
+
+/// A stream grouped by key, awaiting an aggregation.  Mirrors
+/// `org.apache.kafka.streams.kstream.KGroupedStream`.
+pub struct KGroupedStream {
+    inner: Rc<RefCell<BuildState>>,
+    node: usize,
+}
+
+impl KGroupedStream {
+    fn chain(&self, kind: NodeKind) -> KTable {
+        let node = self.inner.borrow_mut().push(kind, Some(self.node));
+        KTable {
+            inner: self.inner.clone(),
+            node,
+        }
+    }
+
+    /// Count records per key into `store`; the running tally is a
+    /// decimal-encoded `Long` (`KGroupedStream.count`).
+    pub fn count(&self, store: &str) -> KTable {
+        self.chain(NodeKind::Aggregate {
+            store: store.to_string(),
+            init: Box::new(|| b"0".to_vec()),
+            agg: Box::new(|_k, _v, current| {
+                let cur: i64 = String::from_utf8_lossy(current).parse().unwrap_or(0);
+                (cur + 1).to_string().into_bytes()
+            }),
+        })
+    }
+
+    /// Reduce values per key into `store` (`KGroupedStream.reduce`).
+    pub fn reduce<F: Fn(&[u8], &[u8]) -> Vec<u8> + 'static>(&self, store: &str, reducer: F) -> KTable {
+        self.chain(NodeKind::Reduce {
+            store: store.to_string(),
+            reducer: Box::new(reducer),
+        })
+    }
+
+    /// Aggregate values per key into `store` with an initializer + aggregator
+    /// (`KGroupedStream.aggregate`).
+    pub fn aggregate<I, A>(&self, store: &str, init: I, agg: A) -> KTable
+    where
+        I: Fn() -> Vec<u8> + 'static,
+        A: Fn(&[u8], &[u8], &[u8]) -> Vec<u8> + 'static,
+    {
+        self.chain(NodeKind::Aggregate {
+            store: store.to_string(),
+            init: Box::new(init),
+            agg: Box::new(agg),
+        })
+    }
+}
+
+/// A changelog-backed table.  Mirrors `org.apache.kafka.streams.kstream.KTable`.
+/// Internally a KTable's nodes carry changelog records (one per update), so
+/// table operators reuse the stream node kinds.
+pub struct KTable {
+    inner: Rc<RefCell<BuildState>>,
+    node: usize,
+}
+
+impl KTable {
+    fn chain(&self, kind: NodeKind) -> KTable {
+        let node = self.inner.borrow_mut().push(kind, Some(self.node));
+        KTable {
+            inner: self.inner.clone(),
+            node,
+        }
+    }
+
+    /// View the changelog as a record stream (`KTable.toStream`).
+    pub fn to_stream(&self) -> KStream {
+        KStream {
+            inner: self.inner.clone(),
+            node: self.node,
+        }
+    }
+
+    /// Filter the changelog (`KTable.filter`).
+    pub fn filter<F: Fn(&Record) -> bool + 'static>(&self, pred: F) -> KTable {
+        self.chain(NodeKind::Filter(Box::new(pred)))
+    }
+
+    /// Transform changelog values (`KTable.mapValues`).
+    pub fn map_values<F: Fn(&[u8]) -> Vec<u8> + 'static>(&self, f: F) -> KTable {
+        self.chain(NodeKind::MapValues(Box::new(f)))
+    }
+
+    /// Terminal: write the changelog to `topic` (`KTable.toStream().to`).
+    pub fn to(&self, topic: &str) {
+        self.chain(NodeKind::Sink {
+            topic: topic.to_string(),
+        });
+    }
 }
 
 // ─── Executable application ──────────────────────────────────────────────────
@@ -276,6 +403,13 @@ enum Step {
     Sink { topic: String, rec: Record },
     /// Append to an intermediate topic, then forward to every child.
     Through { topic: String, rec: Record },
+    /// Write the new aggregate into `store` under `key`, then forward the
+    /// changelog record (`key`, new aggregate) to every child.
+    StoreUpdate {
+        store: String,
+        key: Vec<u8>,
+        changelog: Record,
+    },
 }
 
 impl StreamsApp {
@@ -339,6 +473,35 @@ impl StreamsApp {
                     topic: topic.clone(),
                     rec,
                 },
+                NodeKind::Aggregate { store, init, agg } => {
+                    let cur = self
+                        .stores
+                        .get(store)
+                        .and_then(|s| s.get(&rec.key))
+                        .cloned()
+                        .unwrap_or_else(|| init());
+                    let newv = agg(&rec.key, &rec.value, &cur);
+                    let mut changelog = rec;
+                    changelog.value = newv;
+                    Step::StoreUpdate {
+                        store: store.clone(),
+                        key: changelog.key.clone(),
+                        changelog,
+                    }
+                }
+                NodeKind::Reduce { store, reducer } => {
+                    let newv = match self.stores.get(store).and_then(|s| s.get(&rec.key)) {
+                        Some(cur) => reducer(cur, &rec.value),
+                        None => rec.value.clone(), // first value initializes
+                    };
+                    let mut changelog = rec;
+                    changelog.value = newv;
+                    Step::StoreUpdate {
+                        store: store.clone(),
+                        key: changelog.key.clone(),
+                        changelog,
+                    }
+                }
                 NodeKind::Sink { topic } => Step::Sink {
                     topic: topic.clone(),
                     rec,
@@ -365,6 +528,19 @@ impl StreamsApp {
                 self.output.entry(topic).or_default().push(rec.clone());
                 for &c in &children {
                     self.run(c, rec.clone());
+                }
+            }
+            Step::StoreUpdate {
+                store,
+                key,
+                changelog,
+            } => {
+                self.stores
+                    .entry(store)
+                    .or_default()
+                    .insert(key, changelog.value.clone());
+                for &c in &children {
+                    self.run(c, changelog.clone());
                 }
             }
             Step::Sink { topic, rec } => {
