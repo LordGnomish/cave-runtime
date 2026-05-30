@@ -310,6 +310,151 @@ mod tests {
         let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
         assert_eq!(batch.len(), 2); // two departments
     }
+
+    fn batch_of(resp: &Document) -> Vec<Value> {
+        resp.get("cursor")
+            .and_then(|v| v.as_object())
+            .and_then(|c| c.get("firstBatch"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_unwind_expands_array_one_doc_per_element() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "items",
+            "uw_db1",
+            json!([{"_id": 1, "tags": ["a", "b", "c"]}, {"_id": 2, "tags": ["x"]}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db1".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$unwind": "$tags"}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        // 3 elements from doc 1 + 1 element from doc 2 = 4 docs
+        assert_eq!(batch.len(), 4);
+        // Each emitted doc has the array field replaced by a single scalar element.
+        let tags: Vec<&str> = batch
+            .iter()
+            .filter_map(|d| d.get("tags").and_then(|v| v.as_str()))
+            .collect();
+        assert_eq!(tags, vec!["a", "b", "c", "x"]);
+    }
+
+    #[tokio::test]
+    async fn test_unwind_drops_missing_and_empty_by_default() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "items",
+            "uw_db2",
+            json!([
+                {"_id": 1, "tags": ["a", "b"]},
+                {"_id": 2, "tags": []},
+                {"_id": 3},
+                {"_id": 4, "tags": Value::Null}
+            ]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db2".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$unwind": "$tags"}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        // Only doc 1's two elements survive; empty/missing/null are dropped.
+        assert_eq!(batch.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_unwind_preserve_null_and_empty_arrays() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "items",
+            "uw_db3",
+            json!([
+                {"_id": 1, "tags": ["a"]},
+                {"_id": 2, "tags": []},
+                {"_id": 3}
+            ]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db3".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$unwind": {"path": "$tags", "preserveNullAndEmptyArrays": true}}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        // doc1 (1 elem) + doc2 (preserved, no tags) + doc3 (preserved) = 3
+        assert_eq!(batch.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_unwind_include_array_index() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "items",
+            "uw_db4",
+            json!([{"_id": 1, "tags": ["a", "b", "c"]}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db4".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$unwind": {"path": "$tags", "includeArrayIndex": "idx"}}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        assert_eq!(batch.len(), 3);
+        let idxs: Vec<i64> = batch
+            .iter()
+            .filter_map(|d| d.get("idx").and_then(|v| v.as_i64()))
+            .collect();
+        assert_eq!(idxs, vec![0, 1, 2]);
+    }
+
+    #[tokio::test]
+    async fn test_unwind_scalar_field_emitted_unchanged() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "items",
+            "uw_db5",
+            json!([{"_id": 1, "tags": "solo"}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db5".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$unwind": "$tags"}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        // A non-array, non-null scalar yields exactly one document, unchanged.
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].get("tags").and_then(|v| v.as_str()), Some("solo"));
+    }
 }
 
 fn compare_values(a: Option<&Value>, b: Option<&Value>) -> std::cmp::Ordering {
