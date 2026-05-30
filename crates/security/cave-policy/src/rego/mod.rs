@@ -10,6 +10,7 @@ pub mod builtins;
 pub mod eval;
 pub mod lexer;
 pub mod parser;
+pub mod partial;
 pub mod value;
 
 use std::collections::HashMap;
@@ -128,19 +129,60 @@ impl PolicyEngine {
     }
 
     /// Partial evaluation — returns residual queries.
+    ///
+    /// Evaluates the conjunctive query treating each `unknowns` root (default
+    /// `input`) as undefined. Ground conjuncts are folded away: a provably-true
+    /// conjunct is dropped, a provably-false one renders the whole query
+    /// unsatisfiable (empty `queries`). Unknown-dependent conjuncts — and
+    /// conjuncts referencing a variable bound from an unknown — survive into a
+    /// single residual query. See `rego::partial` for the deferred surface.
     pub fn partial_eval(
         &self,
         query: &str,
         input: Option<serde_json::Value>,
         unknowns: &[String],
     ) -> Result<PartialResult, crate::error::PolicyError> {
-        let _body = parser::parse_query(query)?;
-        let _input = input.unwrap_or_default();
-        let _unknowns = unknowns;
-        // Simplified partial evaluation: evaluate with unknowns treated as undefined
-        // Full PE requires residual query support
+        let body = parser::parse_query(query)?;
+        let input = input.unwrap_or(serde_json::Value::Null);
+
+        // OPA defaults the unknown set to `input` when none is supplied.
+        let unknown_roots: std::collections::HashSet<String> = if unknowns.is_empty() {
+            std::iter::once("input".to_string()).collect()
+        } else {
+            unknowns.iter().cloned().collect()
+        };
+
+        let ctx = EvalCtx::new(self.data.clone(), input, Arc::new(self.modules.clone()));
+
+        let mut tainted: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut residual: Vec<serde_json::Value> = Vec::new();
+        // Accumulated solutions of the ground (known) part of the query.
+        let mut known: Vec<value::Bindings> = vec![value::Bindings::new()];
+
+        for expr in &body {
+            if partial::is_residual(expr, &unknown_roots, &tainted) {
+                partial::mark_tainted(expr, &mut tainted);
+                residual.push(partial::expr_to_json(expr));
+                continue;
+            }
+            // Ground conjunct: evaluate it under every surviving known binding.
+            let mut next = Vec::new();
+            for b in &known {
+                next.extend(eval::eval_body(std::slice::from_ref(expr), b, &ctx));
+            }
+            if next.is_empty() {
+                // Provably false ⇒ the conjunction can never hold.
+                return Ok(PartialResult {
+                    queries: vec![],
+                    support: vec![],
+                });
+            }
+            known = next;
+        }
+
+        // A single residual query (empty body ⇒ unconditionally true).
         Ok(PartialResult {
-            queries: vec![],
+            queries: vec![residual],
             support: vec![],
         })
     }
