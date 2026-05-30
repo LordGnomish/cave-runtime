@@ -12,6 +12,7 @@ use crate::cis_node::node_checks;
 use crate::error::{BenchError, Result};
 use crate::kubescape_mitre::mitre_techniques;
 use crate::kubescape_nsa::nsa_controls;
+use crate::kubescape_security::security_control_ids;
 use crate::models::{Framework, Profile};
 
 /// Built-in profile catalogue.
@@ -44,6 +45,13 @@ pub fn builtin_profiles() -> Vec<Profile> {
             name: "MITRE ATT&CK for Kubernetes".into(),
             description: "Detection coverage across 10 ATT&CK tactics for Kubernetes-native attacks.".into(),
             check_ids: mitre_techniques().iter().map(|t| t.id.clone()).collect(),
+        },
+        Profile {
+            id: "security".into(),
+            framework: Framework::SecurityBaseline,
+            name: "Kubescape Security Baseline".into(),
+            description: "kubescape v4.0.8 \"security\" framework — 37-control security baseline assessing cluster + file-scanning security threats.".into(),
+            check_ids: security_control_ids(),
         },
         Profile {
             id: "soc2-cc-7".into(),

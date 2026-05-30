@@ -12,6 +12,7 @@ use crate::cis_node::node_checks;
 use crate::error::Result;
 use crate::kubescape_mitre::mitre_techniques;
 use crate::kubescape_nsa::{NsaManifestFacts, evaluate_control, nsa_controls};
+use crate::kubescape_security::{SecurityFacts, evaluate_security_control, security_controls};
 use crate::models::{Check, Finding, Framework, NodeType, Profile, ScanSummary, Target, Verdict};
 use std::collections::HashMap;
 
@@ -29,6 +30,7 @@ pub enum RunMode {
 pub struct ScanInput {
     pub cis_context: CisContext,
     pub nsa_facts: NsaManifestFacts,
+    pub security_facts: SecurityFacts,
     pub host: String,
 }
 
@@ -63,6 +65,16 @@ pub fn run_profile(profile: &Profile, target: &Target, input: &ScanInput, mode: 
                 continue;
             }
             findings.push(evaluate_control(&c, &input.nsa_facts, &input.host));
+        }
+    }
+
+    // ── Security baseline (kubescape "security" framework) ──
+    if profile.framework == Framework::SecurityBaseline || matches!(profile.framework, Framework::SocControls) {
+        for c in security_controls() {
+            if !id_set.contains(c.check.id.as_str()) {
+                continue;
+            }
+            findings.push(evaluate_security_control(&c, &input.security_facts, &input.host));
         }
     }
 

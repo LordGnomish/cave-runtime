@@ -20,6 +20,7 @@ pub mod cli;
 pub mod error;
 pub mod kubescape_mitre;
 pub mod kubescape_nsa;
+pub mod kubescape_security;
 pub mod models;
 pub mod observability;
 pub mod parity_self_audit;

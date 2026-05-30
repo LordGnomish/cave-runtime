@@ -50,6 +50,8 @@ pub enum Framework {
     NsaHardening,
     /// MITRE ATT&CK for Kubernetes — kubescape upstream.
     MitreAttack,
+    /// kubescape "security" framework — security baseline (37 controls).
+    SecurityBaseline,
     /// SOC2 / ISO Common Criteria style controls — derived.
     SocControls,
 }
@@ -60,6 +62,7 @@ impl Framework {
             Framework::CisK8s => "cis-k8s",
             Framework::NsaHardening => "nsa-hardening",
             Framework::MitreAttack => "mitre-attack",
+            Framework::SecurityBaseline => "security",
             Framework::SocControls => "soc-controls",
         }
     }
