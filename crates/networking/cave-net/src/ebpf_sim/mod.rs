@@ -35,6 +35,7 @@ pub mod edt_sim;
 pub mod helpers;
 pub mod lb_sim;
 pub mod map;
+pub mod nat46x64;
 pub mod nat_sim;
 pub mod policy_lpm;
 pub mod port_range;
@@ -52,6 +53,10 @@ pub use lb_sim::{
     HASH_INIT4_SEED, LB_MAGLEV_LUT_SIZE,
 };
 pub use map::{Map, MapError, MapKind};
+pub use nat46x64::{
+    build_v4_in_v6, build_v4_in_v6_rfc6052, get_v4_from_v6, is_v4_in_v6, is_v4_in_v6_rfc6052,
+    V6Addr, RFC6052_WELL_KNOWN_PREFIX,
+};
 pub use nat_sim::{NatDir, NatEntry, NatError, NatMap, NatTarget, NatTuple, SNAT_COLLISION_RETRIES};
 pub use policy_lpm::RangePolicyMap;
 pub use port_range::{port_range_to_masked_ports, MaskedPort};
