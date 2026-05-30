@@ -176,6 +176,7 @@ pub fn apiserver_cert_sans(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{Duration, TimeZone, Utc};
 
     // ── Cycle 1: PKI tree ───────────────────────────────────────────────────
 
@@ -317,5 +318,49 @@ mod tests {
         // extra DNS + IP entries are present.
         assert!(san.dns_names.contains(&"tenant.internal".to_string()));
         assert!(san.ip_addresses.contains(&"192.168.1.10".to_string()));
+    }
+
+    // ── Cycle 3: rotation lifecycle ─────────────────────────────────────────
+
+    #[test]
+    fn rotation_strategy_parses_only_supported_labels() {
+        assert_eq!(RotationStrategy::from_label("x509"), Some(RotationStrategy::X509));
+        assert_eq!(
+            RotationStrategy::from_label("kubeconfig"),
+            Some(RotationStrategy::Kubeconfig)
+        );
+        assert_eq!(RotationStrategy::from_label("pkcs12"), None);
+        assert_eq!(RotationStrategy::X509.label(), "x509");
+        assert_eq!(RotationStrategy::Kubeconfig.label(), "kubeconfig");
+    }
+
+    #[test]
+    fn cert_inside_one_day_deadline_must_rotate() {
+        let now = Utc.with_ymd_and_hms(2026, 5, 30, 0, 0, 0).unwrap();
+        // Expires in 12h — inside the 1-day deadline.
+        let soon = now + Duration::hours(12);
+        assert!(needs_rotation(soon, now));
+        // Already expired — definitely rotate.
+        let past = now - Duration::hours(1);
+        assert!(needs_rotation(past, now));
+    }
+
+    #[test]
+    fn cert_outside_one_day_deadline_is_still_valid() {
+        let now = Utc.with_ymd_and_hms(2026, 5, 30, 0, 0, 0).unwrap();
+        // Expires in 5 days — well outside the deadline.
+        let later = now + Duration::days(5);
+        assert!(!needs_rotation(later, now));
+    }
+
+    #[test]
+    fn requeue_after_is_time_until_deadline_then_none() {
+        let now = Utc.with_ymd_and_hms(2026, 5, 30, 0, 0, 0).unwrap();
+        let later = now + Duration::days(5);
+        // deadline = now + 1 day; remaining = NotAfter - deadline = 4 days.
+        assert_eq!(requeue_after(later, now), Some(Duration::days(4)));
+        // A cert needing rotation has no requeue interval.
+        let soon = now + Duration::hours(12);
+        assert_eq!(requeue_after(soon, now), None);
     }
 }
