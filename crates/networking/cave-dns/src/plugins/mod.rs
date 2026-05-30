@@ -10,6 +10,7 @@ pub mod errors;
 pub mod etcd;
 pub mod file;
 pub mod forward;
+pub mod header;
 pub mod health;
 pub mod hosts;
 pub mod kubernetes;
