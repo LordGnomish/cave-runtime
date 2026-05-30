@@ -1004,6 +1004,7 @@ dependencies = [
  "proptest",
  "quick-xml",
  "rand 0.8.6",
+ "regex",
  "reqwest",
  "ring",
  "rsa",

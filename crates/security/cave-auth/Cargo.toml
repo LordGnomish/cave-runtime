@@ -26,6 +26,8 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tower = { workspace = true }
+# Password-policy `regexPattern` validator — Keycloak RegexPatternsPasswordPolicyProvider port
+regex = { workspace = true }
 # Crypto: SHA-256 for PAT hashing
 ring = { workspace = true }
 base64 = { workspace = true }
