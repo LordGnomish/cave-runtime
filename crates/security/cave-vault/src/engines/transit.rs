@@ -212,6 +212,98 @@ fn chacha20_decrypt(key_bytes: &[u8], ciphertext: &[u8]) -> VaultResult<Vec<u8>>
     Ok(plaintext.to_vec())
 }
 
+/// OpenBao's user-facing error when a derived key is used without a context.
+/// Cite: openbao sdk/helper/keysutil/policy.go::DeriveKey.
+const MISSING_CONTEXT_ERR: &str = "missing 'context' for key derivation; the key was created using a derived key, which means additional, per-request information must be included in order to perform operations with the key";
+
+/// HKDF-SHA256 per-context key derivation (empty salt, `info = context`).
+/// Cite: openbao sdk/helper/keysutil/policy.go::DeriveKey, `Kdf_hkdf_sha256`
+/// (`hkdf.New(sha256.New, keyEntry.Key, salt, context)`). New transit keys
+/// default to the HKDF-SHA256 derivation mode.
+fn hkdf_sha256_derive(secret: &[u8], context: &[u8], out_len: usize) -> VaultResult<Vec<u8>> {
+    use ring::hkdf;
+    struct Len(usize);
+    impl hkdf::KeyType for Len {
+        fn len(&self) -> usize {
+            self.0
+        }
+    }
+    let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(secret);
+    let info: [&[u8]; 1] = [context];
+    let okm = prk
+        .expand(&info, Len(out_len))
+        .map_err(|_| VaultError::Crypto("hkdf expand failed".into()))?;
+    let mut out = vec![0u8; out_len];
+    okm.fill(&mut out)
+        .map_err(|_| VaultError::Crypto("hkdf fill failed".into()))?;
+    Ok(out)
+}
+
+/// Resolve the effective AEAD encryption key for a transit key version.
+/// For a derived key a non-empty `context` is required and the key is derived
+/// per-request via HKDF-SHA256; otherwise the stored key is used verbatim.
+/// Cite: openbao keysutil `GetKey`/`DeriveKey`.
+fn derived_enc_key(
+    key: &TransitKey,
+    kv: &KeyVersion,
+    context: Option<&[u8]>,
+) -> VaultResult<Vec<u8>> {
+    if key.derived {
+        let ctx = context
+            .filter(|c| !c.is_empty())
+            .ok_or_else(|| VaultError::InvalidRequest(MISSING_CONTEXT_ERR.into()))?;
+        hkdf_sha256_derive(&kv.key_bytes, ctx, 32)
+    } else {
+        Ok(kv.key_bytes.clone())
+    }
+}
+
+/// Seal a plaintext under a transit key version, honoring derived keys.
+/// Returns nonce-prefixed AEAD ciphertext (before the `vault:vN:` framing).
+fn transit_seal(
+    key: &TransitKey,
+    kv: &KeyVersion,
+    context: Option<&[u8]>,
+    plaintext: &[u8],
+) -> VaultResult<Vec<u8>> {
+    let enc_key = derived_enc_key(key, kv, context)?;
+    match key.key_type {
+        KeyType::Aes256Gcm96 => aes256_gcm_encrypt(&enc_key, plaintext),
+        KeyType::Chacha20Poly1305 => chacha20_encrypt(&enc_key, plaintext),
+        _ => Err(VaultError::InvalidRequest(
+            "encryption not supported for this key type".into(),
+        )),
+    }
+}
+
+/// Open a transit ciphertext under a key version, honoring derived keys.
+fn transit_open(
+    key: &TransitKey,
+    kv: &KeyVersion,
+    context: Option<&[u8]>,
+    ciphertext: &[u8],
+) -> VaultResult<Vec<u8>> {
+    let enc_key = derived_enc_key(key, kv, context)?;
+    match key.key_type {
+        KeyType::Aes256Gcm96 => aes256_gcm_decrypt(&enc_key, ciphertext),
+        KeyType::Chacha20Poly1305 => chacha20_decrypt(&enc_key, ciphertext),
+        _ => Err(VaultError::InvalidRequest(
+            "decryption not supported for this key type".into(),
+        )),
+    }
+}
+
+/// Decode the optional base64 `context` field from a transit request body.
+fn decode_context(context: &Option<String>) -> VaultResult<Option<Vec<u8>>> {
+    match context {
+        Some(c) if !c.is_empty() => base64::engine::general_purpose::STANDARD
+            .decode(c)
+            .map(Some)
+            .map_err(|_| VaultError::InvalidRequest("invalid base64 context".into())),
+        _ => Ok(None),
+    }
+}
+
 pub async fn create_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
@@ -236,6 +328,20 @@ pub async fn create_key(
     }
     if let Some(deletion_allowed) = body.get("deletion_allowed").and_then(|v| v.as_bool()) {
         key.deletion_allowed = deletion_allowed;
+    }
+    if let Some(derived) = body.get("derived").and_then(|v| v.as_bool()) {
+        key.derived = derived;
+    }
+    // Convergent encryption implies derivation (OpenBao forces derived=true
+    // when convergent_encryption is set). Cite: openbao path_keys.go.
+    if let Some(conv) = body
+        .get("convergent_encryption")
+        .and_then(|v| v.as_bool())
+    {
+        key.convergent_encryption = conv;
+        if conv {
+            key.derived = true;
+        }
     }
     store.keys.insert(key_name, key);
     Ok(VaultResponse::new())
@@ -379,15 +485,8 @@ pub async fn encrypt(
         .decode(&body.plaintext)
         .map_err(|_| VaultError::InvalidRequest("invalid base64 plaintext".into()))?;
 
-    let ciphertext_bytes = match &key.key_type {
-        KeyType::Aes256Gcm96 => aes256_gcm_encrypt(&kv.key_bytes, &plaintext)?,
-        KeyType::Chacha20Poly1305 => chacha20_encrypt(&kv.key_bytes, &plaintext)?,
-        _ => {
-            return Err(VaultError::InvalidRequest(
-                "encryption not supported for this key type".into(),
-            ));
-        }
-    };
+    let context = decode_context(&body.context)?;
+    let ciphertext_bytes = transit_seal(key, kv, context.as_deref(), &plaintext)?;
 
     let ciphertext = format!(
         "vault:v{}:{}",
@@ -444,15 +543,8 @@ pub async fn decrypt(
         .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
-    let plaintext_bytes = match &key.key_type {
-        KeyType::Aes256Gcm96 => aes256_gcm_decrypt(&kv.key_bytes, &ciphertext_bytes)?,
-        KeyType::Chacha20Poly1305 => chacha20_decrypt(&kv.key_bytes, &ciphertext_bytes)?,
-        _ => {
-            return Err(VaultError::InvalidRequest(
-                "decryption not supported for this key type".into(),
-            ));
-        }
-    };
+    let context = decode_context(&body.context)?;
+    let plaintext_bytes = transit_open(key, kv, context.as_deref(), &ciphertext_bytes)?;
 
     let plaintext = base64::engine::general_purpose::STANDARD.encode(&plaintext_bytes);
     Ok(VaultResponse::new().with_data(json!({ "plaintext": plaintext })))
