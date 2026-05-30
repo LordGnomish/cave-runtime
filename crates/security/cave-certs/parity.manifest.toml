@@ -15,18 +15,28 @@ source_sha = "e8f3f78a81c8e04def58c8f7d40fc70a41e66c8e"
 # 2026-05-28 honest close — implemented real Certificate/CertificateRequest CRDs,
 # renewal controller, ACME client orchestration, DNS-01/HTTP-01 solvers,
 # SelfSigned + CA issuers, PKCS#10 CSR builder, certificate store, PQC hybrid signer,
-# REST API handlers; ADR-justified 7 sibling/out-of-scope cuts.
+# REST API handlers; ADR-justified sibling/out-of-scope cuts.
+# 2026-05-30 honest uplift (strict TDD) — line-ported the cert-manager webhook
+# admission VALIDATION ENGINE (pure logic) from
+# internal/apis/certmanager/validation/{certificate.go,certificaterequest.go}:
+# ValidateCertificateSpec + ValidateDuration + issuerRef/IP/email/usage checks
+# (src/webhook_validation.rs, 20 tests) and the CertificateRequest
+# approval-condition rules (src/cr_approval_validation.rs, 11 tests). The webhook
+# HTTP/TLS transport + AdmissionReview decode remain cross-crate (cave-admission);
+# only the pure in-crate validation algorithm was ported; the residual webhook
+# transport stays skipped (narrowed to cave-admission). +2 mapped surfaces.
+# mapped 16 -> 18, honest_ratio 0.6957 -> 0.7200.
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.6957
+honest_ratio        = 0.7200
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 16
+mapped_count        = 18
 partial_count       = 0
 skipped_count       = 7
 unmapped_count      = 0
-total               = 23
-last_audit          = "2026-05-28"
+total               = 25
+last_audit          = "2026-05-30"
 infra_only          = false
 
 # ── Mapped surfaces ──────────────────────────────────────────────────────────
@@ -111,6 +121,16 @@ area    = "REST API handlers (issue / list / remove)"
 file    = "src/routes_api.rs"
 notes   = "handle_issue_selfsigned, handle_list_certs, handle_remove_cert; global tenant-scoped store; JSON DTOs"
 
+[[mapped]]
+area    = "Webhook admission Certificate-spec validation engine"
+file    = "src/webhook_validation.rs"
+notes   = "validate_certificate_spec + validate_duration + issuerRef/IP/email/usage/RSA-size/ECDSA-size/CN-64/renewBefore checks; faithful line-port of cert-manager internal/apis/certmanager/validation/certificate.go ValidateCertificateSpec (pure in-crate logic; webhook HTTP/AdmissionReview transport stays cross-crate cave-admission). TDD 2026-05-30, 20 tests."
+
+[[mapped]]
+area    = "Webhook admission CertificateRequest approval-condition validation"
+file    = "src/cr_approval_validation.rs"
+notes   = "validate_cr_approval_condition + validate_update_cr_approval_condition: at most one Approved/Denied each, status must be True, Approved+Denied cannot coexist, immutable once set; line-port of cert-manager internal/apis/certmanager/validation/certificaterequest.go (pure in-crate logic; webhook transport stays cross-crate cave-admission). TDD 2026-05-30, 11 tests."
+
 # ── Skipped surfaces (ADR-justified scope cuts) ───────────────────────────────
 
 [[skipped]]
@@ -130,8 +150,8 @@ area   = "Kubernetes Secret write-back (tls.crt / tls.key)"
 reason = "Writing to K8s Secrets requires the K8s client API — parallel-track cave-apiserver (K8s object store)"
 
 [[skipped]]
-area   = "Validating + mutating admission webhooks"
-reason = "cert-manager webhook binary is a separate Go process serving K8s admission — parallel-track cave-admission"
+area   = "Mutating admission webhook + admission HTTP/TLS transport"
+reason = "The mutating defaulter and the webhook binary's HTTP/TLS server + K8s AdmissionReview decode are a separate Go process serving K8s admission — parallel-track cave-admission. (The pure validating-admission algorithm is now ported in-crate: src/webhook_validation.rs + src/cr_approval_validation.rs.)"
 
 [[skipped]]
 area   = "cert-manager controller-manager operator binary"
@@ -153,4 +173,4 @@ status       = "parallel-track"
 loc          = 0
 priority     = "P3"
 notes        = "cert-manager has no web UI; certificate management exposed via cave-portal CRD viewer — parallel-track cave-portal"
-last_audit   = "2026-05-28"
+last_audit   = "2026-05-30"

@@ -7,6 +7,7 @@
 
 pub mod acme_client;
 pub mod cert_request;
+pub mod cr_approval_validation;
 pub mod crds;
 pub mod csr;
 pub mod engine;
@@ -18,6 +19,7 @@ pub mod routes;
 pub mod routes_api;
 pub mod solvers;
 pub mod store;
+pub mod webhook_validation;
 
 use axum::Router;
 
