@@ -147,19 +147,15 @@ impl IpPattern {
         !run.is_empty() && self.run_matches(&run)
     }
 
-    /// Try to parse one candidate run as an address and test it, tolerating a
-    /// single trailing separator left by adjacent punctuation (`"…4.5."`).
+    /// Try to parse one candidate run as an address and test it, tolerating
+    /// trailing separators left by adjacent punctuation (`"…4.5."`). A valid
+    /// address never ends in a lone `.`/`:`, so trimming them is always safe.
     fn run_matches(&self, run: &str) -> bool {
-        if let Ok(addr) = run.parse::<IpAddr>() {
-            return self.matches(addr);
-        }
-        let trimmed = run.trim_end_matches(['.', ':']);
-        if trimmed.len() != run.len() {
-            if let Ok(addr) = trimmed.parse::<IpAddr>() {
-                return self.matches(addr);
-            }
-        }
-        false
+        let candidate = run.trim_end_matches(['.', ':']);
+        candidate
+            .parse::<IpAddr>()
+            .map(|addr| self.matches(addr))
+            .unwrap_or(false)
     }
 }
 
