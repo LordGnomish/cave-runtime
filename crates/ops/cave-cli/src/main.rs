@@ -604,6 +604,12 @@ enum DashboardCmd {
         #[arg(long)]
         parent: Option<String>,
     },
+    /// Evaluate an RBAC action+scope check against a permissions map.
+    AccessEval {
+        /// Full AccessEvalRequest JSON: {"permissions":{...},"action":"...","scopes":[...]}.
+        #[arg(long)]
+        request: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4764,6 +4770,10 @@ source_root = "src"
                     json!({ "parentUid": parent }),
                 )
                 .await
+            }
+            DashboardCmd::AccessEval { request } => {
+                let body: serde_json::Value = serde_json::from_str(&request)?;
+                c.post("/api/access-control/eval", body).await
             }
         },
         Commands::Deploy { cmd } => match cmd {

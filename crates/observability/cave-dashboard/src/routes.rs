@@ -196,6 +196,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/ds/query", post(ds_query))
         // Server-side expression evaluation (__expr__ datasource)
         .route("/api/ds/query/expr", post(ds_query_expr))
+        // Access-control RBAC evaluation
+        .route("/api/access-control/eval", post(access_control_eval))
         // Annotations
         .route(
             "/api/annotations",
@@ -750,6 +752,35 @@ async fn ds_query(State(state): State<AppState>, Json(req): Json<DsQueryRequest>
     }
 
     Json(response).into_response()
+}
+
+// ─── Access-control RBAC evaluation (Grafana pkg/services/accesscontrol) ───────
+
+#[derive(serde::Deserialize)]
+struct AccessEvalRequest {
+    /// The user's permissions: action → granted scopes.
+    #[serde(default)]
+    permissions: std::collections::HashMap<String, Vec<String>>,
+    /// Action being checked.
+    action: String,
+    /// Required scopes (any-match); empty means action-only.
+    #[serde(default)]
+    scopes: Vec<String>,
+}
+
+/// `POST /api/access-control/eval` — evaluate whether the supplied
+/// permissions satisfy an action + scope requirement, using Grafana's
+/// action/scope wildcard matching.
+async fn access_control_eval(Json(req): Json<AccessEvalRequest>) -> Response {
+    let scope_refs: Vec<&str> = req.scopes.iter().map(String::as_str).collect();
+    let evaluator = crate::access_control::eval_permission(&req.action, &scope_refs);
+    let allowed = evaluator.evaluate(&req.permissions);
+    Json(serde_json::json!({
+        "action": req.action,
+        "scopes": req.scopes,
+        "allowed": allowed,
+    }))
+    .into_response()
 }
 
 // ─── Nested folder service (Grafana pkg/services/folder) ───────────────────────

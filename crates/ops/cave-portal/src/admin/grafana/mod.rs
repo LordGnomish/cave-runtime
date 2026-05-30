@@ -52,6 +52,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GrafanaVie
   Grafana Web UI parity (cave-dashboard).
   Upstream: <a class="text-blue-700 underline" href="https://grafana.com/grafana/dashboards/">grafana.com/grafana/dashboards</a>.
   <br>Nested folders: <code>GET /api/folders/{{uid}}/parents</code> · <code>/children</code> · <code>POST /api/folders/{{uid}}/move</code> (depth + circular-reference validated).
+  <br>RBAC: <code>POST /api/access-control/eval</code> (action + scope wildcard matching).
 </section>
 <nav class="mb-4 flex gap-4 text-sm text-blue-700">
   <a href="#grafana-dashboards">Dashboards</a>
@@ -127,6 +128,7 @@ mod tests {
         }
         assert!(html.contains("/api/ds/query/expr"));
         assert!(html.contains("/api/folders/{uid}/move"));
+        assert!(html.contains("/api/access-control/eval"));
         assert!(html.contains("grafana.com/grafana/dashboards"));
     }
 

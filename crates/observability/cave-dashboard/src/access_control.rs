@@ -11,6 +11,206 @@
 //! wildcards. This is the Grafana-shaped RBAC surface the auth module only
 //! covered shallowly — distinct from cave-auth's identity-provider RBAC.
 
+use std::collections::HashMap;
+
+const MAX_PREFIX_PARTS: usize = 2;
+
+// ── scope.go ────────────────────────────────────────────────────────────────
+
+/// `SplitScope` — returns (kind, attribute, identifier).
+pub fn split_scope(scope: &str) -> (String, String, String) {
+    if scope.is_empty() {
+        return (String::new(), String::new(), String::new());
+    }
+    let fragments: Vec<&str> = scope.split(':').collect();
+    match fragments.len() {
+        1 => (
+            fragments[0].to_string(),
+            fragments[0].to_string(),
+            fragments[0].to_string(),
+        ),
+        2 => (
+            fragments[0].to_string(),
+            fragments[1].to_string(),
+            fragments[1].to_string(),
+        ),
+        _ => (
+            fragments[0].to_string(),
+            fragments[1].to_string(),
+            fragments[2..].join(":"),
+        ),
+    }
+}
+
+/// `Scope` — build a scope from parts joined by ':'.
+pub fn scope(parts: &[&str]) -> String {
+    parts.join(":")
+}
+
+/// `GetResourceScope` — "<resource>:id:<id>".
+pub fn get_resource_scope(resource: &str, resource_id: &str) -> String {
+    scope(&[resource, "id", resource_id])
+}
+
+/// `GetResourceScopeUID` — "<resource>:uid:<id>".
+pub fn get_resource_scope_uid(resource: &str, resource_id: &str) -> String {
+    scope(&[resource, "uid", resource_id])
+}
+
+/// `GetResourceScopeName` — "<resource>:name:<id>".
+pub fn get_resource_scope_name(resource: &str, resource_id: &str) -> String {
+    scope(&[resource, "name", resource_id])
+}
+
+/// `GetResourceAllScope` — "<resource>:*".
+pub fn get_resource_all_scope(resource: &str) -> String {
+    scope(&[resource, "*"])
+}
+
+/// `GetResourceAllIDScope` — "<resource>:id:*".
+pub fn get_resource_all_id_scope(resource: &str) -> String {
+    scope(&[resource, "id", "*"])
+}
+
+/// `ScopePrefix` — the "<resource>:<attribute>:" prefix (≤ maxPrefixParts).
+pub fn scope_prefix(scope: &str) -> String {
+    let mut parts: Vec<String> = scope.split(':').map(str::to_string).collect();
+    if parts.len() > MAX_PREFIX_PARTS {
+        parts.truncate(MAX_PREFIX_PARTS);
+        parts.push(String::new());
+    }
+    parts.join(":")
+}
+
+/// `WildcardsFromPrefixes` — generates valid wildcards from prefixes,
+/// e.g. "datasource:uid:" → ["*", "datasource:*", "datasource:uid:*"].
+pub fn wildcards_from_prefixes(prefixes: &[&str]) -> Vec<String> {
+    let mut wildcards = vec!["*".to_string()];
+    for prefix in prefixes {
+        let mut acc = String::new();
+        for p in prefix.split(':') {
+            if p.is_empty() {
+                continue;
+            }
+            acc.push_str(p);
+            acc.push(':');
+            wildcards.push(format!("{acc}*"));
+        }
+    }
+    wildcards
+}
+
+// ── ValidateScope (accesscontrol.go) ────────────────────────────────────────
+
+/// `ValidateScope` — scopes may only contain `*`/`?` in the last position,
+/// and a trailing `*` must follow ':' or '/'.
+pub fn validate_scope(scope: &str) -> bool {
+    if scope.is_empty() {
+        return false;
+    }
+    let bytes = scope.as_bytes();
+    let last = bytes[bytes.len() - 1];
+    let prefix = &scope[..scope.len() - 1];
+    if !prefix.is_empty() && last == b'*' {
+        let last_char = prefix.as_bytes()[prefix.len() - 1];
+        if last_char != b':' && last_char != b'/' {
+            return false;
+        }
+    }
+    !prefix.contains(['*', '?'])
+}
+
+// ── match() (evaluator.go) ──────────────────────────────────────────────────
+
+/// `match(scope, target)` — exact or trailing-`*` prefix match, gated on
+/// [`validate_scope`].
+pub fn scope_match(scope: &str, target: &str) -> bool {
+    if scope.is_empty() {
+        return false;
+    }
+    if !validate_scope(scope) {
+        return false;
+    }
+    let prefix = &scope[..scope.len() - 1];
+    let last = scope.as_bytes()[scope.len() - 1];
+    if last == b'*' && target.starts_with(prefix) {
+        return true;
+    }
+    scope == target
+}
+
+// ── Evaluator (evaluator.go) ────────────────────────────────────────────────
+
+/// A permission evaluator. Mirrors `permissionEvaluator` / `allEvaluator` /
+/// `anyEvaluator`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Evaluator {
+    Permission { action: String, scopes: Vec<String> },
+    All(Vec<Evaluator>),
+    Any(Vec<Evaluator>),
+}
+
+/// `EvalPermission` — requires at least one of `scopes` to match the user's
+/// scopes for `action` (or just the action if `scopes` is empty).
+pub fn eval_permission(action: &str, scopes: &[&str]) -> Evaluator {
+    Evaluator::Permission {
+        action: action.to_string(),
+        scopes: scopes.iter().map(|s| s.to_string()).collect(),
+    }
+}
+
+/// `EvalAll` — every sub-evaluator must pass.
+pub fn eval_all(all_of: Vec<Evaluator>) -> Evaluator {
+    Evaluator::All(all_of)
+}
+
+/// `EvalAny` — at least one sub-evaluator must pass.
+pub fn eval_any(any_of: Vec<Evaluator>) -> Evaluator {
+    Evaluator::Any(any_of)
+}
+
+impl Evaluator {
+    /// `Evaluate` — decide against a map of `action -> [scopes]`.
+    pub fn evaluate(&self, permissions: &HashMap<String, Vec<String>>) -> bool {
+        match self {
+            Evaluator::Permission { action, scopes } => {
+                let Some(user_scopes) = permissions.get(action) else {
+                    return false;
+                };
+                if scopes.is_empty() {
+                    return true;
+                }
+                for target in scopes {
+                    for scope in user_scopes {
+                        if scope_match(scope, target) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Evaluator::All(all_of) => all_of.iter().all(|e| e.evaluate(permissions)),
+            Evaluator::Any(any_of) => any_of.iter().any(|e| e.evaluate(permissions)),
+        }
+    }
+}
+
+impl std::fmt::Display for Evaluator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Evaluator::Permission { action, .. } => write!(f, "{action}"),
+            Evaluator::All(all_of) => {
+                let parts: Vec<String> = all_of.iter().map(|e| e.to_string()).collect();
+                write!(f, "all of {}", parts.join(", "))
+            }
+            Evaluator::Any(any_of) => {
+                let parts: Vec<String> = any_of.iter().map(|e| e.to_string()).collect();
+                write!(f, "any of {}", parts.join(", "))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
