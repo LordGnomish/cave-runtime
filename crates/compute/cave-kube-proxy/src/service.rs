@@ -120,6 +120,100 @@ impl Cidr {
     }
 }
 
+/// Family-aware CIDR — the dual-stack counterpart to [`Cidr`].
+///
+/// Upstream kube-proxy is dual-stack: `ClusterCIDR` is a comma-separated
+/// `"v4cidr,v6cidr"` string and a proxier is instantiated per IP family.
+/// `IpCidr` carries either family so the IPv6 ClusterCIDR plumbing
+/// (`pkg/proxy/apis/config/types.go:107`) is a live, parsed value rather
+/// than a dead string hook.
+///
+/// Cite: `k8s.io/utils/net` `ParseCIDRs` (comma-separated dual-stack parse),
+/// `pkg/proxy/util/utils.go` `GetClusterIPByFamily` (per-family selection).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IpCidr {
+    pub addr: IpAddr,
+    pub prefix: u8,
+}
+
+impl IpCidr {
+    /// Parse a single `addr/prefix` CIDR, accepting both families. IPv4
+    /// prefixes are bounded at /32, IPv6 at /128 (mirrors `net.ParseCIDR`).
+    pub fn parse(s: &str) -> KubeProxyResult<Self> {
+        let (addr_part, prefix_part) = s.trim().split_once('/').ok_or_else(|| {
+            KubeProxyError::InvalidCidr(s.to_string(), "missing '/' separator".into())
+        })?;
+        let addr = IpAddr::from_str(addr_part.trim())
+            .map_err(|e| KubeProxyError::InvalidCidr(s.to_string(), e.to_string()))?;
+        let prefix: u8 = prefix_part
+            .trim()
+            .parse()
+            .map_err(|_| KubeProxyError::InvalidCidr(s.to_string(), "non-numeric prefix".into()))?;
+        let max = if addr.is_ipv6() { 128 } else { 32 };
+        if prefix > max {
+            return Err(KubeProxyError::InvalidCidr(
+                s.to_string(),
+                format!("prefix > {max}"),
+            ));
+        }
+        Ok(Self { addr, prefix })
+    }
+
+    /// Parse a comma-separated dual-stack ClusterCIDR list (e.g.
+    /// `"10.244.0.0/16,fd00:10:244::/56"`). Empty / whitespace-only entries
+    /// are skipped, matching `k8s.io/utils/net.ParseCIDRs` tolerance.
+    pub fn parse_list(s: &str) -> KubeProxyResult<Vec<Self>> {
+        s.split(',')
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+            .map(Self::parse)
+            .collect()
+    }
+
+    pub fn is_ipv6(&self) -> bool {
+        self.addr.is_ipv6()
+    }
+
+    pub fn prefix(&self) -> u8 {
+        self.prefix
+    }
+
+    /// Family-matched containment. A v4 CIDR never claims a v6 address and
+    /// vice-versa (`GetClusterIPByFamily` keys off the family first).
+    pub fn contains(&self, ip: IpAddr) -> bool {
+        match (self.addr, ip) {
+            (IpAddr::V4(net), IpAddr::V4(cand)) => {
+                Self::v4_in_prefix(net, cand, self.prefix)
+            }
+            (IpAddr::V6(net), IpAddr::V6(cand)) => {
+                Self::v6_in_prefix(net, cand, self.prefix)
+            }
+            // Cross-family — never contained.
+            _ => false,
+        }
+    }
+
+    fn v4_in_prefix(net: std::net::Ipv4Addr, cand: std::net::Ipv4Addr, prefix: u8) -> bool {
+        if prefix == 0 {
+            return true;
+        }
+        let shift = 32u32 - prefix as u32;
+        (u32::from(net) >> shift) == (u32::from(cand) >> shift)
+    }
+
+    fn v6_in_prefix(net: std::net::Ipv6Addr, cand: std::net::Ipv6Addr, prefix: u8) -> bool {
+        if prefix == 0 {
+            return true;
+        }
+        let shift = 128u32 - prefix as u32;
+        (u128::from(net) >> shift) == (u128::from(cand) >> shift)
+    }
+
+    pub fn to_string_canonical(&self) -> String {
+        format!("{}/{}", self.addr, self.prefix)
+    }
+}
+
 /// Cite: `pkg/proxy/serviceport.go:77` (BaseServicePortInfo) — the
 /// canonical per-port snapshot consumed by the proxier. Cave adds
 /// `tenant_id` for namespace isolation.

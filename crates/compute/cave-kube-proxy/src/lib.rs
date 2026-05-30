@@ -39,8 +39,8 @@ pub use nftables::NftablesProxier;
 pub use nodeport::{DEFAULT_MAX_NODE_PORT, DEFAULT_MIN_NODE_PORT, NodePortAllocator};
 pub use proxy_config::{DetectLocal, ProxyConfig, ProxyMode};
 pub use service::{
-    Cidr, Protocol, ServiceChangeTracker, ServicePortInfo, ServicePortName, SessionAffinity,
-    TrafficPolicy,
+    Cidr, IpCidr, Protocol, ServiceChangeTracker, ServicePortInfo, ServicePortName,
+    SessionAffinity, TrafficPolicy,
 };
 pub use sync_runner::{BoundedFrequencyRunner, ProxySyncRunner};
 pub use topology::{can_use_topology, categorize_endpoints, EndpointCategories};
