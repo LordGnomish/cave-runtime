@@ -31,6 +31,7 @@ pub mod binpack;
 pub mod budgets;
 pub mod disruption;
 pub mod drain;
+pub mod labels;
 pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod provider;
