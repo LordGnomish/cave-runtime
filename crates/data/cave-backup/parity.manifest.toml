@@ -38,13 +38,33 @@ url     = "https://github.com/vmware-tanzu/velero"
 #       its *RestoreItemAction* SDK stays trait-dispatched, but the deterministic restore
 #       resource-ordering engine is now genuinely line-ported (11 mirror tests).
 #   mapped 12→14, skipped 13→11, total stays 25. honest_ratio 0.48 → 0.56. fill_ratio stays 1.0.
-mapped_count          = 14
+# 2026-05-30 wave-3 honest uplift (cave-velero cont): fixed orphan-mapped inflation +
+#   ported three pure reconciler/validation pieces out of the internal/controller/
+#   parallel-track skip, via strict-TDD RED→GREEN cycles (same granular-row pattern as
+#   schedule_controller getNextRunTime — the bulk reconcile loop + controller-runtime
+#   client stay owned by cave-controller-manager, so internal/controller/ remains skipped):
+#     - ORPHAN FIX (no count change): internal/volume.go (src/volume.rs) and
+#       internal/types.go (src/types.rs) were counted mapped but undeclared in lib.rs,
+#       so they never compiled and their 6 tests never ran. Declared `pub mod volume` /
+#       `pub mod types`; the mapped claim is now real.
+#     - pkg/controller/backup_controller.go prepareBackupRequest (defaulting +
+#       validation: TTL/CSI/ItemOp timeouts, IncludedNamespaces→["*"], old-vs-new
+#       filter exclusivity, label/orLabel exclusivity, include/exclude overlap) →
+#       src/backup_request.rs (9 mirror tests).
+#     - pkg/controller/backup_controller.go validateAndGetSnapshotLocations + default
+#       BSL resolution (per-provider VSL uniqueness, default-VSL merge, server-default
+#       BSL fallback) → src/snapshot_locations.rs (9 mirror tests).
+#     - pkg/controller/restore_controller.go validateAndComplete
+#       (backupXorScheduleProvided, non-restorable resources, overlap,
+#       mostRecentCompletedBackup) → src/restore_request.rs (12 mirror tests).
+#   mapped 14→17, total 25→28, skipped stays 11. honest_ratio 0.56 → 0.6071. fill_ratio stays 1.0.
+mapped_count          = 17
 partial_count         = 0
 skipped_count         = 11
 unmapped_count        = 0
-total                 = 25
-fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 25/25
-honest_ratio          = 0.56    # mapped / total = 14/25 — raised honestly via 2 TDD line-ports
+total                 = 28
+fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 28/28
+honest_ratio          = 0.6071  # mapped / total = 17/28 — raised honestly via 3 TDD line-ports
 adr_justified_ratio   = 1.0     # all 11 skipped entries architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
@@ -168,6 +188,18 @@ local    = "src/types.rs"
 [[files]]
 upstream = "internal/volume.go"
 local    = "src/volume.rs"
+
+[[files]]
+upstream = "pkg/controller/backup_controller.go (prepareBackupRequest)"
+local    = "src/backup_request.rs"  # defaulting + validation engine; pure logic pulled from internal/controller skip (2026-05-30 wave-3 TDD)
+
+[[files]]
+upstream = "pkg/controller/backup_controller.go (validateAndGetSnapshotLocations)"
+local    = "src/snapshot_locations.rs"  # BSL/VSL resolution + per-provider uniqueness; pure logic pulled from internal/controller skip (2026-05-30 wave-3 TDD)
+
+[[files]]
+upstream = "pkg/controller/restore_controller.go (validateAndComplete)"
+local    = "src/restore_request.rs"  # restore validation + mostRecentCompletedBackup; pure logic pulled from internal/controller skip (2026-05-30 wave-3 TDD)
 
 # ── Function mappings ────────────────────────────────────────────────────────
 [[functions]]
@@ -309,6 +341,36 @@ file          = "src/volume.rs"
 upstream_name = "EffectiveBackupTool"
 local_name    = "effective_backup_tool"
 file          = "src/volume.rs"
+
+[[functions]]
+upstream_name = "prepareBackupRequest"
+local_name    = "prepare_backup_request"
+file          = "src/backup_request.rs"
+
+[[functions]]
+upstream_name = "validateAndGetSnapshotLocations"
+local_name    = "validate_and_get_snapshot_locations"
+file          = "src/snapshot_locations.rs"
+
+[[functions]]
+upstream_name = "defaultBackupStorageLocation"
+local_name    = "resolve_default_backup_storage_location"
+file          = "src/snapshot_locations.rs"
+
+[[functions]]
+upstream_name = "validateAndComplete"
+local_name    = "validate_restore_request"
+file          = "src/restore_request.rs"
+
+[[functions]]
+upstream_name = "backupXorScheduleProvided"
+local_name    = "backup_xor_schedule_provided"
+file          = "src/restore_request.rs"
+
+[[functions]]
+upstream_name = "mostRecentCompletedBackup"
+local_name    = "most_recent_completed_backup"
+file          = "src/restore_request.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 [[tests]]
