@@ -853,6 +853,46 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_keep_drops_everything_else() {
+        // `| keep level` keeps only `level`, dropping app + status (incl. stream labels).
+        let entry = LogEntry::new(0, "ignored");
+        let labels = make_labels(&[("app", "api"), ("level", "warn"), ("status", "200")]);
+        let pipeline = vec![PipelineStage::Keep(KeepLabels {
+            labels: vec![DropKeepLabel::Name("level".into())],
+        })];
+        let r = apply_pipeline(&entry, &labels, &pipeline).unwrap();
+        assert_eq!(r.labels.get("level").map(|s| s.as_str()), Some("warn"));
+        assert!(!r.labels.contains_key("app"));
+        assert!(!r.labels.contains_key("status"));
+    }
+
+    #[test]
+    fn pipeline_keep_conditional_matcher() {
+        // `| keep level, status="500"` keeps level always, status only when ==500.
+        let keep = PipelineStage::Keep(KeepLabels {
+            labels: vec![
+                DropKeepLabel::Name("level".into()),
+                DropKeepLabel::Matcher(LabelMatcher {
+                    name: "status".into(),
+                    op: MatchOp::Eq,
+                    value: "500".into(),
+                }),
+            ],
+        });
+
+        let hit = make_labels(&[("level", "error"), ("status", "500"), ("app", "api")]);
+        let r1 = apply_pipeline(&LogEntry::new(0, "x"), &hit, std::slice::from_ref(&keep)).unwrap();
+        assert_eq!(r1.labels.get("status").map(|s| s.as_str()), Some("500"));
+        assert_eq!(r1.labels.get("level").map(|s| s.as_str()), Some("error"));
+        assert!(!r1.labels.contains_key("app"));
+
+        let miss = make_labels(&[("level", "info"), ("status", "200"), ("app", "api")]);
+        let r2 = apply_pipeline(&LogEntry::new(0, "x"), &miss, std::slice::from_ref(&keep)).unwrap();
+        assert!(!r2.labels.contains_key("status")); // matcher failed → dropped
+        assert_eq!(r2.labels.get("level").map(|s| s.as_str()), Some("info"));
+    }
+
+    #[test]
     fn evaluator_log_query() {
         let store = LogStore::new();
         let t = 1_000_000_000i64;

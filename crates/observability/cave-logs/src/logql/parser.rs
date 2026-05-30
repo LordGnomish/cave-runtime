@@ -929,4 +929,28 @@ mod tests {
             panic!("expected log query");
         }
     }
+
+    #[test]
+    fn parse_keep_labels_names_and_matcher() {
+        let q = Parser::parse_query(r#"{app="x"} | logfmt | keep level, status="500""#).unwrap();
+        if let Query::Log(lq) = q {
+            assert_eq!(lq.pipeline.len(), 2); // logfmt + keep
+            if let PipelineStage::Keep(k) = lq.pipeline.last().unwrap() {
+                assert_eq!(k.labels.len(), 2);
+                assert!(matches!(&k.labels[0], DropKeepLabel::Name(n) if n == "level"));
+                match &k.labels[1] {
+                    DropKeepLabel::Matcher(m) => {
+                        assert_eq!(m.name, "status");
+                        assert_eq!(m.op, MatchOp::Eq);
+                        assert_eq!(m.value, "500");
+                    }
+                    other => panic!("expected matcher, got {:?}", other),
+                }
+            } else {
+                panic!("expected Keep stage, got {:?}", lq.pipeline.last());
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
 }
