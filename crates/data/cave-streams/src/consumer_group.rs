@@ -116,6 +116,11 @@ impl RebalanceProtocol {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupMember {
     pub member_id: String,
+    /// KIP-345 `group.instance.id` — set for static members, `None`
+    /// for dynamic members. A static member keeps the same identity
+    /// across restarts so a transient bounce does not trigger a
+    /// group rebalance.
+    pub group_instance_id: Option<String>,
     pub client_id: String,
     pub client_host: String,
     pub session_timeout_ms: i32,
@@ -133,6 +138,12 @@ impl GroupMember {
     pub fn is_expired(&self) -> bool {
         let elapsed = Utc::now() - self.last_heartbeat;
         elapsed.num_milliseconds() > self.session_timeout_ms as i64
+    }
+
+    /// Whether this is a static member (KIP-345). Static members are
+    /// exempt from the dynamic session-timeout expiry sweep.
+    pub fn is_static(&self) -> bool {
+        self.group_instance_id.is_some()
     }
 }
 
@@ -219,6 +230,7 @@ impl GroupCoordinator {
         // If rejoining, update existing member
         let member = GroupMember {
             member_id: assigned_member_id.clone(),
+            group_instance_id: None,
             client_id,
             client_host,
             session_timeout_ms,
@@ -232,6 +244,155 @@ impl GroupCoordinator {
         group.members.insert(assigned_member_id.clone(), member);
 
         // Elect leader = first member alphabetically
+        if group.leader_id.is_empty() || !group.members.contains_key(&group.leader_id) {
+            group.leader_id = group.members.keys().min().cloned().unwrap_or_default();
+        }
+
+        group.protocol_type = protocol_type;
+        group.state = GroupState::PreparingRebalance;
+        group.generation_id += 1;
+        group.updated_at = Utc::now();
+
+        let is_leader = assigned_member_id == group.leader_id;
+        let members_metadata: Vec<JoinGroupMemberMeta> = if is_leader {
+            group
+                .members
+                .values()
+                .map(|m| JoinGroupMemberMeta {
+                    member_id: m.member_id.clone(),
+                    metadata: m
+                        .protocols
+                        .get(&group.protocol_name)
+                        .cloned()
+                        .unwrap_or_default(),
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        Ok(JoinGroupResult {
+            error_code: 0,
+            generation_id: group.generation_id,
+            protocol_name: group.protocol_name.clone(),
+            leader_id: group.leader_id.clone(),
+            member_id: assigned_member_id,
+            members: members_metadata,
+        })
+    }
+
+    // ── JoinGroup (static, KIP-345) ─────────────────────────────────────────
+
+    /// Join with an optional `group.instance.id` (KIP-345 static
+    /// membership). When `group_instance_id` is `Some`, a returning
+    /// member with the same instance id reuses its existing
+    /// `member_id` and the group does **not** rebalance — the
+    /// generation is preserved. A first-time static join, or any
+    /// dynamic join (`group_instance_id == None`), behaves like the
+    /// classic [`join_group`](Self::join_group) path and triggers a
+    /// rebalance.
+    #[allow(clippy::too_many_arguments)]
+    pub fn join_group_static(
+        &self,
+        group_id: String,
+        group_instance_id: Option<String>,
+        member_id: Option<String>,
+        client_id: String,
+        client_host: String,
+        session_timeout_ms: i32,
+        rebalance_timeout_ms: i32,
+        protocol_type: String,
+        protocols: HashMap<String, Vec<u8>>,
+    ) -> StreamsResult<JoinGroupResult> {
+        // No instance id → ordinary dynamic membership.
+        let Some(instance_id) = group_instance_id.filter(|s| !s.is_empty()) else {
+            return self.join_group(
+                group_id,
+                member_id,
+                client_id,
+                client_host,
+                session_timeout_ms,
+                rebalance_timeout_ms,
+                protocol_type,
+                protocols,
+            );
+        };
+
+        let mut group = self
+            .groups
+            .entry(group_id.clone())
+            .or_insert_with(|| ConsumerGroup::new(group_id.clone()));
+
+        // Look for an existing static member with this instance id.
+        let existing_member_id = group
+            .members
+            .values()
+            .find(|m| m.group_instance_id.as_deref() == Some(instance_id.as_str()))
+            .map(|m| m.member_id.clone());
+
+        if let Some(existing_id) = existing_member_id {
+            // KIP-345 returning member: refresh liveness/metadata in
+            // place, keep the member id, and do NOT bump generation —
+            // this is the no-rebalance fast path.
+            if let Some(m) = group.members.get_mut(&existing_id) {
+                m.client_id = client_id;
+                m.client_host = client_host;
+                m.session_timeout_ms = session_timeout_ms;
+                m.rebalance_timeout_ms = rebalance_timeout_ms;
+                m.protocols = protocols;
+                m.last_heartbeat = Utc::now();
+            }
+            group.updated_at = Utc::now();
+
+            let is_leader = existing_id == group.leader_id;
+            let members_metadata: Vec<JoinGroupMemberMeta> = if is_leader {
+                group
+                    .members
+                    .values()
+                    .map(|m| JoinGroupMemberMeta {
+                        member_id: m.member_id.clone(),
+                        metadata: m
+                            .protocols
+                            .get(&group.protocol_name)
+                            .cloned()
+                            .unwrap_or_default(),
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+
+            return Ok(JoinGroupResult {
+                error_code: 0,
+                generation_id: group.generation_id,
+                protocol_name: group.protocol_name.clone(),
+                leader_id: group.leader_id.clone(),
+                member_id: existing_id,
+                members: members_metadata,
+            });
+        }
+
+        // First-time static member — allocate an id, record the
+        // instance id, and trigger a rebalance (new member joins).
+        let assigned_member_id = member_id
+            .filter(|id| !id.is_empty())
+            .unwrap_or_else(|| format!("{client_id}-{}", Uuid::new_v4()));
+
+        let member = GroupMember {
+            member_id: assigned_member_id.clone(),
+            group_instance_id: Some(instance_id),
+            client_id,
+            client_host,
+            session_timeout_ms,
+            rebalance_timeout_ms,
+            protocol_type: protocol_type.clone(),
+            protocols,
+            assignment: vec![],
+            last_heartbeat: Utc::now(),
+            joined_at: Utc::now(),
+        };
+        group.members.insert(assigned_member_id.clone(), member);
+
         if group.leader_id.is_empty() || !group.members.contains_key(&group.leader_id) {
             group.leader_id = group.members.keys().min().cloned().unwrap_or_default();
         }
@@ -429,7 +590,10 @@ impl GroupCoordinator {
             let stale: Vec<String> = group
                 .members
                 .iter()
-                .filter(|(_, m)| m.is_expired())
+                // KIP-345: static members are exempt from the dynamic
+                // session-timeout sweep so a transient bounce doesn't
+                // evict them and force a rebalance.
+                .filter(|(_, m)| !m.is_static() && m.is_expired())
                 .map(|(id, _)| id.clone())
                 .collect();
             for mid in stale {
