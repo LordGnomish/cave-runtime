@@ -56,23 +56,31 @@ purpose = "Universal binary repository sub-module — see parity-nexus.manifest.
 # with f90c1300 core-abstraction merge on 7 plugin .rs files. Those 9
 # extended plugin sub-systems are listed as [[scope_cuts]] in this manifest
 # until reconciled.
-mapped_count   = 23      # +5 from parity-uplift-sec-stack 2026-05-19 (harbor::rbac/replication_reconciler, nexus::composer/nuget, core::gc)
+mapped_count   = 25      # +2 honest-uplift wave-2 2026-05-30 (harbor::quota engine, pulp::reclaim planner) via strict-TDD
 partial_count  = 4       # Cosign verifier, Nexus REST stub, Harbor webhook framework, Pulp tasking framework
-skipped_count  = 43      # +3 from unmapped→scope_cut: Harbor ORM helpers → cave-rdbms migrations, secret rotation → cave-vault, quota middleware → cave-apiserver admission
+skipped_count  = 41      # -2: src/quota/* and reclaim_space.py converted scope_cut→mapped 2026-05-30
 unmapped_count = 0
 total          = 70
-ratio          = 1.0000  # (23 + 4 + 43) / 70 = 70/70
+ratio          = 1.0000  # (25 + 4 + 41) / 70 = 70/70
 fill_ratio     = 1.0000
 # 2026-05-29 fresh-impl: SECURITY FIX (strict-TDD test 725658eb RED → impl 1709cc87 GREEN) —
 #   verify_sha256 (src/pulp/content.rs) previously only validated the digest STRING was 64 lower-hex
 #   chars and never hashed the data, so any content verified against any well-formed digest. Now
 #   computes Sha256::digest(data) and constant-time compares. Bug-fix to existing mapped coverage —
 #   honest_ratio unchanged (no new area mapped), but the existing mapping is now genuinely honest.
-honest_ratio   = 0.3714  # mapped/total = 26/70 (23 mapped + 3 scope_cut absorbed by sibling crates)
-adr_justified_ratio = 1.0 # 43 skipped: 9 Pulp Phase 2 content plugins (rpm/container/python/file/deb/ostree/maven/helm/ansible); Harbor replication/p2p/jobservice/retention/robot/quota/proxy/exporter → cave-replication/cave-runtime-p2p/cave-jobs/cave-auth/cave-obs; Nexus blobstore-file/s3/azure/gcs/search/rapture/firewall → cave-runtime storage + cave-portal + cave-obs; +3 formalized 2026-05-28: Harbor ORM helpers → cave-rdbms, secret rotation → cave-vault, quota middleware → cave-apiserver admission. 4 partial (Cosign verifier, Nexus REST format-coverage, Harbor webhook HMAC, Pulp worker queue) honestly preserved.
+honest_ratio   = 0.4000  # mapped/total = 28/70 (25 mapped + 3 scope_cut absorbed by sibling crates)
+# 2026-05-30 honest-uplift wave-2: +2 genuinely-in-crate pure-logic ports converted from
+#   scope_cut to mapped via strict-TDD (RED test commit observed failing, then GREEN impl commit):
+#     * src/harbor/quota.rs   — port of goharbor/harbor pkg/quota ResourceList + per-project
+#       limit enforcement (used+delta<=hard, -1=unlimited). Was "Per-project quota engine deferred".
+#     * src/pulp/reclaim.rs    — port of pulpcore/app/tasks/reclaim_space.py disk-reclamation
+#       planner (target-version content minus keep-list, remote-backed only). Was "space reclamation deferred".
+#   honest_ratio rises 0.3714 -> 0.4000 because two real scope-cut runtime algorithms are now
+#   mapped+tested in-crate (not paperwork): 26/70 -> 28/70.
+adr_justified_ratio = 1.0 # 41 skipped: 9 Pulp Phase 2 content plugins (rpm/container/python/file/deb/ostree/maven/helm/ansible); Harbor replication/p2p/jobservice/retention/robot/proxy/exporter → cave-replication/cave-runtime-p2p/cave-jobs/cave-auth/cave-obs; Nexus blobstore-file/s3/azure/gcs/search/rapture/firewall → cave-runtime storage + cave-portal + cave-obs; +3 formalized 2026-05-28: Harbor ORM helpers → cave-rdbms, secret rotation → cave-vault, quota middleware → cave-apiserver admission. (2026-05-30: Harbor per-project quota *engine* + Pulp reclaim_space *planner* moved OUT of skipped → mapped via strict-TDD.) 4 partial (Cosign verifier, Nexus REST format-coverage, Harbor webhook HMAC, Pulp worker queue) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-28"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 # ── Partial ports (real, documented narrow scope-cut) ────────────────────────
@@ -152,10 +160,6 @@ upstream = "src/robot/* (Harbor)"
 reason   = "Robot account framework deferred — cave-auth keycloak service accounts cover this surface"
 
 [[scope_cuts]]
-upstream = "src/quota/* (Harbor)"
-reason   = "Per-project quota engine deferred"
-
-[[scope_cuts]]
 upstream = "src/proxy/* (Harbor proxy cache)"
 reason   = "Pull-through proxy cache deferred"
 
@@ -226,10 +230,6 @@ reason   = "Pulp User model deferred — cave-auth Keycloak"
 [[scope_cuts]]
 upstream = "pulpcore/app/orphans.py"
 reason   = "Pulp orphan cleanup task deferred"
-
-[[scope_cuts]]
-upstream = "pulpcore/app/reclaim_space.py"
-reason   = "Pulp space reclamation task deferred"
 
 [[scope_cuts]]
 upstream = "src/server/v2.0/handler/preheat.go (Harbor)"
@@ -373,6 +373,20 @@ local    = "src/nexus/nuget.rs"
 [[files]]
 upstream = "pulpcore/app/tasks/orphan.py + src/server/middleware/v2auth/.. (Harbor)"
 local    = "src/core/gc.rs"
+
+# ── Honest-uplift wave-2 2026-05-30 — scope_cuts converted to mapped via ─────
+#    strict-TDD (test commit then impl commit, RED observed before GREEN).
+[[files]]
+# was [[scope_cuts]] "src/quota/* (Harbor) — Per-project quota engine deferred"
+# TDD 2026-05-30: tests/quota_engine_tdd.rs (RED) -> src/harbor/quota.rs (GREEN, 8 tests)
+upstream = "src/pkg/quota/{types/resourcelist.go,manager.go} (Harbor)"
+local    = "src/harbor/quota.rs"
+
+[[files]]
+# was [[scope_cuts]] "pulpcore/app/reclaim_space.py — Pulp space reclamation task deferred"
+# TDD 2026-05-30: tests/reclaim_space_tdd.rs (RED) -> src/pulp/reclaim.rs (GREEN, 5 tests)
+upstream = "pulpcore/app/tasks/reclaim_space.py (Pulp)"
+local    = "src/pulp/reclaim.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────
 [[functions]]
