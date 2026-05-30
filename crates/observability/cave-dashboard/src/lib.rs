@@ -37,6 +37,7 @@ pub mod alerting;
 pub mod auth;
 pub mod datasource;
 pub mod explore;
+pub mod expressions;
 pub mod models;
 pub mod panels;
 pub mod plugin_sdk;
