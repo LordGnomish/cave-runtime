@@ -226,6 +226,21 @@ upstream_name = "scaling.Hibernation.Decide"
 local_name    = "Hibernation::decide_at"
 file          = "src/hibernation.rs"
 
+[[functions]]
+upstream_name = "scalers.parseNewRelicMetadata"
+local_name    = "NewRelicScaler::from_metadata"
+file          = "src/newrelic_scaler.rs"
+
+[[functions]]
+upstream_name = "scalers.parseDynatraceMetadata"
+local_name    = "DynatraceScaler::from_metadata"
+file          = "src/dynatrace_scaler.rs"
+
+[[functions]]
+upstream_name = "scalers.parseSplunkMetadata"
+local_name    = "SplunkScaler::from_metadata"
+file          = "src/splunk_scaler.rs"
+
 # ── Mapped subsystems (Charter v2 [[mapped]] block) ─────────────────────────
 
 [[mapped]]
