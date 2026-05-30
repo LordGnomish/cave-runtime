@@ -13,6 +13,7 @@
 //! and is filtered before yielding rows. Cross-tenant leakage is the
 //! single most important correctness invariant.
 
+use crate::graphql_resolver::{GraphQlResolver, ObjectData};
 use crate::indexes::IndexSet;
 use crate::models::*;
 use std::collections::HashMap;
@@ -116,6 +117,52 @@ impl CrmStore {
             .collect();
         out.sort_by_key(|o| o.position);
         out
+    }
+
+    /// Snapshot the workspace's standard read objects into a
+    /// [`GraphQlResolver`] and execute a query. This is the runtime that
+    /// backs Twenty's auto-generated `findOne`/`findMany` resolvers
+    /// (`packages/twenty-server/.../workspace-resolver-builder/`) against
+    /// the in-memory store — every row is workspace-filtered before it
+    /// reaches the executor, preserving tenant isolation.
+    pub async fn graphql_query(&self, workspace_id: Uuid, query: &str) -> serde_json::Value {
+        let resolver = GraphQlResolver::new(self.graphql_objects(workspace_id).await);
+        resolver.execute(query)
+    }
+
+    async fn graphql_objects(&self, ws: Uuid) -> Vec<ObjectData> {
+        fn rows<T: serde::Serialize>(items: impl Iterator<Item = T>) -> Vec<serde_json::Value> {
+            items
+                .filter_map(|v| serde_json::to_value(v).ok())
+                .collect()
+        }
+        vec![
+            ObjectData::new(
+                "person",
+                "people",
+                rows(self.people.read().await.values().filter(|p| p.workspace_id == ws)),
+            ),
+            ObjectData::new(
+                "company",
+                "companies",
+                rows(self.companies.read().await.values().filter(|c| c.workspace_id == ws)),
+            ),
+            ObjectData::new(
+                "opportunity",
+                "opportunities",
+                rows(self.opportunities.read().await.values().filter(|o| o.workspace_id == ws)),
+            ),
+            ObjectData::new(
+                "note",
+                "notes",
+                rows(self.notes.read().await.values().filter(|n| n.workspace_id == ws)),
+            ),
+            ObjectData::new(
+                "task",
+                "tasks",
+                rows(self.tasks.read().await.values().filter(|t| t.workspace_id == ws)),
+            ),
+        ]
     }
 
     /// Convert a Lead → Company + Person + Opportunity. Mirrors the
@@ -297,6 +344,32 @@ mod tests {
         // Lead is now Converted.
         let stored = s.leads.read().await.get(&lead_id).cloned().unwrap();
         assert_eq!(stored.status, LeadStatus::Converted);
+    }
+
+    #[tokio::test]
+    async fn graphql_query_resolves_workspace_filtered_people() {
+        let s = CrmStore::new();
+        let ws1 = s.bootstrap_workspace("Acme").await;
+        let ws2 = s.bootstrap_workspace("Other").await;
+        let p1 = Person::new(ws1.id, "Ada", "Lovelace");
+        let p2 = Person::new(ws2.id, "Bob", "Smith");
+        s.people.write().await.insert(p1.id, p1.clone());
+        s.people.write().await.insert(p2.id, p2);
+
+        let out = s
+            .graphql_query(ws1.id, "{ people { edges { node { firstName } } totalCount } }")
+            .await;
+        // Only ws1's person is visible — tenant isolation holds.
+        assert_eq!(out["data"]["people"]["totalCount"], 1);
+        assert_eq!(
+            out["data"]["people"]["edges"][0]["node"]["firstName"],
+            "Ada"
+        );
+
+        let one = s
+            .graphql_query(ws1.id, &format!("{{ person(filter: {{id: \"{}\"}}) {{ firstName }} }}", p1.id))
+            .await;
+        assert_eq!(one["data"]["person"]["firstName"], "Ada");
     }
 
     #[tokio::test]
