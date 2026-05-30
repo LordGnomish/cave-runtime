@@ -31,6 +31,7 @@ pub mod secret;
 pub mod selfsigned_issuer;
 pub mod store;
 pub mod vault_issuer;
+pub mod webhook_dns;
 
 pub use error::{CertManagerError, CertManagerResult};
 pub use metrics::{AcmeRequestLabels, CertLabels, CertManagerMetrics};
