@@ -39,6 +39,8 @@ uuid.workspace = true
 # In-process dispatchers (eksik-sweep 2026-05-24):
 cave-bench = { path = "../../security/cave-bench" }
 cave-falco = { path = "../../security/cave-falco" }
+# OpenJarvis local-first agent surface (ADR-RUNTIME-OPENJARVIS-ADOPTION-001):
+cave-hermes = { path = "../../ai/cave-hermes" }
 
 [dev-dependencies]
 proptest = "1"

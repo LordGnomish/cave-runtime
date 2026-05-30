@@ -248,6 +248,12 @@ enum Commands {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
     },
+    /// Local-first OpenJarvis personal agent (info | backends | agents)
+    Agent {
+        /// Agent verb and arguments: info (default) | backends | agents
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
     /// Distributed key-value store (etcd v3 replacement; etcdctl parity)
     Etcd {
         #[command(subcommand)]
@@ -4295,6 +4301,13 @@ source_root = "src"
                 Ok(())
             }
         },
+
+        // ── OpenJarvis local-first agent ───────────────────────────────────────
+        Commands::Agent { args } => {
+            let store = cave_hermes::openjarvis::agent_state::AgentStateStore::default_root();
+            println!("{}", cave_hermes::cli::dispatch(&args, &store));
+            Ok(())
+        }
 
         // ── etcd ──────────────────────────────────────────────────────────────
         Commands::Etcd { cmd } => match cmd {

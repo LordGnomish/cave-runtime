@@ -2860,6 +2860,7 @@ dependencies = [
  "base64 0.22.1",
  "cave-bench",
  "cave-falco",
+ "cave-hermes",
  "chrono",
  "clap",
  "colored 2.2.0",
