@@ -69,6 +69,8 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         .route("/api/deploy/helm/resolve", post(resolve_helm_deps))
         // Sync-window evaluation (maintenance windows)
         .route("/api/deploy/sync-windows/evaluate", post(evaluate_sync_windows))
+        // Image-updater write-back (select new tag + compute overrides)
+        .route("/api/deploy/image-updater/select", post(image_updater_select))
         // Health
         .route("/api/deploy/health", get(health))
         .with_state(state)
@@ -397,6 +399,51 @@ async fn evaluate_sync_windows(
         "applicable_windows": applicable.len(),
         "active_window_indexes": active,
     }))
+}
+
+// ─── Image-updater write-back ─────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct ImageSelectReq {
+    /// Update strategy name (semver / newest-build / alphabetical / digest).
+    strategy: String,
+    /// Candidate tags (a Phase-2 registry client supplies these).
+    tags: Vec<ImageCandidate>,
+    constraint: Option<String>,
+    allow_tags: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ImageCandidate {
+    name: String,
+    #[serde(default)]
+    created: Option<i64>,
+}
+
+async fn image_updater_select(
+    State(_state): State<Arc<DeployState>>,
+    Json(req): Json<ImageSelectReq>,
+) -> Result<Json<serde_json::Value>, crate::DeployError> {
+    let strategy = crate::image_updater::UpdateStrategy::parse(&req.strategy)
+        .ok_or_else(|| crate::DeployError::Invalid(format!("unknown strategy '{}'", req.strategy)))?;
+    let candidates: Vec<crate::image_updater::CandidateTag> = req
+        .tags
+        .into_iter()
+        .map(|c| crate::image_updater::CandidateTag {
+            name: c.name,
+            created: c.created,
+        })
+        .collect();
+    let selected = crate::image_updater::select_tag(
+        strategy,
+        &candidates,
+        req.constraint.as_deref(),
+        req.allow_tags.as_deref(),
+    );
+    Ok(Json(serde_json::json!({
+        "selected_tag": selected,
+        "strategy": req.strategy,
+    })))
 }
 
 // ─── Webhook ─────────────────────────────────────────────────────────────────
