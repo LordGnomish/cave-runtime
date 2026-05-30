@@ -87,6 +87,37 @@ pub struct DeleteRequest {
     pub model: String,
 }
 
+/// Cite: `api/types.go::CreateRequest` (`POST /api/create`).
+///
+/// This is the *client* half of model authoring: it ships a serialized
+/// Modelfile to the server. The server-side blob/manifest write path stays an
+/// explicit scope-cut (owned by the registry/runtime). The deprecated
+/// `name`/`quantization` aliases are intentionally not surfaced.
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateRequest {
+    pub model: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub modelfile: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantize: Option<String>,
+}
+
+impl CreateRequest {
+    /// Build a `/api/create` request from a parsed [`Modelfile`], serializing
+    /// it back to canonical Modelfile text for the `modelfile` field.
+    ///
+    /// [`Modelfile`]: crate::modelfile::Modelfile
+    pub fn from_modelfile(
+        _model: impl Into<String>,
+        _mf: &crate::modelfile::Modelfile,
+    ) -> Self {
+        // RED placeholder — implemented in the GREEN commit.
+        unimplemented!("CreateRequest::from_modelfile")
+    }
+}
+
 /// Cite: `api/types.go::EmbedRequest` (`POST /api/embed`).
 #[derive(Debug, Clone, Serialize)]
 pub struct EmbedRequest {
@@ -219,6 +250,29 @@ impl<'a> OllamaLifecycle<'a> {
         Ok(response.json().await?)
     }
 
+    /// Cite: `api/types.go::CreateRequest` (`POST /api/create`) — ships a
+    /// serialized Modelfile to the server. Returns once the create stream
+    /// completes (the server emits NDJSON status frames; cave waits for the
+    /// terminal frame and surfaces transport/HTTP errors).
+    #[instrument(skip(self), fields(model = %req.model))]
+    pub async fn create(&self, req: CreateRequest) -> OllamaResult<()> {
+        let response = self
+            .client
+            .post(format!("{}/api/create", self.base_url))
+            .json(&req)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(OllamaError::Api { status, body });
+        }
+        // Drain the NDJSON status stream so the call is atomic from the
+        // caller's perspective.
+        let _ = response.bytes().await?;
+        Ok(())
+    }
+
     /// Cite: ollama/ollama `api/types.go::ListRunningResponse` (`GET /api/ps`).
     #[instrument(skip(self))]
     pub async fn list_running(&self) -> OllamaResult<Vec<RunningModel>> {
@@ -311,6 +365,55 @@ mod tests {
         let s: PullStatus = serde_json::from_str(raw).unwrap();
         assert_eq!(s.total, Some(100));
         assert_eq!(s.completed, Some(75));
+    }
+
+    #[test]
+    fn create_request_serializes_model_and_modelfile() {
+        let req = CreateRequest {
+            model: "mymodel".to_string(),
+            modelfile: "FROM base\n".to_string(),
+            stream: None,
+            quantize: None,
+        };
+        let s = serde_json::to_string(&req).unwrap();
+        assert!(s.contains("\"model\":\"mymodel\""), "got: {s}");
+        assert!(s.contains("\"modelfile\":\"FROM base\\n\""), "got: {s}");
+        // Optional fields omitted when unset.
+        assert!(!s.contains("stream"), "got: {s}");
+        assert!(!s.contains("quantize"), "got: {s}");
+    }
+
+    #[test]
+    fn create_request_includes_quantize_when_set() {
+        let req = CreateRequest {
+            model: "m".to_string(),
+            modelfile: String::new(),
+            stream: Some(false),
+            quantize: Some("Q4_K_M".to_string()),
+        };
+        let s = serde_json::to_string(&req).unwrap();
+        assert!(s.contains("\"quantize\":\"Q4_K_M\""), "got: {s}");
+        assert!(s.contains("\"stream\":false"), "got: {s}");
+        // Empty modelfile is omitted.
+        assert!(!s.contains("modelfile"), "got: {s}");
+    }
+
+    #[test]
+    fn create_request_from_parsed_modelfile_embeds_commands() {
+        let mf = crate::modelfile::Modelfile::parse(
+            "FROM base\nPARAMETER temperature 0.7\nSYSTEM be nice",
+        )
+        .unwrap();
+        let req = CreateRequest::from_modelfile("derived", &mf);
+        assert_eq!(req.model, "derived");
+        assert!(req.modelfile.contains("FROM base"), "got: {}", req.modelfile);
+        assert!(
+            req.modelfile.contains("PARAMETER temperature \"0.7\""),
+            "got: {}",
+            req.modelfile
+        );
+        assert!(req.modelfile.contains("SYSTEM \"be nice\""), "got: {}", req.modelfile);
+        assert!(req.stream.is_none());
     }
 
     #[test]
