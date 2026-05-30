@@ -223,6 +223,118 @@ pub fn reduce_series_mapped(
     mapper.map_output(reduced)
 }
 
+// ── resample — pkg/expr/mathexp/resample.go ─────────────────────────────────
+
+/// Upsampling strategy when a resample bucket has no source points.
+/// Mirrors `mathexp.Upsampler`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Upsampler {
+    /// Use the last seen value (`pad`).
+    Pad,
+    /// Backfill with the next available value (`backfilling`).
+    Backfill,
+    /// Do not fill — leave null (`fillna`).
+    FillNa,
+}
+
+impl Upsampler {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "pad" => Some(Upsampler::Pad),
+            "backfilling" => Some(Upsampler::Backfill),
+            "fillna" => Some(Upsampler::FillNa),
+            _ => None,
+        }
+    }
+}
+
+/// Resample a `(times, vals)` series onto a uniform grid from `from` to `to`
+/// at `interval`, downsampling multi-point buckets with `downsampler` and
+/// filling empty buckets with `upsampler`. Time units are arbitrary integers
+/// (e.g. seconds or nanoseconds), matching `Series.Resample`.
+#[allow(clippy::too_many_arguments)]
+pub fn resample(
+    times: &[i64],
+    vals: &[Option<f64>],
+    from: i64,
+    to: i64,
+    interval: i64,
+    downsampler: ReducerId,
+    upsampler: Upsampler,
+) -> Result<(Vec<i64>, Vec<Option<f64>>), String> {
+    if interval <= 0 {
+        return Err("resample interval must be positive".to_string());
+    }
+    let new_series_length = (to - from) / interval;
+    if new_series_length <= 0 {
+        return Err(
+            "the series cannot be sampled further; the time range is shorter than the interval"
+                .to_string(),
+        );
+    }
+    let len = times.len().min(vals.len());
+    let mut out_times = Vec::with_capacity((new_series_length + 1) as usize);
+    let mut out_vals = Vec::with_capacity((new_series_length + 1) as usize);
+
+    let mut bookmark = 0usize;
+    let mut last_seen: Option<f64> = None;
+    let mut idx: i64 = 0;
+    let mut t = from;
+    while t <= to && idx <= new_series_length {
+        let mut bucket: Vec<Option<f64>> = Vec::new();
+        let mut s_idx = bookmark;
+        loop {
+            if s_idx == len {
+                break;
+            }
+            let st = times[s_idx];
+            if st > t {
+                break;
+            }
+            bookmark += 1;
+            s_idx += 1;
+            last_seen = vals[s_idx - 1];
+            bucket.push(vals[s_idx - 1]);
+        }
+
+        let value: Option<f64> = if bucket.is_empty() {
+            // upsampling
+            match upsampler {
+                Upsampler::Pad => last_seen,
+                Upsampler::Backfill => {
+                    if s_idx == len {
+                        None
+                    } else {
+                        vals[s_idx]
+                    }
+                }
+                Upsampler::FillNa => None,
+            }
+        } else if bucket.len() == 1 {
+            bucket[0]
+        } else {
+            // downsampling
+            let v = match downsampler {
+                ReducerId::Sum => r_sum(&bucket),
+                ReducerId::Mean => r_avg(&bucket),
+                ReducerId::Min => r_min(&bucket),
+                ReducerId::Max => r_max(&bucket),
+                ReducerId::Last => r_last(&bucket),
+                other => {
+                    return Err(format!("downsampling {other:?} not implemented"));
+                }
+            };
+            Some(v)
+        };
+
+        out_times.push(t);
+        out_vals.push(value);
+        t += interval;
+        idx += 1;
+    }
+    Ok((out_times, out_vals))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
