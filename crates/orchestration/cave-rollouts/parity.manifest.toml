@@ -15,16 +15,16 @@ source_sha = "838d4e792be666ec11bd0c80331e0c5511b5010e"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.7097
-adr_justified_ratio = 1.0      # 9 scope_cuts (8 originals + pod-event-stream → parallel-track cave-controller-manager Informer/EventBroadcaster) + 9 skipped (8 originals + 1 formalized 2026-05-28) all ADR-justified
+honest_ratio        = 0.78125
+adr_justified_ratio = 1.0      # 7 skipped, all ADR-justified scope_cuts to sibling crates (cave-portal-ui / cave-metrics / cave-deploy / cave-gateway / cave-controller-manager). 2026-05-30: Traefik + Ambassador (first-party in-tree) reclassified scope_cut→mapped; AppMesh added as new in-tree mapped — Contour/Gloo stay scope_cut (genuinely out-of-tree plugins, not in v1.9.0 rollout/trafficrouting).
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 22
+mapped_count        = 25
 partial_count       = 0
-skipped_count       = 9
+skipped_count       = 7
 unmapped_count      = 0
-total               = 31
+total               = 32
 
 # 2026-05-24 close-out — claude/cave-rollouts-close-2026-05-24:
 #   * 10 src/ modules (~2 800 LOC), 42 lib + 9 self-audit PASS.
@@ -32,6 +32,18 @@ total               = 31
 #   * honest_ratio = (mapped + partial) / total          = 22 / 31           = 0.7097.
 #   * source_sha pinned to v1.9.0 commit 838d4e792be666ec11bd0c80331e0c5511b5010e.
 #   * 1 unmapped (pod-event-stream — live kubernetes watch) honestly Phase 2.
+#
+# 2026-05-30 honest-cont2 — claude/cave-rollouts-honest-cont2:
+#   * 3 strict-TDD traffic-router ports (in-tree argo-rollouts v1.9.0
+#     rollout/trafficrouting/{traefik,ambassador,appmesh}) as pure weight→patch
+#     reducers in src/traffic_router.rs, matching the existing Istio/SMI/NGINX/
+#     ALB/Apisix/Plugin shape; wired POST /api/rollouts/traffic/preview + cavectl.
+#   * Traefik + Ambassador: scope_cut(cave-gateway) → mapped (first-party in-tree,
+#     same reducer class already shipped). AppMesh: new in-tree mapped.
+#   * Contour + Gloo remain scope_cut — genuinely out-of-tree plugins (NOT present
+#     under rollout/trafficrouting in v1.9.0; map onto the Plugin provider).
+#   * honest_ratio = (mapped + partial) / total = 25 / 32 = 0.78125.
+#   * fill_ratio   = (25 + 0 + 7) / 32 = 1.0.
 
 [module]
 name        = "cave-rollouts"
@@ -148,6 +160,21 @@ name = "http-api-surface"
 upstream = "server/server.go (Rollout REST endpoints)"
 note = "axum router /api/rollouts {list,get,promote,abort,pause,resume,retry,restart} — 8 endpoints; src/routes.rs."
 
+[[mapped]]
+name = "traffic-router-traefik"
+upstream = "rollout/trafficrouting/traefik (TraefikService SetWeight)"
+note = "Pure weight→patch reducer: TraefikService (traefik.io/v1alpha1), spec.weighted.services[{name,weight}] canary=desired/stable=100-desired; src/traffic_router.rs. First-party in-tree provider (was scope_cut cave-gateway — reclassified, same reducer class as Istio/SMI/NGINX/ALB)."
+
+[[mapped]]
+name = "traffic-router-ambassador"
+upstream = "rollout/trafficrouting/ambassador (Mapping buildCanaryMapping)"
+note = "Pure reducer: clones base Mapping (getambassador.io/v2) into <name>-canary, repoints spec.service→canary, spec.weight=desired; src/traffic_router.rs. First-party in-tree provider (was scope_cut cave-gateway — reclassified)."
+
+[[mapped]]
+name = "traffic-router-appmesh"
+upstream = "rollout/trafficrouting/appmesh (VirtualRouter SetWeight)"
+note = "Pure reducer: VirtualRouter (appmesh.k8s.aws/v1beta2), spec.routes[].httpRoute.action.weightedTargets[] keyed by virtualNodeRef.name; src/traffic_router.rs. First-party in-tree provider, previously untracked — new mapped item."
+
 [[scope_cuts]]
 group = "cave-portal-ui"
 reason = "Argo Rollouts Dashboard React app (~25k LOC) maps onto cave-portal-ui. cave-rollouts exposes JSON only."
@@ -165,8 +192,8 @@ items = ["live-kubernetes-apply"]
 
 [[scope_cuts]]
 group = "cave-gateway"
-reason = "Traefik / Contour / Ambassador / Gloo traffic providers belong in cave-gateway alongside the gateway runtime — cave-rollouts ships the six providers Argo Rollouts treats as first-party (Istio, SMI, NGINX, ALB, Apisix, Plugin)."
-items = ["traefik-traffic-provider", "contour-traffic-provider", "ambassador-traffic-provider", "gloo-traffic-provider"]
+reason = "Contour + Gloo traffic providers are out-of-tree Argo Rollouts plugins (NOT present under rollout/trafficrouting in v1.9.0 — they ship as argoproj-labs trafficrouter plugins); they map onto the generic Plugin provider / cave-gateway. The nine first-party in-tree providers (Istio, SMI, NGINX, ALB, Apisix, Plugin, Traefik, Ambassador, AppMesh) are all mapped reducers in src/traffic_router.rs. 2026-05-30: Traefik + Ambassador moved scope_cut→mapped after confirming they are in-tree in v1.9.0."
+items = ["contour-traffic-provider", "gloo-traffic-provider"]
 
 # ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
 # pod-event-stream was already adr_justified=true with category =

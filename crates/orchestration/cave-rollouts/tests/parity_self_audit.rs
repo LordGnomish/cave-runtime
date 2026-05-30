@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-28";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v1.9.0";
 const PINNED_SHA: &str = "838d4e792be666ec11bd0c80331e0c5511b5010e";
@@ -211,6 +211,18 @@ fn assertion_9_rollouts_surface_intact() {
         TrafficProvider::Plugin {
             plugin_name: "p".into(),
             config: serde_json::json!({}),
+        },
+        TrafficProvider::Traefik {
+            traefik_service: "ts".into(),
+            namespace: "ns".into(),
+        },
+        TrafficProvider::Ambassador {
+            mapping: "m".into(),
+            namespace: "ns".into(),
+        },
+        TrafficProvider::AppMesh {
+            virtual_router: "vr".into(),
+            namespace: "ns".into(),
         },
     ] {
         let patch = render_patch(&p, &split, "stable", "canary");
