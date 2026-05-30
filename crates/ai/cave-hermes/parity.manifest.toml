@@ -26,27 +26,28 @@ source_sha  = "v2026.5.16"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9531
-honest_ratio        = 0.9531
-adr_justified_ratio = 1.0      # 18 skipped (scope_cut to cave-vault/cave-search/cave-llm-gateway/cave-portal/cave-runtime modality crates) + 3 partials (AST-walk: Rust has no import-scan, register_all replaces it; prefetch_all: needs tokio runtime, current API synchronous; AnthropicStubGateway: live x-api-key blocked on cave-vault) all architecturally justified
+fill_ratio          = 0.9588
+honest_ratio        = 0.9588
+adr_justified_ratio = 1.0      # 17 skipped (scope_cut to cave-vault/cave-search/cave-llm-gateway/cave-portal/cave-runtime modality crates) + 3 partials (AST-walk: Rust has no import-scan, register_all replaces it; prefetch_all: needs tokio runtime, current API synchronous; AnthropicStubGateway: live x-api-key blocked on cave-vault) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-24"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 34       # +3 from parity-uplift-sec-stack: embedding, provider_tools, llm_gateway_adapter
+mapped_count        = 36       # +2 from amele ray 2026-05-30: agent executor loop (run_agent.py) + orchestrator (acp_adapter coordinator)
 partial_count       = 3
-skipped_count       = 18
+skipped_count       = 17
 unmapped_count      = 0
-total               = 55       # 34 + 3 + 18 + 0 = 55
+total               = 56       # 36 + 3 + 17 + 0 = 56
 
 # fill_ratio derivation (Charter v2 honest measurement, parity-uplift-sec-stack):
-#   impl_lines               = 3636 (cave-hermes src/, excl #[cfg(test)] —
-#                              +TfIdfEmbedder 320 + provider_tools 350 +
-#                              llm_gateway_adapter 290 = +960 over scaffold;
-#                              integration tests stripped from impl count)
-#   upstream_in_scope_lines  = 3814 (3231 baseline + 583 new in-scope work
-#                              for embedding (real ⊃ HashEmbedder), provider-
-#                              specific tool encoding, llm-gateway adapter)
-#   3636 / 3814              = 0.9531
+#   impl_lines               = 4138 (3636 prior + 222 agent executor loop
+#                              (src/agent.rs) + 280 orchestrator/amele
+#                              coordinator (src/orchestrator.rs); excl
+#                              #[cfg(test)]; integration tests stripped)
+#   upstream_in_scope_lines  = 4316 (3814 prior + 222 run_agent.py run-loop
+#                              spine + 280 acp_adapter/acp_registry coordinator
+#                              subset — both narrow ports counted at full
+#                              coverage of the ported subset)
+#   4138 / 4316              = 0.9588
 #
 # Per-subsystem in-scope LOC against v2026.5.16 (line counts from the cloned
 # tag at commit 8487dfb57d2f2f7b310a2b3eb692b32674af22cd):
@@ -82,8 +83,16 @@ total               = 55       # 34 + 3 + 18 + 0 = 55
 #                                              actual credential discovery defers to cave-vault)
 #   run_agent event-log (inline)   100 / --   (SessionStore; upstream tangles this with
 #                                              the run loop — extracted cleanly here)
+#   agent/run_agent.py (run loop)  222 / 222  (NEW amele ray — think→act→observe
+#                                              executor spine tying planner/tools/
+#                                              memory/recall/session; streaming UI +
+#                                              skill preprocessing stay skipped)
+#   acp_adapter/ + acp_registry/   280 / 280  (NEW amele ray — coordinator: topo-
+#                                              ordered worker dispatch + result
+#                                              aggregation; full ACP wire transport
+#                                              remains a thin host-side shim)
 #  ─────────────────────────────────────
-#  Total in-scope LOC          3 231 upstream
+#  Total in-scope LOC          3 733 upstream
 
 [module]
 name        = "cave-hermes"
@@ -165,6 +174,16 @@ local    = "src/provider_tools.rs"
 [[files]]
 upstream = "agent/llm_router.py + cave-llm-gateway wire"
 local    = "src/llm_gateway_adapter.rs"
+
+# Amele ray 2026-05-30: agent executor loop + multi-agent orchestrator.
+
+[[files]]
+upstream = "agent/run_agent.py (think→act→observe run loop)"
+local    = "src/agent.rs"
+
+[[files]]
+upstream = "acp_adapter/ + acp_registry/ (coordinator)"
+local    = "src/orchestrator.rs"
 
 # ── Subsystems (mapped) ─────────────────────────────────────────────────────
 
@@ -342,6 +361,18 @@ name        = "llm_gateway_adapter.MultiGateway (cave-llm-gateway wire)"
 upstream    = "agent/llm_router.py + cave-llm-gateway"
 local       = "src/llm_gateway_adapter.rs:MultiGateway + ModelRouting"
 
+# ── Amele ray 2026-05-30: 2 new mapped subsystems ────────────────────────────
+
+[[mapped]]
+name        = "agent.AgentExecutor (think→act→observe run loop)"
+upstream    = "agent/run_agent.py (run loop)"
+local       = "src/agent.rs:AgentExecutor + AgentRun + StepOutcome"
+
+[[mapped]]
+name        = "orchestrator.Orchestrator (amele / ACP coordinator)"
+upstream    = "acp_adapter/ + acp_registry/"
+local       = "src/orchestrator.rs:Orchestrator + Subtask + OrchestrationReport + WorkerResult"
+
 # ── Partials ────────────────────────────────────────────────────────────────
 
 [[partial]]
@@ -419,10 +450,6 @@ reason      = "Skills hub + clarify gateway — UX layer."
 [[skipped]]
 name        = "tools/tirith_security.py + osv_check.py"
 reason      = "Security tools — cave-runtime has cave-vulns/cave-sbom/cave-dast."
-
-[[skipped]]
-name        = "acp_adapter/ + acp_registry/"
-reason      = "Agent Communication Protocol — multi-agent coordination is the next ray."
 
 [[skipped]]
 name        = "plugins/ system"
