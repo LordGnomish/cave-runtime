@@ -9,6 +9,7 @@
 //! Upstream: grafana/oncall v1.10.0
 
 pub mod engine;
+pub mod grouping;
 pub mod models;
 pub mod oncall;
 pub mod routes;
