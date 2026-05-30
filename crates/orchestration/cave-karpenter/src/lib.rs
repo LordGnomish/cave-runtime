@@ -29,6 +29,7 @@
 pub mod batcher;
 pub mod binpack;
 pub mod budgets;
+pub mod cron;
 pub mod disruption;
 pub mod drain;
 pub mod duration;

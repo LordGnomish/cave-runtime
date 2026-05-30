@@ -159,6 +159,12 @@ local    = "src/nodepool_validation.rs"
 upstream = "pkg/apis/v1/duration.go"
 local    = "src/duration.rs"
 
+# Budget.IsActive (nodepool.go) delegates to robfig/cron/v3 ParseStandard +
+# SpecSchedule.Next; that engine is ported (MIT upstream, see NOTICE).
+[[files]]
+upstream = "vendor/github.com/robfig/cron/v3 (Budget.IsActive engine)"
+local    = "src/cron.rs"
+
 [[files]]
 upstream = "pkg/controllers/provisioning/batcher/batcher.go"
 local    = "src/batcher.rs"

@@ -147,6 +147,7 @@ MIT:
   - microsoft/presidio
   - nobl9/nobl9-go
   - ollama/ollama
+  - robfig/cron            (cave-karpenter; v3 — Budget.IsActive cron engine)
   - twisted/towncrier
 
 MPL-2.0:
