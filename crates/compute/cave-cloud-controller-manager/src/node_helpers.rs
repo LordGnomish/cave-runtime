@@ -170,8 +170,7 @@ impl Taint {
 
 /// `taintExists` — linear search by `MatchTaint`.
 pub fn taint_exists(taints: &[Taint], taint: &Taint) -> bool {
-    let _ = (taints, taint);
-    unimplemented!("RED: taint_exists")
+    taints.iter().any(|t| t.match_taint(taint))
 }
 
 /// `addOrUpdateTaint` — returns the new taint list and whether the node changed.
@@ -179,22 +178,52 @@ pub fn taint_exists(taints: &[Taint], taint: &Taint) -> bool {
 /// (`false`); if it matches but differs → replaced (`true`); if no match → the
 /// taint is appended (`true`).
 pub fn add_or_update_taint(taints: &[Taint], taint: &Taint) -> (Vec<Taint>, bool) {
-    let _ = (taints, taint);
-    unimplemented!("RED: add_or_update_taint")
+    let mut new_taints: Vec<Taint> = Vec::new();
+    let mut updated = false;
+    for existing in taints {
+        if taint.match_taint(existing) {
+            if taint == existing {
+                // Fully equal — node unchanged.
+                return (taints.to_vec(), false);
+            }
+            new_taints.push(taint.clone());
+            updated = true;
+            continue;
+        }
+        new_taints.push(existing.clone());
+    }
+    if !updated {
+        new_taints.push(taint.clone());
+    }
+    (new_taints, true)
 }
 
 /// `deleteTaint` — drop every taint matching `(key,effect)`; returns the list
 /// and whether anything was deleted.
 pub fn delete_taint(taints: &[Taint], taint_to_delete: &Taint) -> (Vec<Taint>, bool) {
-    let _ = (taints, taint_to_delete);
-    unimplemented!("RED: delete_taint")
+    let mut new_taints: Vec<Taint> = Vec::new();
+    let mut deleted = false;
+    for t in taints {
+        if taint_to_delete.match_taint(t) {
+            deleted = true;
+            continue;
+        }
+        new_taints.push(t.clone());
+    }
+    (new_taints, deleted)
 }
 
 /// `removeTaint` — no-op (`false`) when the list is empty or the taint is
 /// absent; otherwise deletes it and reports `true`.
 pub fn remove_taint(taints: &[Taint], taint: &Taint) -> (Vec<Taint>, bool) {
-    let _ = (taints, taint);
-    unimplemented!("RED: remove_taint")
+    if taints.is_empty() {
+        return (taints.to_vec(), false);
+    }
+    if !taint_exists(taints, taint) {
+        return (taints.to_vec(), false);
+    }
+    let (new_taints, _) = delete_taint(taints, taint);
+    (new_taints, true)
 }
 
 #[cfg(test)]
