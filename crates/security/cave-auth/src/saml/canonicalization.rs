@@ -452,4 +452,45 @@ mod tests {
         let out = exc_c14n("<a>héllo wörld 你好</a>".as_bytes()).unwrap();
         assert_eq!(out, "<a>héllo wörld 你好</a>".as_bytes());
     }
+
+    // ── Cycle 1: W3C Canonical XML escaping (Canonical XML 1.0
+    // §Processing Model, inherited by exc-c14n). ──────────────
+
+    #[test]
+    fn text_escapes_amp_lt_gt() {
+        // In character data, `&`, `<`, and `>` are escaped; `>`
+        // is escaped even though XML only *requires* it after
+        // `]]`. (Canonical XML always escapes it.)
+        let out = exc_c14n(b"<a>1 &lt; 2 &amp; 3 &gt; 0</a>").unwrap();
+        assert_eq!(out, b"<a>1 &lt; 2 &amp; 3 &gt; 0</a>");
+    }
+
+    #[test]
+    fn text_carriage_return_becomes_char_ref() {
+        // A literal CR (#xD) in text content is emitted as
+        // `&#xD;` so the signed bytes survive line-ending
+        // mangling. Tab and LF in text are NOT escaped.
+        let out = exc_c14n(b"<a>x\r\n\ty</a>").unwrap();
+        assert_eq!(out, "<a>x&#xD;\n\ty</a>".as_bytes());
+    }
+
+    #[test]
+    fn attr_value_escapes_quote_amp_lt_but_not_gt() {
+        // Attribute values escape `"`, `&`, `<`; `>` is left
+        // literal in attribute values (Canonical XML §2.3).
+        let out = exc_c14n(br#"<a x="&quot;&amp;&lt;>" />"#).unwrap();
+        let s = std::str::from_utf8(&out).unwrap();
+        assert_eq!(s, r#"<a x="&quot;&amp;&lt;>"></a>"#, "got: {s}");
+    }
+
+    #[test]
+    fn attr_value_whitespace_chars_become_char_refs() {
+        // #x9 (tab), #xA (LF), #xD (CR) inside an attribute value
+        // are emitted as character references — the canonical
+        // form prevents whitespace-collapsing attribute-value
+        // normalization from changing the signed bytes.
+        let out = exc_c14n("<a x=\"p\tq\nr\rs\" />".as_bytes()).unwrap();
+        let s = std::str::from_utf8(&out).unwrap();
+        assert_eq!(s, "<a x=\"p&#x9;q&#xA;r&#xD;s\"></a>", "got: {s}");
+    }
 }
