@@ -49,6 +49,33 @@ pub enum ShutdownState {
     Forced,
 }
 
+/// What the daemon loop should do at the top of an iteration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoopAction {
+    /// Process one scheduler tick, then re-evaluate.
+    Tick,
+    /// Finish the in-flight item (already returned from `do_tick`), then exit.
+    DrainAndStop,
+    /// Abort immediately without waiting for another tick.
+    StopNow,
+}
+
+/// Pure decision table mapping the current shutdown state (and whether the
+/// stop-signal file is present) to the next [`LoopAction`].
+///
+/// * `Forced`                  → [`LoopAction::StopNow`]
+/// * `Draining(_)`             → [`LoopAction::DrainAndStop`]
+/// * `Running` + stop-file     → [`LoopAction::DrainAndStop`] (graceful)
+/// * `Running` + no stop-file  → [`LoopAction::Tick`]
+pub fn loop_action(state: ShutdownState, stop_file_present: bool) -> LoopAction {
+    match state {
+        ShutdownState::Forced => LoopAction::StopNow,
+        ShutdownState::Draining(_) => LoopAction::DrainAndStop,
+        ShutdownState::Running if stop_file_present => LoopAction::DrainAndStop,
+        ShutdownState::Running => LoopAction::Tick,
+    }
+}
+
 // State is packed into a single atomic byte so a cloned controller shared with
 // the async signal-listener task observes requests without a lock.
 const STATE_RUNNING: u8 = 0;
@@ -150,6 +177,12 @@ impl ShutdownController {
     /// The reason recorded by the first request, if any.
     pub fn reason(&self) -> Option<ShutdownReason> {
         decode_reason(self.inner.reason.load(Ordering::SeqCst))
+    }
+
+    /// The [`LoopAction`] the daemon loop should take given the live state and
+    /// whether the stop-signal file is currently present on disk.
+    pub fn next_action(&self, stop_file_present: bool) -> LoopAction {
+        loop_action(self.state(), stop_file_present)
     }
 }
 
