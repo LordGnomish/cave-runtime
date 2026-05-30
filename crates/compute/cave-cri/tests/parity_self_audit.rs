@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v2.2.3";
 const FLOOR_FILL_RATIO: f64 = 0.95;
-const FLOOR_MAPPED: usize = 20;
+const FLOOR_MAPPED: usize = 21;
 const FLOOR_RS_FILES: usize = 42;
 
 fn manifest_text() -> String {
@@ -111,13 +111,13 @@ fn parity_honest_ratio_does_not_exceed_fill() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_24() {
+fn parity_last_audit_is_2026_05_30() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-24"),
-        "[parity] last_audit must reflect the 2026-05-24 line-by-line uplift ray close-out"
+        Some("2026-05-30"),
+        "[parity] last_audit must reflect the 2026-05-30 honest uplift (core/diff production path)"
     );
 }
 

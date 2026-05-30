@@ -23,6 +23,19 @@
 #   * 4-track: Backend cave-cri lib (new oom_watcher + introspection
 #     modules) + Portal /admin/cri/ + cavectl CriCmd + observability —
 #     all green.
+#
+# 2026-05-30 HONEST UPLIFT — honest_ratio 0.9118 → 0.9412.
+#   * core/diff/ [[partial]] → [[mapped]]: the double-tree Diff
+#     *production* path (Compare half of core/diff/walking/differ.go on
+#     continuity/fs.Changes) is now ported in src/diff/producer.rs —
+#     compute_changes() merge-walk + write_diff_tar() (archive.WriteDiff
+#     whiteouts) + diff_layer() (gzip + diff_id). Round-trips against the
+#     Apply side. Wired POST /api/cri/diff + cavectl `cri diff` + portal
+#     Layer-diff panel. Strict TDD: 10 integ + 3 unit tests.
+#   * Counts: mapped 20→21, partial 3→2, skipped 11, total 34,
+#     fill_ratio = (21+2+11)/34 = 1.0000, honest_ratio = (21+11)/34
+#     ≈ 0.9412. The two remaining partials (core/content/ + core/leases/)
+#     keep their honest boltdb-persistence scope cut.
 
 [upstream]
 org        = "containerd"
@@ -44,16 +57,16 @@ notes      = "OCI runtime spec generation + cgroup v2 writer — see libcontaine
 # measured value: containerd v2.2.x pkg/cri/* + core/* + plugins/*
 # packages enumerated and classified honestly.
 # See docs/parity/cave-cri-port-2026-05-12.md for methodology.
-mapped_count   = 20
-partial_count  = 3
+mapped_count   = 21
+partial_count  = 2
 skipped_count  = 11
 unmapped_count = 0
 total          = 34
 fill_ratio     = 1.0000
-honest_ratio   = 0.9118
+honest_ratio   = 0.9412
 adr_justified_ratio = 1.0      # 11 skipped (cmd/containerd + cmd/ctr CLI + containerd-shim wire-format + protobuf API + transfer/sandbox plugins + go events + stdlib analogs + plugin registry + vendor/) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
@@ -205,10 +218,10 @@ upstream_pkg = "core/content/"
 local_files  = ["src/content/mod.rs", "src/content/digest.rs", "src/content/store.rs", "src/content/writer.rs"]
 note         = "Content-addressable store (CAS): Digest parsing for sha256/384/512, filesystem-backed LocalStore with <root>/blobs/<alg>/<hex> layout matching containerd, streaming Writer with on-the-fly hashing and rename-on-commit. Scope cuts (honest): no boltdb metadata persistence (in-memory index rebuilds via directory walk on open) and no cross-process locking (single-process cave-cri invariant)."
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "core/diff/"
-local_files  = ["src/diff/mod.rs", "src/diff/walking_differ.rs", "src/diff/compression.rs"]
-note         = "Layer apply (read side): gzip decompress + tar unpack honoring OCI whiteouts (.wh.<name> + .wh..wh..opq) and path-escape rejection. Compression helpers (compress_gzip / compute_diff_id) match the upstream diff-id convention (sha256 of *uncompressed* tar). Scope cut: the double-tree Diff *production* path (snapshot Δ → tarball) is still left to overlayfs at mount time."
+local_files  = ["src/diff/mod.rs", "src/diff/walking_differ.rs", "src/diff/compression.rs", "src/diff/producer.rs"]
+note         = "k8s-cri parity uplift 2026-05-30: BOTH diff directions now in place. Apply (read side) — gzip decompress + tar unpack honoring OCI whiteouts (.wh.<name> + .wh..wh..opq) + path-escape rejection (walking_differ.rs). Compress + diff-id (sha256 of *uncompressed* tar) per upstream convention (compression.rs). The prior scope cut — the double-tree Diff *production* path (the `Compare` half of core/diff/walking/differ.go layered on continuity/fs.Changes) — is now ported in src/diff/producer.rs: compute_changes() merge-walks lower vs upper in lexical order (deleted dir = single whiteout subsuming the subtree, added dir recurses), write_diff_tar() serialises Add/Modify (upper bytes / dir header / symlink) + Delete (.wh.<name>) per archive.WriteDiff, and diff_layer() returns the gzipped layer + diff_id + change set. Round-trip invariant verified against the Apply side: apply(write_diff_tar(lower,upper), copy(lower)) == upper. Wired POST /api/cri/diff + cavectl `cri diff`. 10 integ + 3 unit tests."
 
 [[partial]]
 upstream_pkg = "core/leases/"
