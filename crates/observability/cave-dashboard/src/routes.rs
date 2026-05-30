@@ -172,6 +172,9 @@ pub fn create_router(state: AppState) -> Router {
             "/api/folders/{uid}",
             get(get_folder).put(update_folder).delete(delete_folder),
         )
+        .route("/api/folders/{uid}/parents", get(folder_parents))
+        .route("/api/folders/{uid}/children", get(folder_children))
+        .route("/api/folders/{uid}/move", post(folder_move))
         .route(
             "/api/folders/{uid}/permissions",
             get(get_folder_permissions).post(set_folder_permissions),
@@ -747,6 +750,109 @@ async fn ds_query(State(state): State<AppState>, Json(req): Json<DsQueryRequest>
     }
 
     Json(response).into_response()
+}
+
+// ─── Nested folder service (Grafana pkg/services/folder) ───────────────────────
+
+/// Build a [`crate::folder_service::FolderTree`] snapshot from the store's
+/// folders for the given org.
+fn build_folder_tree(state: &AppState, org_id: i64) -> crate::folder_service::FolderTree {
+    use crate::folder_service::FolderTree;
+    let mut tree = FolderTree::new();
+    let mut folders = state.store.list_folders(org_id).unwrap_or_default();
+    // Insert parents before children so create() validation succeeds; a
+    // topological pass keyed on whether the parent is already present.
+    let mut remaining: Vec<_> = folders.drain(..).collect();
+    let mut guard = 0;
+    while !remaining.is_empty() && guard <= remaining.len() + 1 {
+        let mut progressed = false;
+        let mut next = Vec::new();
+        for f in remaining.drain(..) {
+            let parent = f.parent_uid.as_deref().filter(|p| !p.is_empty());
+            let ready = match parent {
+                None => true,
+                Some(p) => tree.get(p).is_some(),
+            };
+            if ready && tree.create(&f.uid, &f.title, parent).is_ok() {
+                progressed = true;
+            } else {
+                next.push(f);
+            }
+        }
+        remaining = next;
+        if !progressed {
+            break;
+        }
+        guard += 1;
+    }
+    tree
+}
+
+#[derive(serde::Deserialize)]
+struct MoveFolderRequest {
+    #[serde(default, rename = "parentUid")]
+    parent_uid: Option<String>,
+}
+
+/// `GET /api/folders/{uid}/parents` — ancestors root-first.
+async fn folder_parents(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
+    let tree = build_folder_tree(&state, 1);
+    if tree.get(&uid).is_none() {
+        return (axum::http::StatusCode::NOT_FOUND, "folder not found").into_response();
+    }
+    let parents: Vec<_> = tree.get_parents(&uid).into_iter().cloned().collect();
+    Json(serde_json::json!({
+        "uid": uid,
+        "parents": parents,
+        "fullpath": tree.fullpath(&uid),
+        "fullpathUids": tree.fullpath_uids(&uid),
+    }))
+    .into_response()
+}
+
+/// `GET /api/folders/{uid}/children` — direct children.
+async fn folder_children(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
+    let tree = build_folder_tree(&state, 1);
+    if tree.get(&uid).is_none() {
+        return (axum::http::StatusCode::NOT_FOUND, "folder not found").into_response();
+    }
+    let children: Vec<_> = tree.get_children(Some(&uid)).into_iter().cloned().collect();
+    Json(serde_json::json!({ "uid": uid, "children": children })).into_response()
+}
+
+/// `POST /api/folders/{uid}/move` — reparent with depth + circular validation.
+async fn folder_move(
+    State(state): State<AppState>,
+    Path(uid): Path<String>,
+    Json(req): Json<MoveFolderRequest>,
+) -> Response {
+    let mut tree = build_folder_tree(&state, 1);
+    let new_parent = req.parent_uid.as_deref().filter(|p| !p.is_empty());
+    match tree.move_folder(&uid, new_parent) {
+        Ok(()) => match state.store.set_folder_parent(&uid, new_parent) {
+            Ok(folder) => Json(folder).into_response(),
+            Err(e) => store_err(e),
+        },
+        Err(e) => {
+            use crate::folder_service::FolderError;
+            let (code, msg) = match e {
+                FolderError::NotFound => (axum::http::StatusCode::NOT_FOUND, "folder not found"),
+                FolderError::CircularReference => {
+                    (axum::http::StatusCode::BAD_REQUEST, "circular reference detected")
+                }
+                FolderError::MaximumDepthReached => {
+                    (axum::http::StatusCode::BAD_REQUEST, "maximum nested folder depth reached")
+                }
+                FolderError::ParentNotFound => {
+                    (axum::http::StatusCode::BAD_REQUEST, "parent folder not found")
+                }
+                FolderError::AlreadyExists => {
+                    (axum::http::StatusCode::CONFLICT, "folder already exists")
+                }
+            };
+            (code, msg).into_response()
+        }
+    }
 }
 
 // ─── Server-side expressions (Grafana __expr__ datasource) ─────────────────────

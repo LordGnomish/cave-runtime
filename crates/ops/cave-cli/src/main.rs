@@ -586,6 +586,24 @@ enum DashboardCmd {
         #[arg(long)]
         request: String,
     },
+    /// List a nested folder's ancestors (root-first) + full path.
+    FolderParents {
+        /// Folder UID.
+        uid: String,
+    },
+    /// List a nested folder's direct children.
+    FolderChildren {
+        /// Folder UID.
+        uid: String,
+    },
+    /// Move a nested folder to a new parent (depth + circular validated).
+    FolderMove {
+        /// Folder UID to move.
+        uid: String,
+        /// New parent folder UID (omit for root).
+        #[arg(long)]
+        parent: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4733,6 +4751,19 @@ source_root = "src"
             DashboardCmd::Expr { request } => {
                 let body: serde_json::Value = serde_json::from_str(&request)?;
                 c.post("/api/ds/query/expr", body).await
+            }
+            DashboardCmd::FolderParents { uid } => {
+                c.get(&format!("/api/folders/{uid}/parents")).await
+            }
+            DashboardCmd::FolderChildren { uid } => {
+                c.get(&format!("/api/folders/{uid}/children")).await
+            }
+            DashboardCmd::FolderMove { uid, parent } => {
+                c.post(
+                    &format!("/api/folders/{uid}/move"),
+                    json!({ "parentUid": parent }),
+                )
+                .await
             }
         },
         Commands::Deploy { cmd } => match cmd {

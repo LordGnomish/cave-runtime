@@ -579,6 +579,20 @@ impl DashboardStore {
         Ok(folder.clone())
     }
 
+    /// Reparent a folder (used by the nested-folder move operation).
+    /// `None` moves it to the root.
+    pub fn set_folder_parent(&self, uid: &str, parent_uid: Option<&str>) -> StoreResult<Folder> {
+        let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
+        let folder = inner
+            .folders
+            .get_mut(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))?;
+        folder.parent_uid = parent_uid.map(str::to_string);
+        folder.version += 1;
+        folder.updated = Utc::now();
+        Ok(folder.clone())
+    }
+
     pub fn delete_folder(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let f = inner
