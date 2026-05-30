@@ -10,6 +10,7 @@ pub mod engine;
 pub mod executor;
 pub mod models;
 pub mod routes;
+pub mod selector;
 pub mod store;
 pub mod workflow;
 pub mod schedule;
