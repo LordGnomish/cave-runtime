@@ -20,3 +20,6 @@
 //!
 //! Each layer is line-ported from the corresponding Alloy Go package under a
 //! strict RED→GREEN TDD discipline; see `tests/alloy_*_tdd.rs`.
+
+/// Lexical tokens of the Alloy configuration syntax (`syntax/token`).
+pub mod token;
