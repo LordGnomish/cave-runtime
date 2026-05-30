@@ -1,6 +1,8 @@
 # parity.manifest.toml — cave-uptime
 # Upstream: louislam/uptime-kuma  https://github.com/louislam/uptime-kuma
 # Charter v2 honest close — 2026-05-28
+# 2026-05-30 honest uplift — line-ported the maintenance-window evaluation
+#   engine (server/model/maintenance.js) via strict TDD: 1 skip -> mapped.
 
 [upstream]
 org        = "louislam"
@@ -16,17 +18,19 @@ url        = "https://github.com/louislam/uptime-kuma"
 # 2026-05-28 honest close — implemented real HTTP/TCP/DNS/Push probes, scheduler,
 # heartbeat history, window stats (24h/7d/30d), status page, retry, CRUD routes;
 # ADR-justified 8 sibling/out-of-scope cuts.
+# 2026-05-30 — maintenance-window evaluation engine ported (skipped -> mapped),
+#   now 14 mapped / 6 skipped of 20 -> honest_ratio 0.70.
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.65
+honest_ratio        = 0.7
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 13
+mapped_count        = 14
 partial_count       = 0
-skipped_count       = 7
+skipped_count       = 6
 unmapped_count      = 0
 total               = 20
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 # ── Mapped surfaces ──────────────────────────────────────────────────────────
@@ -96,6 +100,17 @@ area    = "Uptime stats engine"
 detail  = "calculate_stats, failed_results, is_below_threshold from probe result slices"
 file    = "src/engine.rs"
 
+[[mapped]]
+# 2026-05-30 strict-TDD: line-ported from server/model/maintenance.js
+# (calcDuration / getStatus / isUnderMaintenance / getDayOfWeekList /
+#  recurring-strategy window evaluation). DB persistence + croner + socket
+# fan-out stay out of crate; pure time/calendar evaluation is in-crate.
+area    = "Maintenance window scheduling"
+detail  = "Maintenance engine: manual/single/recurring-{interval,weekday,day-of-month} strategies, calc_duration (cross-midnight +24h), get_status (inactive/scheduled/ended/under-maintenance), is_active_at window check, is_under_maintenance"
+file    = "src/maintenance.rs"
+local   = "src/maintenance.rs"
+note    = "Port of Uptime Kuma server/model/maintenance.js evaluation logic; 15 TDD tests in tests/maintenance_tdd.rs"
+
 # ── Skipped surfaces (ADR-justified scope cuts) ───────────────────────────────
 
 [[skipped]]
@@ -128,15 +143,12 @@ area   = "Real-time WebSocket event push"
 reason = "out-of-launch-scope — WebSocket server-push requires dedicated event bus; deferred to Phase 2"
 adr    = "ADR-RUNTIME-PARITY-100-PCT-001 §out-of-launch-scope"
 
-[[skipped]]
-area   = "Maintenance window scheduling"
-reason = "out-of-launch-scope — calendar-based maintenance windows deferred to Phase 2"
-adr    = "ADR-RUNTIME-PARITY-100-PCT-001 §out-of-launch-scope"
-
 [module]
 name        = "cave-uptime"
 description = "Uptime monitoring — Uptime Kuma replacement"
 source_root = "src"
+rs_files    = 11
+rs_loc      = 2334
 
 [portal_ui]
 upstream_ui  = "Uptime Kuma"

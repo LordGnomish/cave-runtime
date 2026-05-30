@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 pub mod engine;
 pub mod history;
+pub mod maintenance;
 pub mod models;
 pub mod probe;
 pub mod retry;
