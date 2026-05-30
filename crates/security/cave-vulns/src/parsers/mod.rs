@@ -52,6 +52,7 @@ pub fn registry() -> Vec<Box<dyn ScanParser>> {
         Box::new(sarif::SarifParser),
         Box::new(snyk::SnykParser),
         Box::new(nuclei::NucleiParser),
+        Box::new(generic::GenericParser),
     ]
 }
 
@@ -84,5 +85,10 @@ mod tests {
     fn find_parser_by_scan_type() {
         assert!(find_parser("Bandit Scan").is_some());
         assert!(find_parser("Nope").is_none());
+    }
+
+    #[test]
+    fn registry_includes_generic_universal_importer() {
+        assert!(find_parser("Generic Findings Import").is_some());
     }
 }

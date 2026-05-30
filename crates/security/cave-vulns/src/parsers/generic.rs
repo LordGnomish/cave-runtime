@@ -51,8 +51,10 @@ fn csv_bool(raw: &str) -> bool {
 }
 
 /// Upstream dedup key: `sha256("{severity}|{title}|{description}")`.
-pub(crate) fn dedupe_key(_sev: FindingSeverity, _title: &str, _desc: &str) -> String {
-    String::new() // stub — implemented in GREEN commit
+pub(crate) fn dedupe_key(sev: FindingSeverity, title: &str, desc: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(format!("{}|{}|{}", sev.as_str(), title, desc).as_bytes());
+    format!("{:x}", h.finalize())
 }
 
 #[derive(Deserialize)]
@@ -114,9 +116,166 @@ impl ScanParser for GenericParser {
     fn dedupe_fields(&self) -> &'static [&'static str] {
         &["title", "severity", "description"]
     }
-    fn parse(&self, _data: &[u8]) -> Result<Vec<Finding>, ParserError> {
-        Err(ParserError::MissingField("unimplemented")) // stub — GREEN commit
+    fn parse(&self, data: &[u8]) -> Result<Vec<Finding>, ParserError> {
+        // Auto-detect: JSON objects start with '{', everything else is CSV.
+        let first = data
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .map(|i| data[i]);
+        if first == Some(b'{') {
+            parse_json(data)
+        } else {
+            parse_csv(data)
+        }
     }
+}
+
+fn finding_from_item(item: GenericItem) -> Finding {
+    let sev = normalize_severity(&item.severity);
+    let mut f = Finding::new(item.title, sev);
+    f.description = item.description;
+    f.cwe = item.cwe;
+    f.cvssv3 = item.cvssv3;
+    f.cvssv3_score = item.cvssv3_score;
+    f.mitigation = item.mitigation;
+    f.impact = item.impact;
+    f.references = item.references;
+    f.file_path = item.file_path;
+    f.line = item.line;
+    f.component_name = item.component_name;
+    f.component_version = item.component_version;
+
+    // CVE seeds the vulnerability_ids list; an explicit list wins/merges.
+    let mut vids = item.vulnerability_ids;
+    if let Some(cve) = item.cve {
+        if !vids.contains(&cve) {
+            vids.insert(0, cve);
+        }
+    }
+    if let Some(first) = vids.first() {
+        f.cve = Some(first.clone());
+    }
+    f.vulnerability_ids = vids;
+
+    f.state.active = item.active;
+    f.state.verified = item.verified;
+    f.state.false_p = item.false_p;
+    f.state.duplicate = item.duplicate;
+    f.state.is_mitigated = item.is_mitigated;
+    f.found_by_scanner = Some("Generic Findings Import".into());
+    f
+}
+
+fn parse_json(data: &[u8]) -> Result<Vec<Finding>, ParserError> {
+    let report: GenericReport = serde_json::from_slice(data)?;
+    Ok(report.findings.into_iter().map(finding_from_item).collect())
+}
+
+fn parse_csv(data: &[u8]) -> Result<Vec<Finding>, ParserError> {
+    let text = std::str::from_utf8(data).map_err(|_| ParserError::MissingField("utf8"))?;
+    let mut rows = csv_rows(text);
+    let header = match rows.next() {
+        Some(h) => h,
+        None => return Ok(Vec::new()),
+    };
+    let col = |name: &str| header.iter().position(|h| h == name);
+    let (i_title, i_sev, i_desc) = (col("Title"), col("Severity"), col("Description"));
+
+    // Optional columns.
+    let i_cwe = col("CweId");
+    let i_cve = col("CVE");
+    let i_active = col("Active");
+    let i_verified = col("Verified");
+    let i_fp = col("FalsePositive");
+    let i_dup = col("Duplicate");
+    let i_mit = col("Mitigation");
+    let i_impact = col("Impact");
+    let i_refs = col("References");
+
+    let get = |row: &[String], idx: Option<usize>| -> Option<String> {
+        idx.and_then(|i| row.get(i)).map(|s| s.to_string())
+    };
+
+    // Dedup-by-key, preserving first-seen order.
+    let mut order: Vec<String> = Vec::new();
+    let mut by_key: HashMap<String, Finding> = HashMap::new();
+
+    for row in rows {
+        if row.iter().all(|c| c.trim().is_empty()) {
+            continue;
+        }
+        let title = get(&row, i_title).unwrap_or_default();
+        let sev = normalize_severity(&get(&row, i_sev).unwrap_or_default());
+        let desc = get(&row, i_desc).unwrap_or_default();
+        let key = dedupe_key(sev, &title, &desc);
+
+        if let Some(existing) = by_key.get_mut(&key) {
+            existing.nb_occurences += 1;
+            continue;
+        }
+
+        let mut f = Finding::new(title, sev);
+        f.description = desc;
+        if let Some(c) = get(&row, i_cwe).and_then(|s| s.trim().parse::<u32>().ok()) {
+            f.cwe = Some(c);
+        }
+        if let Some(cve) = get(&row, i_cve).filter(|s| !s.trim().is_empty()) {
+            f.cve = Some(cve.clone());
+            f.vulnerability_ids = vec![cve];
+        }
+        f.mitigation = get(&row, i_mit).filter(|s| !s.is_empty());
+        f.impact = get(&row, i_impact).filter(|s| !s.is_empty());
+        f.references = get(&row, i_refs).filter(|s| !s.is_empty());
+        f.state.active = get(&row, i_active).map(|s| csv_bool(&s)).unwrap_or(true);
+        f.state.verified = get(&row, i_verified).map(|s| csv_bool(&s)).unwrap_or(false);
+        f.state.false_p = get(&row, i_fp).map(|s| csv_bool(&s)).unwrap_or(false);
+        f.state.duplicate = get(&row, i_dup).map(|s| csv_bool(&s)).unwrap_or(false);
+        f.found_by_scanner = Some("Generic Findings Import".into());
+
+        order.push(key.clone());
+        by_key.insert(key, f);
+    }
+
+    Ok(order.into_iter().filter_map(|k| by_key.remove(&k)).collect())
+}
+
+/// Minimal RFC-4180 reader: yields one `Vec<String>` per record, honoring
+/// double-quoted fields (with `""` escaping) that may contain commas and
+/// newlines. Sufficient for DefectDojo's generic CSV export.
+fn csv_rows(text: &str) -> impl Iterator<Item = Vec<String>> + '_ {
+    let mut chars = text.chars().peekable();
+    std::iter::from_fn(move || {
+        if chars.peek().is_none() {
+            return None;
+        }
+        let mut record: Vec<String> = Vec::new();
+        let mut field = String::new();
+        let mut in_quotes = false;
+        loop {
+            match chars.next() {
+                None => {
+                    record.push(std::mem::take(&mut field));
+                    return Some(record);
+                }
+                Some('"') if in_quotes => {
+                    if chars.peek() == Some(&'"') {
+                        chars.next();
+                        field.push('"');
+                    } else {
+                        in_quotes = false;
+                    }
+                }
+                Some('"') if field.is_empty() && !in_quotes => in_quotes = true,
+                Some(',') if !in_quotes => record.push(std::mem::take(&mut field)),
+                Some('\n') if !in_quotes => {
+                    record.push(std::mem::take(&mut field));
+                    return Some(record);
+                }
+                Some('\r') if !in_quotes => {} // swallow CR in CRLF
+                Some(c) => field.push(c),
+            }
+        }
+    })
 }
 
 #[cfg(test)]
