@@ -19,6 +19,7 @@ use crate::metrics::DaemonMetrics;
 use crate::ollama::{GenerateRequest, OllamaClient};
 use crate::queue::{QueueItem, QueueStatus};
 use crate::scheduler::{DiskFreeChecker, Scheduler, SecondaryRepo, SystemDiskChecker};
+use crate::shutdown::{LoopAction, ShutdownController, ShutdownReason};
 
 // ── Error types ───────────────────────────────────────────────────────────────
 
@@ -191,12 +192,21 @@ impl<D: DiskFreeChecker> Daemon<D> {
         }
     }
 
-    /// Runs the daemon until a SIGTERM signal is received or the stop-signal
-    /// file appears.
+    /// Runs the daemon until a shutdown is requested.
+    ///
+    /// Shutdown follows the same lifecycle as ollama/ollama's `server.Serve`
+    /// (`server/routes.go`): the first `SIGINT`/`SIGTERM`, or the stop-signal
+    /// file appearing, triggers a *graceful* drain — the in-flight scheduler
+    /// item is allowed to finish before the loop exits. A *second* signal
+    /// escalates to a forced exit that aborts the in-flight tick.
     pub async fn run(self) -> Result<(), DaemonError> {
+        let shutdown = ShutdownController::new();
+        // Notified whenever a signal lands, so the tick-interval sleep and an
+        // in-flight tick can both wake immediately instead of blocking.
+        let wake = std::sync::Arc::new(tokio::sync::Notify::new());
+
         #[cfg(unix)]
-        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .map_err(DaemonError::Io)?;
+        self.spawn_signal_listener(shutdown.clone(), wake.clone())?;
 
         // Wait for Ollama to be reachable before we start ticking.
         // If the server is still down after the budget expires, exit so launchd
@@ -238,31 +248,87 @@ impl<D: DiskFreeChecker> Daemon<D> {
         );
 
         loop {
-            #[cfg(unix)]
-            tokio::select! {
-                _ = sigterm.recv() => {
-                    info!("SIGTERM received — shutting down");
+            // Decide, before doing any work, whether to keep ticking, drain, or
+            // stop now. The stop-signal file is treated as a graceful request.
+            match shutdown.next_action(self.config.stop_signal_path.exists()) {
+                LoopAction::StopNow => {
+                    info!("forced shutdown — aborting");
                     break;
                 }
-                _ = sleep(self.config.tick_interval) => {}
+                LoopAction::DrainAndStop => {
+                    let reason = shutdown
+                        .reason()
+                        .map(|r| r.to_string())
+                        .unwrap_or_else(|| "stop-signal file".to_string());
+                    info!(reason = %reason, "graceful shutdown — in-flight work drained");
+                    break;
+                }
+                LoopAction::Tick => {}
             }
-            #[cfg(not(unix))]
-            sleep(self.config.tick_interval).await;
+
+            // Sleep for the tick interval, but wake immediately if a signal lands
+            // so we re-evaluate the shutdown state without waiting it out.
+            tokio::select! {
+                _ = sleep(self.config.tick_interval) => {}
+                _ = wake.notified() => continue,
+            }
 
             self.metrics.daemon_ticks_total.inc();
 
-            if self.config.stop_signal_path.exists() {
-                info!("stop signal file found — shutting down gracefully");
-                break;
-            }
-
-            if let Err(e) = self.do_tick().await {
-                error!("tick error: {e}");
+            // Run one tick. A *forced* shutdown (second signal) aborts the
+            // in-flight item; a graceful one lets it finish (we break at the
+            // top of the next iteration).
+            tokio::select! {
+                r = self.do_tick() => {
+                    if let Err(e) = r {
+                        error!("tick error: {e}");
+                    }
+                }
+                _ = Self::wait_until_forced(&shutdown) => {
+                    info!("forced shutdown during tick — aborting in-flight work");
+                    break;
+                }
             }
         }
 
         info!("cave-local-llm daemon stopped");
         Ok(())
+    }
+
+    /// Spawn a background task that listens for `SIGINT`/`SIGTERM` and records
+    /// each into the [`ShutdownController`], waking the main loop. The task
+    /// exits once a forced (second-signal) shutdown is latched.
+    #[cfg(unix)]
+    fn spawn_signal_listener(
+        &self,
+        shutdown: ShutdownController,
+        wake: std::sync::Arc<tokio::sync::Notify>,
+    ) -> Result<(), DaemonError> {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut sigint = signal(SignalKind::interrupt()).map_err(DaemonError::Io)?;
+        let mut sigterm = signal(SignalKind::terminate()).map_err(DaemonError::Io)?;
+        tokio::spawn(async move {
+            loop {
+                let reason = tokio::select! {
+                    _ = sigint.recv() => ShutdownReason::SigInt,
+                    _ = sigterm.recv() => ShutdownReason::SigTerm,
+                };
+                shutdown.request(reason);
+                wake.notify_waiters();
+                if shutdown.is_forced() {
+                    break;
+                }
+            }
+        });
+        Ok(())
+    }
+
+    /// Resolves once the controller has escalated to a forced shutdown. Used as
+    /// the cancel arm of the in-flight `do_tick` select.
+    async fn wait_until_forced(shutdown: &ShutdownController) {
+        while !shutdown.is_forced() {
+            sleep(Duration::from_millis(50)).await;
+        }
     }
 
     /// Performs one scheduler tick.
