@@ -923,6 +923,20 @@ const CATALOG: &[ScalerEntry] = &[
         requires_auth: true,
     },
     ScalerEntry {
+        kind: "dynatrace",
+        category: ScalerCategory::Observability,
+        summary: "Scale on a Dynatrace Metric Data Points API query.",
+        docs_url: "https://keda.sh/docs/2.16/scalers/dynatrace/",
+        metadata_keys: &[
+            "host",
+            "metricSelector",
+            "from",
+            "threshold",
+            "activationThreshold",
+        ],
+        requires_auth: true,
+    },
+    ScalerEntry {
         kind: "sumologic",
         category: ScalerCategory::Observability,
         summary: "Scale on a Sumo Logic dashboard/log query.",
