@@ -12,17 +12,20 @@
 //!   the encoded bytes plus the SHA-256 digest of the *uncompressed*
 //!   form (containerd terminology: the "diff id"). Implemented in
 //!   [`compression`].
-//!
-//! Scope cut: the production path (diff-of-two-filesystems, the
-//! `Differ.Diff` operation that produces an upper-layer tarball from
-//! two overlayfs branches) requires a deep walk of two directory
-//! trees. The walking_differ implementation here covers the read
-//! side (Apply) that container start hits, plus a synthesizing
-//! single-directory "diff" that callers can hash. The double-tree
-//! diff is left for a follow-up.
+//! * **Diff (production)** — the double-tree differ that compares a
+//!   `lower` snapshot against an `upper` rootfs and serialises the
+//!   change set into an OCI layer tarball (additions/modifications
+//!   carry the upper bytes; deletions become `.wh.<name>` whiteouts).
+//!   This is the `Compare` half of `core/diff/walking/differ.go`,
+//!   layered on `continuity/fs.Changes`. Implemented in [`producer`].
+//!   The round-trip invariant — `apply(write_diff_tar(lower, upper))`
+//!   over a copy of `lower` reproduces `upper` — ties it to the Apply
+//!   side above.
 
 pub mod compression;
+pub mod producer;
 pub mod walking_differ;
 
 pub use compression::{compress_gzip, compute_diff_id, decompress_gzip, CompressionError};
+pub use producer::{compute_changes, diff_layer, write_diff_tar, Change, ChangeKind, DiffError, DiffLayer};
 pub use walking_differ::{apply_layer, ApplyError, ApplyStats};
