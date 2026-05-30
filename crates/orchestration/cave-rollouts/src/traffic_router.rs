@@ -57,6 +57,10 @@ pub enum TrafficProvider {
         plugin_name: String,
         config: serde_json::Value,
     },
+    Traefik {
+        traefik_service: String,
+        namespace: String,
+    },
 }
 
 pub fn render_patch(
@@ -155,6 +159,22 @@ pub fn render_patch(
             "config": config,
             "split": {"stable": split.stable, "canary": split.canary},
             "services": {"stable": stable_service, "canary": canary_service},
+        }),
+        TrafficProvider::Traefik {
+            traefik_service,
+            namespace,
+        } => serde_json::json!({
+            "apiVersion": "traefik.io/v1alpha1",
+            "kind": "TraefikService",
+            "metadata": { "name": traefik_service, "namespace": namespace },
+            "spec": {
+                "weighted": {
+                    "services": [
+                        {"name": stable_service, "weight": split.stable},
+                        {"name": canary_service, "weight": split.canary},
+                    ]
+                }
+            }
         }),
     }
 }
