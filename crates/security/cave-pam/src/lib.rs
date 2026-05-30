@@ -15,6 +15,7 @@ pub mod node_inventory;
 pub mod proxy_tunnel;
 pub mod rbac;
 pub mod routes;
+pub mod session_lifecycle;
 pub mod session_recorder;
 pub mod trusted_cluster;
 
