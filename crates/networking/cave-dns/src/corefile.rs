@@ -531,4 +531,48 @@ mod tests {
             parse_with_env(".:{$CAVE_DNS_PORT}\n", Box::new(env)).expect("parse ok");
         assert_eq!(blocks[0].keys, vec![".:1053".to_string()]);
     }
+
+    // ── Cycle 4: import / snippet directive (import.go) ────────────────────
+
+    #[test]
+    fn snippet_definition_is_not_emitted_as_server_block() {
+        // A `(name) { … }` block defines a snippet and produces no server block.
+        let blocks = parse("(only) {\n    whoami\n}\n").expect("parse ok");
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn import_expands_snippet_into_block() {
+        let src = "(common) {\n    errors\n    log\n}\n\nexample.com:53 {\n    import common\n    whoami\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        // The snippet block itself is not emitted — only example.com:53.
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].keys, vec!["example.com:53".to_string()]);
+        // The imported directives are spliced in alongside the local ones.
+        assert!(blocks[0].tokens.contains_key("errors"), "errors imported");
+        assert!(blocks[0].tokens.contains_key("log"), "log imported");
+        assert!(blocks[0].tokens.contains_key("whoami"), "local whoami kept");
+        assert_eq!(texts(&blocks[0].tokens["errors"]), vec!["errors"]);
+    }
+
+    #[test]
+    fn import_carries_snippet_directive_args() {
+        let src = "(fwd) {\n    forward . 1.1.1.1 8.8.8.8\n}\nexample.com {\n    import fwd\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            texts(&blocks[0].tokens["forward"]),
+            vec!["forward", ".", "1.1.1.1", "8.8.8.8"]
+        );
+    }
+
+    #[test]
+    fn import_unknown_snippet_is_error() {
+        let err = parse("example.com {\n    import nope\n}\n").unwrap_err();
+        assert!(
+            err.message.contains("nope") || err.message.contains("snippet"),
+            "message was: {}",
+            err.message
+        );
+    }
 }
