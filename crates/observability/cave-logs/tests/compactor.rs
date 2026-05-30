@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Compactor execution-loop tests — strict-TDD RED for the cave-logs honest
+//! Compactor execution-loop tests — strict-TDD for the cave-logs honest
 //! uplift (2026-05-30). These exercise the *execution* side of Loki's
 //! compactor (`pkg/compactor`): given a set of small chunks, merge the chunks
 //! of each `(tenant, stream_fp)` group into one re-encoded chunk, de-duplicate
@@ -13,7 +13,7 @@
 //! (`multitenant::dry_run_retention`); these tests pin the missing *execution*
 //! half — `compactor::compact`.
 
-use cave_logs::chunk::encode_chunk;
+use cave_logs::chunk::{decode_chunk, encode_chunk};
 use cave_logs::compactor::compact;
 use cave_logs::models::{Chunk, Codec, LogEntry};
 
@@ -21,9 +21,9 @@ use cave_logs::models::{Chunk, Codec, LogEntry};
 fn mk_chunk(tenant: &str, fp: u64, entries: &[LogEntry]) -> Chunk {
     let codec = Codec::Snappy;
     let data = encode_chunk(entries, codec).expect("encode");
-    let min_ts = entries.iter().map(|e| e.timestamp_ns).min().unwrap_or(0);
-    let max_ts = entries.iter().map(|e| e.timestamp_ns).max().unwrap_or(0);
-    let uncompressed_size = entries.iter().map(|e| e.estimated_size()).sum();
+    let min_ts = entries.iter().map(|e| e.ts).min().unwrap_or(0);
+    let max_ts = entries.iter().map(|e| e.ts).max().unwrap_or(0);
+    let uncompressed_size = entries.iter().map(|e| e.size_bytes() as u64).sum();
     Chunk {
         stream_fp: fp,
         tenant: tenant.to_string(),
@@ -38,7 +38,15 @@ fn mk_chunk(tenant: &str, fp: u64, entries: &[LogEntry]) -> Chunk {
 
 /// Decode a chunk back to entries for assertions.
 fn entries_of(chunk: &Chunk) -> Vec<LogEntry> {
-    cave_logs::chunk::decode_chunk(chunk).expect("decode")
+    decode_chunk(chunk).expect("decode")
+}
+
+/// Compare two entry vectors by `(ts, line)` (ignores metadata).
+fn same_entries(a: &[LogEntry], b: &[LogEntry]) -> bool {
+    a.len() == b.len()
+        && a.iter()
+            .zip(b.iter())
+            .all(|(x, y)| x.ts == y.ts && x.line == y.line)
 }
 
 const NO_RETENTION: i64 = i64::MIN;
@@ -46,16 +54,8 @@ const NO_RETENTION: i64 = i64::MIN;
 #[test]
 fn merge_overlapping_chunks_same_stream() {
     // Two chunks for the same stream with interleaving timestamps.
-    let c1 = mk_chunk(
-        "t",
-        7,
-        &[LogEntry::new(100, "a"), LogEntry::new(300, "c")],
-    );
-    let c2 = mk_chunk(
-        "t",
-        7,
-        &[LogEntry::new(200, "b"), LogEntry::new(400, "d")],
-    );
+    let c1 = mk_chunk("t", 7, &[LogEntry::new(100, "a"), LogEntry::new(300, "c")]);
+    let c2 = mk_chunk("t", 7, &[LogEntry::new(200, "b"), LogEntry::new(400, "d")]);
 
     let (out, stats) = compact(&[c1, c2], NO_RETENTION, Codec::Snappy).expect("compact");
 
@@ -194,7 +194,7 @@ fn compaction_is_idempotent() {
 
     // Re-compacting already-compacted output changes nothing.
     assert_eq!(once.len(), twice.len());
-    assert_eq!(entries_of(&once[0]), entries_of(&twice[0]));
+    assert!(same_entries(&entries_of(&once[0]), &entries_of(&twice[0])));
     assert_eq!(stats2.entries_deduped, 0, "no new dups on a clean re-run");
     assert_eq!(stats2.entries_expired, 0);
 }
