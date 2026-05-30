@@ -19,6 +19,7 @@ use uuid::Uuid;
 pub fn create_router(state: Arc<State>) -> Router {
     Router::new()
         .route("/api/chaos/health", get(health))
+        .route("/api/chaos/metrics", get(metrics))
         .route("/api/chaos/experiments", get(list_experiments))
         .route("/api/chaos/experiments", post(create_experiment))
         .route("/api/chaos/experiments/{id}", get(get_experiment))
@@ -36,6 +37,17 @@ async fn health() -> Json<serde_json::Value> {
         "status": "ok",
         "upstream": "Chaos Mesh"
     }))
+}
+
+// ─── Prometheus metrics ─────────────────────────────────────────────────────────
+
+/// `GET /api/chaos/metrics` — Prometheus text exposition of experiment counters.
+async fn metrics(AxumState(state): AxumState<Arc<State>>) -> ([(axum::http::HeaderName, &'static str); 1], String) {
+    let body = crate::metrics::render_prometheus(&state.store.list());
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        body,
+    )
 }
 
 // ─── List experiments ─────────────────────────────────────────────────────────

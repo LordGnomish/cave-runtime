@@ -9,6 +9,7 @@ use std::sync::Arc;
 pub mod daemon;
 pub mod engine;
 pub mod executor;
+pub mod metrics;
 pub mod models;
 pub mod reconcile;
 pub mod routes;
