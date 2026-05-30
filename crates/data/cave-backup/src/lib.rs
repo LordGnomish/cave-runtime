@@ -7,6 +7,7 @@
 //! Provides backup scheduling, storage location management, filesystem
 //! backup via restic/kopia, and garbage collection of expired backups.
 
+pub mod backup_request;
 pub mod engine;
 pub mod filesystem;
 pub mod gc;
