@@ -22,7 +22,6 @@
 
 #![allow(non_snake_case)]
 
-pub mod argo_events;
 pub mod autoscaler;
 pub mod broker_controller;
 pub mod cert_bridge;
