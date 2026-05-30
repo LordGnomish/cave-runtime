@@ -29,6 +29,10 @@ use std::rc::Rc;
 
 // ─── Operator graph ──────────────────────────────────────────────────────────
 
+/// Boxed predicate — the DSL counterpart of `org.apache.kafka.streams.kstream.Predicate`.
+/// Exposed for `KStream::branch`, which takes a heterogeneous list of them.
+pub type DslPredicate = Box<dyn Fn(&Record) -> bool>;
+
 type Predicate = Box<dyn Fn(&Record) -> bool>;
 type ValueMapper = Box<dyn Fn(&[u8]) -> Vec<u8>>;
 type RecordMapper = Box<dyn Fn(&Record) -> Record>;
@@ -49,6 +53,11 @@ enum NodeKind {
     /// Pass-through node with no transform — a join point for `merge` and a
     /// landing node for terminal operators like `foreach`.
     Passthrough,
+    /// Route a record to the first child whose predicate matches (the
+    /// predicate at index `i` guards child `i`); drop if none match.
+    Branch(Vec<Predicate>),
+    /// Persist the record to an intermediate topic, then continue downstream.
+    Through { topic: String },
     Sink { topic: String },
 }
 
@@ -198,6 +207,50 @@ impl KStream {
             topic: topic.to_string(),
         });
     }
+
+    /// Split into N branches — a record goes to the first branch whose
+    /// predicate matches (mutually exclusive) and is dropped if none do.
+    /// Returns one [`KStream`] per predicate, in order (`KStream.branch`).
+    pub fn branch(&self, predicates: Vec<DslPredicate>) -> Vec<KStream> {
+        let n = predicates.len();
+        let mut st = self.inner.borrow_mut();
+        let branch_node = st.push(NodeKind::Branch(predicates), Some(self.node));
+        // One passthrough head per predicate, as ordered children of the
+        // branch node — child index i is guarded by predicate i.
+        let mut heads = Vec::with_capacity(n);
+        for _ in 0..n {
+            let head = st.push(NodeKind::Passthrough, Some(branch_node));
+            heads.push(KStream {
+                inner: self.inner.clone(),
+                node: head,
+            });
+        }
+        heads
+    }
+
+    /// Merge this stream with `other` — downstream sees records from both
+    /// (`KStream.merge`).  Both streams must come from the same builder.
+    pub fn merge(&self, other: &KStream) -> KStream {
+        let node = {
+            let mut st = self.inner.borrow_mut();
+            let node = st.push(NodeKind::Passthrough, Some(self.node));
+            // Also a child of the other parent.
+            st.nodes[other.node].children.push(node);
+            node
+        };
+        KStream {
+            inner: self.inner.clone(),
+            node,
+        }
+    }
+
+    /// Write each record to an intermediate `topic`, then continue the stream
+    /// (`KStream.through`).
+    pub fn through(&self, topic: &str) -> KStream {
+        self.chain(NodeKind::Through {
+            topic: topic.to_string(),
+        })
+    }
 }
 
 // ─── Executable application ──────────────────────────────────────────────────
@@ -216,8 +269,13 @@ pub struct StreamsApp {
 enum Step {
     /// Forward these records to every child.
     Forward(Vec<Record>),
+    /// Forward one record to a single child by local index (branch routing);
+    /// `None` drops it.
+    ForwardChild(Option<usize>, Record),
     /// Append to the named output topic (sink); forwards nothing.
     Sink { topic: String, rec: Record },
+    /// Append to an intermediate topic, then forward to every child.
+    Through { topic: String, rec: Record },
 }
 
 impl StreamsApp {
@@ -273,6 +331,14 @@ impl StreamsApp {
                     f(&rec);
                     Step::Forward(vec![rec])
                 }
+                NodeKind::Branch(preds) => {
+                    let chosen = preds.iter().position(|p| p(&rec));
+                    Step::ForwardChild(chosen, rec)
+                }
+                NodeKind::Through { topic } => Step::Through {
+                    topic: topic.clone(),
+                    rec,
+                },
                 NodeKind::Sink { topic } => Step::Sink {
                     topic: topic.clone(),
                     rec,
@@ -287,6 +353,18 @@ impl StreamsApp {
                     for &c in &children {
                         self.run(c, r.clone());
                     }
+                }
+            }
+            Step::ForwardChild(Some(i), rec) => {
+                if let Some(&c) = children.get(i) {
+                    self.run(c, rec);
+                }
+            }
+            Step::ForwardChild(None, _rec) => {}
+            Step::Through { topic, rec } => {
+                self.output.entry(topic).or_default().push(rec.clone());
+                for &c in &children {
+                    self.run(c, rec.clone());
                 }
             }
             Step::Sink { topic, rec } => {
