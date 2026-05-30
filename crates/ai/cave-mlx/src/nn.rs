@@ -11,8 +11,9 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-use crate::array::Array;
+use crate::array::{Array, MlxError};
 use crate::autograd::{Tape, Var};
+use crate::{conv, ops};
 
 /// The result of a module forward pass on a tape: the output node plus the
 /// parameter leaves (in `parameters()` order) for gradient collection.
@@ -73,6 +74,80 @@ impl Linear {
     /// Write back updated `[weight, bias]` values (as produced by an optimizer).
     pub fn set_parameters(&mut self, params: &[Array]) {
         assert_eq!(params.len(), 2, "Linear expects [weight, bias]");
+        self.weight = params[0].clone();
+        self.bias = params[1].clone();
+    }
+}
+
+/// A 2-D convolution layer — the cave-mlx analog of `mlx.nn.Conv2d`.
+///
+/// Channel-last like upstream MLX: input `(N, H, W, C_in)`, weight
+/// `(C_out, KH, KW, C_in)`, bias `(C_out,)`, output `(N, H_out, W_out, C_out)`.
+/// This is an eager *inference* module (forward-only); the convolution itself
+/// is not yet a tape op, so it is excluded from autograd training loops.
+pub struct Conv2d {
+    /// Weight, shape `(C_out, KH, KW, C_in)`.
+    pub weight: Array,
+    /// Bias, shape `(C_out,)`; broadcasts over the spatial output.
+    pub bias: Array,
+    /// `(stride_h, stride_w)`.
+    pub stride: (usize, usize),
+    /// `(pad_h, pad_w)` zero-padding.
+    pub padding: (usize, usize),
+}
+
+impl Conv2d {
+    /// Construct from explicit weight/bias arrays and stride/padding.
+    pub fn from_parts(
+        weight: Array,
+        bias: Array,
+        stride: (usize, usize),
+        padding: (usize, usize),
+    ) -> Self {
+        Self { weight, bias, stride, padding }
+    }
+
+    /// Construct with Kaiming-uniform weights and zero bias from a fixed seed.
+    ///
+    /// The fan-in is `C_in * KH * KW`, matching the convolution receptive field.
+    pub fn new(
+        c_in: usize,
+        c_out: usize,
+        kernel: (usize, usize),
+        stride: (usize, usize),
+        padding: (usize, usize),
+        seed: u64,
+    ) -> Self {
+        let (kh, kw) = kernel;
+        let fan_in = c_in * kh * kw;
+        let bound = (6.0f32 / fan_in as f32).sqrt();
+        let mut rng = StdRng::seed_from_u64(seed);
+        let weight: Vec<f32> = (0..c_out * kh * kw * c_in)
+            .map(|_| rng.gen_range(-bound..bound))
+            .collect();
+        Self {
+            weight: Array::from_parts(weight, vec![c_out, kh, kw, c_in]),
+            bias: Array::zeros(&[c_out]),
+            stride,
+            padding,
+        }
+    }
+
+    /// Run the convolution and add the per-output-channel bias.
+    pub fn forward(&self, x: &Array) -> Result<Array, MlxError> {
+        let y = conv::conv2d(x, &self.weight, self.stride, self.padding)?;
+        // bias (C_out,) broadcasts over the trailing channel axis of (N,H,W,C_out).
+        ops::add(&y, &self.bias)
+    }
+
+    /// Current parameter values in `[weight, bias]` order.
+    pub fn parameters(&self) -> Vec<Array> {
+        vec![self.weight.clone(), self.bias.clone()]
+    }
+
+    /// Write back updated `[weight, bias]` values.
+    pub fn set_parameters(&mut self, params: &[Array]) {
+        assert_eq!(params.len(), 2, "Conv2d expects [weight, bias]");
         self.weight = params[0].clone();
         self.bias = params[1].clone();
     }
