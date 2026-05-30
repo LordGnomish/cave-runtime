@@ -73,8 +73,33 @@ impl Tree {
 
     /// Merge `src` into `self`, summing `self`/`total` for matching paths and
     /// inserting new branches in sorted order. Ports `tree.go` Merge.
-    pub fn merge(&mut self, _src: &Tree) {
-        // RED placeholder
+    pub fn merge(&mut self, src: &Tree) {
+        merge_children(&mut self.root, &src.root);
+    }
+}
+
+/// Merge `src` nodes into the sorted `dst` child list, recursing into
+/// matching children.
+fn merge_children(dst: &mut Vec<Node>, src: &[Node]) {
+    for s in src {
+        let i = match dst.binary_search_by(|c| c.name.cmp(&s.name)) {
+            Ok(i) => i,
+            Err(i) => {
+                dst.insert(
+                    i,
+                    Node {
+                        name: s.name.clone(),
+                        self_value: 0,
+                        total: 0,
+                        children: Vec::new(),
+                    },
+                );
+                i
+            }
+        };
+        dst[i].self_value += s.self_value;
+        dst[i].total += s.total;
+        merge_children(&mut dst[i].children, &s.children);
     }
 }
 
