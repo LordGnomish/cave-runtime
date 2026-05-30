@@ -91,6 +91,63 @@ impl VoterSet {
     pub fn step_down(&mut self) {
         self.leader = None;
     }
+
+    /// Add a single voter to the quorum (KIP-853 dynamic
+    /// reconfiguration). Mirrors `AddRaftVoter` from upstream's
+    /// `KafkaRaftClient`: a membership change is committed as its own
+    /// quorum event, so the controller epoch advances to fence any
+    /// node still operating against the pre-change voter set.
+    ///
+    /// Returns `Err` if `node_id` is already a voter, or if
+    /// `new_epoch` does not strictly advance the current epoch (a
+    /// stale or replayed reconfiguration). Per Raft single-server
+    /// change rules only one voter is added at a time, so the new
+    /// majority always overlaps the old majority — no split-brain
+    /// window exists. Leadership is preserved across the change.
+    pub fn add_voter(&mut self, node_id: i32, new_epoch: ControllerEpoch) -> Result<(), String> {
+        if self.voters.contains(&node_id) {
+            return Err(format!("node {node_id} is already a voter"));
+        }
+        if new_epoch <= self.epoch {
+            return Err(format!(
+                "stale reconfiguration epoch {new_epoch:?}; current is {:?}",
+                self.epoch
+            ));
+        }
+        self.voters.insert(node_id);
+        self.epoch = new_epoch;
+        Ok(())
+    }
+
+    /// Remove a single voter from the quorum (KIP-853). Mirrors
+    /// `RemoveRaftVoter` from upstream. Advances the epoch like
+    /// [`add_voter`](Self::add_voter).
+    ///
+    /// Returns `Err` if `node_id` is not a current voter, if the
+    /// removal would empty the quorum (the metadata log would be
+    /// lost), or on a stale epoch. If the removed node is the current
+    /// leader, the set steps down — the surviving voters must elect a
+    /// new leader at a higher epoch.
+    pub fn remove_voter(&mut self, node_id: i32, new_epoch: ControllerEpoch) -> Result<(), String> {
+        if !self.voters.contains(&node_id) {
+            return Err(format!("node {node_id} is not a voter"));
+        }
+        if self.voters.len() == 1 {
+            return Err("cannot remove the last voter from the quorum".into());
+        }
+        if new_epoch <= self.epoch {
+            return Err(format!(
+                "stale reconfiguration epoch {new_epoch:?}; current is {:?}",
+                self.epoch
+            ));
+        }
+        self.voters.remove(&node_id);
+        if self.leader == Some(node_id) {
+            self.leader = None;
+        }
+        self.epoch = new_epoch;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
