@@ -7,6 +7,7 @@
 //! `provider.rs`.
 
 pub mod cohere;
+pub mod google;
 pub mod llama_cpp;
 pub mod mistral;
 pub mod mlx;

@@ -48,6 +48,8 @@ pub enum ProviderType {
     Mistral,
     /// Cohere Command v2 chat API (divergent response shape).
     Cohere,
+    /// Google Gemini / Vertex AI (`generateContent` protocol).
+    Google,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -431,6 +433,9 @@ impl ProviderRegistry {
                 }
                 ProviderType::Cohere => {
                     Arc::new(crate::providers::cohere::CohereProvider::new(cfg))
+                }
+                ProviderType::Google => {
+                    Arc::new(crate::providers::google::GoogleProvider::new(cfg))
                 }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
