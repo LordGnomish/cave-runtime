@@ -13,12 +13,14 @@
 //! the first violation — it accumulates every error so an operator sees the
 //! whole set of problems at once.
 
+use serde::{Deserialize, Serialize};
+
 /// Maximum per-node score a plugin may emit, before its profile weight is
 /// applied (upstream `framework.MaxNodeScore`).
 pub const MAX_NODE_SCORE: i64 = 100;
 
 /// A scoring plugin enabled in a profile, with its integer weight.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeightedPlugin {
     pub name: String,
     pub weight: i32,
@@ -26,7 +28,7 @@ pub struct WeightedPlugin {
 
 /// An enabled/disabled plugin set for one extension point. Only `enabled`
 /// carries weights (the score extension point is the weighted one upstream).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PluginSet {
     pub enabled: Vec<WeightedPlugin>,
     pub disabled: Vec<String>,
@@ -34,13 +36,13 @@ pub struct PluginSet {
 
 /// Opaque per-plugin configuration entry; only its name is validated for
 /// uniqueness here (args validation is plugin-specific upstream).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginConfig {
     pub name: String,
 }
 
 /// One scheduling profile's configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileConfig {
     pub scheduler_name: String,
     pub score: PluginSet,
@@ -49,7 +51,7 @@ pub struct ProfileConfig {
 
 /// Top-level scheduler configuration (subset of upstream
 /// `KubeSchedulerConfiguration` carrying the fields with validation rules).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KubeSchedulerConfiguration {
     pub parallelism: i32,
     /// `None` means "unset → use the adaptive default"; when set it must be in
