@@ -326,6 +326,27 @@ mod tests {
     }
 
     #[test]
+    fn appmesh_patch_weights_virtual_nodes() {
+        // argo-rollouts v1.9.0 rollout/trafficrouting/appmesh: VirtualRouter CRD
+        // (appmesh.k8s.aws/v1beta2); SetWeight rewrites
+        // spec.routes[].httpRoute.action.weightedTargets[] keyed by virtualNodeRef.name.
+        let p = TrafficProvider::AppMesh {
+            virtual_router: "demo-vrouter".into(),
+            namespace: "argo".into(),
+        };
+        let patch = render_patch(&p, &WeightSplit::new(15), "stable-node", "canary-node");
+        assert_eq!(patch["apiVersion"], "appmesh.k8s.aws/v1beta2");
+        assert_eq!(patch["kind"], "VirtualRouter");
+        assert_eq!(patch["metadata"]["name"], "demo-vrouter");
+        let targets =
+            &patch["spec"]["routes"][0]["httpRoute"]["action"]["weightedTargets"];
+        assert_eq!(targets[0]["virtualNodeRef"]["name"], "stable-node");
+        assert_eq!(targets[0]["weight"], 85);
+        assert_eq!(targets[1]["virtualNodeRef"]["name"], "canary-node");
+        assert_eq!(targets[1]["weight"], 15);
+    }
+
+    #[test]
     fn weight_split_serde_roundtrip() {
         let s = WeightSplit::new(37);
         let j = serde_json::to_string(&s).unwrap();
