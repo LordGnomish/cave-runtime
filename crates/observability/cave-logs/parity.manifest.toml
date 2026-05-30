@@ -144,6 +144,17 @@ local    = "src/logql/ast.rs"
 upstream = "pkg/logql/engine.go"
 local    = "src/logql/eval.rs"
 
+# Log pipeline label stages (drop/keep) ported 2026-05-30 (strict-TDD):
+# `| drop l1, l2="v"` and `| keep l1, l2="v"` with bare-name + value-matcher
+# entries — exercised end-to-end through the existing lexer→parser→eval path.
+[[files]]
+upstream = "pkg/logql/log/drop_labels.go"
+local    = "src/logql/eval.rs"
+
+[[files]]
+upstream = "pkg/logql/log/keep_labels.go"
+local    = "src/logql/eval.rs"
+
 [[files]]
 upstream = "pkg/logql/logql.go"
 local    = "src/logql/mod.rs"
