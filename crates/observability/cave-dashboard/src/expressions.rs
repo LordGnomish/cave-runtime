@@ -348,4 +348,92 @@ mod tests {
         );
         assert_eq!(r, Some(4.0));
     }
+
+    // ── resample (pkg/expr/mathexp/resample.go) ─────────────────────────────
+
+    #[test]
+    fn test_upsampler_parse() {
+        assert_eq!(Upsampler::parse("pad"), Some(Upsampler::Pad));
+        assert_eq!(Upsampler::parse("backfilling"), Some(Upsampler::Backfill));
+        assert_eq!(Upsampler::parse("fillna"), Some(Upsampler::FillNa));
+        assert_eq!(Upsampler::parse("nope"), None);
+    }
+
+    #[test]
+    fn test_resample_range_shorter_than_interval_errors() {
+        // from=0 to=4 interval=5 -> newSeriesLength = 0 -> error.
+        let r = resample(&[2, 7], &[Some(2.0), Some(1.0)], 0, 4, 5, ReducerId::Mean, Upsampler::FillNa);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_resample_invalid_time_range_errors() {
+        let r = resample(&[2, 7], &[Some(2.0), Some(1.0)], 11, 0, 5, ReducerId::Mean, Upsampler::FillNa);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_resample_downsample_mean_pad() {
+        // source (2,2)(4,3)(7,1)(9,2); from=0 to=16 interval=5; mean / pad.
+        let (times, vals) = resample(
+            &[2, 4, 7, 9],
+            &[Some(2.0), Some(3.0), Some(1.0), Some(2.0)],
+            0,
+            16,
+            5,
+            ReducerId::Mean,
+            Upsampler::Pad,
+        )
+        .unwrap();
+        assert_eq!(times, vec![0, 5, 10, 15]);
+        assert_eq!(vals, vec![None, Some(2.5), Some(1.5), Some(2.0)]);
+    }
+
+    #[test]
+    fn test_resample_downsample_max_fillna() {
+        let (times, vals) = resample(
+            &[2, 4, 7, 9],
+            &[Some(2.0), Some(3.0), Some(1.0), Some(2.0)],
+            0,
+            16,
+            5,
+            ReducerId::Max,
+            Upsampler::FillNa,
+        )
+        .unwrap();
+        assert_eq!(times, vec![0, 5, 10, 15]);
+        assert_eq!(vals, vec![None, Some(3.0), Some(2.0), None]);
+    }
+
+    #[test]
+    fn test_resample_upsample_backfill() {
+        // source (7,1)(9,2)(12,5); from=0 to=16 interval=5; mean / backfilling.
+        let (times, vals) = resample(
+            &[7, 9, 12],
+            &[Some(1.0), Some(2.0), Some(5.0)],
+            0,
+            16,
+            5,
+            ReducerId::Mean,
+            Upsampler::Backfill,
+        )
+        .unwrap();
+        assert_eq!(times, vec![0, 5, 10, 15]);
+        assert_eq!(vals, vec![Some(1.0), Some(1.0), Some(1.5), Some(5.0)]);
+    }
+
+    #[test]
+    fn test_resample_downsample_count_unsupported() {
+        // Go resample only supports sum/mean/min/max/last downsamplers.
+        let r = resample(
+            &[2, 4],
+            &[Some(2.0), Some(3.0)],
+            0,
+            16,
+            5,
+            ReducerId::Count,
+            Upsampler::Pad,
+        );
+        assert!(r.is_err());
+    }
 }
