@@ -5,6 +5,10 @@
 # src/cloud_volume_controller.rs (CloudVolume trait + Hetzner/Azure impls +
 # reconcile loop). Additive Hetzner+Azure deepening: hetzner_instance_lookup
 # and azure_instance_lookup helpers.
+# 2026-05-30 honest uplift: the last [[partial]] (node/helpers/ address utility)
+# promoted to [[mapped]] via src/node_helpers.rs — a full 1:1 strict-TDD port of
+# the node/helpers pack (address.go + component-helpers ips.go + taints.go +
+# core/v1.Taint). honest_ratio 0.9565 → 1.0000.
 
 [upstream]
 org        = "kubernetes"
@@ -22,13 +26,13 @@ source_sha = "v1.36.0"
 # out-of-tree providers (Hetzner + Azure) honestly against
 # kubernetes/kubernetes v1.36.0. See PARITY_REPORT.md for the
 # methodology and scope-cut table.
-mapped_count        = 13
-partial_count       = 1
+mapped_count        = 14
+partial_count       = 0
 skipped_count       = 9
 unmapped_count      = 0
 total               = 23
 fill_ratio          = 1.0000
-honest_ratio        = 0.9565
+honest_ratio        = 1.0000
 adr_justified_ratio = 1.0      # 9 skipped: 4 out-of-launch-scope (AWS/GCP/OpenStack/vSphere — Hetzner+Azure only); 5 architectural (fake test scaffolding, credentialconfig stubs, names const list, api types from k8s.io/api, in-tree legacy providers removed by KEP-2395)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, KEP-2395"
 last_audit          = "2026-05-24"
@@ -101,11 +105,10 @@ name    = "volume/ (cloud volume controllers)"
 local   = "src/cloud_volume_controller.rs"
 notes   = "CloudVolume trait + HetznerCloudVolume + AzureDiskCloudVolume + CloudVolumeController reconcile loop with exponential backoff. State machine: Detached → Attaching → Attached → Detaching → Detached."
 
-# ── Partial subsystems ───────────────────────────────────────────────────────
-[[partial]]
-name    = "node_helpers/address utility"
-local   = "src/node_controller.rs"
-notes   = "AddressNodeAddresses + GetInstanceProviderID present; the broader staging/cloud-provider/node/helpers/ pack is not mapped 1:1."
+[[mapped]]
+name    = "node/helpers/ (address + ips + taints pack)"
+local   = "src/node_helpers.rs"
+notes   = "Full 1:1 port of the node/helpers pack (was partial): address.go AddToNodeAddresses + GetNodeAddressesFromNodeIP; component-helpers node/util ParseNodeIPAnnotation (single/dual-stack rules + exact errors + ParseIPSloppy); taints.go taintExists/addOrUpdateTaint/deleteTaint/removeTaint; core/v1.Taint MatchTaint+ToString. Strict-TDD, 31 tests."
 
 # ── Skipped subsystems (intentional scope-cut, with reason) ─────────────────
 [[skipped]]

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! 1:1 port of `staging/src/k8s.io/cloud-provider/node/helpers/` — the broader
 //! node-helpers pack that was previously only *partially* represented by the
 //! ad-hoc address utilities in [`crate::node_controller`].
