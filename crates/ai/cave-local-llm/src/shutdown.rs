@@ -141,6 +141,12 @@ impl ShutdownController {
         self.inner.state.load(Ordering::SeqCst) != STATE_RUNNING
     }
 
+    /// `true` once a second signal has escalated to a forced exit — the daemon
+    /// should abort the in-flight item rather than wait for it to drain.
+    pub fn is_forced(&self) -> bool {
+        self.inner.state.load(Ordering::SeqCst) == STATE_FORCED
+    }
+
     /// The reason recorded by the first request, if any.
     pub fn reason(&self) -> Option<ShutdownReason> {
         decode_reason(self.inner.reason.load(Ordering::SeqCst))
