@@ -40,6 +40,7 @@
 //! - GET  /ready, /metrics
 
 pub mod chunk;
+pub mod compactor;
 pub mod index;
 pub mod ingest;
 pub mod ingester_rf1;
