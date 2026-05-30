@@ -252,4 +252,60 @@ mod tests {
         c.request(ShutdownReason::SigTerm);
         assert!(c.is_forced());
     }
+
+    // ── Cycle 3: loop_action drain decision table ───────────────────────────
+
+    #[test]
+    fn test_running_no_stopfile_keeps_ticking() {
+        assert_eq!(loop_action(ShutdownState::Running, false), LoopAction::Tick);
+    }
+
+    #[test]
+    fn test_running_with_stopfile_drains() {
+        // The stop-signal file is a graceful request: finish the in-flight
+        // item, then stop.
+        assert_eq!(
+            loop_action(ShutdownState::Running, true),
+            LoopAction::DrainAndStop
+        );
+    }
+
+    #[test]
+    fn test_draining_drains_regardless_of_stopfile() {
+        assert_eq!(
+            loop_action(ShutdownState::Draining(ShutdownReason::SigTerm), false),
+            LoopAction::DrainAndStop
+        );
+        assert_eq!(
+            loop_action(ShutdownState::Draining(ShutdownReason::SigInt), true),
+            LoopAction::DrainAndStop
+        );
+    }
+
+    #[test]
+    fn test_forced_stops_now() {
+        assert_eq!(loop_action(ShutdownState::Forced, false), LoopAction::StopNow);
+        assert_eq!(loop_action(ShutdownState::Forced, true), LoopAction::StopNow);
+    }
+
+    #[test]
+    fn test_controller_next_action_reads_live_state() {
+        // Convenience wrapper used by the daemon loop.
+        let c = ShutdownController::new();
+        assert_eq!(c.next_action(false), LoopAction::Tick);
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.next_action(false), LoopAction::DrainAndStop);
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.next_action(false), LoopAction::StopNow);
+    }
+
+    #[test]
+    fn test_stopfile_seen_then_signal_still_drains() {
+        // Stop-file observed (Running + true) drains; if a signal then lands the
+        // controller is Draining and still drains.
+        let c = ShutdownController::new();
+        assert_eq!(c.next_action(true), LoopAction::DrainAndStop);
+        c.request(ShutdownReason::StopFile);
+        assert_eq!(c.next_action(false), LoopAction::DrainAndStop);
+    }
 }
