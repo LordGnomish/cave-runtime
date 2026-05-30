@@ -67,6 +67,8 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         .route("/api/deploy/webhook", post(handle_webhook))
         // Helm dependency resolution (umbrella Chart.lock)
         .route("/api/deploy/helm/resolve", post(resolve_helm_deps))
+        // Sync-window evaluation (maintenance windows)
+        .route("/api/deploy/sync-windows/evaluate", post(evaluate_sync_windows))
         // Health
         .route("/api/deploy/health", get(health))
         .with_state(state)
@@ -346,6 +348,55 @@ async fn resolve_helm_deps(
         "digest": lock.digest,
         "generated": lock.generated,
     })))
+}
+
+// ─── Sync-window evaluation ───────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct SyncWindowEvalReq {
+    windows: Vec<crate::rbac::SyncWindow>,
+    #[serde(default)]
+    is_manual: bool,
+    /// Optional app coordinates to first filter applicable windows.
+    app_name: Option<String>,
+    namespace: Option<String>,
+    cluster: Option<String>,
+}
+
+async fn evaluate_sync_windows(
+    State(_state): State<Arc<DeployState>>,
+    Json(req): Json<SyncWindowEvalReq>,
+) -> Json<serde_json::Value> {
+    let now = Utc::now();
+    let applicable: Vec<crate::rbac::SyncWindow> = match (
+        req.app_name.as_deref(),
+        req.namespace.as_deref(),
+        req.cluster.as_deref(),
+    ) {
+        (None, None, None) => req.windows.clone(),
+        (a, n, c) => crate::sync_windows::matching_windows(
+            &req.windows,
+            a.unwrap_or(""),
+            n.unwrap_or(""),
+            c.unwrap_or(""),
+        )
+        .into_iter()
+        .cloned()
+        .collect(),
+    };
+    let active: Vec<usize> = applicable
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| crate::sync_windows::window_active(w, now))
+        .map(|(i, _)| i)
+        .collect();
+    let can = crate::sync_windows::can_sync(&applicable, now, req.is_manual);
+    Json(serde_json::json!({
+        "can_sync": can,
+        "is_manual": req.is_manual,
+        "applicable_windows": applicable.len(),
+        "active_window_indexes": active,
+    }))
 }
 
 // ─── Webhook ─────────────────────────────────────────────────────────────────

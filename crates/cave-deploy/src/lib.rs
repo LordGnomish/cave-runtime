@@ -31,6 +31,7 @@ pub mod rollout;
 pub mod routes;
 pub mod store;
 pub mod sync;
+pub mod sync_windows;
 
 use axum::Router;
 use cave_db::CavePool;
