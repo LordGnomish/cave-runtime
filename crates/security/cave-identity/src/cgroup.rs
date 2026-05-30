@@ -67,7 +67,56 @@ pub fn cgroup_path(line: &str) -> Option<&str> {
 /// must agree on the IDs; conflicting matches are an error, as is the absence
 /// of any container ID.
 pub fn extract(cgroup_content: &str) -> Result<ContainerInfo> {
-    todo!("cgroup::extract")
+    let mut found: Option<ContainerInfo> = None;
+    for line in cgroup_content.lines() {
+        let Some(path) = cgroup_path(line) else {
+            continue;
+        };
+        // Trim a trailing systemd ".scope" before matching, exactly as SPIRE
+        // does prior to applying the cgroup regexes.
+        let path = path.strip_suffix(".scope").unwrap_or(path);
+
+        let info = if let Some(caps) = re_with_pod().captures(path) {
+            ContainerInfo {
+                pod_uid: Some(canonicalize_pod_uid(&caps["poduid"])),
+                container_id: caps["containerid"].to_string(),
+            }
+        } else if let Some(caps) = re_container_only().captures(path) {
+            ContainerInfo {
+                pod_uid: None,
+                container_id: caps["containerid"].to_string(),
+            }
+        } else {
+            continue;
+        };
+
+        match &found {
+            None => found = Some(info),
+            Some(prev) => {
+                if prev.container_id != info.container_id {
+                    return Err(IdentityError::AttestationFailed(format!(
+                        "cgroup: conflicting container ids ({} != {})",
+                        prev.container_id, info.container_id
+                    )));
+                }
+                match (&prev.pod_uid, &info.pod_uid) {
+                    // A later line that carries the pod UID supersedes a bare
+                    // container-only match.
+                    (None, Some(_)) => found = Some(info),
+                    (Some(a), Some(b)) if a != b => {
+                        return Err(IdentityError::AttestationFailed(format!(
+                            "cgroup: conflicting pod uids ({} != {})",
+                            a, b
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    found.ok_or_else(|| {
+        IdentityError::AttestationFailed("cgroup: no container id found".into())
+    })
 }
 
 /// Canonicalise a pod UID by converting every non-alphanumeric separator to a
