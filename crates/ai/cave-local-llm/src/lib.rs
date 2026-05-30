@@ -53,6 +53,9 @@ pub mod vllm_paged_attention;
 /// vLLM automatic prefix caching — content-hashed, ref-counted, LRU-evicting blocks.
 pub mod vllm_prefix_cache;
 
+/// vLLM tensor/pipeline parallel sharding math — rank topology, weight + layer partition.
+pub mod vllm_parallel;
+
 /// vLLM continuous-batching scheduler — budget, prefill/decode, preemption.
 pub mod vllm_scheduler;
 
