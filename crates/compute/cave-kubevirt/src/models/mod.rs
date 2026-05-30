@@ -69,8 +69,65 @@ pub struct VirtualMachineInstanceTemplateSpec {
 pub struct VirtualMachineInstance {
     pub name: String,
     pub namespace: Option<String>,
+    /// Set by the API server when a delete is issued; the VMI lingers while
+    /// finalizers run. Mirrors `ObjectMeta.DeletionTimestamp` (Unix seconds).
+    pub deletion_timestamp: Option<i64>,
     pub spec: VirtualMachineInstanceSpec,
     pub status: Option<VirtualMachineInstanceStatus>,
+}
+
+impl VirtualMachineInstance {
+    /// Current phase string, defaulting to the upstream "unset" sentinel ("").
+    fn phase(&self) -> &str {
+        self.status.as_ref().map(|s| s.phase.as_str()).unwrap_or("")
+    }
+
+    /// `vmi.IsUnprocessed()` — no phase yet or still Pending.
+    pub fn is_unprocessed(&self) -> bool {
+        matches!(self.phase(), "" | "Pending")
+    }
+
+    /// `vmi.IsScheduling()`.
+    pub fn is_scheduling(&self) -> bool {
+        self.phase() == "Scheduling"
+    }
+
+    /// `vmi.IsScheduled()`.
+    pub fn is_scheduled(&self) -> bool {
+        self.phase() == "Scheduled"
+    }
+
+    /// `vmi.IsRunning()`.
+    pub fn is_running(&self) -> bool {
+        self.phase() == "Running"
+    }
+
+    /// `vmi.IsFinal()` — reached a terminal phase (Succeeded or Failed).
+    pub fn is_final(&self) -> bool {
+        matches!(self.phase(), "Succeeded" | "Failed")
+    }
+
+    /// `vmi.IsMarkedForDeletion()`.
+    pub fn is_marked_for_deletion(&self) -> bool {
+        self.deletion_timestamp.is_some()
+    }
+
+    /// True iff a condition of the given type is present with the given status.
+    pub fn has_condition(&self, kind: &str, status: &str) -> bool {
+        self.status
+            .as_ref()
+            .map(|s| {
+                s.conditions
+                    .iter()
+                    .any(|c| c.kind == kind && c.status == status)
+            })
+            .unwrap_or(false)
+    }
+
+    /// `hasPausedCondition` — VMI carries a `Paused=True` condition.
+    pub fn has_paused_condition(&self) -> bool {
+        self.has_condition("Paused", "True")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
