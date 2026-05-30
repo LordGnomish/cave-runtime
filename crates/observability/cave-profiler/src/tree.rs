@@ -173,8 +173,25 @@ impl Tree {
     /// frame with non-zero self weight, root-first frames joined by `;` then a
     /// space and the self count. Ports `tree.go` WriteCollapsed.
     pub fn collapsed(&self) -> String {
-        // RED placeholder
-        String::new()
+        let mut out = String::new();
+        let mut path: Vec<&str> = Vec::new();
+        collapse_walk(&self.root, &mut path, &mut out);
+        out
+    }
+}
+
+/// Pre-order DFS emitting a folded line per node with self weight > 0.
+fn collapse_walk<'a>(nodes: &'a [Node], path: &mut Vec<&'a str>, out: &mut String) {
+    for n in nodes {
+        path.push(n.name.as_str());
+        if n.self_value > 0 {
+            out.push_str(&path.join(";"));
+            out.push(' ');
+            out.push_str(&n.self_value.to_string());
+            out.push('\n');
+        }
+        collapse_walk(&n.children, path, out);
+        path.pop();
     }
 }
 
