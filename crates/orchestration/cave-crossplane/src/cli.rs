@@ -44,6 +44,8 @@ pub enum InfraAction {
     Get(String),
     Health,
     Catalog,
+    /// Garbage-collect revisions: `gc <name> [revisionHistoryLimit]`.
+    Gc(String, Option<i64>),
 }
 
 impl InfraAction {
@@ -55,6 +57,18 @@ impl InfraAction {
                     CrossplaneError::Internal("get requires a name".to_string())
                 })?;
                 Ok(Self::Get(name))
+            }
+            Some("gc") => {
+                let name = args.get(1).cloned().ok_or_else(|| {
+                    CrossplaneError::Internal("gc requires a name".to_string())
+                })?;
+                let limit = match args.get(2) {
+                    Some(l) => Some(l.parse::<i64>().map_err(|_| {
+                        CrossplaneError::Internal(format!("gc limit must be an integer: {}", l))
+                    })?),
+                    None => None,
+                };
+                Ok(Self::Gc(name, limit))
             }
             Some("health") => Ok(Self::Health),
             Some("catalog") => Ok(Self::Catalog),
@@ -91,6 +105,19 @@ pub fn dispatch(
         (InfraSubcommand::Composition, InfraAction::Get(name)) => {
             let c = state.composition_store.get(&name)?;
             Ok(serde_json::to_value(c).unwrap_or(Value::Null))
+        }
+        (InfraSubcommand::Composition, InfraAction::Gc(name, limit)) => {
+            let collected = state.composition_store.gc_revisions(&name, limit)?;
+            Ok(json!({
+                "name": name,
+                "limit": limit,
+                "collected": collected,
+                "remaining": state
+                    .composition_store
+                    .get_revisions(&name)
+                    .map(|r| r.len())
+                    .unwrap_or(0),
+            }))
         }
         (InfraSubcommand::Provider, InfraAction::List) => Ok(json!({
             "items": state.provider_store.list().iter().map(|p| json!({
@@ -144,6 +171,10 @@ pub fn dispatch(
         })),
         (sub, InfraAction::Catalog) => Err(CrossplaneError::Internal(format!(
             "catalog action is only valid for `provider`; got `{:?}`",
+            sub
+        ))),
+        (sub, InfraAction::Gc(..)) => Err(CrossplaneError::Internal(format!(
+            "gc action is only valid for `composition`; got `{:?}`",
             sub
         ))),
     }
@@ -239,6 +270,44 @@ mod tests {
     #[test]
     fn run_cli_no_args_errors() {
         assert!(run_cli(&s(), &[]).is_err());
+    }
+
+    #[test]
+    fn action_gc_parses_name_and_limit() {
+        let a = InfraAction::from_args(&["gc".into(), "c1".into(), "3".into()]).unwrap();
+        assert_eq!(a, InfraAction::Gc("c1".into(), Some(3)));
+        let a2 = InfraAction::from_args(&["gc".into(), "c1".into()]).unwrap();
+        assert_eq!(a2, InfraAction::Gc("c1".into(), None));
+    }
+
+    #[test]
+    fn action_gc_requires_name() {
+        assert!(InfraAction::from_args(&["gc".into()]).is_err());
+    }
+
+    #[test]
+    fn action_gc_rejects_bad_limit() {
+        assert!(InfraAction::from_args(&["gc".into(), "c1".into(), "x".into()]).is_err());
+    }
+
+    #[test]
+    fn dispatch_composition_gc_missing_errors() {
+        let r = dispatch(
+            &s(),
+            InfraSubcommand::Composition,
+            InfraAction::Gc("nope".into(), Some(1)),
+        );
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn dispatch_gc_only_valid_for_composition() {
+        let r = dispatch(
+            &s(),
+            InfraSubcommand::Provider,
+            InfraAction::Gc("p".into(), None),
+        );
+        assert!(r.is_err());
     }
 
     #[test]

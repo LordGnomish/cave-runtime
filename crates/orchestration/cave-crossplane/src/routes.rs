@@ -47,6 +47,10 @@ pub fn create_router(state: Arc<CrossplaneState>) -> Router {
             "/api/crossplane/compositions/{name}/revisions",
             get(get_composition_revisions),
         )
+        .route(
+            "/api/crossplane/compositions/{name}/revisions/gc",
+            post(gc_composition_revisions),
+        )
         // Claims (namespaced)
         .route(
             "/api/crossplane/namespaces/{ns}/claims/{kind}",
@@ -273,6 +277,34 @@ async fn get_composition_revisions(
                 "status": format!("{:?}", r.status),
                 "created_at": r.created_at,
             })).collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct GcQuery {
+    /// revisionHistoryLimit: omitted → default 1; 0 → keep all.
+    limit: Option<i64>,
+}
+
+/// Garbage-collect old composition revisions per `revisionHistoryLimit`.
+async fn gc_composition_revisions(
+    State(s): State<AppState>,
+    Path(name): Path<String>,
+    Query(q): Query<GcQuery>,
+) -> impl IntoResponse {
+    match s.composition_store.gc_revisions(&name, q.limit) {
+        Ok(collected) => Json(json!({
+            "name": name,
+            "limit": q.limit,
+            "collected": collected,
+            "remaining": s
+                .composition_store
+                .get_revisions(&name)
+                .map(|r| r.len())
+                .unwrap_or(0),
         }))
         .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
