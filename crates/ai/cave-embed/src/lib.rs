@@ -41,3 +41,6 @@ pub mod cache;
 
 /// Embedding quantization — IEEE-754 half (fp16) and per-vector int8.
 pub mod quant;
+
+/// Cross-encoder reranker + `/v1/rerank` API.
+pub mod rerank;

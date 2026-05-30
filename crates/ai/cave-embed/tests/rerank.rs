@@ -27,10 +27,11 @@ fn rerank_sorts_by_relevance_descending() {
     let rr = Reranker::new(Box::new(LexicalCrossEncoder::new()));
     let docs = vec![
         "completely unrelated text".to_string(),
-        "vector database for embeddings".to_string(),
+        "vector database systems".to_string(),
         "embeddings and vector search".to_string(),
     ];
-    let out = rr.rerank("vector embeddings", &docs, None);
+    // query covers 3 terms; doc2 has both vector+embeddings, doc1 only vector.
+    let out = rr.rerank("vector embeddings search", &docs, None);
     // most-overlapping doc first.
     assert_eq!(out[0].index, 2);
     assert!(out[0].relevance_score >= out[1].relevance_score);
