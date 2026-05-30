@@ -35,3 +35,6 @@ pub mod parser;
 
 /// Component registration framework (`internal/component/registry.go`).
 pub mod component;
+
+/// Component-graph DAG controller (`internal/runtime/internal/dag`).
+pub mod graph;
