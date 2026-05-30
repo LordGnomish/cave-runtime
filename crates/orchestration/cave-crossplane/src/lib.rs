@@ -15,6 +15,7 @@ pub mod cli;
 pub mod composition;
 pub mod conditions;
 pub mod engine;
+pub mod environment;
 pub mod error;
 pub mod function;
 pub mod models;
