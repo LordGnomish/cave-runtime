@@ -10,7 +10,7 @@
 //! record through the operator graph; `drain_output` collects what reached a
 //! sink; `store_get` queries a materialized state store.
 
-use cave_streams::kafka_streams_dsl::{Record, StreamsBuilder};
+use cave_streams::kafka_streams_dsl::{DslPredicate, Record, StreamsBuilder};
 
 fn rec_values(recs: &[Record]) -> Vec<Vec<u8>> {
     recs.iter().map(|r| r.value.clone()).collect()
@@ -187,4 +187,93 @@ fn drain_is_destructive() {
     app.pipe_input("in", b"k", b"v", 0);
     assert_eq!(app.drain_output("out").len(), 1);
     assert!(app.drain_output("out").is_empty()); // drained
+}
+
+// ─── Cycle 2: branch / merge / through ───────────────────────────────────────
+
+#[test]
+fn branch_routes_to_first_matching_predicate() {
+    let b = StreamsBuilder::new();
+    let preds: Vec<DslPredicate> = vec![
+        Box::new(|r: &Record| r.value.starts_with(b"a")),
+        Box::new(|r: &Record| r.value.starts_with(b"b")),
+    ];
+    let branches = b.stream("in").branch(preds);
+    branches[0].to("as");
+    branches[1].to("bs");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"apple", 0);
+    app.pipe_input("in", b"k", b"banana", 0);
+    app.pipe_input("in", b"k", b"avocado", 0);
+
+    assert_eq!(
+        rec_values(&app.drain_output("as")),
+        vec![b"apple".to_vec(), b"avocado".to_vec()]
+    );
+    assert_eq!(rec_values(&app.drain_output("bs")), vec![b"banana".to_vec()]);
+}
+
+#[test]
+fn branch_is_mutually_exclusive_first_match_wins() {
+    let b = StreamsBuilder::new();
+    let preds: Vec<DslPredicate> = vec![
+        Box::new(|_r: &Record| true), // matches everything first
+        Box::new(|_r: &Record| true),
+    ];
+    let branches = b.stream("in").branch(preds);
+    branches[0].to("first");
+    branches[1].to("second");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"x", 0);
+    assert_eq!(app.drain_output("first").len(), 1);
+    assert!(app.drain_output("second").is_empty()); // first match consumed it
+}
+
+#[test]
+fn branch_drops_records_matching_no_predicate() {
+    let b = StreamsBuilder::new();
+    let preds: Vec<DslPredicate> = vec![Box::new(|r: &Record| r.value == b"keep")];
+    let branches = b.stream("in").branch(preds);
+    branches[0].to("kept");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"keep", 0);
+    app.pipe_input("in", b"k", b"nomatch", 0);
+    assert_eq!(rec_values(&app.drain_output("kept")), vec![b"keep".to_vec()]);
+}
+
+#[test]
+fn merge_interleaves_two_streams() {
+    let b = StreamsBuilder::new();
+    let s1 = b.stream("in1").map_values(|v| [b"1:".as_ref(), v].concat());
+    let s2 = b.stream("in2").map_values(|v| [b"2:".as_ref(), v].concat());
+    s1.merge(&s2).to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in1", b"k", b"x", 0);
+    app.pipe_input("in2", b"k", b"y", 0);
+    app.pipe_input("in1", b"k", b"z", 0);
+
+    assert_eq!(
+        rec_values(&app.drain_output("out")),
+        vec![b"1:x".to_vec(), b"2:y".to_vec(), b"1:z".to_vec()]
+    );
+}
+
+#[test]
+fn through_persists_then_continues_downstream() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .through("mid")
+        .map_values(|v| v.to_ascii_uppercase())
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"hi", 0);
+    // `through` writes the pre-transform record to the intermediate topic ...
+    assert_eq!(rec_values(&app.drain_output("mid")), vec![b"hi".to_vec()]);
+    // ... and the stream continues through the rest of the topology.
+    assert_eq!(rec_values(&app.drain_output("out")), vec![b"HI".to_vec()]);
 }
