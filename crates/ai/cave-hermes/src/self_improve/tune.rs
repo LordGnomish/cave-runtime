@@ -13,6 +13,175 @@
 //! of mode. There is no autonomous live change — `Propose` is the default and
 //! `Apply` is the explicit gate (cluster flag `CAVE_AGENT_AUTOAPPLY`).
 
+use serde::{Deserialize, Serialize};
+
+use super::observe::{Anomaly, Severity};
+
+/// The surface a tuning change touches. The mutable variants are the only
+/// ones the runtime agent is permitted to change (ADR-SELF-IMPROVE-001 §3);
+/// the rest are explicitly off-limits (§4) and can never be applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChangeSurface {
+    // Mutable surface.
+    SchedulerWeight,
+    CacheTtl,
+    RateLimit,
+    ResourceLimit,
+    FeatureFlag,
+    SloBudget,
+    // Forbidden surface.
+    Identity,
+    NetworkPolicy,
+    Crypto,
+    ApiSignature,
+}
+
+impl ChangeSurface {
+    /// Whether the runtime agent may apply a change to this surface.
+    pub fn is_mutable(&self) -> bool {
+        matches!(
+            self,
+            ChangeSurface::SchedulerWeight
+                | ChangeSurface::CacheTtl
+                | ChangeSurface::RateLimit
+                | ChangeSurface::ResourceLimit
+                | ChangeSurface::FeatureFlag
+                | ChangeSurface::SloBudget
+        )
+    }
+}
+
+/// A proposed operational change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TuningSuggestion {
+    pub target: String,
+    pub surface: ChangeSurface,
+    pub current: String,
+    pub proposed: String,
+    pub rationale: String,
+    pub severity: Severity,
+}
+
+impl TuningSuggestion {
+    pub fn new(
+        target: impl Into<String>,
+        surface: ChangeSurface,
+        current: impl Into<String>,
+        proposed: impl Into<String>,
+        rationale: impl Into<String>,
+        severity: Severity,
+    ) -> Self {
+        Self {
+            target: target.into(),
+            surface,
+            current: current.into(),
+            proposed: proposed.into(),
+            rationale: rationale.into(),
+            severity,
+        }
+    }
+}
+
+/// Whether to merely propose a change or actually apply it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyMode {
+    /// Default — record nothing, hand the suggestion to a human.
+    Propose,
+    /// Opt-in — apply mutable-surface changes (gated by `CAVE_AGENT_AUTOAPPLY`).
+    Apply,
+}
+
+/// Result of an [`TuningEngine::apply`] call.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApplyOutcome {
+    Applied,
+    Proposed,
+    Rejected { reason: String },
+}
+
+/// Maps anomalies to suggestions and gates their application.
+#[derive(Debug, Default)]
+pub struct TuningEngine {
+    history: Vec<TuningSuggestion>,
+}
+
+impl TuningEngine {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Translate anomalies into suggestions over the constrained surface.
+    /// Signals are matched heuristically: latency/p99 → scheduler weight,
+    /// error-rate → rate limit, cache → cache TTL.
+    pub fn suggest(&self, anomalies: &[Anomaly]) -> Vec<TuningSuggestion> {
+        anomalies
+            .iter()
+            .filter_map(Self::suggestion_for)
+            .collect()
+    }
+
+    fn suggestion_for(a: &Anomaly) -> Option<TuningSuggestion> {
+        let sig = a.signal.to_ascii_lowercase();
+        let (surface, target, proposed) = if sig.contains("error_rate") {
+            (
+                ChangeSurface::RateLimit,
+                "ingress.rate_limit_rps",
+                "reduce by 20% + extend backoff",
+            )
+        } else if sig.contains("cache") {
+            (
+                ChangeSurface::CacheTtl,
+                "cache.default_ttl_s",
+                "increase TTL to lift hit-ratio",
+            )
+        } else if sig.contains("p99") || sig.contains("latency") {
+            (
+                ChangeSurface::SchedulerWeight,
+                "scheduler.binpack_weight",
+                "shift weight toward spread to relieve hot nodes",
+            )
+        } else {
+            return None;
+        };
+        Some(TuningSuggestion::new(
+            target,
+            surface,
+            format!("observed={:.2}", a.observed),
+            proposed,
+            format!(
+                "anomaly on '{}' ({:?}): {}",
+                a.signal, a.severity, a.detail
+            ),
+            a.severity,
+        ))
+    }
+
+    /// Apply or propose a suggestion. A forbidden surface is always
+    /// rejected; a mutable surface is applied only in [`ApplyMode::Apply`].
+    pub fn apply(&mut self, suggestion: &TuningSuggestion, mode: ApplyMode) -> ApplyOutcome {
+        if !suggestion.surface.is_mutable() {
+            return ApplyOutcome::Rejected {
+                reason: format!(
+                    "surface {:?} is off-limits to the runtime agent (ADR-SELF-IMPROVE-001 §4)",
+                    suggestion.surface
+                ),
+            };
+        }
+        match mode {
+            ApplyMode::Propose => ApplyOutcome::Proposed,
+            ApplyMode::Apply => {
+                self.history.push(suggestion.clone());
+                ApplyOutcome::Applied
+            }
+        }
+    }
+
+    /// Every suggestion that was actually applied, in order.
+    pub fn history(&self) -> &[TuningSuggestion] {
+        &self.history
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
