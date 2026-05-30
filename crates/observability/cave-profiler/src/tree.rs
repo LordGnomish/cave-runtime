@@ -35,13 +35,40 @@ impl Tree {
     ///
     /// Children are kept sorted by name; `total` accumulates along the path and
     /// `self` is credited to the leaf. Non-positive `v` is ignored.
-    pub fn insert_stack(&mut self, _v: i64, _stack: &[&str]) {
-        // RED placeholder
+    pub fn insert_stack(&mut self, v: i64, stack: &[&str]) {
+        if v <= 0 || stack.is_empty() {
+            return;
+        }
+        let last = stack.len() - 1;
+        let mut children = &mut self.root;
+        for (idx, &name) in stack.iter().enumerate() {
+            let i = match children.binary_search_by(|c| c.name.as_str().cmp(name)) {
+                Ok(i) => i,
+                Err(i) => {
+                    children.insert(
+                        i,
+                        Node {
+                            name: name.to_string(),
+                            self_value: 0,
+                            total: 0,
+                            children: Vec::new(),
+                        },
+                    );
+                    i
+                }
+            };
+            let node = &mut children[i];
+            node.total += v;
+            if idx == last {
+                node.self_value += v;
+            }
+            children = &mut node.children;
+        }
     }
 
     /// Sum of `total` across root nodes.
     pub fn total(&self) -> i64 {
-        0
+        self.root.iter().map(|n| n.total).sum()
     }
 }
 
