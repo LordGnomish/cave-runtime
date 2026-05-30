@@ -331,6 +331,35 @@ pub fn within_notify_window(from_minute: u32, to_minute: u32, now_minute: u32) -
     }
 }
 
+/// Count alerts whose `created_at` falls within the trailing
+/// `window_minutes` measured back from the *most recent* alert.
+///
+/// Port of the count in `STEP_NOTIFY_IF_NUM_ALERTS_IN_TIME_WINDOW`
+/// (escalation_policy_snapshot.py):
+/// `alerts.filter(created_at__gte=last_alert.created_at - time_delta).count()`.
+/// The window is anchored on the latest alert (not wall-clock now) and the
+/// lower edge is inclusive (`>=`). An empty slice yields 0.
+pub fn num_alerts_in_window(alert_times: &[DateTime<Utc>], window_minutes: u32) -> usize {
+    let Some(last) = alert_times.iter().max() else {
+        return 0;
+    };
+    let cutoff = *last - Duration::minutes(window_minutes as i64);
+    alert_times.iter().filter(|&&t| t >= cutoff).count()
+}
+
+/// Whether the num-alerts-in-window escalation guard lets the chain proceed.
+///
+/// Upstream pauses when `num_alerts_in_window <= self.num_alerts_in_window`, so
+/// escalation continues only when the trailing-window count is *strictly
+/// greater* than `threshold`.
+pub fn num_alerts_condition_met(
+    alert_times: &[DateTime<Utc>],
+    window_minutes: u32,
+    threshold: u32,
+) -> bool {
+    num_alerts_in_window(alert_times, window_minutes) as u32 > threshold
+}
+
 /// Validate a rotation configuration for basic sanity.
 pub fn validate_rotation(rot: &Rotation) -> Result<(), OnCallError> {
     if rot.users.is_empty() {
