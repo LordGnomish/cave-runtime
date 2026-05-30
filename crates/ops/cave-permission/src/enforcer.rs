@@ -16,6 +16,7 @@
 //! The [`enforce`](Enforcer::enforce) / [`batch_enforce`](Enforcer::batch_enforce)
 //! decision functions live alongside the store (see the `enforce` impl block).
 
+use crate::matchers::key_match;
 use crate::rbac::{RoleManager, DEFAULT_MAX_HIERARCHY_LEVEL};
 
 /// A single `p` policy rule: `[sub, obj, act]`.
@@ -107,6 +108,32 @@ impl Enforcer {
     /// The role manager backing the `g` rules (read access for enforce/tests).
     pub fn role_manager(&self) -> &RoleManager {
         &self.role_manager
+    }
+
+    // ─── enforcer.go — decision ──────────────────────────────────────────────
+
+    /// Evaluates the request `(sub, obj, act)` against the policy set.
+    ///
+    /// Upstream: `Enforcer.Enforce` specialised to the RBAC-with-resource model
+    ///   `m = g(r.sub, p.sub) && keyMatch(r.obj, p.obj) && r.act == p.act`
+    /// with effect `e = some(where (p.eft == allow))`: the request is allowed
+    /// iff at least one `p` rule matches. `g(r.sub, p.sub)` is the role
+    /// manager's `has_link` (reflexive, so a direct `p.sub == r.sub` grant also
+    /// matches); object matching uses the Casbin `keyMatch` operator.
+    pub fn enforce(&self, sub: &str, obj: &str, act: &str) -> bool {
+        self.policies.iter().any(|rule| {
+            let (p_sub, p_obj, p_act) = (&rule[0], &rule[1], &rule[2]);
+            self.role_manager.has_link(sub, p_sub) && key_match(obj, p_obj) && act == p_act
+        })
+    }
+
+    /// Vectorised [`enforce`](Enforcer::enforce) over many requests.
+    /// Upstream: `enforcer_interface.go BatchEnforce`.
+    pub fn batch_enforce(&self, requests: &[(&str, &str, &str)]) -> Vec<bool> {
+        requests
+            .iter()
+            .map(|(sub, obj, act)| self.enforce(sub, obj, act))
+            .collect()
     }
 }
 
