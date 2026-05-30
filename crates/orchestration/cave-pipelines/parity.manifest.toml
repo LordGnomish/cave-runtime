@@ -16,18 +16,32 @@ language= "Go"
 url     = "https://github.com/tektoncd/pipeline"
 
 [parity]
-# 2026-05-29 Charter v2 close — fill_ratio 0.0 → 1.0
+# 2026-05-30 Wave-3 honest uplift — honest_ratio 0.6316 → 0.6842
 #   Source count methodology:
 #     total          = upstream surface areas = 19
-#     mapped         = 11  (all implemented src/ modules)
+#     mapped         = 12  (all implemented src/ modules)
 #     partial        = 1   (Tekton Dashboard / portal_ui)
-#     skipped        = 7   (ADR-RUNTIME-PARITY-100-PCT-001 §5 scope-cuts)
+#     skipped        = 6   (ADR-RUNTIME-PARITY-100-PCT-001 §5 scope-cuts)
 #     unmapped_count = 0
 #
-#   fill_ratio  = (11 + 1 + 7) / 19 = 1.0
-#   honest_ratio = (11 + 1) / 19  = 0.6316  (preserved; real portal partial)
+#   fill_ratio  = (12 + 1 + 6) / 19 = 1.0
+#   honest_ratio = (12 + 1) / 19  = 0.6842
 #
-#   Absorb delta vs. prior ratio=0.0 placeholder:
+#   Wave-3 (2026-05-30) honest conversion (strict TDD, RED→GREEN):
+#     * pkg/pod/ skip → mapped: ported the PURE step-sequencing core of
+#       tektoncd/pipeline pkg/pod/entrypoint.go `orderContainers` (+helpers
+#       resultArgument / stepResultArgument / collectResultsName) into
+#       src/entrypoint.rs. This rewrites every step's argv to wrap it in the
+#       /tekton/bin/entrypoint binary with -wait_file/-post_file flags so
+#       step N blocks on step N-1's /tekton/run/{i-1}/out post-file — pure
+#       in-memory argv assembly, NOT k8s pod scheduling / volume mounting
+#       (which remains cave-cri's). 6 entrypoint_tdd + 2 inline tests.
+#     * The k8s pod lifecycle (init-container sidecars, workspace volume
+#       mounts, runtime class) that the prior pkg/pod/ skip ALSO covered is
+#       genuinely cave-cri's; that residue is folded into the pkg/container/
+#       sub-component skip below (cave-cri owns container execution).
+#
+#   2026-05-29 Charter v2 close — fill_ratio 0.0 → 1.0:
 #     * Added pub mod declarations in lib.rs for 5 previously-orphaned modules
 #       (build, executor, github, notifications, workspace) — all had genuine
 #       implementations on disk but were undeclared.
@@ -35,26 +49,25 @@ url     = "https://github.com/tektoncd/pipeline"
 #       current models.rs (RunStatus→RunPhase, WorkspaceBinding struct→enum,
 #       ParameterValue→Param/ParamValue, interpolate_params→resolve_param_string,
 #       Step.timeout_seconds→Step.timeout: Option<String>).
-#     * 67 lib tests + 4 proptest = 71 PASS (was 41+4).
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.6316
+honest_ratio        = 0.6842
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 11
+mapped_count        = 12
 partial_count       = 1
-skipped_count       = 7
+skipped_count       = 6
 unmapped_count      = 0
 total               = 19
-last_audit          = "2026-05-29"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 [module]
 name        = "cave-pipelines"
 description = "Tekton-parity CI/CD — pipelines/tasks/runs, triggers (CEL), workspaces, build strategies, GitHub status, Jenkins import, catalog"
 source_root = "src"
-rs_files    = 12
-tests_passing = 71
+rs_files    = 13
+tests_passing = 73
 
 # ── Mapped subsystems ────────────────────────────────────────────────────────
 
@@ -113,6 +126,11 @@ upstream_pkg = "pkg/apis/pipeline/v1/routes.go"
 local_files  = ["src/routes.rs"]
 note         = "HTTP routes — Pipeline/Task/PipelineRun/TaskRun CRUD, logs streaming, catalog, event-listeners, Jenkins import"
 
+[[mapped]]
+upstream_pkg = "pkg/pod/entrypoint.go"
+local_files  = ["src/entrypoint.rs"]
+note         = "Step-sequencing (orderContainers): rewrites each step's argv to wrap /tekton/bin/entrypoint with -wait_file/-post_file so step N blocks on step N-1's /tekton/run/{i-1}/out post-file; + resultArgument/stepResultArgument/collectResultsName. Pure in-memory argv assembly. 2026-05-30 strict-TDD RED→GREEN (tests/entrypoint_tdd.rs). k8s pod scheduling/volume mounts remain cave-cri."
+
 # ── Partial ──────────────────────────────────────────────────────────────────
 
 [[partial]]
@@ -139,14 +157,9 @@ reason       = "parallel-track"
 note         = "HTTP/OCI remote resource fetcher backing the resolver framework. Same parallel-track as pkg/resolution/ above."
 
 [[skipped]]
-upstream_pkg = "pkg/pod/"
-reason       = "sub-component"
-note         = "Pod lifecycle (initContainer sidecars, step ordering, workspace volume mounts on k8s pods). cave-cri owns pod scheduling. ADR-RUNTIME-PARITY-100-PCT-001 §5."
-
-[[skipped]]
 upstream_pkg = "pkg/container/"
 reason       = "sub-component"
-note         = "Step container spec plumbing (runtime class, security, resource limits). cave-cri owns container execution. ADR-RUNTIME-PARITY-100-PCT-001 §5."
+note         = "Step container spec plumbing (runtime class, security, resource limits) AND the k8s pod lifecycle residue of pkg/pod/ (initContainer sidecars, workspace volume mounts on k8s pods, pod scheduling). cave-cri owns container/pod execution. The PURE step-ordering algorithm of pkg/pod/entrypoint.go was ported in-crate (see src/entrypoint.rs mapped entry). ADR-RUNTIME-PARITY-100-PCT-001 §5."
 
 [[skipped]]
 upstream_pkg = "tkn"
@@ -208,6 +221,10 @@ local    = "src/jenkins.rs"
 upstream = "pkg/apis/pipeline/v1/routes.go"
 local    = "src/routes.rs"
 
+[[files]]
+upstream = "pkg/pod/entrypoint.go"
+local    = "src/entrypoint.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 
 [[functions]]
@@ -249,6 +266,21 @@ file          = "src/jenkins.rs"
 upstream_name = "ToPipelineSpec"
 local_name    = "to_pipeline_spec"
 file          = "src/jenkins.rs"
+
+[[functions]]
+upstream_name = "orderContainers"
+local_name    = "order_containers"
+file          = "src/entrypoint.rs"
+
+[[functions]]
+upstream_name = "resultArgument"
+local_name    = "result_argument"
+file          = "src/entrypoint.rs"
+
+[[functions]]
+upstream_name = "stepResultArgument"
+local_name    = "step_result_argument"
+file          = "src/entrypoint.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 
