@@ -176,4 +176,35 @@ mod tests {
         assert!(IpPattern::parse("192.168.0.0/99").is_err());
         assert!(IpPattern::parse("10.0.0.5-").is_err());
     }
+
+    #[test]
+    fn line_match_finds_embedded_v4() {
+        let p = IpPattern::parse("192.168.0.0/16").unwrap();
+        assert!(p.line_matches(r#"level=info msg="from 192.168.4.5 ok""#));
+        assert!(!p.line_matches(r#"level=info msg="from 10.0.0.1 ok""#));
+    }
+
+    #[test]
+    fn line_match_finds_embedded_v6() {
+        let p = IpPattern::parse("2001:db8::/32").unwrap();
+        assert!(p.line_matches("client=2001:db8::dead:beef connected"));
+        assert!(!p.line_matches("client=fe80::1 connected"));
+    }
+
+    #[test]
+    fn line_match_range_and_no_ip_line() {
+        let p = IpPattern::parse("192.168.4.5-192.168.4.20").unwrap();
+        assert!(p.line_matches("a 192.168.4.12 b"));
+        assert!(!p.line_matches("a 192.168.4.99 b"));
+        // A line with no parseable address never matches.
+        assert!(!p.line_matches("no addresses here at all"));
+    }
+
+    #[test]
+    fn line_match_ignores_version_like_dotted_runs() {
+        // "1.2.3" is not a valid IPv4 (3 octets) — must not false-match.
+        let p = IpPattern::parse("1.2.0.0/16").unwrap();
+        assert!(!p.line_matches("app version 1.2.3 started"));
+        assert!(p.line_matches("app talking to 1.2.3.4 now"));
+    }
 }
