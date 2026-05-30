@@ -281,17 +281,26 @@ async fn delete(
 async fn aggregate(
     State(state): State<Arc<DocDbState>>,
     Path((db, col)): Path<(String, String)>,
-    Json(_req): Json<AggregateRequest>,
+    Json(req): Json<AggregateRequest>,
 ) -> ApiResult<Vec<Value>> {
-    let database = state.engine.get_or_create_database(&db).await;
-    let collection = database.get_or_create_collection(&col).await;
+    // Build the command document the aggregation engine expects and run the
+    // full pipeline ($match/$project/$group/$sort/$unwind/$limit/$skip/...).
+    let mut cmd = Document::new();
+    cmd.insert("aggregate".to_string(), Value::String(col.clone()));
+    cmd.insert("$db".to_string(), Value::String(db.clone()));
+    cmd.insert("pipeline".to_string(), Value::Array(req.pipeline));
 
-    let docs = collection.find(None).await.map_err(|e| err_internal(&e))?;
+    let resp = crate::commands::agg::aggregate(&cmd, state.engine.clone())
+        .await
+        .map_err(|e| err_internal(&e))?;
 
-    let results = docs
-        .into_iter()
-        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
-        .collect();
+    let results = resp
+        .get("cursor")
+        .and_then(|v| v.as_object())
+        .and_then(|c| c.get("firstBatch"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
 
     Ok(Json(results))
 }
