@@ -1,6 +1,6 @@
 [package]
 name = "cave-tracing"
-description = "Sovereign OpenTelemetry-compatible tracing SDK — span SDK, batching, sampling, OTLP exporter, W3C propagation, multi-tenant"
+description = "Grafana Alloy reimplementation — Alloy/River config syntax + component-graph controller + OpenTelemetry span SDK (batching, sampling, OTLP exporter, W3C propagation, multi-tenant)"
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true

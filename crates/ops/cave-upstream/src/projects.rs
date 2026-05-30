@@ -284,6 +284,15 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 1,
     },
     TrackedProject {
+        name: "Grafana Alloy",
+        github_repo: "grafana/alloy",
+        cave_module: "cave-tracing",
+        track_features: "Alloy/River config syntax, component graph controller, otelcol/prometheus/loki components, telemetry pipelines",
+        check_frequency: "biweekly",
+        category: "observability",
+        phase: 1,
+    },
+    TrackedProject {
         name: "Tempo",
         github_repo: "grafana/tempo",
         cave_module: "cave-trace",

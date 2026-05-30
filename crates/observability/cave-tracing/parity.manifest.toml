@@ -1,28 +1,71 @@
 # parity.manifest.toml — cave-tracing
-# Upstream: jaegertracing/jaeger v2.17.0
-#   https://github.com/jaegertracing/jaeger
+# Upstream: grafana/alloy v1.5.0
+#   https://github.com/grafana/alloy
 #
-# Jaeger v2 is a CNCF graduated distributed-tracing collector. cave-tracing
-# tracks its OTLP-receiver and storage surface. cave-trace (already in
-# the registry) covers the same upstream — these may merge before launch.
+# Grafana Alloy is the OpenTelemetry-Collector-distribution + Grafana Agent +
+# Promtail successor: a single telemetry collector configured in the Alloy
+# configuration syntax (formerly "River"), a declarative HCL-like language
+# whose `component "label" { ... }` blocks wire into a directed acyclic graph
+# (DAG) that the controller evaluates and runs. cave-tracing reimplements that
+# engine: the Alloy/River config language (scanner → parser → AST), the
+# component registration framework, and the DAG controller, plus the existing
+# in-process OpenTelemetry span SDK (tracer/exporter/sampling/propagation)
+# which backs Alloy's tracing pipeline (otelcol.* tracing path).
 #
-# Stubbed 2026-05-02.
+# 2026-05-28 honest repoint: the previous manifest pointed at jaegertracing/
+# jaeger v2.17.0 with `infra_only = true` + `ratio = 0.0` (a stub — Jaeger is
+# already covered by the cave-trace crate). Repointed to grafana/alloy and the
+# parity surface measured honestly against Alloy's architecture for the first
+# time.
+#
+# MVP subsystem inventory (16 curated Alloy subsystems):
+#   ENGINE (this ray — strict-TDD ports):
+#     syntax-token      syntax/token/token.go       — lexical tokens + precedence
+#     syntax-scanner    syntax/scanner/scanner.go   — lexer + terminator insertion
+#     syntax-ast        syntax/ast/ast.go           — AST node tree
+#     syntax-parser     syntax/parser/internal.go   — recursive-descent parser
+#     component-registry internal/component/registry.go — registration framework
+#     component-graph   internal/component controller — DAG build + topo eval
+#   BROADER SURFACE (honestly unmapped — real gaps, NOT scope-cut):
+#     syntax-vm         syntax/vm — expression evaluation engine
+#     syntax-encoding   syntax/encoding — Go-struct <-> River value tags
+#     syntax-printer    syntax/printer — config formatter / pretty-printer
+#     otelcol-family    internal/component/otelcol — receiver/processor/exporter
+#     prometheus-family internal/component/prometheus — scrape/remote_write/relabel
+#     loki-family       internal/component/loki — source.*/process/write
+#     discovery-family  internal/component/discovery — service discovery
+#     http-ui-debug     internal/web — debug UI + component graph endpoint
+#   OUT OF MVP (skipped — categorical long tail):
+#     clustering        internal/service/cluster — distributed clustering (cave-ha)
+#     cloud-integrations beyla/faro/pyroscope/mimir + cloud-SDK receivers
+#
+# fill_ratio   = (mapped + partial + skipped) / total
+# honest_ratio = (mapped + partial)           / total
 
 [upstream]
-org     = "jaegertracing"
-repo    = "jaeger"
-version = "v2.17.0"
-name    = "Jaeger"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/jaegertracing/jaeger"
+org        = "grafana"
+repo       = "alloy"
+version    = "v1.5.0"
+name       = "Grafana Alloy"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/grafana/alloy"
+source_sha = "3a39c06613073f2cc76dab03c7cf8210569871e9"
+
 [module]
 name        = "cave-tracing"
-description = "Distributed tracing collector — Jaeger v2 reimplementation"
+description = "Grafana Alloy reimplementation — Alloy/River config syntax + component-graph controller + OpenTelemetry span SDK"
 source_root = "src"
 
 [parity]
-infra_only = true
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-
+parity_ratio_source = "manifest"
+fill_ratio          = 0.0    # populated by the strict-TDD engine ports below
+honest_ratio        = 0.0
+adr_justified_ratio = 0.0    # no ADR scope-cut inflation; honest measure only
+last_audit          = "2026-05-28"
+infra_only          = false
+mapped_count        = 0
+partial_count       = 0
+skipped_count       = 2
+unmapped_count      = 14
+total               = 16

@@ -27,6 +27,13 @@
 //! See `examples/quickstart.rs` (out-of-tree) for a full wiring example.
 //! Tail sampling lives next to head sampling in `sampling::TailSampler`.
 
+/// Grafana Alloy engine reimplementation.
+///
+/// Ports the Alloy/River configuration syntax (scanner → parser → AST), the
+/// component registration framework, and the DAG controller. See the module
+/// docs for the layering. Upstream: grafana/alloy v1.5.0 (Apache-2.0).
+pub mod alloy;
+
 /// Re-export of the batch processing module.
 ///
 /// Contains `BatchSpanProcessor` and related configuration types like
