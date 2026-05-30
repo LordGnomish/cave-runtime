@@ -36,6 +36,7 @@ pub mod middleware;
 pub mod oauth_endpoints;
 pub mod oid4vc;
 pub mod otp;
+pub mod password_hash;
 pub mod okta;
 pub mod persistence;
 pub mod rbac;
