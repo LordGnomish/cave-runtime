@@ -23,16 +23,16 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5870   # (mapped + partial) / total = 27/46
+honest_ratio         = 0.6087   # (mapped + partial) / total = 28/46
 adr_justified_ratio  = 1.00     # every [[partial]] + [[skipped]] cites one of the 8 standard scope-cut labels from the umbrella ADR
 adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153"
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-24"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 24
+mapped_count         = 25
 partial_count        = 3
-skipped_count        = 19
+skipped_count        = 18
 unmapped_count       = 0
 total                = 46
 
@@ -135,6 +135,10 @@ local    = "src/providers/mistral.rs"
 [[files]]
 upstream = "litellm/llms/cohere/chat/transformation.py"
 local    = "src/providers/cohere.rs"
+
+[[files]]
+upstream = "litellm/llms/vertex_ai/gemini/transformation.py"
+local    = "src/providers/google.rs"
 
 [[files]]
 upstream = "litellm/secret_managers/main.py"
@@ -314,6 +318,13 @@ name = "provider-mistral"
 name = "provider-cohere"
 
 [[mapped]]
+name = "provider-vertex-google"
+# generateContent request/response transform (shared by Gemini API +
+# Vertex AI). Credential resolution (Gemini ?key= vs Vertex GCP-SA OAuth
+# bearer) defers to cave-vault/keychain per the API-key red line — same
+# contract as every other SaaS provider in this crate.
+
+[[mapped]]
 name = "provider-local-openai-compat"
 
 [[mapped]]
@@ -391,11 +402,6 @@ cut_to = "cave-llm-gateway-phase-2"
 [[skipped]]
 name   = "provider-azure-openai"
 reason = "Azure OpenAI — provider matrix Phase 2"
-cut_to = "cave-llm-gateway-phase-2"
-
-[[skipped]]
-name   = "provider-vertex-google"
-reason = "GCP Vertex/Gemini — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
 
 [[skipped]]
@@ -482,7 +488,7 @@ cut_to = "cave-portal-api"
 
 [[scope_cuts]]
 group   = "cloud-saas-matrix"
-members = ["provider-bedrock", "provider-azure-openai", "provider-vertex-google",
+members = ["provider-bedrock", "provider-azure-openai",
            "provider-together-fireworks",
            "provider-replicate-huggingface", "provider-groq-deepseek"]
 reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plus all three local backends"
