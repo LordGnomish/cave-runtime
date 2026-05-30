@@ -65,6 +65,14 @@ pub struct MapType {
     pub value: Box<Type>,
 }
 
+/// Reserved Iceberg v3 row-lineage metadata field id — `_row_id`,
+/// the unique long assigned to a row for lineage tracking.
+pub const RESERVED_FIELD_ID_ROW_ID: i32 = 2147483540;
+/// Reserved Iceberg v3 row-lineage metadata field id —
+/// `_last_updated_sequence_number`, the sequence number that last
+/// updated a row.
+pub const RESERVED_FIELD_ID_LAST_UPDATED_SEQ: i32 = 2147483539;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NestedField {
     pub id: i32,
@@ -72,6 +80,22 @@ pub struct NestedField {
     pub required: bool,
     pub field_type: Type,
     pub doc: Option<String>,
+    /// v3 `initial-default` — value backfilled for rows written before
+    /// this column existed. Immutable once a column is added.
+    #[serde(
+        rename = "initial-default",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub initial_default: Option<serde_json::Value>,
+    /// v3 `write-default` — value used for new rows that omit this
+    /// column. May be changed through schema evolution.
+    #[serde(
+        rename = "write-default",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub write_default: Option<serde_json::Value>,
 }
 
 impl NestedField {
@@ -82,6 +106,8 @@ impl NestedField {
             required: true,
             field_type: ty,
             doc: None,
+            initial_default: None,
+            write_default: None,
         }
     }
 
@@ -92,12 +118,50 @@ impl NestedField {
             required: false,
             field_type: ty,
             doc: None,
+            initial_default: None,
+            write_default: None,
         }
     }
 
     pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
         self.doc = Some(doc.into());
         self
+    }
+
+    /// Set the v3 `initial-default` (read-time backfill value).
+    pub fn with_initial_default(mut self, v: serde_json::Value) -> Self {
+        self.initial_default = Some(v);
+        self
+    }
+
+    /// Set the v3 `write-default` (new-row default value).
+    pub fn with_write_default(mut self, v: serde_json::Value) -> Self {
+        self.write_default = Some(v);
+        self
+    }
+
+    /// The value to substitute when reading a row that predates this
+    /// column — Iceberg's `initial-default`, or `None` if unset.
+    pub fn read_default(&self) -> Option<&serde_json::Value> {
+        self.initial_default.as_ref()
+    }
+
+    /// The reserved v3 `_row_id` row-lineage metadata column.
+    pub fn row_id() -> Self {
+        Self::optional(
+            RESERVED_FIELD_ID_ROW_ID,
+            "_row_id",
+            Type::Primitive(PrimitiveType::Long),
+        )
+    }
+
+    /// The reserved v3 `_last_updated_sequence_number` metadata column.
+    pub fn last_updated_sequence_number() -> Self {
+        Self::optional(
+            RESERVED_FIELD_ID_LAST_UPDATED_SEQ,
+            "_last_updated_sequence_number",
+            Type::Primitive(PrimitiveType::Long),
+        )
     }
 }
 
