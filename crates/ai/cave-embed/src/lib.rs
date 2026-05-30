@@ -35,3 +35,6 @@ pub mod api;
 
 /// Embedding service — orchestrates registry + backend + tokenizer.
 pub mod service;
+
+/// Embedding result cache (LRU memoization).
+pub mod cache;

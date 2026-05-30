@@ -43,12 +43,17 @@ pub enum ServiceError {
 pub struct EmbeddingService {
     registry: ModelRegistry,
     backend: Box<dyn EmbeddingBackend>,
+    cache: Option<crate::cache::EmbeddingCache>,
 }
 
 impl EmbeddingService {
     /// Build a service with the given registry and backend.
     pub fn new(registry: ModelRegistry, backend: Box<dyn EmbeddingBackend>) -> Self {
-        EmbeddingService { registry, backend }
+        EmbeddingService {
+            registry,
+            backend,
+            cache: None,
+        }
     }
 
     /// Build a service with the built-in model catalogue and reference backend.
@@ -57,6 +62,17 @@ impl EmbeddingService {
             ModelRegistry::with_builtins(),
             Box::new(HashEmbedder::new()),
         )
+    }
+
+    /// Enable result memoization with the given LRU capacity.
+    pub fn with_cache(mut self, capacity: usize) -> Self {
+        self.cache = Some(crate::cache::EmbeddingCache::new(capacity));
+        self
+    }
+
+    /// `(hits, misses)` if a cache is enabled.
+    pub fn cache_stats(&self) -> Option<(u64, u64)> {
+        self.cache.as_ref().map(|c| c.stats())
     }
 
     /// Borrow the model registry (for `/v1/models`).
@@ -94,18 +110,49 @@ impl EmbeddingService {
             prepared.push(t);
         }
 
-        let raw = self.backend.embed(&prepared, card)?;
-
-        let base64 = req.encoding_format.as_deref() == Some("base64");
-        let mut data = Vec::with_capacity(raw.len());
-        for (index, mut vec) in raw.into_iter().enumerate() {
-            // Matryoshka dimension truncation + renormalize.
-            if let Some(d) = req.dimensions {
-                vec.truncate(d);
-                if card.normalize {
-                    vec = l2_normalize(&vec);
+        // Resolve from cache where possible; embed only the misses as a batch.
+        // Cached vectors are stored post-Matryoshka (the key includes `dimensions`).
+        let mut finals: Vec<Option<Vec<f32>>> = vec![None; prepared.len()];
+        let mut miss_idx: Vec<usize> = Vec::new();
+        let mut miss_text: Vec<String> = Vec::new();
+        for (i, text) in prepared.iter().enumerate() {
+            if let Some(cache) = &self.cache {
+                let key = crate::cache::EmbeddingCache::key(&card.id, req.dimensions, text);
+                if let Some(v) = cache.get(&key) {
+                    finals[i] = Some(v);
+                    continue;
                 }
             }
+            miss_idx.push(i);
+            miss_text.push(text.clone());
+        }
+
+        if !miss_text.is_empty() {
+            let raw = self.backend.embed(&miss_text, card)?;
+            for (slot, mut vec) in miss_idx.iter().zip(raw.into_iter()) {
+                // Matryoshka dimension truncation + renormalize.
+                if let Some(d) = req.dimensions {
+                    vec.truncate(d);
+                    if card.normalize {
+                        vec = l2_normalize(&vec);
+                    }
+                }
+                if let Some(cache) = &self.cache {
+                    let key = crate::cache::EmbeddingCache::key(
+                        &card.id,
+                        req.dimensions,
+                        &prepared[*slot],
+                    );
+                    cache.put(key, vec.clone());
+                }
+                finals[*slot] = Some(vec);
+            }
+        }
+
+        let base64 = req.encoding_format.as_deref() == Some("base64");
+        let mut data = Vec::with_capacity(finals.len());
+        for (index, vec) in finals.into_iter().enumerate() {
+            let vec = vec.expect("every slot filled from cache or backend");
             let embedding = if base64 {
                 EmbeddingData::Base64(encode_f32_base64(&vec))
             } else {
