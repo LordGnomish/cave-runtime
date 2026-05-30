@@ -1,9 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Shared eBPF types and BPF map definitions.
-//! Used by both kernel-space eBPF programs (via Aya) and user-space consumers.
+//! Shared eBPF types and BPF map definitions, plus a userspace-approximation
+//! port of the grafana/beyla eBPF auto-instrumentation pipeline.
+//!
+//! ## Layout
+//!
+//! The original crate held the Cave-internal eBPF event structs
+//! ([`SyscallEvent`], [`NetEvent`], [`ResourceEvent`]). It now also hosts a
+//! userspace port of [Beyla](https://github.com/grafana/beyla) (Apache-2.0)
+//! — the userspace half of Beyla's eBPF auto-instrumentation:
+//!
+//! * [`loader`]   — eBPF object load path (spec validation, GPL gate).
+//! * [`map`]      — BPF map abstraction (hash / array / LRU / ringbuf).
+//! * [`ringbuf`]  — ring-buffer record reader (reserve / commit / consume).
+//! * [`probe`]    — kprobe / uprobe / tracepoint attach registry.
+//! * [`discover`] — HTTP / gRPC / SQL protocol detection from raw buffers.
+//! * [`process`]  — process discovery + exec/exit watcher.
+//! * [`otlp`]     — request span → OTLP trace export.
+//!
+//! Kernel-side eBPF C programs and the `bpf(2)` syscall FFI are documented
+//! userspace approximations, tracked honestly in `parity.manifest.toml`.
+//! The Cilium parity port lives in `cave-net`, not here.
 
 use serde::{Deserialize, Serialize};
+
+pub mod loader;
 
 /// Syscall audit event from eBPF.
 #[derive(Debug, Clone, Serialize, Deserialize)]
