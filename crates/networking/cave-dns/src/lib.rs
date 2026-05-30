@@ -39,3 +39,4 @@ pub mod dns64;
 pub mod ixfr;
 pub mod secondary_refresh;
 pub mod tsig;
+pub mod corefile;
