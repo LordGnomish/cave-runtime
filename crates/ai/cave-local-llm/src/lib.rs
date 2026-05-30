@@ -49,3 +49,6 @@ pub mod vllm_paged_attention;
 
 /// vLLM continuous-batching scheduler — budget, prefill/decode, preemption.
 pub mod vllm_scheduler;
+
+/// vLLM SamplingParams — sampling contract, validation, OpenAI mapping.
+pub mod vllm_sampling;
