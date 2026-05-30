@@ -60,7 +60,26 @@ pub struct LabelSelector {
 /// Evaluate a Kubernetes LabelSelector against a label set
 /// (`k8s.io/apimachinery labels.Selector.Matches` semantics).
 pub fn label_selector_matches(sel: &LabelSelector, labels: &BTreeMap<String, String>) -> bool {
-    todo!("label_selector_matches")
+    // matchLabels: every (k, v) must be present and equal.
+    for (k, v) in &sel.match_labels {
+        if labels.get(k) != Some(v) {
+            return false;
+        }
+    }
+    // matchExpressions: every requirement must hold.
+    for req in &sel.match_expressions {
+        let present = labels.get(&req.key);
+        let ok = match req.operator {
+            LabelSelectorOperator::In => present.is_some_and(|v| req.values.contains(v)),
+            LabelSelectorOperator::NotIn => present.map_or(true, |v| !req.values.contains(v)),
+            LabelSelectorOperator::Exists => present.is_some(),
+            LabelSelectorOperator::DoesNotExist => present.is_none(),
+        };
+        if !ok {
+            return false;
+        }
+    }
+    true
 }
 
 // ─── Template inputs (the controller-manager template root object) ───────────
@@ -97,13 +116,52 @@ pub struct ReconcileContext {
 
 /// Resolve a single `{{ .Path }}` expression against the context.
 fn resolve_path(path: &str, ctx: &ReconcileContext) -> Result<String> {
-    todo!("resolve_path")
+    let p = path.trim();
+    match p {
+        ".TrustDomain" => Ok(ctx.trust_domain.clone()),
+        ".ClusterName" => Ok(ctx.cluster_name.clone()),
+        ".ClusterDomain" => Ok(ctx.cluster_domain.clone()),
+        ".PodMeta.Namespace" => Ok(ctx.pod_meta.namespace.clone()),
+        ".PodMeta.Name" => Ok(ctx.pod_meta.name.clone()),
+        ".PodMeta.UID" => Ok(ctx.pod_meta.uid.clone()),
+        ".PodSpec.ServiceAccountName" => Ok(ctx.pod_spec.service_account_name.clone()),
+        ".PodSpec.NodeName" => Ok(ctx.pod_spec.node_name.clone()),
+        other => {
+            if let Some(k) = other.strip_prefix(".PodMeta.Labels.") {
+                return ctx.pod_meta.labels.get(k).cloned().ok_or_else(|| {
+                    IdentityError::Internal(format!("template: missing pod label '{}'", k))
+                });
+            }
+            if let Some(k) = other.strip_prefix(".PodMeta.Annotations.") {
+                return ctx.pod_meta.annotations.get(k).cloned().ok_or_else(|| {
+                    IdentityError::Internal(format!("template: missing pod annotation '{}'", k))
+                });
+            }
+            Err(IdentityError::Internal(format!(
+                "template: unknown path '{}'",
+                other
+            )))
+        }
+    }
 }
 
 /// Render a Go-`text/template`-style string supporting the `{{ .Path }}`
 /// pipeline subset the controller-manager templates rely on.
 pub fn render_template(tmpl: &str, ctx: &ReconcileContext) -> Result<String> {
-    todo!("render_template")
+    let mut out = String::with_capacity(tmpl.len());
+    let mut rest = tmpl;
+    while let Some(start) = rest.find("{{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        let end = after.find("}}").ok_or_else(|| {
+            IdentityError::Internal("template: unterminated '{{' action".into())
+        })?;
+        let expr = after[..end].trim();
+        out.push_str(&resolve_path(expr, ctx)?);
+        rest = &after[end + 2..];
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 // ─── ClusterSPIFFEID CRD ─────────────────────────────────────────────────────
@@ -131,7 +189,17 @@ impl ClusterSpiffeId {
     /// True when both the namespace selector (vs `namespace_labels`) and the
     /// pod selector (vs `pod_meta.labels`) match. Absent selectors match all.
     pub fn matches(&self, ctx: &ReconcileContext) -> bool {
-        todo!("ClusterSpiffeId::matches")
+        if let Some(ns) = &self.namespace_selector {
+            if !label_selector_matches(ns, &ctx.namespace_labels) {
+                return false;
+            }
+        }
+        if let Some(ps) = &self.pod_selector {
+            if !label_selector_matches(ps, &ctx.pod_meta.labels) {
+                return false;
+            }
+        }
+        true
     }
 
     /// Render a [`RegistrationEntry`] for `ctx` parented at `parent_id` (the
@@ -142,7 +210,75 @@ impl ClusterSpiffeId {
         ctx: &ReconcileContext,
         parent_id: &SpiffeId,
     ) -> Result<RegistrationEntry> {
-        todo!("ClusterSpiffeId::reconcile")
+        if !self.matches(ctx) {
+            return Err(IdentityError::Internal(
+                "pod does not match ClusterSPIFFEID selectors".into(),
+            ));
+        }
+        let tmpl = if self.spiffe_id_template.is_empty() {
+            DEFAULT_SPIFFE_ID_TEMPLATE
+        } else {
+            self.spiffe_id_template.as_str()
+        };
+        let spiffe_id_str = render_template(tmpl, ctx)?;
+        // Validate the rendered ID is a well-formed SPIFFE ID.
+        parse_spiffe_id(&spiffe_id_str)?;
+
+        // Pin the entry to this exact pod via the k8s pod-uid selector, then
+        // append any rendered workloadSelectorTemplates (each "kind:value").
+        let mut selectors = vec![Selector::new("k8s", format!("pod-uid:{}", ctx.pod_meta.uid))];
+        for t in &self.workload_selector_templates {
+            let rendered = render_template(t, ctx)?;
+            let (kind, value) = rendered.split_once(':').ok_or_else(|| {
+                IdentityError::Internal(format!(
+                    "workload selector template must render to 'kind:value': {}",
+                    rendered
+                ))
+            })?;
+            selectors.push(Selector::new(kind, value));
+        }
+
+        let mut dns_names = Vec::new();
+        for t in &self.dns_name_templates {
+            dns_names.push(render_template(t, ctx)?);
+        }
+        if self.auto_populate_dns_names && !ctx.pod_meta.name.is_empty() {
+            // controller-manager auto-populates the pod's own name as a SAN.
+            if !dns_names.contains(&ctx.pod_meta.name) {
+                dns_names.push(ctx.pod_meta.name.clone());
+            }
+        }
+
+        let ttl = if self.ttl_seconds > 0 {
+            self.ttl_seconds
+        } else {
+            RegistrationEntry::default().x509_svid_ttl_seconds
+        };
+        let jwt_ttl = if self.jwt_ttl_seconds > 0 {
+            self.jwt_ttl_seconds
+        } else {
+            RegistrationEntry::default().jwt_svid_ttl_seconds
+        };
+        let federates_with = self
+            .federates_with
+            .iter()
+            .map(|s| TrustDomain::new(s.clone()))
+            .collect();
+
+        Ok(RegistrationEntry {
+            spiffe_id: SpiffeId::new(spiffe_id_str),
+            parent_id: parent_id.clone(),
+            selectors,
+            ttl_seconds: ttl,
+            x509_svid_ttl_seconds: ttl,
+            jwt_svid_ttl_seconds: jwt_ttl,
+            federates_with,
+            admin: self.admin,
+            downstream: self.downstream,
+            dns_names,
+            hint: self.hint.clone(),
+            ..Default::default()
+        })
     }
 }
 
@@ -169,7 +305,30 @@ impl ClusterFederatedTrustDomain {
     /// Validate + map to a [`FederationRelationship`]
     /// (`spireapi.FederationRelationship` conversion in the reconciler).
     pub fn to_federation_relationship(&self) -> Result<FederationRelationship> {
-        todo!("ClusterFederatedTrustDomain::to_federation_relationship")
+        if self.trust_domain.is_empty() {
+            return Err(IdentityError::FederationInvalid("trust domain empty".into()));
+        }
+        validate_trust_domain(&self.trust_domain)?;
+        if !self.bundle_endpoint_url.starts_with("https://") {
+            return Err(IdentityError::FederationInvalid(
+                "bundle endpoint url must be https://".into(),
+            ));
+        }
+        let profile = match &self.bundle_endpoint_profile {
+            FederationProfileSpec::HttpsWeb => BundleEndpointProfile::HttpsWeb,
+            FederationProfileSpec::HttpsSpiffe { endpoint_spiffe_id } => {
+                parse_spiffe_id(endpoint_spiffe_id)?;
+                BundleEndpointProfile::HttpsSpiffe {
+                    endpoint_spiffe_id: SpiffeId::new(endpoint_spiffe_id.clone()),
+                }
+            }
+        };
+        Ok(FederationRelationship {
+            trust_domain: TrustDomain::new(self.trust_domain.clone()),
+            bundle_endpoint_url: self.bundle_endpoint_url.clone(),
+            bundle_endpoint_profile: profile,
+            trust_domain_bundle: None,
+        })
     }
 }
 
