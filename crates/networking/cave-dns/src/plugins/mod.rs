@@ -3,6 +3,7 @@
 pub mod acl;
 pub mod any;
 pub mod auto;
+pub mod bufsize;
 pub mod cache;
 pub mod chaos;
 pub mod errors;
