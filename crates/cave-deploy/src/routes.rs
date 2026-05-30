@@ -65,6 +65,8 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         )
         // Webhook
         .route("/api/deploy/webhook", post(handle_webhook))
+        // Helm dependency resolution (umbrella Chart.lock)
+        .route("/api/deploy/helm/resolve", post(resolve_helm_deps))
         // Health
         .route("/api/deploy/health", get(health))
         .with_state(state)
@@ -314,6 +316,36 @@ async fn update_sso_config(
     Json(config): Json<SSOConfig>,
 ) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "updated", "provider": format!("{:?}", config.provider) }))
+}
+
+// ─── Helm dependency resolution ──────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct HelmResolveReq {
+    /// Raw `Chart.yaml` text of the umbrella chart.
+    chart_yaml: String,
+    /// chart name → published versions, as scraped from each Helm repo index.
+    #[serde(default)]
+    available: std::collections::HashMap<String, Vec<String>>,
+}
+
+async fn resolve_helm_deps(
+    State(_state): State<Arc<DeployState>>,
+    Json(req): Json<HelmResolveReq>,
+) -> Result<Json<serde_json::Value>, crate::DeployError> {
+    let chart = crate::helm_deps::parse_chart_yaml(&req.chart_yaml)?;
+    let lock = crate::helm_deps::generate_lock(&chart, &req.available, &Utc::now().to_rfc3339())?;
+    Ok(Json(serde_json::json!({
+        "chart": chart.name,
+        "version": chart.version,
+        "dependencies": lock.dependencies.iter().map(|d| serde_json::json!({
+            "name": d.name,
+            "repository": d.repository,
+            "version": d.version,
+        })).collect::<Vec<_>>(),
+        "digest": lock.digest,
+        "generated": lock.generated,
+    })))
 }
 
 // ─── Webhook ─────────────────────────────────────────────────────────────────
