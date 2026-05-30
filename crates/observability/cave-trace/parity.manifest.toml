@@ -48,14 +48,14 @@ source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.6053
-adr_justified_ratio = 1.0      # 15 skipped (7 operational storage backends → cave-store Phase 3 / 4 standalone CLIs → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical.
+honest_ratio        = 0.6316
+adr_justified_ratio = 1.0      # 14 skipped (7 operational storage backends → cave-store Phase 3 / 3 standalone CLIs (ingester/remote-storage) + es-tooling → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 21
+mapped_count        = 22
 partial_count       = 2
-skipped_count       = 15
+skipped_count       = 14
 unmapped_count      = 0
 total               = 38
 
@@ -63,10 +63,19 @@ total               = 38
 #   * Existing 9 742 LOC scaffold (27 src/.rs files, 106 unit tests) measured
 #     against Jaeger v1.52.0 upstream subsystems.
 #   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
-#     = (21 + 2 + 13) / 38 = 0.9474.
-#   * honest_ratio = (mapped + partial) / total = 23 / 38 = 0.6053 — reflects
-#     that 13 operational storage/CLI subsystems are honestly cut from MVP
+#     = (22 + 2 + 14) / 38 = 1.0000.
+#   * honest_ratio = (mapped + partial) / total = 24 / 38 = 0.6316 — reflects
+#     that 14 operational storage/CLI subsystems are honestly cut from MVP
 #     scope, not silently absent.
+#
+# 2026-05-30 honest-uplift (Wave 4 strict-TDD): cmd-tracegen-binary skip
+#   reclassified to mapped subsystem 'synthetic-trace-generator'. The skip
+#   reason was about the *standalone binary*; the pure span-shape construction
+#   algorithm (internal/tracegen/worker.go + config.go) is genuinely in-crate
+#   and is now line-ported to src/tracegen.rs under strict TDD
+#   (tests/tracegen_tdd.rs — RED then GREEN, 7 cases). The standalone binary +
+#   OTLP exporter remain out of scope (standalone-cli-binaries scope_cut).
+#   mapped 21→22, skipped 15→14, honest_ratio 0.6053→0.6316.
 #   * source_sha pinned to v1.52.0 commit
 #     9866eba85aed1b0a66a77c8c6928a372edc5040f.
 #   * parity_ratio_source switched from absent to "manifest" (scaffold had
@@ -79,7 +88,7 @@ name        = "cave-trace"
 description = "Distributed tracing — Jaeger reimplementation + OTLP/Zipkin/OpenCensus ingestion + Tempo TraceQL search + SPM"
 source_root = "src"
 
-# ─── Mapped subsystems (21) ──────────────────────────────────────────────────
+# ─── Mapped subsystems (22) ──────────────────────────────────────────────────
 
 [[mapped]]
 name = "span-model"
@@ -186,6 +195,12 @@ name = "adjuster-anonymizer-pipeline"
 upstream = "model/adjuster/adjuster.go + cmd/anonymizer/app/anonymizer/anonymizer.go"
 note = "Adjuster pipeline (deduplicate / normalize spans) + PII anonymizer (hash/scrub user.* + http.url query params + db.statement values); src/analyzer.rs + src/correlation.rs + src/comparison.rs."
 
+[[mapped]]
+name = "synthetic-trace-generator"
+upstream = "internal/tracegen/worker.go + internal/tracegen/config.go"
+local = "src/tracegen.rs"
+note = "tracegen span-shape construction line-port: root SERVER span 'lets-go' (peer.service/peer.host.ipv4 + debug/firehose flags) + N child CLIENT spans 'child-span-NN', 123us fakeSpanDuration each, parent total = ChildSpans*fakeSpanDuration, cyclic attr_NN/val_NN keys mod attr_keys/attr_values; simulate_one_trace + simulate_traces (workers*traces, services suffix). 2026-05-30 TDD RED->GREEN (tests/tracegen_tdd.rs, 7 cases). The standalone cmd/tracegen binary + OTLP exporter stay scope_cut (standalone-cli-binaries)."
+
 # ─── Partial subsystems (2) ──────────────────────────────────────────────────
 
 [[partial]]
@@ -198,7 +213,7 @@ name = "clientcfg-remote-sampler"
 upstream = "pkg/clientcfg + cmd/agent/app/configmanager"
 note = "reqwest-based client for fetching remote sampler strategy is present (used by AdaptiveSampler), but the server-side strategy distribution endpoint (jaeger-agent → SDK fetch) is not exposed."
 
-# ─── Skipped subsystems (13 — out of MVP scope) ──────────────────────────────
+# ─── Skipped subsystems (12 — out of MVP scope) ──────────────────────────────
 
 [[skipped]]
 name = "storage-cassandra"
@@ -244,11 +259,6 @@ reason = "Standalone Kafka consumer binary draining storage-kafka into a span st
 name = "cmd-remote-storage-binary"
 upstream = "cmd/remote-storage"
 reason = "Standalone gRPC plugin host. Skipped jointly with storage-grpc-remote."
-
-[[skipped]]
-name = "cmd-tracegen-binary"
-upstream = "cmd/tracegen"
-reason = "Load-test generator that emits synthetic traces. tests/qwen_drafted.rs + parity_self_audit cover the in-process equivalent; standalone binary not warranted in cave-runtime."
 
 [[skipped]]
 name = "es-tooling"
@@ -374,6 +384,10 @@ local    = "src/otlp.rs"
 [[files]]
 upstream = "(Tempo-compat extension)"
 local    = "src/traceql.rs"
+
+[[files]]
+upstream = "internal/tracegen/worker.go + internal/tracegen/config.go"
+local    = "src/tracegen.rs"
 
 [[files]]
 upstream = "internal/jaegerclientenv2otel/headers.go"
