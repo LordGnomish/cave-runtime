@@ -111,23 +111,42 @@ impl Default for OffloadStore {
 impl NodeStatusRepo for OffloadStore {
     fn save(
         &mut self,
-        _uid: Uuid,
-        _nodes: &HashMap<String, NodeStatus>,
-        _now: DateTime<Utc>,
+        uid: Uuid,
+        nodes: &HashMap<String, NodeStatus>,
+        now: DateTime<Utc>,
     ) -> String {
-        unimplemented!()
+        let (nodes_json, version) = node_status_version(nodes);
+        // Idempotent insert: duplicate (uid, version) rows are ignored.
+        self.records
+            .entry((uid, version.clone()))
+            .or_insert_with(|| OffloadRecord {
+                uid,
+                version: version.clone(),
+                nodes_json,
+                updated_at: now,
+            });
+        // Retention GC: drop superseded versions of *this* uid whose row is
+        // older than the TTL relative to `now` — never the version we just
+        // wrote (oldOffload condition in Argo's Save).
+        let cutoff = now - self.ttl;
+        self.records.retain(|(ruid, rver), rec| {
+            !(*ruid == uid && *rver != version && rec.updated_at < cutoff)
+        });
+        version
     }
 
-    fn get(&self, _uid: Uuid, _version: &str) -> Option<HashMap<String, NodeStatus>> {
-        unimplemented!()
+    fn get(&self, uid: Uuid, version: &str) -> Option<HashMap<String, NodeStatus>> {
+        let rec = self.records.get(&(uid, version.to_string()))?;
+        let list: Vec<NodeStatus> = serde_json::from_str(&rec.nodes_json).ok()?;
+        Some(list.into_iter().map(|n| (n.id.clone(), n)).collect())
     }
 
     fn list(&self) -> Vec<(Uuid, String)> {
-        unimplemented!()
+        self.records.keys().cloned().collect()
     }
 
-    fn delete(&mut self, _uid: Uuid, _version: &str) -> bool {
-        unimplemented!()
+    fn delete(&mut self, uid: Uuid, version: &str) -> bool {
+        self.records.remove(&(uid, version.to_string())).is_some()
     }
 }
 
@@ -156,22 +175,44 @@ impl WorkflowArchive {
     /// Archive a terminal workflow with its labels. Only Succeeded / Failed /
     /// Error workflows are archivable; archiving a live one is a no-op that
     /// returns `false`.
-    pub fn archive(&mut self, _wf: &Workflow, _labels: HashMap<String, String>) -> bool {
-        unimplemented!()
+    pub fn archive(&mut self, wf: &Workflow, labels: HashMap<String, String>) -> bool {
+        if !matches!(
+            wf.status.phase,
+            WorkflowPhase::Succeeded | WorkflowPhase::Failed | WorkflowPhase::Error
+        ) {
+            return false;
+        }
+        // Upsert by uid.
+        self.items.retain(|a| a.uid != wf.id);
+        self.items.push(ArchivedWorkflow {
+            uid: wf.id,
+            name: wf.name.clone(),
+            namespace: wf.namespace.clone(),
+            phase: wf.status.phase,
+            labels,
+            workflow: wf.clone(),
+        });
+        true
     }
 
-    pub fn get(&self, _uid: Uuid) -> Option<&ArchivedWorkflow> {
-        unimplemented!()
+    pub fn get(&self, uid: Uuid) -> Option<&ArchivedWorkflow> {
+        self.items.iter().find(|a| a.uid == uid)
     }
 
     /// List archived workflows in a namespace whose labels match every entry
     /// in `selector` (equality match, AND semantics).
-    pub fn list(&self, _namespace: &str, _selector: &HashMap<String, String>) -> Vec<&ArchivedWorkflow> {
-        unimplemented!()
+    pub fn list(&self, namespace: &str, selector: &HashMap<String, String>) -> Vec<&ArchivedWorkflow> {
+        self.items
+            .iter()
+            .filter(|a| a.namespace == namespace)
+            .filter(|a| selector.iter().all(|(k, v)| a.labels.get(k) == Some(v)))
+            .collect()
     }
 
-    pub fn delete(&mut self, _uid: Uuid) -> bool {
-        unimplemented!()
+    pub fn delete(&mut self, uid: Uuid) -> bool {
+        let before = self.items.len();
+        self.items.retain(|a| a.uid != uid);
+        self.items.len() != before
     }
 
     pub fn len(&self) -> usize {
@@ -186,12 +227,29 @@ impl WorkflowArchive {
 /// Returns the rehydrated [`WorkflowStatus`] with the resume applied, or
 /// `None` if no offloaded record exists for `uid`/`version`.
 pub fn durable_resume(
-    _repo: &dyn NodeStatusRepo,
-    _uid: Uuid,
-    _version: &str,
-    _prior: &WorkflowStatus,
+    repo: &dyn NodeStatusRepo,
+    uid: Uuid,
+    version: &str,
+    prior: &WorkflowStatus,
 ) -> Option<WorkflowStatus> {
-    unimplemented!()
+    let nodes = repo.get(uid, version)?;
+    let mut status = prior.clone();
+    status.nodes = nodes;
+    // Transition every Suspended node back to Running.
+    let mut resumed_any = false;
+    for n in status.nodes.values_mut() {
+        if n.phase == WorkflowPhase::Suspended {
+            n.phase = WorkflowPhase::Running;
+            n.finished_at = None;
+            resumed_any = true;
+        }
+    }
+    // A workflow that was Suspended (or that had a suspended node) returns to
+    // Running once resumed.
+    if resumed_any || status.phase == WorkflowPhase::Suspended {
+        status.phase = WorkflowPhase::Running;
+    }
+    Some(status)
 }
 
 #[cfg(test)]
