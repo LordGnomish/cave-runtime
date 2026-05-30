@@ -15,9 +15,12 @@
 #![forbid(unsafe_code)]
 
 pub mod document;
+pub mod embedding;
 pub mod error;
 pub mod loaders;
+pub mod math;
 pub mod splitter;
+pub mod vectorstore;
 
 pub use document::{Document, Metadata};
 pub use error::{RagError, Result};
