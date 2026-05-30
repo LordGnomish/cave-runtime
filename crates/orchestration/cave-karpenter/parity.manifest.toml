@@ -146,6 +146,11 @@ local    = "src/budgets.rs"
 upstream = "pkg/apis/v1/labels.go"
 local    = "src/labels.rs"
 
+# ── apis/v1 validation (v1.12.1 deep-port, cont3 2026-05-30) ──────────────────
+[[files]]
+upstream = "pkg/apis/v1/nodeclaim_validation.go"
+local    = "src/validation.rs"
+
 [[files]]
 upstream = "pkg/controllers/provisioning/batcher/batcher.go"
 local    = "src/batcher.rs"

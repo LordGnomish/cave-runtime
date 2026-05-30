@@ -39,6 +39,7 @@ pub mod resources;
 pub mod scheduler;
 pub mod scheduling;
 pub mod store;
+pub mod validation;
 
 pub use models::{
     Budget, Disruption, Limits, NodeClaim, NodeClaimSpec, NodeClaimStatus, NodeClaimTemplate,

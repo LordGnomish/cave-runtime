@@ -59,7 +59,7 @@ pub struct NodeSelectorRequirement {
 
 /// Normalized-label map: upstream `v1.NormalizedLabels` rewrites the
 /// deprecated beta labels to their stable equivalents on construction.
-fn normalized_label(key: &str) -> &str {
+pub fn normalized_label(key: &str) -> &str {
     match key {
         "failure-domain.beta.kubernetes.io/zone" => "topology.kubernetes.io/zone",
         "failure-domain.beta.kubernetes.io/region" => "topology.kubernetes.io/region",

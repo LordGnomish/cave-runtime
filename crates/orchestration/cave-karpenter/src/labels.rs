@@ -126,7 +126,7 @@ pub fn node_class_label_key(group: &str, kind: &str) -> String {
 
 /// Well-known requirement keys whose values are gated to a known set
 /// (`WellKnownValuesForRequirements`).
-fn well_known_values_for(key: &str) -> Option<&'static [&'static str]> {
+pub fn well_known_values_for(key: &str) -> Option<&'static [&'static str]> {
     if key == CAPACITY_TYPE_LABEL_KEY {
         Some(&[
             CAPACITY_TYPE_ON_DEMAND,
