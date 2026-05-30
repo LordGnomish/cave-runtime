@@ -19,6 +19,7 @@ pub mod embedding;
 pub mod error;
 pub mod loaders;
 pub mod math;
+pub mod rerank;
 pub mod retriever;
 pub mod splitter;
 pub mod vectorstore;
