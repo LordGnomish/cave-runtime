@@ -14,11 +14,13 @@ use std::cmp::Ordering;
 pub mod brin;
 pub mod btree;
 pub mod gin;
+pub mod gist;
 pub mod hash;
 
 pub use brin::{BrinIndex, BrinRange};
 pub use btree::BTreeIndex;
 pub use gin::GinIndex;
+pub use gist::GistIndex;
 pub use hash::HashIndex;
 
 /// Total order over [`SqlValue`] used by the ordered access methods.
