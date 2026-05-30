@@ -5,6 +5,7 @@
 
 pub mod discovery;
 pub mod manager;
+pub mod relabel;
 pub mod target;
 
 pub use manager::ScrapeManager;

@@ -42,6 +42,9 @@ prost = "0.13"
 # Snappy compression (remote_write)
 snap = "1"
 
+# MD5 — relabel hashmod action parity (prometheus model/relabel)
+md-5 = "0.10"
+
 # Concurrency
 parking_lot = "0.12"
 
