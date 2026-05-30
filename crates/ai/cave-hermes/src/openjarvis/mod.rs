@@ -25,6 +25,7 @@
 //! | plan-and-execute loop             | [`plan_execute`]                |
 //! | inter-agent communication         | [`multi_agent`]                 |
 
+pub mod agent_state;
 pub mod backend;
 pub mod eval;
 
