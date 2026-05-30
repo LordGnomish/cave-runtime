@@ -10,6 +10,225 @@
 //! ([`HotPatchQueue`]) — the "propose a port when a new release lands" half
 //! of the self-improvement mandate.
 
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::HermesError;
+
+/// A semantic version triple.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Version {
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
+}
+
+impl Version {
+    pub fn new(major: u64, minor: u64, patch: u64) -> Self {
+        Self {
+            major,
+            minor,
+            patch,
+        }
+    }
+
+    /// Parse `"v1.2.3"` or `"1.2.3"`. Requires exactly three numeric fields.
+    pub fn parse(s: &str) -> crate::error::Result<Self> {
+        let s = s.trim().trim_start_matches(['v', 'V']);
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 3 {
+            return Err(HermesError::SelfImprove(format!(
+                "version '{s}' is not major.minor.patch"
+            )));
+        }
+        let parse_part = |p: &str| {
+            p.parse::<u64>()
+                .map_err(|_| HermesError::SelfImprove(format!("non-numeric version field '{p}'")))
+        };
+        Ok(Version::new(
+            parse_part(parts[0])?,
+            parse_part(parts[1])?,
+            parse_part(parts[2])?,
+        ))
+    }
+
+    pub fn is_newer_than(&self, other: &Version) -> bool {
+        self > other
+    }
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "v{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+/// The kind of version bump between two versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BumpKind {
+    Major,
+    Minor,
+    Patch,
+}
+
+impl BumpKind {
+    /// Classify the bump from `from` to `to`, or `None` if `to` is not newer.
+    pub fn classify(from: &Version, to: &Version) -> Option<Self> {
+        if !to.is_newer_than(from) {
+            return None;
+        }
+        if to.major != from.major {
+            Some(BumpKind::Major)
+        } else if to.minor != from.minor {
+            Some(BumpKind::Minor)
+        } else {
+            Some(BumpKind::Patch)
+        }
+    }
+}
+
+/// Port priority for a [`PortProposal`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Priority {
+    Low,
+    Medium,
+    High,
+}
+
+impl Priority {
+    fn rank(&self) -> u8 {
+        match self {
+            Priority::High => 2,
+            Priority::Medium => 1,
+            Priority::Low => 0,
+        }
+    }
+}
+
+/// A detected upstream version change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpstreamUpdate {
+    pub name: String,
+    pub repo: String,
+    pub from: Version,
+    pub to: Version,
+    pub kind: BumpKind,
+}
+
+/// Watches tracked upstreams against the latest versions the tracker reports.
+#[derive(Debug, Default)]
+pub struct ChangelogWatcher {
+    tracked: BTreeMap<String, (String, Version)>,
+}
+
+impl ChangelogWatcher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register an upstream with its currently pinned version.
+    pub fn track(&mut self, name: &str, repo: &str, current: Version) -> &mut Self {
+        self.tracked
+            .insert(name.to_string(), (repo.to_string(), current));
+        self
+    }
+
+    /// Compare each tracked upstream against `latest` (name → latest version,
+    /// as reported by cave-llm-tracker) and emit an update per outdated pin.
+    pub fn scan(&self, latest: &[(&str, Version)]) -> Vec<UpstreamUpdate> {
+        let mut out = Vec::new();
+        for (name, latest_ver) in latest {
+            let Some((repo, current)) = self.tracked.get(*name) else {
+                continue;
+            };
+            if let Some(kind) = BumpKind::classify(current, latest_ver) {
+                out.push(UpstreamUpdate {
+                    name: (*name).to_string(),
+                    repo: repo.clone(),
+                    from: *current,
+                    to: *latest_ver,
+                    kind,
+                });
+            }
+        }
+        out
+    }
+}
+
+/// A queued, prioritised proposal to port an upstream bump.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PortProposal {
+    pub upstream: String,
+    pub repo: String,
+    pub from: Version,
+    pub to: Version,
+    pub priority: Priority,
+    pub action: String,
+}
+
+impl PortProposal {
+    pub fn from_update(u: &UpstreamUpdate) -> Self {
+        let priority = match u.kind {
+            BumpKind::Major => Priority::High,
+            BumpKind::Minor => Priority::Medium,
+            BumpKind::Patch => Priority::Low,
+        };
+        Self {
+            upstream: u.name.clone(),
+            repo: u.repo.clone(),
+            from: u.from,
+            to: u.to,
+            priority,
+            action: format!(
+                "review {} → {} ({:?}); port new/changed functions, bump parity manifest pin",
+                u.from, u.to, u.kind
+            ),
+        }
+    }
+
+    fn key(&self) -> String {
+        format!("{}@{}", self.upstream, self.to)
+    }
+}
+
+/// Dedup-on-enqueue, drain-by-priority queue of port proposals.
+#[derive(Debug, Default)]
+pub struct HotPatchQueue {
+    items: Vec<PortProposal>,
+}
+
+impl HotPatchQueue {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enqueue a proposal. Returns `false` (no-op) if an identical
+    /// `(upstream, to-version)` is already queued.
+    pub fn enqueue(&mut self, proposal: PortProposal) -> bool {
+        if self.items.iter().any(|p| p.key() == proposal.key()) {
+            return false;
+        }
+        self.items.push(proposal);
+        true
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Drain all proposals, highest priority first (stable within a tier).
+    pub fn drain_by_priority(&mut self) -> Vec<PortProposal> {
+        let mut drained = std::mem::take(&mut self.items);
+        drained.sort_by(|a, b| b.priority.rank().cmp(&a.priority.rank()));
+        drained
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
