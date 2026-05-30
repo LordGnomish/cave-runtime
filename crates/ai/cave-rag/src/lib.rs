@@ -13,3 +13,9 @@
 //! | pipeline component model   | `deepset-ai/haystack` (Apache-2.0)              |
 
 #![forbid(unsafe_code)]
+
+pub mod document;
+pub mod error;
+
+pub use document::{Document, Metadata};
+pub use error::{RagError, Result};
