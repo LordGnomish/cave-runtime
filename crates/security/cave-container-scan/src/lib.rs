@@ -9,6 +9,7 @@ pub mod models;
 pub mod policy;
 pub mod routes;
 pub mod scanners;
+pub mod vex;
 
 pub use engine::{ScanError, ScanOrchestrator, Scanner};
 pub use routes::ContainerScanStore;
