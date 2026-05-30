@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const TODAY: &str = "2026-05-23";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const TRIVY_VERSION: &str = "v0.70.0";
 const TRIVY_SHA: &str = "8a3177aedf7ee0864920eb1852eef031cd3742b8";
