@@ -6,6 +6,7 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
+pub mod conversation_export;
 pub mod conversation_tree;
 pub mod engine;
 pub mod models;
