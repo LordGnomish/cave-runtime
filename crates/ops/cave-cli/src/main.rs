@@ -3030,6 +3030,12 @@ enum SchedulerCmd {
         #[arg(long, default_value_t = 128_000_000)]
         memory_bytes: u64,
     },
+    /// Validate a KubeSchedulerConfiguration JSON file
+    ValidateConfig {
+        /// Path to a KubeSchedulerConfiguration JSON document
+        #[arg(long)]
+        file: String,
+    },
     /// Liveness probe (/api/scheduler/health)
     Health,
 }
@@ -4503,6 +4509,13 @@ source_root = "src"
                     }),
                 )
                 .await
+            }
+            SchedulerCmd::ValidateConfig { file } => {
+                let raw = std::fs::read_to_string(&file)
+                    .map_err(|e| anyhow::anyhow!("read {file}: {e}"))?;
+                let body: serde_json::Value = serde_json::from_str(&raw)
+                    .map_err(|e| anyhow::anyhow!("parse {file}: {e}"))?;
+                c.post("/api/scheduler/config/validate", body).await
             }
             SchedulerCmd::Health => c.get("/api/scheduler/health").await,
         },
