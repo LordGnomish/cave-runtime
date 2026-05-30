@@ -24,6 +24,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod discover;
 pub mod loader;
 pub mod map;
 pub mod probe;
