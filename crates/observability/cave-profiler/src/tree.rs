@@ -70,6 +70,12 @@ impl Tree {
     pub fn total(&self) -> i64 {
         self.root.iter().map(|n| n.total).sum()
     }
+
+    /// Merge `src` into `self`, summing `self`/`total` for matching paths and
+    /// inserting new branches in sorted order. Ports `tree.go` Merge.
+    pub fn merge(&mut self, _src: &Tree) {
+        // RED placeholder
+    }
 }
 
 #[cfg(test)]
@@ -139,5 +145,49 @@ mod tests {
         t.insert_stack(-5, &["b"]);
         assert_eq!(t.total(), 0);
         assert!(t.root.is_empty());
+    }
+
+    #[test]
+    fn merge_overlapping_paths_sums_weights() {
+        let mut a = Tree::new();
+        a.insert_stack(10, &["main", "foo"]);
+        let mut b = Tree::new();
+        b.insert_stack(5, &["main", "foo"]);
+        b.insert_stack(7, &["main", "bar"]);
+        a.merge(&b);
+        assert_eq!(a.total(), 22);
+        let main = &a.root[0];
+        assert_eq!(main.total, 22);
+        assert_eq!(main.children.len(), 2);
+        // sorted: bar, foo
+        assert_eq!(main.children[0].name, "bar");
+        assert_eq!(main.children[0].total, 7);
+        assert_eq!(main.children[0].self_value, 7);
+        assert_eq!(main.children[1].name, "foo");
+        assert_eq!(main.children[1].total, 15);
+        assert_eq!(main.children[1].self_value, 15);
+    }
+
+    #[test]
+    fn merge_into_empty_copies() {
+        let mut a = Tree::new();
+        let mut b = Tree::new();
+        b.insert_stack(4, &["x", "y"]);
+        a.merge(&b);
+        assert_eq!(a.total(), 4);
+        assert_eq!(a.root[0].name, "x");
+        assert_eq!(a.root[0].children[0].name, "y");
+    }
+
+    #[test]
+    fn merge_disjoint_roots_unions_sorted() {
+        let mut a = Tree::new();
+        a.insert_stack(1, &["z"]);
+        let mut b = Tree::new();
+        b.insert_stack(1, &["a"]);
+        a.merge(&b);
+        let names: Vec<&str> = a.root.iter().map(|n| n.name.as_str()).collect();
+        assert_eq!(names, vec!["a", "z"]);
+        assert_eq!(a.total(), 2);
     }
 }
