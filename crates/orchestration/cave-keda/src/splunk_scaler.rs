@@ -176,4 +176,94 @@ mod tests {
     fn validate_host_rejects_empty_scheme() {
         assert!(SplunkScaler::validate_host("://localhost").is_err());
     }
+
+    fn md(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn from_metadata_parses_full_config() {
+        let s = SplunkScaler::from_metadata(&md(&[
+            ("host", "https://localhost:8089"),
+            ("username", "admin"),
+            ("password", "changeme"),
+            ("savedSearchName", "my_search"),
+            ("valueField", "count"),
+            ("targetValue", "10"),
+            ("activationValue", "2"),
+            ("unsafeSsl", "true"),
+        ]))
+        .unwrap();
+        assert_eq!(s.username, "admin");
+        assert_eq!(s.saved_search_name, "my_search");
+        assert_eq!(s.value_field, "count");
+        assert_eq!(s.target_value, 10);
+        assert_eq!(s.activation_value, 2);
+        assert!(s.unsafe_ssl);
+    }
+
+    #[test]
+    fn from_metadata_defaults_unsafe_ssl_false() {
+        let s = SplunkScaler::from_metadata(&md(&[
+            ("host", "https://localhost:8089"),
+            ("username", "admin"),
+            ("apiToken", "tok"),
+            ("savedSearchName", "s"),
+            ("valueField", "v"),
+            ("targetValue", "1"),
+            ("activationValue", "0"),
+        ]))
+        .unwrap();
+        assert!(!s.unsafe_ssl);
+    }
+
+    #[test]
+    fn from_metadata_rejects_bad_host_and_creds() {
+        // missing scheme → invalid host
+        assert!(
+            SplunkScaler::from_metadata(&md(&[
+                ("host", "localhost:8089"),
+                ("username", "admin"),
+                ("savedSearchName", "s"),
+                ("valueField", "v"),
+                ("targetValue", "1"),
+                ("activationValue", "0"),
+            ]))
+            .is_err()
+        );
+        // apiToken + password both set → mutually exclusive
+        assert!(
+            SplunkScaler::from_metadata(&md(&[
+                ("host", "https://localhost:8089"),
+                ("username", "admin"),
+                ("apiToken", "t"),
+                ("password", "p"),
+                ("savedSearchName", "s"),
+                ("valueField", "v"),
+                ("targetValue", "1"),
+                ("activationValue", "0"),
+            ]))
+            .is_err()
+        );
+        // username missing → invalid
+        assert!(
+            SplunkScaler::from_metadata(&md(&[
+                ("host", "https://localhost:8089"),
+                ("savedSearchName", "s"),
+                ("valueField", "v"),
+                ("targetValue", "1"),
+                ("activationValue", "0"),
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn metric_name_includes_saved_search() {
+        let s = SplunkScaler::new("admin", "my_search", "count");
+        assert_eq!(s.metric_name(), "splunk-my_search");
+    }
 }
