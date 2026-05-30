@@ -39,6 +39,7 @@ pub mod prompt;
 pub mod provider_tools;
 pub mod recall;
 pub mod router;
+pub mod self_improve;
 pub mod session;
 pub mod tool;
 pub mod tools_builtin;
