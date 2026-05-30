@@ -4,8 +4,11 @@
 # 2026-05-28 honest close — implemented real incident management core:
 #   incident CRUD lifecycle, responders, postmortems, MTTA/MTTR metrics,
 #   timeline/audit log, full HTTP REST API.
-#   ADR-justified 6 sibling cuts → cave-oncall (schedule/rotation/escalation/
-#   notifications/PagerDuty) + cave-alerts (alert routing/dedup) + cave-portal (UI).
+#   ADR-justified 5 sibling cuts → cave-oncall (schedule/rotation/escalation/
+#   notifications/PagerDuty) + cave-alerts (routing tree/inhibit) + cave-portal (UI).
+# 2026-05-30 strict-TDD honest uplift: ported incident grouping/dedup (md5
+#   distinction + get_or_create_grouping) + incident-group silence state from the
+#   former cave-alerts bundle → src/grouping.rs + src/silence.rs (honest_ratio 0.5714→0.6429).
 
 [upstream]
 org        = "grafana"
@@ -20,24 +23,27 @@ url        = "https://github.com/grafana/oncall"
 [parity]
 # 2026-05-28 honest close — implemented real incident CRUD lifecycle (open→ack→resolve→close),
 # responders, postmortems, MTTA/MTTR metrics, timeline, full HTTP REST API, parity self-audit;
-# ADR-justified 6 parallel-track cuts to cave-oncall/cave-alerts/cave-portal.
+# ADR-justified parallel-track cuts to cave-oncall/cave-alerts/cave-portal.
+# 2026-05-30 — incident grouping/dedup + incident-group silence ported in-crate (5 skips remain).
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.5714      # (mapped 8 + partial 0) / total 14; 6 ADR-justified skips
+honest_ratio        = 0.6429      # (mapped 9 + partial 0) / total 14; 5 ADR-justified skips
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 8
+mapped_count        = 9
 partial_count       = 0
-skipped_count       = 6
+skipped_count       = 5
 unmapped_count      = 0
 total               = 14
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 [module]
 name        = "cave-incidents"
 description = "Incident management — Grafana OnCall incident tracking replacement"
 source_root = "src"
+rs_files    = 9
+rs_loc      = 1850
 
 # ── File mappings ─────────────────────────────────────────────────────────────
 
@@ -115,6 +121,18 @@ area        = "Parity self-audit (Charter v2 8-gate)"
 local       = "tests/parity_self_audit.rs"
 notes       = "SPDX/source_sha/fill_ratio/counts/no-stubs/report gates"
 
+[[mapped]]
+area        = "Incident grouping / deduplication + incident-group silence state"
+local       = "src/grouping.rs + src/silence.rs"
+# 2026-05-30 strict-TDD conversion (was bundled in the cave-alerts skip).
+# grouping.rs line-ports grafana/oncall alert.py::render_group_data/insert_random_uuid
+#   (md5 group_distinction; random-uuid no-group fallback for None/demo) + alert_group.py::
+#   get_or_create_grouping (get-or-create open group by (channel,distinction); resolve-signal
+#   re-attach to latest resolved group). silence.rs line-ports alert_group.py status precedence
+#   (resolved>acknowledged>silenced>new), is_silenced_forever/for_period, silence/un_silence.
+#   In-crate RFC-1321 md5 (no new dep). RED grouping_tdd.rs (8) + silence_tdd.rs (8) -> GREEN.
+notes       = "render_group_data md5 distinction + get_or_create_grouping matcher + silence/status precedence; tests/grouping_tdd.rs (8) + tests/silence_tdd.rs (8)"
+
 # ── Scope cuts (ADR-justified) ────────────────────────────────────────────────
 
 [[skipped]]
@@ -128,10 +146,6 @@ reason = "parallel-track cave-oncall — escalation_engine.py is ported in cave-
 [[skipped]]
 area   = "Notification delivery (Slack/SMS/email/PagerDuty dispatch)"
 reason = "parallel-track cave-oncall — slack.rs + sms_voice.rs + pagerduty_migrator.rs all live in cave-oncall"
-
-[[skipped]]
-area   = "Alert routing / deduplication / silences"
-reason = "parallel-track cave-alerts — Alertmanager parity (dedupe, routing tree, inhibit, silences) in cave-alerts"
 
 [[skipped]]
 area   = "PagerDuty migration runner"
