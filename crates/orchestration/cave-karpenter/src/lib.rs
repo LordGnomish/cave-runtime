@@ -34,6 +34,7 @@ pub mod disruption;
 pub mod drain;
 pub mod duration;
 pub mod hash;
+pub mod hash_controller;
 pub mod labels;
 pub mod models;
 pub mod nodeclaim_lifecycle;
