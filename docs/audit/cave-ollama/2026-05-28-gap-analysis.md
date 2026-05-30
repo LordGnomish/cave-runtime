@@ -73,3 +73,47 @@ honest_ratio = (18+10)/29   = 28/29 = 0.9655   ✓ ≥ 0.95
 ```
 
 Final honest_ratio is recomputed against actual mapped/partial/skipped after the cycles land (Phase 4). **No `docs/parity/parity-index.json` hand-edit** — the post-commit hook regenerates it from `parity.manifest.toml`.
+
+## Phase 4 — final parity (actual)
+
+```
+mapped=18  partial=1  skipped=10  unmapped=0  total=29
+fill_ratio   = 1.0000   (29/29)
+honest_ratio = 0.9655   (28/29)   ✓ ≥ 0.95   (was 0.9259)
+```
+
+Self-audit: **9/9 gates PASS** (`cargo test -p cave-local-llm --test parity_self_audit`). Crate tests: **lib 99 → 127 (+28)**, all green, 0 build warnings, new modules clippy-clean. `cave-local-llm` is a leaf crate (no reverse dependents), so the type additions are isolated.
+
+### TDD cycle ledger (test → FAIL → impl → PASS; test+impl never in one commit)
+
+| Cycle | Component | RED (FAIL) | GREEN (PASS) | Δ tests |
+|---|---|---|---|---|
+| 1 | Multimodal images | `f43458a0` | `e00f7d64` | +5 |
+| 2 | Tool / function calling | `61def66d` | `4a0331ee` | +4 |
+| 3 | OpenAI `/v1` SSE streaming | `cf021890` | `92c6ae4a` | +4 unit +1 integ |
+| 4 | GGUF reader | `39e0f6c7` | `6fda5732` | +7 |
+| 5 | Quantization helpers | `c6a6904d` | `473a85e3` | +8 |
+
+Gap analysis doc: `7b57b175`. Each RED commit fails to compile (missing fields/types/fns); each GREEN commit implements and turns the suite green.
+
+### honest_ratio movement
+
+`honest_ratio = (mapped + skipped) / total`. The lift came from **resolving the OpenAI-compat streaming partial** (2 partials → 1). Reclassifying multimodal/tool-calling (skipped → mapped) and adding the GGUF/quant mapped pieces did not change the honest numerator (skipped already counted as honest) but materially increased real coverage and shrank the skip list. The daemon graceful-shutdown partial was **kept honest, not inflated** — SIGTERM + stop-file shutdown already works in-crate; SIGINT/full-drain remains a cave-runtime host concern.
+
+### LOC delta (cave-local-llm src)
+
+| | LOC |
+|---|---|
+| Pre-uplift src (15 files) | 5 217 |
+| New `gguf.rs` | ~290 |
+| New `quant.rs` | ~250 |
+| Additions to `ollama.rs` / `openai_compat.rs` (types, helpers, streaming) | ~230 |
+| **Post-uplift (approx.)** | **~6 000** |
+
+### Remaining work (honest, out of this scope)
+
+- Daemon SIGINT + in-flight drain (resolves the last partial → 1.0).
+- Concrete llama.cpp/vLLM inference adapters (still delegated to `cave-llm-gateway`).
+- `/api/pull|push|create|blobs` model-authoring flow, KV-cache eviction, JSON-mode validation — all remain honest scope-cuts.
+- GGUF tensor-info block (offsets/dims) reading — current reader stops after the metadata block; the tensor directory is parseable next if the registry needs it.
+- Version pin bump `v0.3.0 → latest` is deliberately deferred (gate_2 + functional re-audit), tracked separately.

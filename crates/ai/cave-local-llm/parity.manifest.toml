@@ -14,45 +14,57 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # OpenAI-compat /v1/* layer (docs/openai.md), a Go-template-subset prompt
 # engine, and a provider-agnostic InferenceBackend trait.
 #
-# Mapped (13): ollama.rs, ollama_extras.rs (show/copy/delete/embed/list_running),
+# Mapped (18): ollama.rs (generate/chat ±stream + multimodal images +
+# tool/function calling), ollama_extras.rs (show/copy/delete/embed/list_running),
 # openai_compat.rs (chat_completions/completions/embeddings/models +
-# optional bearer auth), prompt_template.rs (var + if + range), backend.rs
-# (InferenceBackend trait + Ollama + OpenAI adapters + BackendRegistry),
+# chat_completions_stream SSE + optional bearer auth), prompt_template.rs
+# (var + if + range), backend.rs (InferenceBackend trait + Ollama + OpenAI
+# adapters + BackendRegistry), gguf.rs (pure-Rust GGUF header+metadata
+# reader), quant.rs (GGUF FileType quant helpers — names, bits/weight, size),
 # manifest.rs, draft.rs, scheduler.rs, queue.rs, daemon.rs, metrics.rs,
 # cave-local-llm bin, cave-local-llm-daemon bin.
 #
-# Partial (2): daemon graceful-shutdown (signal handling lives outside
-# the crate), OpenAI-compat streaming.
+# 2026-05-28 honest_ratio uplift (strict-TDD, 5 RED->GREEN cycles): resolved
+# the OpenAI-compat streaming partial (chat_completions_stream); reclassified
+# multimodal images + tool-calling from skipped -> mapped (now implemented on
+# the native /api/* client); and decomposed the former "llama.cpp/vLLM
+# concrete adapters" skip into two newly-mapped pure-Rust pieces — a GGUF
+# reader and quantization helpers — that introspect models without running
+# inference. The request/response contract additions (images/tools) and the
+# GGUF layout were re-validated against ollama HEAD 11be8f6a; all are additive
+# and present at/before the pinned v0.3.0 baseline.
 #
-# Skipped (12): /api/pull (NDJSON progress UX deferred), /api/push (no
+# Partial (1): daemon graceful-shutdown — the loop already handles SIGTERM +
+# a stop-signal file (daemon.rs); SIGINT/full in-flight drain is still owned
+# by the cave-runtime host. Kept honest (not inflated to mapped).
+#
+# Skipped (10): /api/pull (NDJSON progress UX deferred), /api/push (no
 # upstream-registry write path in sovereign deploy), /api/create + /api/blobs
 # (model authoring deferred), server-side /v1 hosting (cave-portal-api +
-# cave-llm-gateway own it), llama.cpp / vLLM concrete adapters (trait open
-# for extension), embedding-recall RAG store (cave-hermes), multimodal
-# images, tool-calling in chat, KV-cache eviction state machine,
-# JSON-mode response validation, /api/version surface in extras.
-mapped_count          = 13
-partial_count         = 2
-skipped_count         = 12
+# cave-llm-gateway own it), llama.cpp / vLLM concrete inference adapters
+# (trait open for extension), embedding-recall RAG store (cave-hermes),
+# KV-cache eviction state machine (runtime-internal), JSON-mode response
+# validation, /api/version surface in extras.
+mapped_count          = 18
+partial_count         = 1
+skipped_count         = 10
 unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
-total                 = 27
-fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 27/27
-honest_ratio          = 0.9259  # (mapped + skipped) / total            = 25/27
+total                 = 29  # 2026-05-28: +2 (gguf reader + quant helpers) decomposed from the llama.cpp-adapters scope-cut and now mapped
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 29/29
+honest_ratio          = 0.9655  # (mapped + skipped) / total            = 28/29
 adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-28"
 infra_only            = false
 
-# adr_justified_ratio breakdown (2026-05-24):
-#   * daemon graceful shutdown partial   → host-preflight: cave-runtime owns signal handling
-#   * OpenAI-compat streaming partial    → parallel-track: cave-llm-gateway owns the OpenAI wire-format streaming layer; this crate keeps the InferenceBackend trait open for streaming adapters
-#   * 12 [[skipped]] subsystems          → categorised inline in [parity] comment block above
+# adr_justified_ratio breakdown (2026-05-28):
+#   * daemon graceful shutdown partial   → host-preflight: cave-runtime owns SIGINT/full-drain (SIGTERM + stop-file already handled in-crate)
+#   * 10 [[skipped]] subsystems          → categorised inline in [parity] comment block above
 #     - /api/pull, /api/push, /api/create, /api/blobs    → out-of-scope-subsystem (model authoring deferred)
 #     - server-side /v1 hosting                          → parallel-track (cave-portal-api + cave-llm-gateway)
-#     - llama.cpp / vLLM concrete adapters               → vendor-adapter (cave-llm-gateway)
+#     - llama.cpp / vLLM concrete inference adapters     → vendor-adapter (cave-llm-gateway)
 #     - embedding-recall RAG store                       → parallel-track (cave-hermes)
-#     - multimodal images, tool-calling in chat          → out-of-scope-subsystem
 #     - KV-cache eviction state machine                  → out-of-scope-subsystem
 #     - JSON-mode response validation                    → out-of-scope-subsystem
 #     - /api/version surface in extras                   → stdlib-analog (handled by clap --version)
@@ -97,6 +109,32 @@ file          = "src/ollama.rs"
 upstream_name = "ChatStream"
 local_name    = "chat_stream"
 file          = "src/ollama.rs"
+
+# 2026-05-28 honest_ratio uplift — new mapped capabilities (strict-TDD).
+[[functions]]
+upstream_name = "api.ImageData (multimodal)"
+local_name    = "encode_image"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "api.Tool/ToolCall (function calling)"
+local_name    = "Tool::function"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "openai.ChatCompletionChunk (SSE stream)"
+local_name    = "chat_completions_stream"
+file          = "src/openai_compat.rs"
+
+[[functions]]
+upstream_name = "fs/ggml.gguf.decode"
+local_name    = "GgufFile::parse"
+file          = "src/gguf.rs"
+
+[[functions]]
+upstream_name = "fs/ggml.ParseFileType / FileType.String"
+local_name    = "QuantType::{from_file_type,from_str,name}"
+file          = "src/quant.rs"
 
 [[surfaces]]
 kind          = "http"
