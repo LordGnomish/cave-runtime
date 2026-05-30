@@ -28,6 +28,7 @@
 pub mod agent_state;
 pub mod backend;
 pub mod eval;
+pub mod multi_agent;
 pub mod plan_execute;
 
 /// Upstream pin for the OpenJarvis primitive set. Tracked alongside the
