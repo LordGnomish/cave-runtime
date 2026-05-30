@@ -17,6 +17,7 @@ pub mod company;
 pub mod custom_field;
 pub mod custom_object;
 pub mod lead;
+pub mod message;
 pub mod opportunity;
 pub mod person;
 pub mod pipeline_step;
