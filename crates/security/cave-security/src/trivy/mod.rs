@@ -22,6 +22,7 @@ pub mod output;
 pub mod sbom;
 pub mod scanner;
 pub mod secret;
+pub mod vex;
 pub mod vuln_db;
 
 pub use scanner::{ScanOptions, ScanResult, ScanType, Scanner, VulnFinding};
