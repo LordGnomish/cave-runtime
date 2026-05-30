@@ -201,4 +201,49 @@ mod tests {
         assert_eq!(ShutdownReason::SigTerm.to_string(), "SIGTERM");
         assert_eq!(ShutdownReason::StopFile.to_string(), "stop-signal file");
     }
+
+    // ── Cycle 2: double-signal force-quit escalation ────────────────────────
+
+    #[test]
+    fn test_second_signal_escalates_to_forced() {
+        let c = ShutdownController::new();
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.state(), ShutdownState::Draining(ShutdownReason::SigInt));
+        // "Press Ctrl-C again to force quit."
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.state(), ShutdownState::Forced);
+        assert!(c.is_shutdown_requested());
+    }
+
+    #[test]
+    fn test_first_reason_is_preserved_after_escalation() {
+        let c = ShutdownController::new();
+        c.request(ShutdownReason::SigTerm);
+        // A different second signal still forces, but the original reason stands.
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.state(), ShutdownState::Forced);
+        assert_eq!(c.reason(), Some(ShutdownReason::SigTerm));
+    }
+
+    #[test]
+    fn test_forced_state_is_sticky() {
+        let c = ShutdownController::new();
+        c.request(ShutdownReason::SigInt);
+        c.request(ShutdownReason::SigTerm);
+        assert_eq!(c.state(), ShutdownState::Forced);
+        // Further signals never downgrade out of Forced.
+        c.request(ShutdownReason::StopFile);
+        c.request(ShutdownReason::SigInt);
+        assert_eq!(c.state(), ShutdownState::Forced);
+    }
+
+    #[test]
+    fn test_is_forced_helper() {
+        let c = ShutdownController::new();
+        assert!(!c.is_forced());
+        c.request(ShutdownReason::SigTerm);
+        assert!(!c.is_forced());
+        c.request(ShutdownReason::SigTerm);
+        assert!(c.is_forced());
+    }
 }
