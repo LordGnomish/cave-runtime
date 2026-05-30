@@ -498,18 +498,43 @@ impl ProgressTracker {
     /// Record a vote from `id`. The first vote recorded for a member wins;
     /// later votes for the same member are ignored (matching etcd).
     pub fn record_vote(&mut self, id: u64, granted: bool) {
-        unimplemented!()
+        self.votes.entry(id).or_insert(granted);
     }
 
     /// Count votes among voters, excluding learners. Returns
     /// `(granted, rejected)`.
     pub fn tally_votes(&self) -> (usize, usize) {
-        unimplemented!()
+        let mut granted = 0usize;
+        let mut rejected = 0usize;
+        // Only members that hold (non-learner) progress count toward the tally.
+        for (id, pr) in &self.progress {
+            if pr.is_learner {
+                continue;
+            }
+            match self.votes.get(id) {
+                Some(true) => granted += 1,
+                Some(false) => rejected += 1,
+                None => {}
+            }
+        }
+        (granted, rejected)
     }
 
     /// Resolve the recorded votes against the joint voter configuration.
+    ///
+    /// The result is [`Won`](VoteResult::Won) only if BOTH the incoming and
+    /// outgoing majority configs are won; [`Lost`](VoteResult::Lost) if either
+    /// is lost; otherwise [`Pending`](VoteResult::Pending).
     pub fn vote_result(&self) -> VoteResult {
-        unimplemented!()
+        let r_in = majority_vote_result(&self.incoming, &self.votes);
+        let r_out = majority_vote_result(&self.outgoing, &self.votes);
+        if r_in == r_out {
+            return r_in;
+        }
+        if r_in == VoteResult::Lost || r_out == VoteResult::Lost {
+            return VoteResult::Lost;
+        }
+        VoteResult::Pending
     }
 }
 
