@@ -26,8 +26,9 @@ fn codes_fit_in_bit_width() {
     assert_eq!(q4.bits, 4);
     // 4-bit codes are in [0, 15].
     assert!(q4.codes.iter().all(|&c| c <= 15));
+    // 8-bit must exploit more levels than 4-bit on this spread-out data.
     let q8 = quantize(&a, 8, 8);
-    assert!(q8.codes.iter().all(|&c| c <= 255));
+    assert!(q8.codes.iter().any(|&c| c > 15));
 }
 
 #[test]
