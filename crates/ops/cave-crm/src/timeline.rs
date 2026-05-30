@@ -12,6 +12,168 @@
 //! aggregation contract — closing the `[[partial]]` timeline gap that the
 //! bare `ActivityTarget` link only enabled.
 
+use crate::models::{ActivityKind, ActivityTarget, ActivityTargetKind, Note, Task};
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TimelineItemKind {
+    Note,
+    Task,
+    CalendarEvent,
+    Message,
+    /// A `TimelineActivity` audit row (e.g. a field-change diff).
+    FieldUpdate,
+}
+
+/// An audit row — Twenty's `TimelineActivity` workspace-entity. Captures a
+/// named event (`opportunity.updated`, `note.created`, …) against a
+/// polymorphic target, with an optional `properties.diff` payload.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TimelineActivity {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    pub name: String,
+    pub target_kind: ActivityTargetKind,
+    pub target_id: Uuid,
+    pub linked_record_id: Option<Uuid>,
+    pub workspace_member_id: Option<Uuid>,
+    pub properties: Value,
+    pub happens_at: DateTime<Utc>,
+}
+
+impl TimelineActivity {
+    pub fn new(
+        workspace_id: Uuid,
+        name: impl Into<String>,
+        target_kind: ActivityTargetKind,
+        target_id: Uuid,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            workspace_id,
+            name: name.into(),
+            target_kind,
+            target_id,
+            linked_record_id: None,
+            workspace_member_id: None,
+            properties: Value::Null,
+            happens_at: Utc::now(),
+        }
+    }
+
+    pub fn with_properties(mut self, properties: Value) -> Self {
+        self.properties = properties;
+        self
+    }
+
+    /// Two audit rows merge when they describe the same event against the
+    /// same target by the same actor (and the same linked record, if any) —
+    /// the recency window is applied separately by [`merge_recent`].
+    fn mergeable_with(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.target_kind == other.target_kind
+            && self.target_id == other.target_id
+            && self.workspace_member_id == other.workspace_member_id
+            && self.linked_record_id == other.linked_record_id
+    }
+}
+
+/// One entry in a record's timeline feed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TimelineEntry {
+    pub kind: TimelineItemKind,
+    /// The note/task/audit record id.
+    pub record_id: Uuid,
+    pub title: String,
+    pub happens_at: DateTime<Utc>,
+}
+
+/// Build a record's timeline feed: every Note and Task linked to the target
+/// via `ActivityTarget`, plus every `TimelineActivity` audit row pointed at
+/// the target — ordered newest-first (Twenty orders `createdAt`/`happensAt`
+/// DESC).
+pub fn timeline_for_target(
+    target_kind: ActivityTargetKind,
+    target_id: Uuid,
+    targets: &[ActivityTarget],
+    notes: &[Note],
+    tasks: &[Task],
+    audits: &[TimelineActivity],
+) -> Vec<TimelineEntry> {
+    let mut feed: Vec<TimelineEntry> = Vec::new();
+
+    // Polymorphic links pointing at this record.
+    let linked: Vec<&ActivityTarget> = targets
+        .iter()
+        .filter(|t| t.target_kind == target_kind && t.target_id == target_id)
+        .collect();
+
+    for note in notes {
+        let hit = linked
+            .iter()
+            .any(|t| t.activity_kind == ActivityKind::Note && t.activity_id == note.id);
+        if hit {
+            feed.push(TimelineEntry {
+                kind: TimelineItemKind::Note,
+                record_id: note.id,
+                title: note.title.clone(),
+                happens_at: note.created_at,
+            });
+        }
+    }
+
+    for task in tasks {
+        let hit = linked
+            .iter()
+            .any(|t| t.activity_kind == ActivityKind::Task && t.activity_id == task.id);
+        if hit {
+            feed.push(TimelineEntry {
+                kind: TimelineItemKind::Task,
+                record_id: task.id,
+                title: task.title.clone(),
+                happens_at: task.created_at,
+            });
+        }
+    }
+
+    for a in audits {
+        if a.target_kind == target_kind && a.target_id == target_id {
+            feed.push(TimelineEntry {
+                kind: TimelineItemKind::FieldUpdate,
+                record_id: a.id,
+                title: a.name.clone(),
+                happens_at: a.happens_at,
+            });
+        }
+    }
+
+    feed.sort_by(|a, b| b.happens_at.cmp(&a.happens_at));
+    feed
+}
+
+/// Collapse audit rows that are mergeable and fall within `window` of one
+/// another (Twenty's 10-minute timeline dedup). Keeps the newest of each
+/// merged cluster. Input order is irrelevant; output is newest-first.
+pub fn merge_recent(activities: &[TimelineActivity], window: Duration) -> Vec<TimelineActivity> {
+    let mut sorted: Vec<TimelineActivity> = activities.to_vec();
+    sorted.sort_by(|a, b| b.happens_at.cmp(&a.happens_at));
+
+    let mut kept: Vec<TimelineActivity> = Vec::new();
+    for act in sorted {
+        let dup = kept.iter().any(|k| {
+            k.mergeable_with(&act) && (k.happens_at - act.happens_at).abs() <= window
+        });
+        if !dup {
+            kept.push(act);
+        }
+    }
+    kept
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

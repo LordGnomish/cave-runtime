@@ -33,6 +33,7 @@ pub mod webhook;
 pub mod workflow;
 
 pub use store::{ConvertedLead, CrmStore};
+pub use timeline::{merge_recent, timeline_for_target, TimelineActivity, TimelineEntry, TimelineItemKind};
 pub use webhook::{WebhookBus, WebhookDelivery, WebhookOperation, WebhookSubscription};
 pub use workflow::{Workflow, WorkflowRun, WorkflowRunStatus, WorkflowStep, WorkflowStepType, WorkflowStore};
 

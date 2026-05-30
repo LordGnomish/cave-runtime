@@ -52,6 +52,8 @@ pub struct CrmStore {
     pub custom_field_values: Arc<RwLock<HashMap<(Uuid, Uuid, Uuid), String>>>,
 
     pub indexes: Arc<RwLock<IndexSet>>,
+
+    pub timeline_activities: Arc<RwLock<HashMap<Uuid, crate::timeline::TimelineActivity>>>,
 }
 
 impl CrmStore {
@@ -163,6 +165,25 @@ impl CrmStore {
                 rows(self.tasks.read().await.values().filter(|t| t.workspace_id == ws)),
             ),
         ]
+    }
+
+    /// Build a record's timeline feed from the store — every Note/Task
+    /// linked to it via `ActivityTarget` plus its `TimelineActivity` audit
+    /// rows, newest-first. Backs Twenty's per-record activity feed.
+    pub async fn timeline_for_target(
+        &self,
+        target_kind: ActivityTargetKind,
+        target_id: Uuid,
+    ) -> Vec<crate::timeline::TimelineEntry> {
+        let targets: Vec<ActivityTarget> =
+            self.activity_targets.read().await.values().cloned().collect();
+        let notes: Vec<Note> = self.notes.read().await.values().cloned().collect();
+        let tasks: Vec<Task> = self.tasks.read().await.values().cloned().collect();
+        let audits: Vec<crate::timeline::TimelineActivity> =
+            self.timeline_activities.read().await.values().cloned().collect();
+        crate::timeline::timeline_for_target(
+            target_kind, target_id, &targets, &notes, &tasks, &audits,
+        )
     }
 
     /// Convert a Lead → Company + Person + Opportunity. Mirrors the
@@ -370,6 +391,32 @@ mod tests {
             .graphql_query(ws1.id, &format!("{{ person(filter: {{id: \"{}\"}}) {{ firstName }} }}", p1.id))
             .await;
         assert_eq!(one["data"]["person"]["firstName"], "Ada");
+    }
+
+    #[tokio::test]
+    async fn timeline_for_target_aggregates_store_rows() {
+        let s = CrmStore::new();
+        let ws = s.bootstrap_workspace("Acme").await;
+        let person = Person::new(ws.id, "Ada", "Lovelace");
+        let pid = person.id;
+        s.people.write().await.insert(pid, person);
+
+        let note = Note::new(ws.id, "Intro call");
+        let nt = ActivityTarget::new(
+            ws.id,
+            note.id,
+            ActivityKind::Note,
+            ActivityTargetKind::Person,
+            pid,
+        );
+        s.notes.write().await.insert(note.id, note);
+        s.activity_targets.write().await.insert(nt.id, nt);
+
+        let feed = s
+            .timeline_for_target(ActivityTargetKind::Person, pid)
+            .await;
+        assert_eq!(feed.len(), 1);
+        assert_eq!(feed[0].title, "Intro call");
     }
 
     #[tokio::test]
