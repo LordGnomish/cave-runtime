@@ -17,6 +17,7 @@ pub mod models;
 pub mod restore_order;
 pub mod routes;
 pub mod schedule;
+pub mod snapshot_locations;
 pub mod storage;
 pub mod types;
 pub mod volume;
