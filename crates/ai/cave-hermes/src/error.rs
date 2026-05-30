@@ -48,6 +48,9 @@ pub enum HermesError {
     #[error("self-improvement error: {0}")]
     SelfImprove(String),
 
+    #[error("inter-agent comms error: {0}")]
+    Comms(String),
+
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 

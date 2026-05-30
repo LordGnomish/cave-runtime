@@ -11,6 +11,177 @@
 //! counterpart to the cluster-wide EventBus. Cross-process multi-agent
 //! messaging defers to `cave-kernel`'s EventBus downstream.
 
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::HermesError;
+
+/// Coarse message intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MessageKind {
+    /// A unit of work delegated to a worker.
+    Task,
+    /// A reply carrying a worker's output.
+    Result,
+    /// Informational / coordination chatter.
+    Info,
+}
+
+/// One message on the bus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Message {
+    pub seq: u64,
+    pub from: String,
+    pub to: String,
+    pub kind: MessageKind,
+    pub body: String,
+}
+
+/// In-process, synchronous message bus. Each registered agent owns an
+/// ordered inbox; [`receive`](MessageBus::receive) drains it.
+#[derive(Debug, Default)]
+pub struct MessageBus {
+    inboxes: BTreeMap<String, Vec<Message>>,
+    next_seq: u64,
+}
+
+impl MessageBus {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register an agent (idempotent — re-spawning keeps the existing inbox).
+    pub fn spawn(&mut self, name: &str) -> &mut Self {
+        self.inboxes.entry(name.to_string()).or_default();
+        self
+    }
+
+    pub fn is_registered(&self, name: &str) -> bool {
+        self.inboxes.contains_key(name)
+    }
+
+    /// Deliver a message to `to`'s inbox. Errors if the recipient is not
+    /// registered.
+    pub fn send(
+        &mut self,
+        from: &str,
+        to: &str,
+        kind: MessageKind,
+        body: impl Into<String>,
+    ) -> crate::error::Result<u64> {
+        if !self.inboxes.contains_key(to) {
+            return Err(HermesError::Comms(format!("unknown recipient '{to}'")));
+        }
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        let msg = Message {
+            seq,
+            from: from.to_string(),
+            to: to.to_string(),
+            kind,
+            body: body.into(),
+        };
+        self.inboxes.get_mut(to).expect("checked above").push(msg);
+        Ok(seq)
+    }
+
+    /// Send to every registered agent except the sender. Returns the
+    /// recipient count.
+    pub fn broadcast(
+        &mut self,
+        from: &str,
+        kind: MessageKind,
+        body: impl Into<String>,
+    ) -> crate::error::Result<usize> {
+        let body = body.into();
+        let recipients: Vec<String> = self
+            .inboxes
+            .keys()
+            .filter(|k| k.as_str() != from)
+            .cloned()
+            .collect();
+        for to in &recipients {
+            self.send(from, to, kind, body.clone())?;
+        }
+        Ok(recipients.len())
+    }
+
+    /// Number of undelivered messages in an agent's inbox.
+    pub fn pending(&self, name: &str) -> usize {
+        self.inboxes.get(name).map(Vec::len).unwrap_or(0)
+    }
+
+    /// Drain and return an agent's inbox in arrival order.
+    pub fn receive(&mut self, name: &str) -> crate::error::Result<Vec<Message>> {
+        let inbox = self
+            .inboxes
+            .get_mut(name)
+            .ok_or_else(|| HermesError::Comms(format!("unknown agent '{name}'")))?;
+        Ok(std::mem::take(inbox))
+    }
+}
+
+/// Thin coordinator over a [`MessageBus`]: fans a task out to a worker pool
+/// and gathers the replies addressed back to it.
+#[derive(Debug)]
+pub struct Orchestrator {
+    coordinator: String,
+    workers: Vec<String>,
+    bus: MessageBus,
+}
+
+impl Orchestrator {
+    pub fn new(coordinator: impl Into<String>) -> Self {
+        let coordinator = coordinator.into();
+        let mut bus = MessageBus::new();
+        bus.spawn(&coordinator);
+        Self {
+            coordinator,
+            workers: Vec::new(),
+            bus,
+        }
+    }
+
+    pub fn add_worker(&mut self, name: impl Into<String>) -> &mut Self {
+        let name = name.into();
+        self.bus.spawn(&name);
+        self.workers.push(name);
+        self
+    }
+
+    pub fn bus_mut(&mut self) -> &mut MessageBus {
+        &mut self.bus
+    }
+
+    pub fn workers(&self) -> &[String] {
+        &self.workers
+    }
+
+    /// Send `body` as a [`MessageKind::Task`] to every worker. Returns the
+    /// number dispatched.
+    pub fn delegate(&mut self, body: impl Into<String>) -> crate::error::Result<usize> {
+        let body = body.into();
+        let workers = self.workers.clone();
+        for w in &workers {
+            self.bus
+                .send(&self.coordinator, w, MessageKind::Task, body.clone())?;
+        }
+        Ok(workers.len())
+    }
+
+    /// Drain the coordinator's inbox and return only the [`MessageKind::Result`]
+    /// replies, in arrival order.
+    pub fn collect_results(&mut self) -> crate::error::Result<Vec<Message>> {
+        let coordinator = self.coordinator.clone();
+        let all = self.bus.receive(&coordinator)?;
+        Ok(all
+            .into_iter()
+            .filter(|m| m.kind == MessageKind::Result)
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
