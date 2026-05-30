@@ -50,6 +50,10 @@ pub struct Condition {
     pub reason: Option<String>,
     pub message: Option<String>,
     pub last_transition_time: DateTime<Utc>,
+    /// `.metadata.generation` the condition was last computed from.
+    /// Upstream `apis/common/v1/condition.go::Condition.ObservedGeneration` (omitempty).
+    #[serde(default)]
+    pub observed_generation: i64,
 }
 
 impl Condition {
@@ -60,6 +64,7 @@ impl Condition {
             reason: None,
             message: None,
             last_transition_time: Utc::now(),
+            observed_generation: 0,
         }
     }
 
@@ -73,15 +78,131 @@ impl Condition {
         self
     }
 
+    /// Stamp the observed generation onto the condition.
+    /// Upstream `Condition.WithObservedGeneration`.
+    pub fn with_observed_generation(mut self, generation: i64) -> Self {
+        self.observed_generation = generation;
+        self
+    }
+
+    /// True if this condition is identical to `other`, ignoring the
+    /// `LastTransitionTime` and `ObservedGeneration`.
+    /// Upstream `Condition.Equal`.
+    pub fn equal(&self, other: &Condition) -> bool {
+        self.condition_type == other.condition_type
+            && self.status == other.status
+            && self.reason == other.reason
+            && self.message == other.message
+    }
+
     /// Convert to upstream Kubernetes JSON shape.
     pub fn to_json(&self) -> Value {
-        json!({
+        let mut v = json!({
             "type": self.condition_type.as_str(),
             "status": self.status.as_str(),
             "reason": self.reason,
             "message": self.message,
             "lastTransitionTime": self.last_transition_time.to_rfc3339(),
+        });
+        // omitempty: observedGeneration only appears when non-zero.
+        if self.observed_generation != 0 {
+            v["observedGeneration"] = json!(self.observed_generation);
+        }
+        v
+    }
+
+    /// Parse a condition back from its upstream Kubernetes JSON shape.
+    /// Returns `None` for an unrecognised `type`.
+    pub fn from_json(v: &Value) -> Option<Self> {
+        let condition_type = match v.get("type").and_then(|t| t.as_str())? {
+            "Ready" => ConditionType::Ready,
+            "Synced" => ConditionType::Synced,
+            "Healthy" => ConditionType::Healthy,
+            _ => return None,
+        };
+        let status = match v.get("status").and_then(|s| s.as_str()).unwrap_or("Unknown") {
+            "True" => ConditionStatus::True,
+            "False" => ConditionStatus::False,
+            _ => ConditionStatus::Unknown,
+        };
+        let last_transition_time = v
+            .get("lastTransitionTime")
+            .and_then(|t| t.as_str())
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(Utc::now);
+        Some(Self {
+            condition_type,
+            status,
+            reason: v
+                .get("reason")
+                .and_then(|r| r.as_str())
+                .map(|s| s.to_string()),
+            message: v
+                .get("message")
+                .and_then(|m| m.as_str())
+                .map(|s| s.to_string()),
+            last_transition_time,
+            observed_generation: v
+                .get("observedGeneration")
+                .and_then(|g| g.as_i64())
+                .unwrap_or(0),
         })
+    }
+}
+
+/// Observed status of a resource — at most one condition per type.
+/// Upstream `apis/common/v1/condition.go::ConditionedStatus`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConditionedStatus {
+    pub conditions: Vec<Condition>,
+}
+
+impl ConditionedStatus {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Return the condition for `ct`, or an Unknown placeholder if absent.
+    /// Upstream `ConditionedStatus.GetCondition`.
+    pub fn get_condition(&self, ct: ConditionType) -> Condition {
+        self.conditions
+            .iter()
+            .find(|c| c.condition_type == ct)
+            .cloned()
+            .unwrap_or_else(|| Condition::new(ct, ConditionStatus::Unknown))
+    }
+
+    /// Set the supplied conditions, replacing any existing of the same type.
+    ///
+    /// A no-op when a supplied condition is `Equal` (ignoring transition time +
+    /// observed generation) to the existing one — only advancing
+    /// `observedGeneration` if the new one is higher (LastTransitionTime
+    /// preserved). On a real transition the condition is replaced wholesale, so
+    /// the new `LastTransitionTime` applies.
+    ///
+    /// Upstream `ConditionedStatus.SetConditions`.
+    pub fn set_conditions(&mut self, incoming: &[Condition]) {
+        for new in incoming {
+            let mut exists = false;
+            for existing in self.conditions.iter_mut() {
+                if existing.condition_type != new.condition_type {
+                    continue;
+                }
+                if existing.equal(new) {
+                    exists = true;
+                    if existing.observed_generation < new.observed_generation {
+                        existing.observed_generation = new.observed_generation;
+                    }
+                    continue;
+                }
+                *existing = new.clone();
+                exists = true;
+            }
+            if !exists {
+                self.conditions.push(new.clone());
+            }
+        }
     }
 }
 
@@ -123,11 +244,32 @@ pub fn propagate_composed_to_xr(xr: &Value, composed: &[Value]) -> Value {
             ConditionStatus::True
         },
     );
-    let new_conds = vec![
-        ready_cond.to_json(),
-        synced_cond.to_json(),
-        healthy_cond.to_json(),
-    ];
+    // Stamp the XR's observed generation onto each desired condition so a stable
+    // reconcile advances observedGeneration without churning LastTransitionTime.
+    let generation = xr
+        .get("metadata")
+        .and_then(|m| m.get("generation"))
+        .and_then(|g| g.as_i64())
+        .unwrap_or(0);
+
+    // Load the existing conditioned status so SetConditions can preserve the
+    // LastTransitionTime of conditions whose status has not transitioned.
+    let mut status = ConditionedStatus::default();
+    if let Some(arr) = xr
+        .get("status")
+        .and_then(|s| s.get("conditions"))
+        .and_then(|c| c.as_array())
+    {
+        status.conditions = arr.iter().filter_map(Condition::from_json).collect();
+    }
+
+    status.set_conditions(&[
+        ready_cond.with_observed_generation(generation),
+        synced_cond.with_observed_generation(generation),
+        healthy_cond.with_observed_generation(generation),
+    ]);
+
+    let new_conds = status.conditions.iter().map(|c| c.to_json()).collect();
     set_conditions(&mut xr, new_conds);
     xr
 }
