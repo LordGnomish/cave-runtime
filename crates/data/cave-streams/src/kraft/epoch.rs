@@ -8,12 +8,16 @@
 
 use std::collections::BTreeSet;
 
+use serde::{Deserialize, Serialize};
+
 /// Monotonic counter that increments every time leadership
 /// transitions in the controller quorum. Every `MetadataRecord`
 /// that lands in the log carries the epoch at the moment of
 /// append — old leaders that try to replay records past their
 /// epoch are rejected.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
+)]
 pub struct ControllerEpoch(pub u64);
 
 impl ControllerEpoch {

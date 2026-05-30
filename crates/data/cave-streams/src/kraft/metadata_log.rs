@@ -12,8 +12,59 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
+use serde::{Deserialize, Serialize};
+
 use super::epoch::ControllerEpoch;
 use super::metadata::{ClusterMetadata, MetadataKey, MetadataRecord};
+
+/// A compacted KRaft metadata snapshot (KIP-630).
+///
+/// Mirrors the on-disk `*-checkpoint` artifact produced by
+/// upstream's `SnapshotWriter`: a self-contained image of the
+/// metadata log up to (and including) `last_contained_offset`.
+/// A node that loads a snapshot can discard every log record at a
+/// lower offset and resume fetching/appending from the snapshot
+/// boundary, instead of replaying the entire log from offset 0.
+///
+/// The snapshot holds the *compacted* live record set (one record
+/// per [`MetadataKey`], tombstoned keys already dropped) so that
+/// applying it reproduces the exact `ClusterMetadata` the source
+/// log materialised.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetadataSnapshot {
+    /// The next offset that would have been assigned at the moment
+    /// the snapshot was taken — every record below this offset is
+    /// represented (post-compaction) inside `records`.
+    last_contained_offset: u64,
+    /// Highest controller epoch present in any contained record.
+    last_contained_epoch: ControllerEpoch,
+    /// The compacted live records, ordered by their original log
+    /// offset for deterministic re-application.
+    records: Vec<MetadataRecord>,
+}
+
+impl MetadataSnapshot {
+    /// Offset boundary — the next offset assigned after the
+    /// snapshot point. New appends on a restored log resume here.
+    pub fn last_contained_offset(&self) -> u64 {
+        self.last_contained_offset
+    }
+
+    /// Highest epoch among contained records (`INITIAL` if empty).
+    pub fn last_contained_epoch(&self) -> ControllerEpoch {
+        self.last_contained_epoch
+    }
+
+    /// Number of live (post-compaction) records in the snapshot.
+    pub fn record_count(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Borrow the contained records in offset order.
+    pub fn records(&self) -> &[MetadataRecord] {
+        &self.records
+    }
+}
 
 /// One committed entry — record + the log offset it landed at.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,6 +178,63 @@ impl MetadataLog {
             .map(|e| e.record.epoch())
             .max()
             .unwrap_or(ControllerEpoch::INITIAL)
+    }
+
+    /// Generate a compacted snapshot of the current log state
+    /// (KIP-630). Captures the live (post-compaction) record set
+    /// plus the current high-water mark so a restored log resumes
+    /// offsets monotonically across the snapshot boundary.
+    ///
+    /// Records are emitted in original-offset order so re-applying
+    /// them reproduces the exact `ClusterMetadata`.
+    pub fn generate_snapshot(&self) -> MetadataSnapshot {
+        let g = self.inner.read().expect("poisoned");
+        let mut entries: Vec<&LogEntry> = g.by_key.values().collect();
+        entries.sort_by_key(|e| e.offset);
+        let records: Vec<MetadataRecord> = entries.iter().map(|e| e.record.clone()).collect();
+        let last_contained_epoch = records
+            .iter()
+            .map(|r| r.epoch())
+            .max()
+            .unwrap_or(ControllerEpoch::INITIAL);
+        MetadataSnapshot {
+            last_contained_offset: g.next_offset,
+            last_contained_epoch,
+            records,
+        }
+    }
+
+    /// Build a fresh log from a snapshot (KIP-630 load path). The
+    /// restored log's live state equals the snapshot's; its next
+    /// offset resumes at `last_contained_offset` so subsequent
+    /// appends keep offsets monotone with the original log.
+    ///
+    /// Snapshot records are pre-compacted (one per key, tombstones
+    /// already applied), so they are installed directly into the
+    /// by-key index rather than re-run through tombstone logic.
+    pub fn from_snapshot(snapshot: &MetadataSnapshot) -> Self {
+        let mut by_key: HashMap<MetadataKey, LogEntry> = HashMap::new();
+        let mut appended: Vec<LogEntry> = Vec::with_capacity(snapshot.records.len());
+        // Re-key the contained records onto contiguous offsets
+        // ending at the snapshot boundary, preserving order.
+        let base = snapshot
+            .last_contained_offset
+            .saturating_sub(snapshot.records.len() as u64);
+        for (i, record) in snapshot.records.iter().cloned().enumerate() {
+            let entry = LogEntry {
+                offset: base + i as u64,
+                record,
+            };
+            by_key.insert(entry.record.key(), entry.clone());
+            appended.push(entry);
+        }
+        Self {
+            inner: RwLock::new(MetadataLogInner {
+                next_offset: snapshot.last_contained_offset,
+                by_key,
+                appended,
+            }),
+        }
     }
 }
 

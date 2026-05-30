@@ -51,7 +51,7 @@ pub mod rpc;
 
 pub use epoch::{ControllerEpoch, VoterSet};
 pub use metadata::{BrokerRegistration, MetadataKey, MetadataRecord, PartitionRecord, TopicRecord};
-pub use metadata_log::MetadataLog;
+pub use metadata_log::{MetadataLog, MetadataSnapshot};
 pub use quorum_controller::{ControllerRequest, ControllerResponse, QuorumController};
 pub use rpc::{
     BeginQuorumEpochRequest, BeginQuorumEpochResponse, DescribeQuorumRequest,

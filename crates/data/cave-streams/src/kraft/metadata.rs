@@ -16,6 +16,8 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use super::epoch::ControllerEpoch;
 
 /// Identifier of which metadata record we have in hand. The
@@ -34,7 +36,7 @@ pub enum MetadataKey {
 
 /// `TopicRecord` — KIP-595 §3.2. Created when a topic is
 /// created, deleted when the topic is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopicRecord {
     pub name: String,
     /// Stable UUID — survives topic re-creation under the same
@@ -47,7 +49,7 @@ pub struct TopicRecord {
 
 /// `PartitionRecord` — current leader + ISR for one partition.
 /// Emitted on partition creation and on every leadership change.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartitionRecord {
     pub topic: String,
     pub partition_id: i32,
@@ -64,7 +66,7 @@ pub struct PartitionRecord {
 /// itself with the controller on start; the record carries the
 /// broker's endpoints and an incarnation ID that distinguishes
 /// restarts.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrokerRegistration {
     pub broker_id: i32,
     pub host: String,
@@ -79,7 +81,7 @@ pub struct BrokerRegistration {
 
 /// `ConfigRecord` — upsert of one configuration key. `value =
 /// None` represents a delete.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigRecord {
     pub scope: String,
     pub target: String,
@@ -90,7 +92,7 @@ pub struct ConfigRecord {
 /// The discriminated union the metadata log stores. Each
 /// variant carries its own payload plus the epoch at which it
 /// was appended.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MetadataRecord {
     Topic {
         epoch: ControllerEpoch,
