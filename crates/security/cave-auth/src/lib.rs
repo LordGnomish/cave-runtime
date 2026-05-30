@@ -34,6 +34,7 @@ pub mod ldap;
 pub mod middleware;
 pub mod oauth_endpoints;
 pub mod oid4vc;
+pub mod otp;
 pub mod okta;
 pub mod persistence;
 pub mod rbac;
