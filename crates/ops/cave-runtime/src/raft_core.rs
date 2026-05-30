@@ -471,6 +471,19 @@ impl RaftCore {
         self.members.len() / 2 + 1
     }
 
+    /// Resolve the current election outcome through the ported etcd
+    /// [`ProgressTracker`](cave_etcd::raft_tracker::ProgressTracker) vote ledger.
+    ///
+    /// The candidate's granted votes (including its own self-vote, recorded in
+    /// `votes_received`) are tallied against the voter configuration. For the
+    /// single (non-joint) config this is behaviourally identical to
+    /// `votes_received.len() >= majority()`, but routes the decision through the
+    /// joint-aware `VoteResult` primitive so a future joint reconfiguration is
+    /// handled correctly.
+    pub fn election_vote_result(&self) -> cave_etcd::raft_tracker::VoteResult {
+        unimplemented!()
+    }
+
     // ── Inbound RPC handlers ───────────────────────────────────────────────
 
     /// Process a `RequestVote` from a candidate. Per paper §5.4.1, grant
@@ -1293,6 +1306,31 @@ mod tests {
         .unwrap();
         assert_eq!(core.role(), Role::Leader);
         assert_eq!(core.leader(), Some(1));
+    }
+
+    #[test]
+    fn election_vote_result_routes_through_ported_tracker() {
+        use cave_etcd::raft_tracker::VoteResult;
+        let tmp = TempDir::new().unwrap();
+        let mut core = make_core(1, vec![1, 2, 3], tmp.path());
+        // Before campaigning: no self-vote recorded → not yet decided.
+        assert_eq!(core.election_vote_result(), VoteResult::Pending);
+        // Candidate records its own vote (1/3) → still Pending.
+        core.become_candidate(t0()).unwrap();
+        assert_eq!(core.election_vote_result(), VoteResult::Pending);
+        // One peer grant → 2/3 majority → Won, and the reply path must promote
+        // the node to Leader using exactly this outcome.
+        core.handle_request_vote_reply(
+            2,
+            RequestVoteReply {
+                term: 1,
+                vote_granted: true,
+            },
+            t0(),
+        )
+        .unwrap();
+        assert_eq!(core.election_vote_result(), VoteResult::Won);
+        assert_eq!(core.role(), Role::Leader);
     }
 
     #[test]
