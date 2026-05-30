@@ -43,6 +43,92 @@ impl Tenant {
     }
 }
 
+/// Action taken when a backlog quota is exceeded (Pulsar
+/// `BacklogQuota.RetentionPolicy`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RetentionAction {
+    /// Hold (block) producer requests until the backlog drains.
+    ProducerRequestHold,
+    /// Fail producer requests with an exception.
+    ProducerException,
+    /// Drop the oldest unacknowledged messages to make room.
+    ConsumerBacklogEviction,
+}
+
+/// The enforcement decision a backlog-quota check yields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BacklogDecision {
+    /// Within quota — proceed normally.
+    Allow,
+    /// Backlog exceeded; block the producer until it drains.
+    HoldProducer,
+    /// Backlog exceeded; reject the produce with an error.
+    RejectProducer,
+    /// Backlog exceeded; evict oldest unacked messages.
+    EvictBacklog,
+}
+
+/// Per-namespace backlog quota (Pulsar `BacklogQuota`). A quota
+/// limits either the **size** (bytes of unacknowledged backlog) or
+/// the **age** (seconds since the oldest unacked entry), with an
+/// action to apply once the limit is strictly exceeded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BacklogQuota {
+    /// Size limit in bytes (0 = unlimited).
+    pub limit_bytes: u64,
+    /// Time limit in seconds (0 = unlimited).
+    pub limit_secs: u64,
+    /// Action when the limit is exceeded.
+    pub policy: RetentionAction,
+}
+
+impl BacklogQuota {
+    /// A size-based quota.
+    pub fn size(limit_bytes: u64, policy: RetentionAction) -> Self {
+        Self {
+            limit_bytes,
+            limit_secs: 0,
+            policy,
+        }
+    }
+
+    /// A time-based quota.
+    pub fn time(limit_secs: u64, policy: RetentionAction) -> Self {
+        Self {
+            limit_bytes: 0,
+            limit_secs,
+            policy,
+        }
+    }
+
+    /// Map the configured retention action to a decision.
+    fn action(&self) -> BacklogDecision {
+        match self.policy {
+            RetentionAction::ProducerRequestHold => BacklogDecision::HoldProducer,
+            RetentionAction::ProducerException => BacklogDecision::RejectProducer,
+            RetentionAction::ConsumerBacklogEviction => BacklogDecision::EvictBacklog,
+        }
+    }
+
+    /// Evaluate the current backlog against this quota.
+    ///
+    /// `backlog_bytes` is the size of unacknowledged backlog;
+    /// `oldest_unacked_age_secs` is the age of the oldest unacked
+    /// entry. The quota trips when *either* configured limit is
+    /// strictly exceeded (Pulsar checks `> limit`, not `>=`). A
+    /// limit of 0 disables that dimension.
+    pub fn evaluate(&self, backlog_bytes: u64, oldest_unacked_age_secs: u64) -> BacklogDecision {
+        let over_size = self.limit_bytes > 0 && backlog_bytes > self.limit_bytes;
+        let over_time = self.limit_secs > 0 && oldest_unacked_age_secs > self.limit_secs;
+        if over_size || over_time {
+            self.action()
+        } else {
+            BacklogDecision::Allow
+        }
+    }
+}
+
 /// Namespace configuration scoped to a tenant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Namespace {
@@ -54,6 +140,9 @@ pub struct Namespace {
     pub message_ttl_secs: u32,
     /// Per-namespace per-topic retention in MB (0 = unlimited).
     pub retention_mb: u64,
+    /// Per-namespace backlog quota (Pulsar `backlogQuotaMap`).
+    /// `None` = unlimited backlog.
+    pub backlog_quota: Option<BacklogQuota>,
 }
 
 impl Namespace {
@@ -64,12 +153,26 @@ impl Namespace {
             replication_clusters: HashSet::new(),
             message_ttl_secs: 0,
             retention_mb: 0,
+            backlog_quota: None,
         }
     }
 
     /// Fully-qualified name `tenant/namespace`.
     pub fn fqn(&self) -> String {
         format!("{}/{}", self.tenant, self.name)
+    }
+
+    /// Evaluate a topic's backlog against this namespace's quota.
+    /// Returns [`BacklogDecision::Allow`] when no quota is set.
+    pub fn evaluate_backlog(
+        &self,
+        backlog_bytes: u64,
+        oldest_unacked_age_secs: u64,
+    ) -> BacklogDecision {
+        match &self.backlog_quota {
+            Some(q) => q.evaluate(backlog_bytes, oldest_unacked_age_secs),
+            None => BacklogDecision::Allow,
+        }
     }
 }
 
