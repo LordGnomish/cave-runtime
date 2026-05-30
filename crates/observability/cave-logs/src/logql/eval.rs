@@ -288,6 +288,19 @@ fn apply_label_filter(labels: &HashMap<String, String>, lf: &LabelFilter) -> boo
                 _ => false,
             }
         }
+        LabelFilterValue::Ip(pat) => {
+            // Parse the label value as an address; an unparseable value never
+            // matches (so `=` is false and `!=` is true for it).
+            let hit = actual
+                .and_then(|s| s.trim().parse::<std::net::IpAddr>().ok())
+                .map(|addr| pat.matches(addr))
+                .unwrap_or(false);
+            match &lf.op {
+                CompareOp::Eq => hit,
+                CompareOp::Neq => !hit,
+                _ => false,
+            }
+        }
     }
 }
 

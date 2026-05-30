@@ -397,6 +397,16 @@ impl Parser {
                 };
                 LabelFilterValue::Duration(Duration::from_nanos(ns))
             }
+            // `ip("…")` value form, e.g. `| addr = ip("192.168.0.0/16")`.
+            Some(Token::Ident(s)) if s == "ip" && matches!(self.peek2(), Some(Token::LParen)) => {
+                self.advance(); // ip
+                self.expect(&Token::LParen)?;
+                let pat = self.expect_str()?;
+                self.expect(&Token::RParen)?;
+                let parsed = crate::logql::ip::IpPattern::parse(&pat)
+                    .map_err(|e| ParseError::Other(format!("invalid ip() pattern: {e}")))?;
+                LabelFilterValue::Ip(parsed)
+            }
             Some(Token::Ident(_)) => {
                 let s = self.expect_ident()?;
                 LabelFilterValue::String(s)

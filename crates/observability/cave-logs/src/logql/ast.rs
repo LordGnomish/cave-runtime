@@ -92,6 +92,9 @@ pub enum LabelFilterValue {
     Float(f64),
     Duration(Duration),
     Bytes(u64),
+    /// `addr = ip("…")` — the label value is parsed as an address and tested
+    /// against the pattern. Only `Eq`/`Neq` are meaningful.
+    Ip(IpPattern),
 }
 
 /// Label filter stage: `| status_code >= 400`
