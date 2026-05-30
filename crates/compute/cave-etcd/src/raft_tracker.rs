@@ -210,27 +210,45 @@ impl Progress {
     /// Transition to `Probe`. `next` is set just past the better of the known
     /// match index and any pending snapshot index.
     pub fn become_probe(&mut self) {
-        unimplemented!()
+        // If a snapshot was in flight, resume probing past it; otherwise probe
+        // just past the known match index.
+        if self.state == ProgressState::Snapshot {
+            let pending = self.pending_snapshot;
+            self.reset_state(ProgressState::Probe);
+            self.next = (self.r#match + 1).max(pending + 1);
+        } else {
+            self.reset_state(ProgressState::Probe);
+            self.next = self.r#match + 1;
+        }
     }
 
     /// Transition to `Replicate`, streaming from `match + 1`.
     pub fn become_replicate(&mut self) {
-        unimplemented!()
+        self.reset_state(ProgressState::Replicate);
+        self.next = self.r#match + 1;
     }
 
     /// Transition to `Snapshot`, recording the snapshot index being installed.
     pub fn become_snapshot(&mut self, snapshot_idx: u64) {
-        unimplemented!()
+        self.reset_state(ProgressState::Snapshot);
+        self.pending_snapshot = snapshot_idx;
     }
 
     /// Apply an acknowledgement of index `n`. Returns whether `match` advanced.
     pub fn maybe_update(&mut self, n: u64) -> bool {
-        unimplemented!()
+        let mut updated = false;
+        if self.r#match < n {
+            self.r#match = n;
+            updated = true;
+            self.probe_acked();
+        }
+        self.next = self.next.max(n + 1);
+        updated
     }
 
     /// Optimistically advance `next` after sending entries up to `n` (Replicate).
     pub fn optimistic_update(&mut self, n: u64) {
-        unimplemented!()
+        self.next = n + 1;
     }
 
     /// React to an `AppendEntries` rejection reported by the follower.
@@ -239,12 +257,32 @@ impl Progress {
     /// follower's last matching index hint. Returns whether `next` was rolled
     /// back (a stale/spurious rejection returns `false` and changes nothing).
     pub fn maybe_decr_to(&mut self, rejected: u64, match_hint: u64) -> bool {
-        unimplemented!()
+        if self.state == ProgressState::Replicate {
+            // We optimistically stream in Replicate, so a rejection at or below
+            // the known match index is obsolete and must be ignored.
+            if rejected <= self.r#match {
+                return false;
+            }
+            self.next = self.r#match + 1;
+            return true;
+        }
+        // Probe/Snapshot: the rejection must concern the single in-flight probe
+        // at `next - 1`; anything else is stale.
+        if self.next == 0 || self.next - 1 != rejected {
+            return false;
+        }
+        self.next = rejected.min(match_hint + 1).max(1);
+        self.msg_app_flow_paused = false;
+        true
     }
 
     /// Whether the leader must currently withhold appends to this follower.
     pub fn is_paused(&self) -> bool {
-        unimplemented!()
+        match self.state {
+            ProgressState::Probe => self.msg_app_flow_paused,
+            ProgressState::Replicate => self.inflights.full(),
+            ProgressState::Snapshot => true,
+        }
     }
 }
 
