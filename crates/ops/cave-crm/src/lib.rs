@@ -22,6 +22,7 @@
 //! # }
 //! ```
 
+pub mod graphql_resolver;
 pub mod graphql_schema;
 pub mod indexes;
 pub mod models;
