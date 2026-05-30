@@ -35,12 +35,36 @@ pub struct Snapshot {
     pub summary: HashMap<String, String>,
     #[serde(rename = "schema-id", skip_serializing_if = "Option::is_none")]
     pub schema_id: Option<i32>,
+    /// v3 row lineage — the `_row_id` assigned to the first row in this
+    /// snapshot's first data file. Set on commit from the table's
+    /// `next-row-id`. `None` for v1/v2 snapshots.
+    #[serde(rename = "first-row-id", skip_serializing_if = "Option::is_none")]
+    pub first_row_id: Option<i64>,
+    /// v3 row lineage — upper bound of the number of rows that received
+    /// an assigned `_row_id` in this snapshot.
+    #[serde(rename = "added-rows", skip_serializing_if = "Option::is_none")]
+    pub added_rows: Option<i64>,
 }
 
 impl Snapshot {
     pub fn operation(&self) -> Option<&str> {
         self.summary.get("operation").map(String::as_str)
     }
+}
+
+/// Iceberg v3 data-file row-id inheritance. Given the snapshot's
+/// `first_row_id` and the record-count of each newly added data file in
+/// write order, return the `first_row_id` each data file should carry.
+/// File `i` starts at `first_row_id + sum(record_counts[0..i])`; a row's
+/// `_row_id` is then `data_file.first_row_id + _pos`.
+pub fn assign_data_file_first_row_ids(first_row_id: i64, record_counts: &[i64]) -> Vec<i64> {
+    let mut out = Vec::with_capacity(record_counts.len());
+    let mut cursor = first_row_id;
+    for &count in record_counts {
+        out.push(cursor);
+        cursor += count;
+    }
+    out
 }
 
 /// A named reference (branch / tag) → snapshot-id binding.
@@ -126,6 +150,8 @@ mod tests {
             manifest_list: format!("s3://x/manifest-{}.avro", id),
             summary: HashMap::from_iter([("operation".to_string(), "append".to_string())]),
             schema_id: Some(0),
+            first_row_id: None,
+            added_rows: None,
         }
     }
 

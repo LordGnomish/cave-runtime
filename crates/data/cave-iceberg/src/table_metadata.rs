@@ -105,6 +105,11 @@ pub struct TableMetadata {
     pub metadata_log: Vec<MetadataLogEntry>,
     #[serde(default)]
     pub refs: HashMap<String, SnapshotRef>,
+    /// v3 row lineage — the `_row_id` to assign to the next added row.
+    /// Advanced by each commit's `added-rows`. Always present in v3
+    /// metadata; defaults to 0 for v1/v2 round-trips.
+    #[serde(rename = "next-row-id", default)]
+    pub next_row_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -150,6 +155,17 @@ impl TableMetadata {
 
     pub fn to_json(&self) -> Result<String> {
         Ok(serde_json::to_string_pretty(self)?)
+    }
+
+    /// Iceberg v3 row-lineage assignment for a committing snapshot.
+    /// Stamps the snapshot's `first-row-id` from the table's current
+    /// `next-row-id`, records `added-rows`, then advances `next-row-id`
+    /// by that count. An empty commit (`added_rows == 0`) leaves
+    /// `next-row-id` unchanged but still stamps `first-row-id`.
+    pub fn assign_snapshot_row_ids(&mut self, snapshot: &mut Snapshot, added_rows: i64) {
+        snapshot.first_row_id = Some(self.next_row_id);
+        snapshot.added_rows = Some(added_rows);
+        self.next_row_id += added_rows;
     }
 }
 
@@ -210,6 +226,7 @@ impl TableMetadataBuilder {
             snapshot_log: vec![],
             metadata_log: vec![],
             refs: HashMap::new(),
+            next_row_id: 0,
         })
     }
 }

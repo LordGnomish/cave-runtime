@@ -91,6 +91,7 @@ impl Transaction {
                 continue;
             }
             sequence_number += 1;
+            let added_records = plan.added_records();
             let op = plan
                 .operation
                 .as_ref()
@@ -114,7 +115,7 @@ impl Transaction {
                 new_meta.location, snap_id, sequence_number, op
             );
 
-            let snap = Snapshot {
+            let mut snap = Snapshot {
                 snapshot_id: snap_id,
                 parent_snapshot_id: last_parent,
                 sequence_number,
@@ -122,7 +123,15 @@ impl Transaction {
                 manifest_list,
                 summary,
                 schema_id: Some(new_meta.current_schema_id),
+                first_row_id: None,
+                added_rows: None,
             };
+
+            // Iceberg v3 row lineage — stamp the committing snapshot with a
+            // contiguous `_row_id` range and advance the table's next-row-id.
+            if new_meta.format_version == crate::table_metadata::FormatVersion::V3 {
+                new_meta.assign_snapshot_row_ids(&mut snap, added_records);
+            }
 
             new_meta.snapshots.push(snap);
             new_meta.current_snapshot_id = Some(snap_id);
