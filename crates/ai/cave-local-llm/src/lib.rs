@@ -40,3 +40,6 @@ pub mod scheduler;
 
 /// Pure-Rust GGUF header + metadata reader (no tensor data, no inference).
 pub mod gguf;
+
+/// GGUF quantization file-type helpers (Q4/Q5/Q8 …) — names, bits/weight, size.
+pub mod quant;
