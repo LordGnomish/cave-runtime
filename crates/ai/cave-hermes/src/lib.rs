@@ -28,6 +28,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod agent;
 pub mod embedding;
 pub mod error;
 pub mod gateway;
@@ -43,6 +44,7 @@ pub mod tool;
 pub mod tools_builtin;
 pub mod workflow;
 
+pub use agent::{AgentExecutor, AgentRun, StepOutcome};
 pub use error::HermesError;
 pub use gateway::{
     AnthropicStubGateway, CompletionRequest, CompletionResponse, LlmGateway, OllamaGateway,
