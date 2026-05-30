@@ -411,4 +411,57 @@ mod tests {
         assert_eq!(blocks[0].keys, vec![".:53".to_string()]);
         assert!(blocks[0].tokens.is_empty());
     }
+
+    // ── Cycle 2: multiple addresses + duplicate directives ─────────────────
+
+    #[test]
+    fn parse_comma_separated_addresses_same_line() {
+        let src = "example.com:53, example.org:53 {\n    whoami\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            blocks[0].keys,
+            vec!["example.com:53".to_string(), "example.org:53".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_trailing_comma_continues_addresses_on_next_line() {
+        // A trailing comma means the address list continues on the next line.
+        let src = "example.com:53,\nexample.org:53 {\n    whoami\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            blocks[0].keys,
+            vec!["example.com:53".to_string(), "example.org:53".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_dangling_comma_at_eof_is_error() {
+        // Trailing comma with nothing following is a parse error (caddy EOFErr).
+        let err = parse("example.com:53,").unwrap_err();
+        assert!(err.message.contains("EOF") || err.message.contains("another address"));
+    }
+
+    #[test]
+    fn parse_duplicate_directive_accumulates_tokens() {
+        // Two `forward` lines merge into one directive token slice (upstream
+        // ServerBlock.Tokens is a map keyed by directive name).
+        let src = "example.com {\n    forward . 1.1.1.1\n    forward . 8.8.8.8\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(
+            texts(&blocks[0].tokens["forward"]),
+            vec!["forward", ".", "1.1.1.1", "forward", ".", "8.8.8.8"]
+        );
+    }
+
+    #[test]
+    fn parse_multiple_server_blocks() {
+        let src = ".:53 {\n    whoami\n}\n\nexample.com:1053 {\n    chaos\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].keys, vec![".:53".to_string()]);
+        assert_eq!(blocks[1].keys, vec!["example.com:1053".to_string()]);
+    }
 }
