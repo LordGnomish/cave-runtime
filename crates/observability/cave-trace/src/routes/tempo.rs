@@ -47,7 +47,27 @@ pub fn create_router(state: Arc<TraceState>) -> Router {
         )
         .route("/tempo/api/echo", get(echo))
         .route("/tempo/api/status/buildinfo", get(build_info))
+        .route("/tempo/api/metrics/servicegraph", get(service_graph))
         .with_state(state)
+}
+
+/// Tempo metrics-generator service-graph endpoint: rebuild the
+/// `(client, server)` edge metrics from the tenant's stored traces and
+/// expose them in Prometheus text format.
+async fn service_graph(headers: HeaderMap, State(state): State<Arc<TraceState>>) -> Response {
+    use crate::servicegraph::ServiceGraphProcessor;
+    let tenant = tenant_from_headers(&headers);
+    let store = state.store.read().await;
+    let mut proc = ServiceGraphProcessor::new();
+    for record in store.all_records_for_tenant(&tenant) {
+        proc.consume_at(&record.spans, 0);
+    }
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain; version=0.0.4")],
+        proc.to_prometheus(),
+    )
+        .into_response()
 }
 
 // ─── Tempo trace wire format ───────────────────────────────────────────────

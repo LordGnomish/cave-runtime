@@ -37,6 +37,7 @@ pub mod propagation;
 pub mod query;
 pub mod routes;
 pub mod sampling;
+pub mod servicegraph;
 pub mod spm;
 pub mod storage;
 pub mod storage_badger;
