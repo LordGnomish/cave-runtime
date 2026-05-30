@@ -137,6 +137,229 @@ impl Inflights {
     }
 }
 
+/// Replication state of one follower as seen by the leader.
+///
+/// Mirrors etcd `tracker.StateType`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProgressState {
+    /// At most one append in flight; the leader is searching for the follower's
+    /// match index after (re)gaining leadership or a rejection.
+    Probe,
+    /// The follower's log is caught up enough to stream entries optimistically,
+    /// bounded by the [`Inflights`] window.
+    Replicate,
+    /// A snapshot is being installed; no appends are sent until it completes.
+    Snapshot,
+}
+
+/// Per-follower replication progress on the leader.
+///
+/// Mirrors etcd `tracker.Progress` (`raft/tracker/progress.go`). Tracks the
+/// highest replicated index (`match`), the next index to send (`next`), the
+/// replication [`ProgressState`], and the flow-control window.
+#[derive(Clone, Debug)]
+pub struct Progress {
+    /// Highest log index known to be replicated on the follower.
+    pub r#match: u64,
+    /// Next log index the leader will send to the follower.
+    pub next: u64,
+    /// Current replication state.
+    pub state: ProgressState,
+    /// In `Snapshot` state, the snapshot index being installed.
+    pub pending_snapshot: u64,
+    /// Whether the follower has been heard from in the current election timeout.
+    pub recent_active: bool,
+    /// In `Probe` state, whether an append is already outstanding (pauses sends).
+    /// (etcd v3.6 renamed `ProbeSent` → `MsgAppFlowPaused`.)
+    pub msg_app_flow_paused: bool,
+    /// Whether this peer is a non-voting learner.
+    pub is_learner: bool,
+    /// Sliding-window flow control for `Replicate` state.
+    pub inflights: Inflights,
+}
+
+impl Progress {
+    /// Create a fresh `Probe`-state progress starting at `next`, with an
+    /// in-flight window of `inflight_size`.
+    pub fn new(next: u64, inflight_size: usize) -> Self {
+        Self {
+            r#match: 0,
+            next,
+            state: ProgressState::Probe,
+            pending_snapshot: 0,
+            recent_active: false,
+            msg_app_flow_paused: false,
+            is_learner: false,
+            inflights: Inflights::new(inflight_size),
+        }
+    }
+
+    /// Reset the volatile flow-control fields when transitioning to `state`.
+    fn reset_state(&mut self, state: ProgressState) {
+        self.msg_app_flow_paused = false;
+        self.pending_snapshot = 0;
+        self.state = state;
+        self.inflights.reset();
+    }
+
+    /// Mark that the in-flight probe has been acknowledged, resuming sends.
+    pub fn probe_acked(&mut self) {
+        self.msg_app_flow_paused = false;
+    }
+
+    /// Transition to `Probe`. `next` is set just past the better of the known
+    /// match index and any pending snapshot index.
+    pub fn become_probe(&mut self) {
+        unimplemented!()
+    }
+
+    /// Transition to `Replicate`, streaming from `match + 1`.
+    pub fn become_replicate(&mut self) {
+        unimplemented!()
+    }
+
+    /// Transition to `Snapshot`, recording the snapshot index being installed.
+    pub fn become_snapshot(&mut self, snapshot_idx: u64) {
+        unimplemented!()
+    }
+
+    /// Apply an acknowledgement of index `n`. Returns whether `match` advanced.
+    pub fn maybe_update(&mut self, n: u64) -> bool {
+        unimplemented!()
+    }
+
+    /// Optimistically advance `next` after sending entries up to `n` (Replicate).
+    pub fn optimistic_update(&mut self, n: u64) {
+        unimplemented!()
+    }
+
+    /// React to an `AppendEntries` rejection reported by the follower.
+    ///
+    /// `rejected` is the index the follower refused; `match_hint` is the
+    /// follower's last matching index hint. Returns whether `next` was rolled
+    /// back (a stale/spurious rejection returns `false` and changes nothing).
+    pub fn maybe_decr_to(&mut self, rejected: u64, match_hint: u64) -> bool {
+        unimplemented!()
+    }
+
+    /// Whether the leader must currently withhold appends to this follower.
+    pub fn is_paused(&self) -> bool {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod progress_tests {
+    use super::*;
+
+    #[test]
+    fn become_replicate_streams_from_match_plus_one() {
+        let mut pr = Progress::new(1, 4);
+        pr.r#match = 5;
+        pr.become_replicate();
+        assert_eq!(pr.state, ProgressState::Replicate);
+        assert_eq!(pr.next, 6);
+    }
+
+    #[test]
+    fn become_probe_from_replicate_uses_match() {
+        let mut pr = Progress::new(1, 4);
+        pr.r#match = 5;
+        pr.become_replicate();
+        pr.become_probe();
+        assert_eq!(pr.state, ProgressState::Probe);
+        assert_eq!(pr.next, 6); // match + 1
+    }
+
+    #[test]
+    fn become_probe_from_snapshot_uses_pending_snapshot_floor() {
+        let mut pr = Progress::new(1, 4);
+        pr.r#match = 3;
+        pr.become_snapshot(11);
+        assert_eq!(pr.state, ProgressState::Snapshot);
+        assert_eq!(pr.pending_snapshot, 11);
+        pr.become_probe();
+        assert_eq!(pr.state, ProgressState::Probe);
+        // max(match+1=4, pending_snapshot+1=12) = 12
+        assert_eq!(pr.next, 12);
+        assert_eq!(pr.pending_snapshot, 0, "pending snapshot cleared on reset");
+    }
+
+    #[test]
+    fn maybe_update_advances_and_reports() {
+        let mut pr = Progress::new(1, 4);
+        assert!(pr.maybe_update(5), "first ack advances match");
+        assert_eq!(pr.r#match, 5);
+        assert_eq!(pr.next, 6);
+        assert!(!pr.maybe_update(3), "stale ack does not advance match");
+        assert_eq!(pr.r#match, 5);
+        assert_eq!(pr.next, 6, "next never regresses");
+    }
+
+    #[test]
+    fn optimistic_update_sets_next() {
+        let mut pr = Progress::new(1, 4);
+        pr.optimistic_update(9);
+        assert_eq!(pr.next, 10);
+    }
+
+    #[test]
+    fn maybe_decr_to_in_replicate() {
+        let mut pr = Progress::new(1, 4);
+        pr.r#match = 5;
+        pr.become_replicate(); // next = 6
+        // Rejection at or below match is obsolete → ignored.
+        assert!(!pr.maybe_decr_to(5, 5));
+        assert_eq!(pr.next, 6);
+        // Genuine rejection above match → snap next back to match+1.
+        pr.next = 12;
+        assert!(pr.maybe_decr_to(11, 7));
+        assert_eq!(pr.next, 6);
+    }
+
+    #[test]
+    fn maybe_decr_to_in_probe_respects_hint_and_floor() {
+        let mut pr = Progress::new(10, 4); // Probe, next = 10
+        // Stale rejection (not for the in-flight probe at next-1=9) → no-op.
+        assert!(!pr.maybe_decr_to(7, 7));
+        assert_eq!(pr.next, 10);
+        // Valid rejection for next-1=9; hint says follower has up to 4.
+        pr.msg_app_flow_paused = true;
+        assert!(pr.maybe_decr_to(9, 4));
+        // next = max(min(rejected=9, hint+1=5), 1) = 5
+        assert_eq!(pr.next, 5);
+        assert!(!pr.msg_app_flow_paused, "rejection resumes probing");
+    }
+
+    #[test]
+    fn maybe_decr_to_probe_floor_is_one() {
+        let mut pr = Progress::new(1, 4); // next = 1, next-1 = 0
+        assert!(pr.maybe_decr_to(0, 0));
+        assert_eq!(pr.next, 1, "next never drops below 1");
+    }
+
+    #[test]
+    fn is_paused_per_state() {
+        // Probe: paused iff an append is outstanding.
+        let mut pr = Progress::new(1, 2);
+        assert!(!pr.is_paused());
+        pr.msg_app_flow_paused = true;
+        assert!(pr.is_paused());
+
+        // Replicate: paused iff the inflight window is full.
+        pr.r#match = 1;
+        pr.become_replicate();
+        assert!(!pr.is_paused());
+        pr.inflights.add(2);
+        pr.inflights.add(3);
+        assert!(pr.is_paused(), "full window pauses replicate");
+
+        // Snapshot: always paused.
+        pr.become_snapshot(9);
+        assert!(pr.is_paused());
+    }
+}
+
 #[cfg(test)]
 mod inflights_tests {
     use super::*;
