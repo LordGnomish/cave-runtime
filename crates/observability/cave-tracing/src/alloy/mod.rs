@@ -29,3 +29,6 @@ pub mod scanner;
 
 /// Abstract syntax tree (`syntax/ast`).
 pub mod ast;
+
+/// Recursive-descent parser (`syntax/parser`).
+pub mod parser;
