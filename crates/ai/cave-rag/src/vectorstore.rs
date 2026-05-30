@@ -70,6 +70,36 @@ impl InMemoryVectorStore {
         self.entries.iter().map(|e| e.id.clone()).collect()
     }
 
+    /// Like [`similarity_search`](VectorStore::similarity_search) but also
+    /// returns each hit's stored vector — needed by the MMR retriever, which
+    /// must compare candidates against one another, not just the query.
+    pub fn similarity_search_with_vectors(
+        &self,
+        query_vec: &[f32],
+        k: usize,
+    ) -> Vec<(ScoredDocument, Vec<f32>)> {
+        let mut scored: Vec<(ScoredDocument, Vec<f32>)> = self
+            .entries
+            .iter()
+            .map(|e| {
+                (
+                    ScoredDocument {
+                        document: e.document.clone(),
+                        score: cosine_similarity(query_vec, &e.vector),
+                    },
+                    e.vector.clone(),
+                )
+            })
+            .collect();
+        scored.sort_by(|a, b| {
+            b.0.score
+                .partial_cmp(&a.0.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        scored.truncate(k);
+        scored
+    }
+
     /// Serialize the whole index to JSON.
     pub fn to_json(&self) -> Result<String> {
         serde_json::to_string(self).map_err(|e| RagError::VectorStore(e.to_string()))
