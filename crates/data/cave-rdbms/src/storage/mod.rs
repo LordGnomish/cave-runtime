@@ -8,6 +8,6 @@ pub mod schema;
 pub mod transaction;
 
 pub use catalog::SystemCatalog;
-pub use index::BTreeIndex;
+pub use index::{BTreeIndex, HashIndex};
 pub use schema::{Database, Schema, Table};
 pub use transaction::Transaction;

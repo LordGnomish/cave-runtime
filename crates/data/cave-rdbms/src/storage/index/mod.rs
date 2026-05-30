@@ -12,8 +12,10 @@ use crate::types::SqlValue;
 use std::cmp::Ordering;
 
 pub mod btree;
+pub mod hash;
 
 pub use btree::BTreeIndex;
+pub use hash::HashIndex;
 
 /// Total order over [`SqlValue`] used by the ordered access methods.
 ///
