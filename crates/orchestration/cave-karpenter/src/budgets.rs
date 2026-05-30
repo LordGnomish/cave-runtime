@@ -19,11 +19,17 @@
 //! (`NodePool.GetAllowedDisruptionsByReason`), and
 //! [`must_get_allowed_disruptions`] (`MustGetAllowedDisruptions`).
 //!
-//! Scope-cut this cycle: the cron-schedule `IsActive` window (`Schedule` +
-//! `Duration`) needs a cron parser. A budget with a schedule is reported via
-//! [`BudgetError::ScheduleNotPortable`]; only no-schedule (always-active)
-//! budgets are evaluated, which is the common case.
+//! The cron-schedule `IsActive` window (`Schedule` + `Duration`) is evaluated
+//! by the clock-threaded [`budget_is_active_at`] / [`budget_allowed_disruptions_at`]
+//! (cont3 2026-05-30), faithfully porting `(*Budget).IsActive` over the
+//! [`crate::cron`] engine and the [`crate::duration`] parser. The legacy
+//! no-clock helpers ([`budget_allowed_disruptions`] etc.) only evaluate
+//! always-active (no-schedule) budgets; a scheduled budget on that path still
+//! returns [`BudgetError::ScheduleNotPortable`] since it has no clock to
+//! evaluate against — callers with a clock should use the `_at` variants.
 
+use crate::cron::parse_standard;
+use crate::duration::parse_duration;
 use crate::models::Budget;
 use std::fmt;
 
@@ -35,9 +41,13 @@ pub const UNBOUNDED_DISRUPTIONS: i64 = i32::MAX as i64;
 pub enum BudgetError {
     /// `nodes` was neither a valid integer nor a valid percentage.
     InvalidIntOrPercent(String),
-    /// The budget carries a cron `Schedule`/`Duration`; evaluating it needs a
-    /// cron parser that is not ported in this cycle.
+    /// The budget carries a cron `Schedule`/`Duration` but was evaluated on the
+    /// legacy no-clock path. Use [`budget_is_active_at`] / the `_at` variants.
     ScheduleNotPortable,
+    /// The budget's `Schedule` is not a valid standard cron expression.
+    InvalidCron(String),
+    /// The budget's `Duration` is not a valid Go duration string.
+    InvalidDuration(String),
 }
 
 impl fmt::Display for BudgetError {
@@ -46,9 +56,11 @@ impl fmt::Display for BudgetError {
             BudgetError::InvalidIntOrPercent(s) => {
                 write!(f, "invalid int-or-percent budget value: {s:?}")
             }
-            BudgetError::ScheduleNotPortable => {
-                f.write_str("scheduled budget window evaluation is not ported (cron scope-cut)")
-            }
+            BudgetError::ScheduleNotPortable => f.write_str(
+                "scheduled budget needs a clock; use budget_is_active_at / the _at variants",
+            ),
+            BudgetError::InvalidCron(s) => write!(f, "invalid cron schedule: {s:?}"),
+            BudgetError::InvalidDuration(s) => write!(f, "invalid budget duration: {s:?}"),
         }
     }
 }
@@ -108,13 +120,95 @@ pub fn budget_allowed_disruptions(budget: &Budget, num_nodes: usize) -> Result<i
 
 /// `(*Budget).IsActive` — no-schedule path only. A budget with neither a
 /// schedule nor a duration is always active; a scheduled budget returns
-/// [`BudgetError::ScheduleNotPortable`] (cron evaluation is scope-cut).
+/// [`BudgetError::ScheduleNotPortable`] (the no-clock path cannot evaluate it).
 fn budget_is_active(budget: &Budget) -> Result<bool, BudgetError> {
     if budget.schedule.is_none() && budget.duration.is_none() {
         Ok(true)
     } else {
         Err(BudgetError::ScheduleNotPortable)
     }
+}
+
+/// `(*Budget).IsActive`: faithful clock-threaded port. A budget with neither a
+/// schedule nor a duration is always active. Otherwise it walks back the
+/// duration from `now_unix` (UTC seconds), asks the cron engine for the next
+/// schedule hit at-or-after that checkpoint, and is active when that hit is not
+/// after `now` — i.e. when the most recent hit's window still covers `now`.
+pub fn budget_is_active_at(budget: &Budget, now_unix: i64) -> Result<bool, BudgetError> {
+    if budget.schedule.is_none() && budget.duration.is_none() {
+        return Ok(true);
+    }
+    // lo.FromPtr semantics: a nil schedule parses as the empty string (which
+    // the cron engine rejects), a nil duration is zero.
+    let schedule_str = budget.schedule.as_deref().unwrap_or("");
+    let schedule = parse_standard(&format!("TZ=UTC {schedule_str}"))
+        .map_err(|e| BudgetError::InvalidCron(e.to_string()))?;
+    let duration_ns = match budget.duration.as_deref() {
+        Some(d) => parse_duration(d).map_err(|_| BudgetError::InvalidDuration(d.to_string()))?,
+        None => 0,
+    };
+    let duration_secs = duration_ns / 1_000_000_000;
+    let checkpoint = now_unix - duration_secs;
+    match schedule.next(checkpoint) {
+        Some(next_hit) => Ok(next_hit <= now_unix),
+        None => Ok(false),
+    }
+}
+
+/// `(*Budget).GetAllowedDisruptions` with a clock: inactive budgets are
+/// unbounded (`MaxInt32`); active budgets scale their `nodes` IntOrString
+/// against `num_nodes`, rounding up — the clock-threaded twin of
+/// [`budget_allowed_disruptions`].
+pub fn budget_allowed_disruptions_at(
+    budget: &Budget,
+    num_nodes: usize,
+    now_unix: i64,
+) -> Result<i64, BudgetError> {
+    if !budget_is_active_at(budget, now_unix)? {
+        return Ok(UNBOUNDED_DISRUPTIONS);
+    }
+    let v = scaled_value_from_int_or_percent(&budget.nodes, num_nodes, true)?;
+    Ok(v as i64)
+}
+
+/// `(*NodePool).GetAllowedDisruptionsByReason` with a clock — the
+/// clock-threaded twin of [`nodepool_allowed_disruptions_by_reason`].
+pub fn nodepool_allowed_disruptions_by_reason_at(
+    budgets: &[Budget],
+    num_nodes: usize,
+    reason: &str,
+    now_unix: i64,
+) -> Result<i64, BudgetError> {
+    let mut allowed = UNBOUNDED_DISRUPTIONS;
+    let mut first_err: Option<BudgetError> = None;
+    for budget in budgets {
+        match budget_allowed_disruptions_at(budget, num_nodes, now_unix) {
+            Ok(val) => {
+                if budget.reasons.is_empty() || budget.reasons.iter().any(|r| r == reason) {
+                    allowed = allowed.min(val);
+                }
+            }
+            Err(e) => {
+                if first_err.is_none() {
+                    first_err = Some(e);
+                }
+            }
+        }
+    }
+    match first_err {
+        Some(e) => Err(e),
+        None => Ok(allowed),
+    }
+}
+
+/// `(*NodePool).MustGetAllowedDisruptions` with a clock — fails closed to `0`.
+pub fn must_get_allowed_disruptions_at(
+    budgets: &[Budget],
+    num_nodes: usize,
+    reason: &str,
+    now_unix: i64,
+) -> i64 {
+    nodepool_allowed_disruptions_by_reason_at(budgets, num_nodes, reason, now_unix).unwrap_or(0)
 }
 
 /// `(*NodePool).GetAllowedDisruptionsByReason`: the minimum allowance across
