@@ -38,3 +38,6 @@ pub mod service;
 
 /// Embedding result cache (LRU memoization).
 pub mod cache;
+
+/// Embedding quantization — IEEE-754 half (fp16) and per-vector int8.
+pub mod quant;
