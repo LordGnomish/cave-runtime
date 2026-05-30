@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! Per-tenant control-plane certificate lifecycle — the cave port of
+//! Kamaji's certificate controller surface.
+//!
+//! Upstream reference (clastix/kamaji v1.0.0):
+//!   internal/kubeadm/certificates.go            (PKI tree + base names)
+//!   internal/resources/ca_certificate.go        (CA generation)
+//!   internal/resources/api_server_certificate.go (apiserver serving cert + SANs)
+//!   internal/resources/{api_server_kubelet_client,front-proxy-client,sa}_certificate.go
+//!   controllers/certificate_lifecycle_controller.go (rotation deadline)
+//!
+//! Kamaji generates a full kubeadm-shaped PKI per TenantControlPlane —
+//! a Kubernetes root CA, a front-proxy CA, leaf serving/client certs, and
+//! the service-account key-pair — then runs a `CertificateLifecycle`
+//! controller that rotates any cert (bare x509 secret or kubeconfig-embedded
+//! client cert) once it falls inside a one-day expiry deadline.
+//!
+//! Real x509 signing is delegated to cave-certs / cave-pki (this workspace's
+//! crypto owners); this module ports the *decision* layer that upstream owns:
+//! the kubeadm PKI tree (who signs whom), the apiserver SAN computation, the
+//! rotation deadline, and the regeneration-skip predicate.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Cycle 1: PKI tree ───────────────────────────────────────────────────
+
+    #[test]
+    fn base_names_match_kubeadm_constants() {
+        assert_eq!(CertBaseName::Ca.base_name(), "ca");
+        assert_eq!(CertBaseName::ApiServer.base_name(), "apiserver");
+        assert_eq!(
+            CertBaseName::ApiServerKubeletClient.base_name(),
+            "apiserver-kubelet-client"
+        );
+        assert_eq!(CertBaseName::FrontProxyCa.base_name(), "front-proxy-ca");
+        assert_eq!(
+            CertBaseName::FrontProxyClient.base_name(),
+            "front-proxy-client"
+        );
+        assert_eq!(CertBaseName::Sa.base_name(), "sa");
+    }
+
+    #[test]
+    fn cas_are_self_signed_leaves_chain_to_their_ca() {
+        // CAs sign themselves (no parent signer).
+        assert_eq!(CertBaseName::Ca.signer(), None);
+        assert_eq!(CertBaseName::FrontProxyCa.signer(), None);
+        // Kubernetes leaves chain to the root CA.
+        assert_eq!(CertBaseName::ApiServer.signer(), Some(CertBaseName::Ca));
+        assert_eq!(
+            CertBaseName::ApiServerKubeletClient.signer(),
+            Some(CertBaseName::Ca)
+        );
+        // Front-proxy client chains to the front-proxy CA.
+        assert_eq!(
+            CertBaseName::FrontProxyClient.signer(),
+            Some(CertBaseName::FrontProxyCa)
+        );
+    }
+
+    #[test]
+    fn is_ca_and_is_keypair_classify_correctly() {
+        assert!(CertBaseName::Ca.is_ca());
+        assert!(CertBaseName::FrontProxyCa.is_ca());
+        assert!(!CertBaseName::ApiServer.is_ca());
+        // The service-account material is a bare key-pair, not an x509 cert.
+        assert!(CertBaseName::Sa.is_keypair());
+        assert!(!CertBaseName::Ca.is_keypair());
+    }
+
+    #[test]
+    fn ext_key_usage_follows_server_vs_client_role() {
+        assert_eq!(
+            CertBaseName::ApiServer.ext_key_usage(),
+            Some(ExtKeyUsage::ServerAuth)
+        );
+        assert_eq!(
+            CertBaseName::ApiServerKubeletClient.ext_key_usage(),
+            Some(ExtKeyUsage::ClientAuth)
+        );
+        assert_eq!(
+            CertBaseName::FrontProxyClient.ext_key_usage(),
+            Some(ExtKeyUsage::ClientAuth)
+        );
+        // CAs and the SA key-pair carry no leaf ext-key-usage.
+        assert_eq!(CertBaseName::Ca.ext_key_usage(), None);
+        assert_eq!(CertBaseName::Sa.ext_key_usage(), None);
+    }
+
+    #[test]
+    fn pki_tree_lists_every_subject_cas_before_their_leaves() {
+        let tree = pki_tree();
+        assert_eq!(tree.len(), 6);
+        // Each non-CA, non-keypair leaf's signer must appear earlier in the tree.
+        for (i, cert) in tree.iter().enumerate() {
+            if let Some(signer) = cert.signer() {
+                let signer_idx = tree.iter().position(|c| *c == signer).unwrap();
+                assert!(
+                    signer_idx < i,
+                    "{:?} must be generated after its signer {:?}",
+                    cert,
+                    signer
+                );
+            }
+        }
+    }
+}

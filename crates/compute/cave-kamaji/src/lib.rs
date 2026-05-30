@@ -5,6 +5,7 @@
 //! This crate provides the core state management and routing for the Cave Kamaji service.
 //! It handles tenant lifecycle operations via Axum routes and maintains tenant state in memory.
 
+pub mod certs;
 pub mod cluster_api;
 pub mod datastore;
 pub mod konnectivity;
