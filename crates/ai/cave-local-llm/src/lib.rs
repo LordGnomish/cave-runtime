@@ -43,3 +43,6 @@ pub mod gguf;
 
 /// GGUF quantization file-type helpers (Q4/Q5/Q8 …) — names, bits/weight, size.
 pub mod quant;
+
+/// vLLM PagedAttention block manager — KV-block alloc, ref-counted CoW, swap.
+pub mod vllm_paged_attention;
