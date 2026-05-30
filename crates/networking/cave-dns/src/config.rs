@@ -641,3 +641,48 @@ impl Default for Route53Config {
         }
     }
 }
+
+#[cfg(test)]
+mod corefile_config_tests {
+    use super::*;
+
+    #[test]
+    fn from_corefile_sets_port_from_server_key() {
+        let cfg = DnsConfig::from_corefile(".:1053 {\n    whoami\n}\n").expect("ok");
+        assert_eq!(cfg.listen_udp, vec!["0.0.0.0:1053".to_string()]);
+        assert_eq!(cfg.listen_tcp, vec!["0.0.0.0:1053".to_string()]);
+    }
+
+    #[test]
+    fn from_corefile_keyless_port_defaults_to_53() {
+        let cfg = DnsConfig::from_corefile("example.com {\n    whoami\n}\n").expect("ok");
+        assert_eq!(cfg.listen_udp, vec!["0.0.0.0:53".to_string()]);
+    }
+
+    #[test]
+    fn from_corefile_builds_whoami_and_forward_plugins() {
+        let cfg = DnsConfig::from_corefile(
+            ".:53 {\n    whoami\n    forward . 1.1.1.1 8.8.8.8\n}\n",
+        )
+        .expect("ok");
+        assert!(matches!(cfg.plugins[0], PluginConfig::Whoami));
+        match &cfg.plugins[1] {
+            PluginConfig::Forward(f) => {
+                // The FROM zone (".") is dropped; the rest are upstreams.
+                assert_eq!(f.upstreams, vec!["1.1.1.1".to_string(), "8.8.8.8".to_string()]);
+            }
+            other => panic!("expected forward, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_corefile_resolves_env_in_port() {
+        // {$VAR} substitution flows through parse() into the listen port.
+        // SAFETY: single-threaded test process for this var; restored after.
+        unsafe { std::env::set_var("CAVE_DNS_CFG_PORT", "5300") };
+        let cfg = DnsConfig::from_corefile(".:{$CAVE_DNS_CFG_PORT} {\n    whoami\n}\n")
+            .expect("ok");
+        unsafe { std::env::remove_var("CAVE_DNS_CFG_PORT") };
+        assert_eq!(cfg.listen_udp, vec!["0.0.0.0:5300".to_string()]);
+    }
+}
