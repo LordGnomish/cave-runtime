@@ -214,11 +214,20 @@ struct Parser {
     block: ServerBlock,
     eof: bool,
     env: Box<dyn Fn(&str) -> Option<String>>,
+    /// `(name)` snippet bodies captured for `import` splicing.
+    snippets: BTreeMap<String, Vec<Token>>,
 }
 
 impl Parser {
     fn new(tokens: Vec<Token>, env: Box<dyn Fn(&str) -> Option<String>>) -> Self {
-        Self { tokens, cursor: -1, block: ServerBlock::default(), eof: false, env }
+        Self {
+            tokens,
+            cursor: -1,
+            block: ServerBlock::default(),
+            eof: false,
+            env,
+            snippets: BTreeMap::new(),
+        }
     }
 
     // ── Dispenser primitives ────────────────────────────────────────────
@@ -283,7 +292,86 @@ impl Parser {
         if self.eof {
             return Ok(());
         }
+        // A `(name)` block defines a reusable snippet rather than a server.
+        if self.block.keys.len() == 1
+            && self.block.keys[0].starts_with('(')
+            && self.block.keys[0].ends_with(')')
+        {
+            return self.capture_snippet();
+        }
         self.block_contents()
+    }
+
+    /// Capture a `(name) { … }` snippet body as a flat token slice and store
+    /// it for later `import`. The block is cleared so it is not emitted.
+    /// Port of caddy's snippet retention in `parse.go::begin`.
+    fn capture_snippet(&mut self) -> Result<(), ParseError> {
+        let raw = self.block.keys[0].clone();
+        let name = raw[1..raw.len() - 1].to_string();
+        if self.val() != "{" {
+            return Err(ParseError {
+                line: self.line(),
+                message: format!("snippet '{name}' must be followed by a block"),
+            });
+        }
+        let mut body = Vec::new();
+        let mut nesting = 1i32;
+        while self.next() {
+            match self.val() {
+                "{" => {
+                    nesting += 1;
+                    body.push(self.cur());
+                }
+                "}" => {
+                    nesting -= 1;
+                    if nesting == 0 {
+                        break;
+                    }
+                    body.push(self.cur());
+                }
+                _ => body.push(self.cur()),
+            }
+        }
+        if nesting != 0 {
+            return Err(ParseError {
+                line: self.line(),
+                message: format!("unterminated snippet '{name}' block"),
+            });
+        }
+        self.snippets.insert(name, body);
+        self.block.keys.clear(); // snippets are not emitted as server blocks
+        Ok(())
+    }
+
+    /// Splice a snippet's tokens in place of an `import <name>` directive.
+    /// Port of `caddyfile/import.go::doImport` (snippet path only; file-glob
+    /// import remains a Phase 2 cut owned by cave-dns-corefile).
+    fn do_import(&mut self) -> Result<(), ParseError> {
+        let import_pos = self.cursor; // on "import"
+        if !self.next() {
+            return Err(ParseError {
+                line: self.line(),
+                message: "import requires a snippet name".into(),
+            });
+        }
+        let name = self.val().to_string();
+        let after_pos = self.cursor; // on the snippet-name argument
+        let Some(nodes) = self.snippets.get(&name).cloned() else {
+            return Err(ParseError {
+                line: self.line(),
+                message: format!(
+                    "import: snippet '{name}' is not defined (file-glob import is a Phase 2 cut)"
+                ),
+            });
+        };
+        let mut spliced = self.tokens[..import_pos as usize].to_vec();
+        let tail = self.tokens[after_pos as usize + 1..].to_vec();
+        spliced.extend(nodes);
+        spliced.extend(tail);
+        self.tokens = spliced;
+        // Rewind so the surrounding loop's next() lands on the first node.
+        self.cursor = import_pos - 1;
+        Ok(())
     }
 
     /// Read the address labels that precede a block. A trailing comma on a
@@ -358,6 +446,10 @@ impl Parser {
                 // Unget so block_contents can consume the closing brace.
                 self.cursor -= 1;
                 break;
+            }
+            if self.val() == "import" && self.is_newline() {
+                self.do_import()?;
+                continue;
             }
             self.directive()?;
         }
