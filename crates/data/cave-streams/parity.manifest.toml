@@ -500,9 +500,9 @@ local_files  = ["src/quota.rs"]
 note         = "Per-client + per-user produce/fetch quotas"
 
 [[mapped]]
-upstream_pkg = "apache/kafka:streams/src/main/java"
-local_files  = ["src/streams_api.rs"]
-note         = "Kafka Streams API surface (KStream / KTable) — DSL stub"
+upstream_pkg = "apache/kafka:streams/src/main/java/org/apache/kafka/streams/kstream"
+local_files  = ["src/kafka_streams_dsl.rs", "src/kafka_streams_processor.rs"]
+note         = "Kafka Streams high-level DSL — KStream (filter/map/flatMap/branch/merge/through), KGroupedStream (count/reduce/aggregate), KTable, and windowed aggregation (TimeWindows tumbling/hopping) — compiled on top of the low-level Processor API. Replaces the former uncompiled streams_api.rs stub."
 
 [[mapped]]
 upstream_pkg = "apache/kafka:connect/api"

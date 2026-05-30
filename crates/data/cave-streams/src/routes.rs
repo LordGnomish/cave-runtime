@@ -23,6 +23,8 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
     Router::new()
         // ── Health ─────────────────────────────────────────────────────────
         .route("/api/streams/health", get(health))
+        // ── Kafka Streams DSL introspection ──────────────────────────────────
+        .route("/api/streams/dsl", get(dsl_catalog))
 
         // ── Schema Registry ────────────────────────────────────────────────
         .route("/subjects", get(list_subjects))
@@ -112,6 +114,21 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
             "port": crate::PULSAR_PORT,
             "tenants": pulsar_tenants,
         },
+    }))
+}
+
+/// Catalogue the high-level Kafka Streams DSL operators the compiled
+/// `kafka_streams_dsl` module supports (`org.apache.kafka.streams.kstream`).
+async fn dsl_catalog() -> Json<serde_json::Value> {
+    let types: Vec<serde_json::Value> = crate::kafka_streams_dsl::dsl_catalog()
+        .into_iter()
+        .map(|(ty, ops)| json!({ "type": ty, "operators": ops }))
+        .collect();
+    Json(json!({
+        "module": "cave-streams",
+        "api": "kafka-streams-dsl",
+        "upstream": "org.apache.kafka.streams.kstream",
+        "types": types,
     }))
 }
 

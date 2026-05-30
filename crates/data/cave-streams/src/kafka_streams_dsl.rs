@@ -741,9 +741,59 @@ impl StreamsApp {
     }
 }
 
+/// The high-level DSL operators this compiled module supports, grouped by the
+/// upstream `org.apache.kafka.streams.kstream` type that owns them.  Used by
+/// the `/api/streams/dsl` introspection endpoint — a factual catalogue of the
+/// compiled surface, not configuration.
+pub fn dsl_catalog() -> Vec<(&'static str, Vec<&'static str>)> {
+    vec![
+        (
+            "KStream",
+            vec![
+                "filter",
+                "filterNot",
+                "mapValues",
+                "map",
+                "flatMapValues",
+                "flatMap",
+                "selectKey",
+                "peek",
+                "foreach",
+                "branch",
+                "merge",
+                "through",
+                "to",
+                "groupByKey",
+                "groupBy",
+            ],
+        ),
+        (
+            "KGroupedStream",
+            vec!["count", "reduce", "aggregate", "windowedBy"],
+        ),
+        (
+            "TimeWindowedKStream",
+            vec!["count", "aggregate"],
+        ),
+        ("KTable", vec!["toStream", "filter", "mapValues", "to"]),
+        (
+            "TimeWindows",
+            vec!["ofSizeMs (tumbling)", "advanceByMs (hopping)"],
+        ),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn catalog_lists_grouped_operators() {
+        let cat = dsl_catalog();
+        assert!(cat.iter().any(|(ty, _)| *ty == "KStream"));
+        let kgrouped = cat.iter().find(|(ty, _)| *ty == "KGroupedStream").unwrap();
+        assert!(kgrouped.1.contains(&"windowedBy"));
+    }
 
     #[test]
     fn builder_registers_source() {

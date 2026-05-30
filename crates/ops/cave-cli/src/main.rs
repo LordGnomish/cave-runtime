@@ -1985,6 +1985,8 @@ enum KafkaCmd {
 enum StreamsCmd {
     /// Combined liveness/health summary (Kafka + Pulsar)
     Health,
+    /// Kafka Streams high-level DSL — supported operator catalogue
+    Dsl,
     /// Kafka subset — topics, consumer groups, schemas, connectors
     Kafka {
         #[command(subcommand)]
@@ -3798,6 +3800,7 @@ async fn run(cli: Cli) -> Result<()> {
         // ── Streams (Kafka + Pulsar) ──────────────────────────────────────────
         Commands::Streams { cmd } => match cmd {
             StreamsCmd::Health => c.get("/api/streams/health").await,
+            StreamsCmd::Dsl => c.get("/api/streams/dsl").await,
             StreamsCmd::Kafka { cmd } => dispatch_kafka(&c, cmd).await,
             StreamsCmd::Kraft { cmd } => match cmd {
                 KraftCmd::DescribeQuorum => c.get("/api/streams/kraft/describe-quorum").await,
