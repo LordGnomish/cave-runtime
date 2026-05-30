@@ -34,8 +34,15 @@
 #   * Corefile/Caddyfile lexer (src/corefile.rs — lexer.go tokeniser)
 #   * tsig.go HMAC zone-transfer signing (src/tsig.rs — RFC 8945, hmac-sha*)
 #
+# Closed 2026-05-30 cont2 (were skipped scope_cuts, now mapped — strict-TDD):
+#   * Corefile parser (src/corefile.rs — parse.go: Dispenser + server-block
+#     grammar + {$ENV} substitution), bridged into DnsConfig::from_corefile
+#     (src/config.rs) and the /api/v1/corefile/validate surface (src/api/corefile.rs)
+#   * Corefile import/snippet directive (src/corefile.rs — import.go doImport
+#     snippet path; file-glob import remains a documented Phase 2 cut)
+#
 # Out of MVP (skipped / Phase 2 — see [[scope_cuts]] + [[skipped]]):
-#   * Caddyfile parser/import directive + plugin.cfg compile (cave-dns-corefile)
+#   * Caddyfile file-glob import + plugin.cfg compile (cave-dns-corefile)
 #   * Plugin marketplace + external plugin loader (CGO-style dynamic plugins)
 #   * Live AWS Route 53 / Azure DNS / GCP Cloud DNS SDK clients
 #   * Live etcd watch + skydns/2 wire format
@@ -67,18 +74,21 @@ source_sha = "vendored-by-coredns-v1.14.3"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-# honest_ratio rises +2/48 (0.7917 -> 0.8333) by genuinely closing 2 partials
-# into line-by-line ports: tsig-hmac-zone-transfer (src/tsig.rs, RFC 8945) and
-# caddyfile-corefile-parser (src/corefile.rs, lexer.go). 1 partial preserved
-# honestly (DoQ 0-RTT — needs the cave-net QUIC slot).
-honest_ratio        = 0.8333
-adr_justified_ratio = 1.0   # 12 skipped scope_cut: 10 to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 1 partial (DoQ 0-RTT) honestly preserved.
+# 2026-05-30 cont2: honest_ratio rises +2/48 (0.8333 -> 0.8750) by genuinely
+# closing 2 deferred-to-sibling scope_cuts into line-by-line ports that now
+# live and are wired in cave-dns: corefile-parser (src/corefile.rs, parse.go
+# Dispenser + server-block grammar + {$ENV}, consumed by
+# DnsConfig::from_corefile and /api/v1/corefile/validate) and corefile-import
+# (src/corefile.rs, import.go snippet splicing). 1 partial preserved honestly
+# (DoQ 0-RTT — needs the cave-net QUIC slot).
+honest_ratio        = 0.8750
+adr_justified_ratio = 1.0   # 10 skipped scope_cut: 8 to siblings (cave-dns-corefile file-glob / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / cave-fsnotify / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 1 partial (DoQ 0-RTT) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 35
+mapped_count        = 37
 partial_count       = 1
-skipped_count       = 12
+skipped_count       = 10
 unmapped_count      = 0
 total               = 48
 
@@ -87,7 +97,7 @@ name        = "cave-dns"
 description = "CoreDNS-compatible authoritative and recursive DNS server — plugin chain + DNSSEC + UDP/TCP/DoH/DoT/DoQ + zone-transfer + Kubernetes + REST API"
 source_root = "src"
 
-# ─── Mapped subsystems (33) ─────────────────────────────────────────────────
+# ─── Mapped subsystems (37) ─────────────────────────────────────────────────
 
 [[mapped]]
 name = "plugin-chain-framework"
@@ -299,6 +309,18 @@ upstream = "core/caddyfile/lexer.go (Caddy v1 lexer)"
 local_files = ["src/corefile.rs"]
 note = "Native Corefile tokeniser — whitespace-delimited tokens with 1-based line tracking, '#' line comments at token boundaries, double-quoted strings with backslash escapes (newline-spanning), and backtick literal strings. Closes the 2026-05-30 partial; serde JSON/TOML shim remains as an alternate input."
 
+[[mapped]]
+name = "corefile-parser"
+upstream = "core/caddyfile/parse.go (Caddy v1 parser + Dispenser)"
+local_files = ["src/corefile.rs", "src/config.rs", "src/api/corefile.rs"]
+note = "parse() over the tokeniser — Dispenser cursor (next/val/line/isNewLine), addresses() with trailing-comma multi-address continuation, block_contents/directives/directive with nested-brace depth tracking (each directive slice begins with the directive name token, ServerBlock.Tokens semantics), and replaceEnvReferences {$VAR} substitution in address tokens. Wired into DnsConfig::from_corefile (directive->PluginConfig) and the POST /api/v1/corefile/validate surface. Closes the caddyfile-lexer parse.go scope_cut (2026-05-30 cont2)."
+
+[[mapped]]
+name = "corefile-import"
+upstream = "core/caddyfile/import.go (doImport, snippet path) + parse.go snippet retention"
+local_files = ["src/corefile.rs"]
+note = "(name){..} snippet definitions captured as flat token slices (not emitted as server blocks) + import <name> token-splicing into the enclosing block; unknown snippet errors. File-glob import (filesystem) stays a documented Phase 2 cut owned by cave-dns-corefile. Closes the corefile-import-directive scope_cut (2026-05-30 cont2)."
+
 # ─── Partial subsystems (1) ─────────────────────────────────────────────────
 
 [[partial]]
@@ -308,13 +330,7 @@ local_files = ["src/server/doh.rs"]
 note = "DoQ session reuse: we accept the QUIC ALPN profile on the DoH HTTP/3 path but do not yet bind a dedicated 0-RTT listener. Phase 2 — cave-net QUIC slot."
 gap_reason = "QUIC 0-RTT pre-handshake binding deferred to dedicated cave-net QUIC slot; current code path reuses DoH"
 
-# ─── Skipped subsystems (10 — formalised Phase 2 cuts) ──────────────────────
-
-[[skipped]]
-name = "caddyfile-lexer"
-upstream = "core/caddyfile/lexer.go + parse.go"
-reason = "Full Caddyfile lexer + parser ships as cave-dns-corefile in Phase 2; cave-dns accepts the equivalent serde JSON/TOML config today."
-scope_cut_target = "cave-dns-corefile"
+# ─── Skipped subsystems (8 — formalised Phase 2 cuts) ───────────────────────
 
 [[skipped]]
 name = "external-plugin-loader"
@@ -364,12 +380,6 @@ upstream = "plugin/file/reload.go (inotify)"
 reason = "Live fsnotify file-watcher reload — we ship a poll-loop (plugin reload directive) today. Phase 2 routes through cave-fsnotify."
 scope_cut_target = "cave-fsnotify"
 
-[[skipped]]
-name = "corefile-import-directive"
-upstream = "core/caddyfile/import.go"
-reason = "Caddyfile `import` directive lives with the Corefile lexer cut."
-scope_cut_target = "cave-dns-corefile"
-
 # ─── Unmapped (2 — honest gaps) ─────────────────────────────────────────────
 
 [[skipped]]
@@ -387,9 +397,9 @@ scope_cut_target = "cave-cert operator path"
 # ─── Scope cuts (groupings → Phase 2 crate owners) ──────────────────────────
 
 [[scope_cuts]]
-group = "corefile-parser"
+group = "corefile-fileglob"
 crates = ["cave-dns-corefile"]
-items = ["caddyfile-lexer", "corefile-import-directive"]
+items = ["corefile-fileglob-import (residual of mapped corefile-import — see note)"]
 
 [[scope_cuts]]
 group = "external-plugins"
