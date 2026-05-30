@@ -402,4 +402,36 @@ mod tests {
         assert_eq!(h.0, "Authorization");
         assert_eq!(h.1, "Bearer k");
     }
+
+    // ── Streaming — cite docs/openai.md: SSE `chat.completion.chunk` frames
+    //    delimited by `data: ` lines, terminated by `data: [DONE]`. ────────────
+    #[test]
+    fn chat_chunk_deserializes_delta() {
+        let raw = r#"{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1700000000,"model":"qwen3","choices":[{"index":0,"delta":{"content":"He"},"finish_reason":null}]}"#;
+        let c: OpenAiChatChunk = serde_json::from_str(raw).unwrap();
+        assert_eq!(c.choices[0].delta.content.as_deref(), Some("He"));
+        assert!(c.choices[0].finish_reason.is_none());
+    }
+
+    #[test]
+    fn parse_sse_line_extracts_data_chunk() {
+        let line = r#"data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":{"content":"hi"}}]}"#;
+        match parse_sse_line(line) {
+            Some(Ok(chunk)) => {
+                assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("hi"))
+            }
+            other => panic!("expected Some(Ok(chunk)), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_sse_line_done_terminates() {
+        assert!(parse_sse_line("data: [DONE]").is_none());
+    }
+
+    #[test]
+    fn parse_sse_line_ignores_blank_and_comments() {
+        assert!(parse_sse_line("").is_none());
+        assert!(parse_sse_line(": keep-alive comment").is_none());
+    }
 }
