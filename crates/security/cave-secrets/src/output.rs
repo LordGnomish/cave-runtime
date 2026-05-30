@@ -10,7 +10,8 @@
 //! command with its sha256 dedupe — matches upstream.
 
 use crate::models::SecretFinding;
-use std::collections::BTreeMap;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, HashSet};
 
 /// Title-case a key: uppercase the first letter of each whitespace-separated
 /// word, lowercase the rest. Approximates upstream's
@@ -88,6 +89,84 @@ pub fn plain_print(r: &PlainResult) -> String {
     // Upstream fmt.Println("") — trailing blank line.
     out.push('\n');
     out
+}
+
+// ── GitHubActionsPrinter (pkg/output/github_actions.go) ──────────────────────
+
+/// Emits GitHub Actions `::warning` workflow commands per finding, suppressing
+/// duplicates. Upstream keys its dedupe cache on the sha256 of
+/// "<decoder>:<detector>:<status>:<file>:<line>".
+#[derive(Debug, Default)]
+pub struct GitHubActionsPrinter {
+    dedupe: HashSet<String>,
+}
+
+impl GitHubActionsPrinter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The sha256 hex dedupe key for a finding, matching upstream's
+    /// `fmt.Sprintf("%s:%s:%s:%s:%d", decoder, detector, status, file, line)`
+    /// hashed with sha256 and hex-encoded.
+    pub fn dedupe_key(
+        detector_type: &str,
+        decoder_type: &str,
+        verified: bool,
+        filename: &str,
+        start_line: i64,
+    ) -> String {
+        let status = if verified { "verified" } else { "unverified" };
+        let raw = format!(
+            "{}:{}:{}:{}:{}",
+            decoder_type, detector_type, status, filename, start_line
+        );
+        let mut h = Sha256::new();
+        h.update(raw.as_bytes());
+        hex::encode(h.finalize())
+    }
+
+    /// Render the `::warning` command for a finding, or `None` if an identical
+    /// finding has already been printed (upstream returns nil after caching).
+    pub fn print(
+        &mut self,
+        detector_type: &str,
+        decoder_type: &str,
+        verified: bool,
+        filename: &str,
+        start_line: i64,
+    ) -> Option<String> {
+        let key = Self::dedupe_key(detector_type, decoder_type, verified, filename, start_line);
+        if !self.dedupe.insert(key) {
+            return None;
+        }
+
+        let status = if verified { "verified" } else { "unverified" };
+        let message = if decoder_type == "PLAIN" {
+            format!("Found {} {} result 🐷🔑\n", status, detector_type)
+        } else {
+            format!(
+                "Found {} {} result with {} encoding 🐷🔑\n",
+                status, detector_type, decoder_type
+            )
+        };
+
+        Some(format!(
+            "::warning file={},line={},endLine={}::{}",
+            filename, start_line, start_line, message
+        ))
+    }
+
+    /// Convenience bridge for a cave-secrets [`SecretFinding`].
+    pub fn print_finding(&mut self, f: &SecretFinding, verified: bool) -> Option<String> {
+        self.print(
+            &f.secret_type.to_string(),
+            "PLAIN",
+            verified,
+            &f.file_path,
+            f.line_number.map(|n| n as i64).unwrap_or(0),
+        )
+    }
 }
 
 #[cfg(test)]
