@@ -55,16 +55,26 @@ source_sha = "v1.36.0"
 # 2026-05-28: preemption-victim-recovery closed (EvictionRecoveryLoop +
 # mark_failed/take_failed/failed_evictions in default_preemption.rs).
 parity_ratio_source = "manifest"
-mapped_count   = 22
+# 2026-05-30 honest uplift — two skipped/stdlib-analog reclassifications backed
+# by real strict-TDD ports:
+#   * pkg/scheduler/internal/heap/ skipped→mapped (src/scheduling_heap.rs): the
+#     scheduler heap is a key-indexed structure (Update/Delete/AddIfNotPresent),
+#     NOT a std BinaryHeap analog. Wired into the active queue.
+#   * pkg/scheduler/apis/config/validation/ added as a new mapped package
+#     (src/config_validation.rs); the config *types* remain a serde skip below.
+#   Counts: mapped 22→24, skipped 7→6, total 29→30.
+#   honest_ratio = mapped/total = 24/30 = 0.8 (was 0.7586).
+#   fill_ratio = (mapped + skipped) / total = (24+6)/30 = 1.0.
+mapped_count   = 24
 partial_count  = 0
-skipped_count  = 7
+skipped_count  = 6
 unmapped_count = 0
-total          = 29
+total          = 30
 fill_ratio     = 1.0
-honest_ratio   = 0.7586
+honest_ratio   = 0.8
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
@@ -168,11 +178,6 @@ reason       = "stdlib-analog"
 note         = "KubeSchedulerConfiguration types — cave uses serde structs in models.rs"
 
 [[skipped]]
-upstream_pkg = "pkg/scheduler/internal/heap/"
-reason       = "stdlib-analog"
-note         = "Min-heap helpers; cave uses std BinaryHeap"
-
-[[skipped]]
 upstream_pkg = "staging/src/k8s.io/component-helpers/scheduling/"
 reason       = "stdlib-analog"
 note         = "Tolerates/Affinity helpers — folded into plugins.rs"
@@ -211,6 +216,16 @@ note         = "2026-05-19 uplift: dedicated module mirroring upstream's package
 upstream_pkg = "pkg/scheduler/framework/preemption/recovery"
 local_files  = ["src/default_preemption.rs"]
 note         = "2026-05-28 close: EvictionRecoveryLoop + mark_failed/take_failed/failed_evictions added to AsyncPreemptHandle in default_preemption.rs. When the apiserver returns a transient error during eviction, mark_failed() moves the task from pending→failed; drain_failed() atomically drains the failed list, clears preemptor nominations (so the next cycle can pick a different node), and returns the failed tasks for re-admission — mirrors upstream pkg/scheduler/framework/preemption/preemption.go §handlePreemptionResult error-path."
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/internal/heap/"
+local_files  = ["src/scheduling_heap.rs"]
+note         = "2026-05-30 honest uplift (skipped→mapped): faithful port of heap.go's key-indexed Heap. Wraps an items-by-key map alongside the heap queue so the active queue can Update a pod in place, Delete an interior node by key, and AddIfNotPresent without duplicates — operations std BinaryHeap cannot express. sift up/down/fix/remove mirror container/heap exactly, keeping the index map consistent on every swap; metricRecorder add-counter modeled. Wired as the backing store for priority_queue::PriorityQueue.active (add dedups by uid, new update()/delete() methods). 10 heap + 3 queue port tests."
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/apis/config/validation/"
+local_files  = ["src/config_validation.rs"]
+note         = "2026-05-30 honest uplift (new mapped package; config *types* stay serde-skipped above): port of validation.go's ValidateKubeSchedulerConfiguration rules — parallelism>0, percentageOfNodesToScore in [0,100], at-least-one profile, required+unique scheduler names, positive non-overflowing score weights, unique enabled plugins + plugin-config names. Errors aggregate like field.ErrorList. Wired to POST /api/scheduler/config/validate + cavectl scheduler validate-config + /admin/scheduler Config tab. 11 validation + 2 route tests."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
