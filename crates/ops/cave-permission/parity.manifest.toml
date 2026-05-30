@@ -27,31 +27,31 @@ url     = "https://github.com/casbin/casbin"
 name        = "cave-permission"
 description = "Fine-grained authorization — Casbin reimplementation (Backstage permission-backend wire protocol)"
 source_root = "src"
-rs_files    = 5
-rs_loc      = 590
+rs_files    = 8
+rs_loc      = 1043
 
 [parity]
 # 2026-05-29 CLOSE — Charter v2 fill_ratio 0.0 → 1.0
 #   5 src modules (lib / models / policy / catalog / routes) map cleanly to
 #   Casbin's core enforcer, model/policy types, RBAC interface, permission
 #   constants, and HTTP service layer.
-#   17 Casbin upstream areas are skipped under ADR-RUNTIME-PARITY-100-PCT-001
+#   13 Casbin upstream areas are skipped under ADR-RUNTIME-PARITY-100-PCT-001
 #   §5 (Go-native / CLI-replaced / portal-api-owned / plugin-framework-only /
 #   persistence-consolidation / parallel-track).
 #
-#   fill_ratio = (mapped + partial + skipped) / total = (6 + 0 + 16) / 22
-#   honest_ratio = mapped / total = 6 / 22
-mapped_count   = 6
+#   fill_ratio = (mapped + partial + skipped) / total = (9 + 0 + 13) / 22
+#   honest_ratio = mapped / total = 9 / 22
+mapped_count   = 9
 partial_count  = 0
-skipped_count  = 16
+skipped_count  = 13
 unmapped_count = 0
 total          = 22
-fill_ratio     = 1.0    # (6 + 0 + 16) / 22 = 22/22 — all 16 skipped areas are architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5 (persistence-consolidation, plugin-framework-only, cli-replaced, portal-api-owned, parallel-track)
-honest_ratio   = 0.2727  # 6/22 — fresh-impl uplift 2026-05-29 ported real Casbin builtin matcher operators (src/matchers.rs) via strict-TDD; remaining 16 skips preserved honestly
+fill_ratio     = 1.0    # (9 + 0 + 13) / 22 = 22/22 — all 13 remaining skipped areas are architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5 (persistence-consolidation, plugin-framework-only, cli-replaced, portal-api-owned, parallel-track, obs-stack-owned)
+honest_ratio   = 0.4091  # 9/22 — strict-TDD uplift 2026-05-30 ported a real Casbin enforce engine: rbac.rs (RoleManager + rbac_api), enforcer.rs (management_api policy store + enforce/batch_enforce). 3 skips (rbac_api/management_api/BatchEnforce) -> mapped; remaining 13 skips preserved honestly
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
-last_audit  = "2026-05-29"
+last_audit  = "2026-05-30"
 infra_only  = false
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ note     = "POST /api/permission/authorize (batch evaluation) + GET /api/permiss
 # 2026-05-29 confirmed: axum routes, batch loop through policy.handle()
 
 # ─── Skipped ─────────────────────────────────────────────────────────────────
-# All 16 skipped items are justified under ADR-RUNTIME-PARITY-100-PCT-001 §5.
+# All 13 remaining skipped items are justified under ADR-RUNTIME-PARITY-100-PCT-001 §5.
 
 [[skipped]]
 upstream = "casbin/casbin — persist/adapter.go + persist/file-adapter/ (file-based policy adapter)"
@@ -149,11 +149,11 @@ reason   = "cli-replaced — cavectl provides the permission management CLI; Cas
 adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (cli-replaced)"
 # 2026-05-29
 
-[[skipped]]
-upstream = "casbin/casbin — enforcer_interface.go batch enforce (BatchEnforce, BatchEnforceWithMatcher)"
-reason   = "sub-component — batch enforce is architecturally absorbed into the POST /authorize batch endpoint in routes.rs; a separate BatchEnforce method is redundant"
-adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (sub-component)"
-# 2026-05-29
+[[mapped]]
+upstream = "casbin/casbin — enforcer.go Enforce + enforcer_interface.go BatchEnforce (decision engine)"
+local    = "src/enforcer.rs"
+note     = "Enforcer::enforce implements the RBAC-with-resource matcher m = g(r.sub,p.sub) && keyMatch(r.obj,p.obj) && r.act==p.act with effect some(where p.eft==allow); Enforcer::batch_enforce vectorises it. Real first-class enforce engine, not an HTTP shim."
+# 2026-05-30 strict-TDD uplift: tests/enforce_tdd.rs (5 cases) RED->GREEN, line-port of enforcer.go Enforce + enforcer_interface.go BatchEnforce
 
 [[skipped]]
 upstream = "casbin/casbin — enforcer_synced.go (SyncedEnforcer with auto-reload ticker)"
@@ -161,17 +161,17 @@ reason   = "parallel-track — auto-reload is handled by cave-etcd watch notific
 adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (parallel-track)"
 # 2026-05-29
 
-[[skipped]]
-upstream = "casbin/casbin — management_api.go (AddPolicy/RemovePolicy/GetPolicy mutation API)"
-reason   = "portal-api-owned — policy mutation surface is exposed through the cave-portal admin API; cave-permission is read-path only (authorize endpoint)"
-adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (portal-api-owned)"
-# 2026-05-29
+[[mapped]]
+upstream = "casbin/casbin — management_api.go (AddPolicy/RemovePolicy/HasPolicy/GetPolicy + AddGroupingPolicy/HasGroupingPolicy)"
+local    = "src/enforcer.rs"
+note     = "In-memory policy store CRUD for p rules and g rules (the latter feeding the RoleManager). Pure runtime store operations the authorizer needs; distinct from the portal HTTP mutation surface."
+# 2026-05-30 strict-TDD uplift: tests/enforcer_mgmt_tdd.rs (4 cases) RED->GREEN, line-port of management_api.go
 
-[[skipped]]
-upstream = "casbin/casbin — rbac_api.go (GetRolesForUser / GetUsersForRole RBAC query helpers)"
-reason   = "portal-api-owned — role-graph query helpers are surfaced through cave-portal's admin UI; runtime only needs the enforce decision"
-adr_ref  = "ADR-RUNTIME-PARITY-100-PCT-001 §5 (portal-api-owned)"
-# 2026-05-29
+[[mapped]]
+upstream = "casbin/casbin — rbac/default-role-manager/role_manager.go + rbac_api.go (RoleManagerImpl + GetRolesForUser/GetUsersForRole/GetImplicitRolesForUser)"
+local    = "src/rbac.rs"
+note     = "RoleManager with bidirectional name adjacency: add_link/delete_link/has_link (BFS bounded by max_hierarchy_level) + get_roles/get_users/get_implicit_roles. Pure runtime role-graph the g(r.sub,p.sub) matcher rests on; not a portal concern."
+# 2026-05-30 strict-TDD uplift: tests/rbac_tdd.rs (6 cases) RED->GREEN, line-port of default-role-manager/role_manager.go + rbac_api.go
 
 [[skipped]]
 upstream = "casbin/casbin — frontend/casbin-editor (policy visual editor)"
