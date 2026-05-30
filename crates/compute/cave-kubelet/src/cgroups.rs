@@ -316,4 +316,190 @@ mod tests {
         let got = b.read(&p, "memory.max").unwrap();
         assert_eq!(got, Some(CgroupValue::MemoryMax(MemoryLimit::Bytes(2))));
     }
+
+    // ── cgroup v2 on-disk serialization (libcontainer/cgroups/fs2) ────────────
+
+    #[test]
+    fn serialize_memory_max_bytes_is_decimal() {
+        let (cf, content) = serialize_value(&CgroupValue::MemoryMax(MemoryLimit::Bytes(1_048_576)));
+        assert_eq!(cf, "memory.max");
+        assert_eq!(content, "1048576");
+    }
+
+    #[test]
+    fn serialize_memory_max_unlimited_is_literal_max() {
+        let (cf, content) = serialize_value(&CgroupValue::MemoryMax(MemoryLimit::Unlimited));
+        assert_eq!(cf, "memory.max");
+        assert_eq!(content, "max");
+    }
+
+    #[test]
+    fn serialize_cpu_max_quota_period_space_separated() {
+        let (cf, content) = serialize_value(&CgroupValue::CpuMax {
+            quota: Some(50_000),
+            period_us: 100_000,
+        });
+        assert_eq!(cf, "cpu.max");
+        // cgroup v2 cpu.max format is "$QUOTA $PERIOD".
+        assert_eq!(content, "50000 100000");
+    }
+
+    #[test]
+    fn serialize_cpu_max_unlimited_quota_is_max_period() {
+        let (_, content) = serialize_value(&CgroupValue::CpuMax {
+            quota: None,
+            period_us: 100_000,
+        });
+        assert_eq!(content, "max 100000");
+    }
+
+    #[test]
+    fn serialize_pids_max_unlimited_is_literal_max() {
+        let (cf, content) = serialize_value(&CgroupValue::PidsMax(None));
+        assert_eq!(cf, "pids.max");
+        assert_eq!(content, "max");
+    }
+
+    #[test]
+    fn parse_cpu_max_roundtrips() {
+        let v = parse_value(
+            "cpu.max",
+            "50000 100000",
+        )
+        .unwrap();
+        assert_eq!(
+            v,
+            CgroupValue::CpuMax {
+                quota: Some(50_000),
+                period_us: 100_000
+            }
+        );
+    }
+
+    #[test]
+    fn parse_memory_max_max_is_unlimited() {
+        let v = parse_value("memory.max", "max\n").unwrap();
+        assert_eq!(v, CgroupValue::MemoryMax(MemoryLimit::Unlimited));
+    }
+
+    #[test]
+    fn parse_unknown_control_is_invalid() {
+        assert!(matches!(
+            parse_value("io.weight", "100"),
+            Err(CgroupError::Invalid(_))
+        ));
+    }
+
+    // ── Cgroupv2FsBackend — real filesystem writer rooted at a test dir ──────
+
+    fn temp_root(tag: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static CTR: AtomicU64 = AtomicU64::new(0);
+        let n = CTR.fetch_add(1, Ordering::SeqCst);
+        let d = std::env::temp_dir().join(format!(
+            "cave-cg-{}-{}-{}",
+            std::process::id(),
+            tag,
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&d);
+        d
+    }
+
+    #[test]
+    fn fs_write_creates_nested_slice_dirs_and_control_file() {
+        let root = temp_root("nested");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Burstable, "abc-123");
+        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(2_000_000)))
+            .unwrap();
+        // The slice hierarchy is materialised on disk, with the control
+        // file holding the v2 wire content.
+        let dir = root.join(p.0.trim_start_matches('/'));
+        assert!(dir.is_dir(), "slice dir should exist: {dir:?}");
+        let raw = std::fs::read_to_string(dir.join("memory.max")).unwrap();
+        assert_eq!(raw, "2000000");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_write_then_read_roundtrips_cpu_max() {
+        let root = temp_root("cpu");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        let v = CgroupValue::CpuMax {
+            quota: Some(80_000),
+            period_us: 100_000,
+        };
+        b.write(&p, v.clone()).unwrap();
+        assert_eq!(b.read(&p, "cpu.max").unwrap(), Some(v));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_read_missing_returns_none() {
+        let root = temp_root("missing");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        assert_eq!(b.read(&p, "memory.max").unwrap(), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_remove_drops_directory_tree() {
+        let root = temp_root("remove");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        b.write(&p, CgroupValue::PidsMax(Some(200))).unwrap();
+        let dir = root.join(p.0.trim_start_matches('/'));
+        assert!(dir.is_dir());
+        b.remove(&p).unwrap();
+        assert!(!dir.exists());
+        // Removing an absent cgroup is idempotent.
+        b.remove(&p).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_write_rejects_zero_quota_before_touching_disk() {
+        let root = temp_root("zeroquota");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        let err = b
+            .write(
+                &p,
+                CgroupValue::CpuMax {
+                    quota: Some(0),
+                    period_us: 100_000,
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(err, CgroupError::Invalid(_)));
+        // Validation must short-circuit — no dir created.
+        assert!(!root.join(p.0.trim_start_matches('/')).exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_write_rejects_empty_cpuset() {
+        let root = temp_root("emptycpuset");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        assert!(b.write(&p, CgroupValue::CpusetCpus(String::new())).is_err());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_read_memory_max_unlimited_parses_back() {
+        let root = temp_root("memunlim");
+        let b = Cgroupv2FsBackend::new(&root);
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Unlimited))
+            .unwrap();
+        assert_eq!(
+            b.read(&p, "memory.max").unwrap(),
+            Some(CgroupValue::MemoryMax(MemoryLimit::Unlimited))
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
