@@ -112,28 +112,156 @@ fn spec_is_empty(spec: &VirtualMachineInstanceSpec) -> bool {
         && spec.termination_grace_period_seconds.is_none()
 }
 
-/// Compute the printable VM status — the user-visible `vm.status.printable_status`
-/// field. Mirrors upstream's `getPrintableStatus` switch.
+/// The user-visible `vm.status.printable_status` value. Mirrors the
+/// `VirtualMachinePrintableStatus` enum in api/core/v1/types.go. `as_str`
+/// returns the exact upstream wire string (note `Unschedulable` →
+/// `"ErrorUnschedulable"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrintableStatus {
+    Stopped,
+    Starting,
+    Running,
+    Paused,
+    Stopping,
+    Terminating,
+    CrashLoopBackOff,
+    Migrating,
+    Unschedulable,
+    ErrImagePull,
+    ImagePullBackOff,
+    Unknown,
+}
+
+impl PrintableStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PrintableStatus::Stopped => "Stopped",
+            PrintableStatus::Starting => "Starting",
+            PrintableStatus::Running => "Running",
+            PrintableStatus::Paused => "Paused",
+            PrintableStatus::Stopping => "Stopping",
+            PrintableStatus::Terminating => "Terminating",
+            PrintableStatus::CrashLoopBackOff => "CrashLoopBackOff",
+            PrintableStatus::Migrating => "Migrating",
+            PrintableStatus::Unschedulable => "ErrorUnschedulable",
+            PrintableStatus::ErrImagePull => "ErrImagePull",
+            PrintableStatus::ImagePullBackOff => "ImagePullBackOff",
+            PrintableStatus::Unknown => "Unknown",
+        }
+    }
+}
+
+/// Find a VMI status condition by type.
+fn vmi_condition<'a>(
+    vmi: &'a VirtualMachineInstance,
+    kind: &str,
+) -> Option<&'a crate::models::Condition> {
+    vmi.status
+        .as_ref()?
+        .conditions
+        .iter()
+        .find(|c| c.kind == kind)
+}
+
+/// Faithful port of `setPrintableStatus` (pkg/virt-controller/watch/vm/vm.go):
+/// an ordered, first-match-wins evaluation of the VM's user-facing status.
+///
+/// The upstream `isVMIStartExpected` / `isVMIStopExpected` helpers read an
+/// internal expectation tracker that has no analogue here, so we derive their
+/// outputs from `RunStrategy` + the StartFailure backoff state: an auto-start
+/// strategy expects a start unless a start-failure backoff is active, and a
+/// `Halted` VM expects its VMI stopped.
+pub fn evaluate_printable_status(
+    vm: &VirtualMachine,
+    vmi: Option<&VirtualMachineInstance>,
+) -> PrintableStatus {
+    let run = vm.spec.run_strategy;
+    let auto_start = matches!(
+        run,
+        RunStrategy::Always | RunStrategy::RerunOnFailure | RunStrategy::Once
+    );
+    let auto_restart = matches!(run, RunStrategy::Always | RunStrategy::RerunOnFailure);
+    let has_start_failure = vm
+        .status
+        .as_ref()
+        .and_then(|s| s.start_failure.as_ref())
+        .map(|f| f.consecutive_fail_count > 0)
+        .unwrap_or(false);
+    let start_expected = auto_start && !has_start_failure;
+    let stop_expected = matches!(run, RunStrategy::Halted);
+
+    // 1. Terminating — the VM object itself is being deleted.
+    if vm.deletion_timestamp.is_some() {
+        return PrintableStatus::Terminating;
+    }
+
+    if let Some(v) = vmi {
+        // 2. Stopping — live VMI marked for deletion or a stop is expected.
+        if !v.is_final() && (v.is_marked_for_deletion() || stop_expected) {
+            return PrintableStatus::Stopping;
+        }
+        // 3. Migrating.
+        let phase = v.status.as_ref().map(|s| s.phase.as_str()).unwrap_or("");
+        if phase == "Migrating" {
+            return PrintableStatus::Migrating;
+        }
+        // 4/5. Paused vs Running.
+        if v.is_running() {
+            return if v.has_paused_condition() {
+                PrintableStatus::Paused
+            } else {
+                PrintableStatus::Running
+            };
+        }
+        // 6. Unschedulable — PodScheduled=False/Unschedulable.
+        if let Some(c) = vmi_condition(v, "PodScheduled") {
+            if c.status == "False" && c.reason.as_deref() == Some("Unschedulable") {
+                return PrintableStatus::Unschedulable;
+            }
+        }
+        // 7/8. Image-pull errors — Synchronized=False with a pull reason.
+        if let Some(c) = vmi_condition(v, "Synchronized") {
+            if c.status == "False" {
+                match c.reason.as_deref() {
+                    Some("ErrImagePull") => return PrintableStatus::ErrImagePull,
+                    Some("ImagePullBackOff") => return PrintableStatus::ImagePullBackOff,
+                    _ => {}
+                }
+            }
+        }
+        // 9. Starting — VMI exists but has not reached Running yet.
+        if v.is_unprocessed() || v.is_scheduling() || v.is_scheduled() {
+            return PrintableStatus::Starting;
+        }
+        // 10. CrashLoopBackOff — terminal VMI under an auto-restart strategy
+        //     while a start-failure backoff is active.
+        if v.is_final() && !start_expected && auto_restart && has_start_failure {
+            return PrintableStatus::CrashLoopBackOff;
+        }
+        // 11. Stopped — terminal VMI with no pending restart.
+        if v.is_final() {
+            return PrintableStatus::Stopped;
+        }
+        PrintableStatus::Unknown
+    } else {
+        // No VMI: backoff → CrashLoopBackOff; auto-start → Starting; else Stopped.
+        if !start_expected && auto_restart && has_start_failure {
+            PrintableStatus::CrashLoopBackOff
+        } else if start_expected {
+            PrintableStatus::Starting
+        } else {
+            PrintableStatus::Stopped
+        }
+    }
+}
+
+/// Compute the printable VM status string. Thin wrapper over
+/// [`evaluate_printable_status`] returning the upstream wire string.
 pub fn printable_status(
     vm: &VirtualMachine,
     vmi: Option<&VirtualMachineInstance>,
 ) -> &'static str {
-    let phase = vmi
-        .and_then(|v| v.status.as_ref())
-        .map(|s| s.phase.as_str())
-        .unwrap_or("");
-    match (vm.spec.run_strategy, phase) {
-        (RunStrategy::Halted, _) | (RunStrategy::Manual, "") => "Stopped",
-        (_, "Pending") | (_, "Scheduling") | (_, "Scheduled") => "Starting",
-        (_, "Running") => "Running",
-        (_, "Migrating") => "Migrating",
-        (_, "Succeeded") => "Succeeded",
-        (_, "Failed") => "Failed",
-        (RunStrategy::Always, "") => "Starting",
-        (RunStrategy::Once, "") => "Starting",
-        (RunStrategy::RerunOnFailure, "") => "Stopped",
-        _ => "Stopped",
-    }
+    evaluate_printable_status(vm, vmi).as_str()
 }
 
 /// Top-level driver: run one VM reconcile against the store, executing the

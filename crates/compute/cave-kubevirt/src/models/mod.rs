@@ -13,6 +13,9 @@ use std::collections::BTreeMap;
 pub struct VirtualMachine {
     pub name: String,
     pub namespace: Option<String>,
+    /// `ObjectMeta.DeletionTimestamp` (Unix seconds) — set once a delete is
+    /// issued; drives the `Terminating` printable status.
+    pub deletion_timestamp: Option<i64>,
     pub spec: VirtualMachineSpec,
     pub status: Option<VirtualMachineStatus>,
 }
@@ -42,6 +45,19 @@ pub struct VirtualMachineStatus {
     pub printable_status: String,
     pub ready: bool,
     pub created: bool,
+    /// Tracks consecutive failed start attempts to drive CrashLoopBackOff.
+    /// Mirrors `VirtualMachineStartFailure` in api/core/v1/types.go.
+    pub start_failure: Option<StartFailure>,
+}
+
+/// `VirtualMachineStartFailure` — records how many times the VM's VMI has
+/// failed before reaching Running, plus when the next start may be retried.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StartFailure {
+    pub consecutive_fail_count: u32,
+    /// Unix seconds; a start is gated until now ≥ this value.
+    pub retry_after_timestamp: Option<i64>,
+    pub last_failed_vmi_uid: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
