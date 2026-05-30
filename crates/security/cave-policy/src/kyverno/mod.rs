@@ -5,6 +5,7 @@
 //! Implements: ClusterPolicy/Policy, validate/mutate/generate/verifyImages rules,
 //! JMESPath variable substitution, PolicyReports, CleanupPolicies, PolicyExceptions.
 
+pub mod cleanup;
 pub mod exception;
 pub mod generate;
 pub mod image_verify;
@@ -273,7 +274,7 @@ impl Default for KyvernoEngine {
     }
 }
 
-fn matches_resources(
+pub(crate) fn matches_resources(
     match_res: &MatchResources,
     resource: &serde_json::Value,
     namespace: Option<&str>,
@@ -309,7 +310,7 @@ fn matches_resources(
     any_match && all_match
 }
 
-fn matches_exclude(
+pub(crate) fn matches_exclude(
     exclude: &ExcludeResources,
     resource: &serde_json::Value,
     namespace: Option<&str>,
