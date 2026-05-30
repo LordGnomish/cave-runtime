@@ -17,6 +17,7 @@
 pub mod document;
 pub mod error;
 pub mod loaders;
+pub mod splitter;
 
 pub use document::{Document, Metadata};
 pub use error::{RagError, Result};

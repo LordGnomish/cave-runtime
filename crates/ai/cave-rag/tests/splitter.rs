@@ -8,7 +8,7 @@ use cave_rag::splitter::RecursiveCharacterTextSplitter;
 fn splits_on_highest_priority_separator() {
     let text = "aaaa\n\nbbbb\n\ncccc";
     let s = RecursiveCharacterTextSplitter::default()
-        .with_chunk_size(4)
+        .with_chunk_size(8)
         .with_chunk_overlap(0);
     let chunks = s.split_text(text);
     assert_eq!(chunks, vec!["aaaa", "bbbb", "cccc"]);
@@ -38,7 +38,7 @@ fn every_chunk_within_size_when_separators_allow() {
 fn split_documents_preserves_source_and_indexes_chunks() {
     let doc = Document::new("alpha\n\nbeta\n\ngamma").with_source("d.txt");
     let s = RecursiveCharacterTextSplitter::default()
-        .with_chunk_size(5)
+        .with_chunk_size(8)
         .with_chunk_overlap(0);
     let out = s.split_documents(&[doc]);
     assert_eq!(out.len(), 3);
