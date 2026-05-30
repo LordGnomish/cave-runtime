@@ -304,3 +304,184 @@ mod tests {
         assert!(store.get_vmi("default", "vm-1").is_none());
     }
 }
+
+#[cfg(test)]
+mod printable_status_tests {
+    use super::*;
+    use crate::models::{
+        Condition, RunStrategy, StartFailure, VirtualMachine, VirtualMachineInstance,
+        VirtualMachineInstanceStatus, VirtualMachineStatus,
+    };
+
+    fn vm(run: RunStrategy) -> VirtualMachine {
+        let mut v = VirtualMachine::default();
+        v.name = "vm-1".into();
+        v.spec.run_strategy = run;
+        v
+    }
+
+    fn vmi(phase: &str) -> VirtualMachineInstance {
+        let mut v = VirtualMachineInstance::default();
+        v.status = Some(VirtualMachineInstanceStatus {
+            phase: phase.into(),
+            ..Default::default()
+        });
+        v
+    }
+
+    #[test]
+    fn deletion_timestamp_wins_as_terminating() {
+        let mut v = vm(RunStrategy::Always);
+        v.deletion_timestamp = Some(1_780_000_000);
+        // Even with a running VMI, a deleting VM is Terminating.
+        let running = vmi("Running");
+        assert_eq!(
+            evaluate_printable_status(&v, Some(&running)),
+            PrintableStatus::Terminating
+        );
+    }
+
+    #[test]
+    fn marked_for_deletion_vmi_is_stopping() {
+        let mut running = vmi("Running");
+        running.deletion_timestamp = Some(1_780_000_000);
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&running)),
+            PrintableStatus::Stopping
+        );
+    }
+
+    #[test]
+    fn halted_with_running_vmi_is_stopping() {
+        // stop_expected derives from RunStrategy::Halted.
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Halted), Some(&vmi("Running"))),
+            PrintableStatus::Stopping
+        );
+    }
+
+    #[test]
+    fn migrating_phase_is_migrating() {
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&vmi("Migrating"))),
+            PrintableStatus::Migrating
+        );
+    }
+
+    #[test]
+    fn running_vmi_with_paused_condition_is_paused() {
+        let mut v = vmi("Running");
+        v.status.as_mut().unwrap().conditions.push(Condition {
+            kind: "Paused".into(),
+            status: "True".into(),
+            reason: None,
+            message: None,
+        });
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&v)),
+            PrintableStatus::Paused
+        );
+    }
+
+    #[test]
+    fn running_without_paused_is_running() {
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&vmi("Running"))),
+            PrintableStatus::Running
+        );
+    }
+
+    #[test]
+    fn unschedulable_pod_scheduled_false() {
+        let mut v = vmi("Scheduling");
+        v.status.as_mut().unwrap().conditions.push(Condition {
+            kind: "PodScheduled".into(),
+            status: "False".into(),
+            reason: Some("Unschedulable".into()),
+            message: None,
+        });
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&v)),
+            PrintableStatus::Unschedulable
+        );
+    }
+
+    #[test]
+    fn err_image_pull_and_backoff() {
+        for (reason, want) in [
+            ("ErrImagePull", PrintableStatus::ErrImagePull),
+            ("ImagePullBackOff", PrintableStatus::ImagePullBackOff),
+        ] {
+            let mut v = vmi("Scheduling");
+            v.status.as_mut().unwrap().conditions.push(Condition {
+                kind: "Synchronized".into(),
+                status: "False".into(),
+                reason: Some(reason.into()),
+                message: None,
+            });
+            assert_eq!(
+                evaluate_printable_status(&vm(RunStrategy::Always), Some(&v)),
+                want
+            );
+        }
+    }
+
+    #[test]
+    fn no_vmi_auto_start_is_starting() {
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), None),
+            PrintableStatus::Starting
+        );
+    }
+
+    #[test]
+    fn scheduling_vmi_is_starting() {
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Always), Some(&vmi("Scheduling"))),
+            PrintableStatus::Starting
+        );
+    }
+
+    #[test]
+    fn final_vmi_with_start_failure_is_crashloop() {
+        let mut v = vm(RunStrategy::Always);
+        v.status = Some(VirtualMachineStatus {
+            start_failure: Some(StartFailure {
+                consecutive_fail_count: 3,
+                retry_after_timestamp: Some(1_780_000_300),
+                last_failed_vmi_uid: Some("uid-1".into()),
+            }),
+            ..Default::default()
+        });
+        // VMI failed; backoff active (start not expected) → CrashLoopBackOff.
+        assert_eq!(
+            evaluate_printable_status(&v, Some(&vmi("Failed"))),
+            PrintableStatus::CrashLoopBackOff
+        );
+    }
+
+    #[test]
+    fn manual_no_vmi_is_stopped() {
+        // Manual does not auto-start: no VMI, no start expected → Stopped.
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Manual), None),
+            PrintableStatus::Stopped
+        );
+    }
+
+    #[test]
+    fn once_succeeded_vmi_is_stopped_not_crashloop() {
+        // Once is not an auto-restart strategy → terminal VMI is Stopped.
+        assert_eq!(
+            evaluate_printable_status(&vm(RunStrategy::Once), Some(&vmi("Succeeded"))),
+            PrintableStatus::Stopped
+        );
+    }
+
+    #[test]
+    fn as_str_round_trips_legacy_strings() {
+        assert_eq!(PrintableStatus::Running.as_str(), "Running");
+        assert_eq!(PrintableStatus::CrashLoopBackOff.as_str(), "CrashLoopBackOff");
+        assert_eq!(PrintableStatus::Unschedulable.as_str(), "ErrorUnschedulable");
+    }
+}
