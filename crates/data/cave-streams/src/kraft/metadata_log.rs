@@ -266,4 +266,82 @@ mod tests {
         });
         assert_eq!(log.last_epoch(), ControllerEpoch(5));
     }
+
+    // ── KIP-630: KRaft compacted metadata snapshots ────────────────────────
+
+    #[test]
+    fn snapshot_captures_offset_and_live_records() {
+        let log = MetadataLog::new();
+        log.append(topic_record("orders"));
+        log.append(partition_record("orders", 0, 1));
+        log.append(partition_record("orders", 1, 2));
+        // A snapshot records the offset it was taken at (the next
+        // offset that would be assigned) and the compacted live set.
+        let snap = log.generate_snapshot();
+        assert_eq!(snap.last_contained_offset(), 3);
+        // 3 live keys: 1 topic + 2 partitions.
+        assert_eq!(snap.record_count(), 3);
+        assert_eq!(snap.last_contained_epoch(), ControllerEpoch(1));
+    }
+
+    #[test]
+    fn snapshot_excludes_tombstoned_keys() {
+        let log = MetadataLog::new();
+        log.append(topic_record("a"));
+        log.append(topic_record("b"));
+        log.append(MetadataRecord::TopicRemoved {
+            epoch: ControllerEpoch(1),
+            name: "a".into(),
+        });
+        let snap = log.generate_snapshot();
+        // Only "b" survives compaction into the snapshot.
+        assert_eq!(snap.record_count(), 1);
+        // Offset still reflects all 3 appends.
+        assert_eq!(snap.last_contained_offset(), 3);
+    }
+
+    #[test]
+    fn load_snapshot_rebuilds_fresh_log_state() {
+        let src = MetadataLog::new();
+        src.append(topic_record("orders"));
+        src.append(partition_record("orders", 0, 7));
+        let snap = src.generate_snapshot();
+
+        // A brand-new node loads the snapshot instead of replaying
+        // the whole log from offset 0.
+        let restored = MetadataLog::from_snapshot(&snap);
+        let cm = restored.snapshot();
+        assert!(cm.topics.contains_key("orders"));
+        assert_eq!(cm.partitions[&("orders".into(), 0)].leader, 7);
+        assert_eq!(restored.live_keys(), 2);
+    }
+
+    #[test]
+    fn load_snapshot_resumes_offsets_after_snapshot_point() {
+        let src = MetadataLog::new();
+        src.append(topic_record("a")); // offset 0
+        src.append(topic_record("b")); // offset 1
+        let snap = src.generate_snapshot(); // last_contained_offset = 2
+
+        let restored = MetadataLog::from_snapshot(&snap);
+        // New appends continue from the snapshot's offset, not 0 —
+        // offsets must stay monotone across the snapshot boundary.
+        let e = restored.append(topic_record("c"));
+        assert_eq!(e.offset, 2);
+        assert_eq!(restored.high_water_mark(), 3);
+    }
+
+    #[test]
+    fn snapshot_is_serializable_roundtrip() {
+        let log = MetadataLog::new();
+        log.append(topic_record("orders"));
+        log.append(partition_record("orders", 0, 1));
+        let snap = log.generate_snapshot();
+        let json = serde_json::to_string(&snap).expect("serialize");
+        let back: MetadataSnapshot = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.last_contained_offset(), snap.last_contained_offset());
+        assert_eq!(back.record_count(), snap.record_count());
+        let restored = MetadataLog::from_snapshot(&back);
+        assert!(restored.snapshot().topics.contains_key("orders"));
+    }
 }
