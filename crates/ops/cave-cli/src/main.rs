@@ -965,6 +965,8 @@ enum OncallCmd {
     Shifts,
     Rotations,
     Incidents,
+    /// List supported per-source webhook integrations
+    Integrations,
 }
 #[derive(Subcommand)]
 enum SearchCmd {
@@ -4916,6 +4918,7 @@ source_root = "src"
             OncallCmd::Shifts => c.get("/api/oncall/shifts").await,
             OncallCmd::Rotations => c.get("/api/oncall/rotations").await,
             OncallCmd::Incidents => c.get("/api/oncall/incidents").await,
+            OncallCmd::Integrations => c.get("/api/oncall/integrations").await,
         },
         Commands::Search { cmd } => match cmd {
             SearchCmd::Indexes => c.get("/api/search/indexes").await,

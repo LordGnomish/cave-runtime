@@ -53,6 +53,19 @@ pub fn active_at<'a>(rows: &'a [OncallShift], at_unix: i64) -> Vec<&'a OncallShi
         .collect()
 }
 
+/// Per-source webhook receivers cave-oncall normalizes — mirrors
+/// `cave_oncall::integrations::IntegrationType::all()`. Surfaced read-only so
+/// operators can see which monitoring sources can page this stack.
+pub fn supported_integrations() -> [&'static str; 5] {
+    [
+        "alertmanager",
+        "grafana_alerting",
+        "grafana",
+        "formatted_webhook",
+        "webhook",
+    ]
+}
+
 pub fn unique_oncallers(rows: &[OncallShift]) -> Vec<String> {
     use std::collections::BTreeSet;
     let mut set: BTreeSet<String> = BTreeSet::new();
@@ -69,6 +82,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, OncallView
     let chips: String = groups.iter().map(|(r, v)| format!(
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{r} <strong>×{n}</strong></span>"#,
         r = escape(r), n = v.len())).collect();
+    let integration_chips: String = supported_integrations()
+        .iter()
+        .map(|s| format!(
+            r#"<span class="px-2 py-1 mr-2 rounded bg-blue-100 text-blue-800 text-sm font-mono">{}</span>"#,
+            escape(s)
+        ))
+        .collect();
     let table_rows: Vec<Vec<String>> = rows
         .iter()
         .map(|r| {
@@ -88,12 +108,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, OncallView
     <span class="px-2 py-1 rounded bg-gray-200"><strong>{u}</strong> oncallers</span>
   </div>
   <div class="mb-4">{chips}</div>
+  <h2 class="text-lg font-semibold mb-2">Alert integrations</h2>
+  <div class="mb-4">{integrations}</div>
   <h2 class="text-lg font-semibold mb-2">Shifts ({n})</h2>
   {tbl}
 </section>"#,
         n = rows.len(),
         u = oncallers.len(),
         chips = chips,
+        integrations = integration_chips,
         tbl = table(&["rotation", "oncaller", "start", "end"], &table_rows),
     );
     Ok(page_shell_full(
@@ -171,6 +194,15 @@ mod tests {
     fn render_excludes_evil_row() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::OncallRead])).unwrap();
         assert!(!html.contains("evil-rotation"));
+    }
+
+    #[test]
+    fn render_lists_supported_integrations() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::OncallRead])).unwrap();
+        assert!(html.contains("Alert integrations"));
+        for slug in supported_integrations() {
+            assert!(html.contains(slug), "integration {slug} missing from page");
+        }
     }
 
     #[test]

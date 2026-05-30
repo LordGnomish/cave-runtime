@@ -152,6 +152,9 @@ pub fn create_router(state: Arc<OnCallStore>) -> Router {
         // Webhooks
         .route("/api/oncall/webhooks/prometheus", post(webhook_prometheus))
         .route("/api/oncall/webhooks/generic", post(webhook_generic))
+        // Integrations (per-source webhook receivers — Grafana OnCall parity)
+        .route("/api/oncall/integrations", get(list_integrations))
+        .route("/api/oncall/integrations/{slug}", post(webhook_integration))
         // Stats
         .route("/api/oncall/stats", get(stats))
         .with_state(state)
@@ -812,6 +815,64 @@ async fn webhook_generic(
     let alert_id = alert.id;
     store.alerts.write().await.insert(alert_id, alert);
     StatusCode::CREATED
+}
+
+// Integrations — list supported per-source receivers.
+async fn list_integrations() -> Json<serde_json::Value> {
+    let slugs: Vec<&str> = crate::integrations::IntegrationType::all()
+        .iter()
+        .map(|t| t.slug())
+        .collect();
+    Json(serde_json::json!({ "integrations": slugs }))
+}
+
+/// Receive a raw monitoring payload on a per-source integration endpoint,
+/// normalize it through [`crate::integrations::parse_for`], then dedupe by the
+/// integration's grouping_id. A resolved page auto-resolves the matching open
+/// alert (mirrors upstream `is_able_to_autoresolve`); a firing page either
+/// opens a new alert or is rejected as a duplicate of an open one.
+async fn webhook_integration(
+    AxumState(store): AxumState<Arc<OnCallStore>>,
+    Path(slug): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let incoming = match crate::integrations::parse_for(&slug, &payload) {
+        Ok(a) => a,
+        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+    };
+
+    // Resolve path: close the matching open alert if one exists.
+    if incoming.is_resolved {
+        let mut alerts = store.alerts.write().await;
+        if let Some(alert) = alerts
+            .values_mut()
+            .find(|a| a.fingerprint == incoming.grouping_id && a.state != AlertState::Resolved)
+        {
+            alert.state = AlertState::Resolved;
+            alert.resolved_at = Some(Utc::now());
+            return (StatusCode::OK, Json(serde_json::json!({ "status": "resolved", "alert_id": alert.id })));
+        }
+        return (StatusCode::OK, Json(serde_json::json!({ "status": "no_open_alert" })));
+    }
+
+    // Firing path: reject if an open alert already shares this grouping_id.
+    {
+        let alerts = store.alerts.read().await;
+        if alerts
+            .values()
+            .any(|a| a.fingerprint == incoming.grouping_id && a.state != AlertState::Resolved)
+        {
+            return (StatusCode::CONFLICT, Json(serde_json::json!({ "status": "duplicate" })));
+        }
+    }
+
+    let alert = incoming.to_alert(Uuid::nil());
+    let alert_id = alert.id;
+    store.alerts.write().await.insert(alert_id, alert);
+    (
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "status": "created", "alert_id": alert_id, "integration": slug })),
+    )
 }
 
 // Stats

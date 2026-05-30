@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 pub mod engine;
+pub mod integrations;
 pub mod models;
 pub mod pagerduty_migrator;
 pub mod routes;
