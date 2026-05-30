@@ -26,6 +26,7 @@
 //! | inter-agent communication         | [`multi_agent`]                 |
 
 pub mod backend;
+pub mod eval;
 
 /// Upstream pin for the OpenJarvis primitive set. Tracked alongside the
 /// Hermes upstream pin in [`crate::UPSTREAM_VERSION`]; cave-hermes is a
