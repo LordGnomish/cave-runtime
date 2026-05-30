@@ -48,14 +48,14 @@ source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.6316
-adr_justified_ratio = 1.0      # 14 skipped (7 operational storage backends → cave-store Phase 3 / 3 standalone CLIs (ingester/remote-storage) + es-tooling → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical.
+honest_ratio        = 0.7105
+adr_justified_ratio = 1.0      # 11 skipped (4 operational storage backends kafka/grpc-remote/scylladb/blackhole → cave-store/cave-streams Phase 3 / 3 standalone CLIs (ingester/remote-storage) + es-tooling → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical. The cassandra/elasticsearch/badger *db-model codecs* are now mapped in-crate (live network drivers stay scope_cut).
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 22
+mapped_count        = 25
 partial_count       = 2
-skipped_count       = 14
+skipped_count       = 11
 unmapped_count      = 0
 total               = 38
 
@@ -63,9 +63,9 @@ total               = 38
 #   * Existing 9 742 LOC scaffold (27 src/.rs files, 106 unit tests) measured
 #     against Jaeger v1.52.0 upstream subsystems.
 #   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
-#     = (22 + 2 + 14) / 38 = 1.0000.
-#   * honest_ratio = (mapped + partial) / total = 24 / 38 = 0.6316 — reflects
-#     that 14 operational storage/CLI subsystems are honestly cut from MVP
+#     = (25 + 2 + 11) / 38 = 1.0000.
+#   * honest_ratio = (mapped + partial) / total = 27 / 38 = 0.7105 — reflects
+#     that 11 operational storage/CLI subsystems are honestly cut from MVP
 #     scope, not silently absent.
 #
 # 2026-05-30 honest-uplift (Wave 4 strict-TDD): cmd-tracegen-binary skip
@@ -76,6 +76,33 @@ total               = 38
 #   (tests/tracegen_tdd.rs — RED then GREEN, 7 cases). The standalone binary +
 #   OTLP exporter remain out of scope (standalone-cli-binaries scope_cut).
 #   mapped 21→22, skipped 15→14, honest_ratio 0.6053→0.6316.
+#
+# 2026-05-30 honest-uplift (Wave 5 strict-TDD, claude/cave-trace-honest-cont):
+#   three operational-storage *db-model codecs* reclassified skipped→mapped.
+#   For each backend the live network/mmap driver is genuinely operational and
+#   stays scope_cut, but the *pure encoding layer* — the algorithmic heart the
+#   driver calls before issuing I/O — is line-portable and is now in-crate
+#   under strict TDD (RED test commit → GREEN impl commit, never together):
+#     * storage-cassandra → src/storage_cassandra.rs (dbmodel model.go +
+#       converter.go + tag_filter.go): DbSpan from/to_domain (16-byte BE
+#       TraceID, micros time, span_hash), DbKeyValue typed AsString,
+#       GetAllUniqueTags index-tag extraction. tests/cassandra_dbmodel_tdd.rs
+#       (8 cases).
+#     * storage-elasticsearch → src/storage_es.rs (es dbmodel model.go +
+#       from_domain.go): EsSpan document (hex IDs, startTimeMillis routing,
+#       UPPERCASE refs, structured tags + Kibana flattened tag map dots→@,
+#       date-rotated [prefix-]jaeger-span-YYYY-MM-DD index).
+#       tests/es_dbmodel_tdd.rs (9 cases).
+#     * storage-badger → src/storage_badger.rs (badger spanstore writer.go key
+#       layout): byte-exact primary + secondary index keys + per-index value
+#       bytes, backed by a sorted BTreeMap store whose get_trace /
+#       trace_ids_by_service prefix scans exercise the real layout.
+#       tests/badger_keys_tdd.rs (8 cases).
+#   mapped 22→25, skipped 14→11, honest_ratio 0.6316→0.7105. The scylladb,
+#   kafka, grpc-remote, blackhole backends + all CLI/leader-election/v2 skips
+#   stay honestly cut. The storage-pluggable-trait partial is intentionally NOT
+#   promoted: only the memory backend is a full TraceStore; these three are
+#   codec layers, not live TraceStore implementations.
 #   * source_sha pinned to v1.52.0 commit
 #     9866eba85aed1b0a66a77c8c6928a372edc5040f.
 #   * parity_ratio_source switched from absent to "manifest" (scaffold had
@@ -201,6 +228,24 @@ upstream = "internal/tracegen/worker.go + internal/tracegen/config.go"
 local = "src/tracegen.rs"
 note = "tracegen span-shape construction line-port: root SERVER span 'lets-go' (peer.service/peer.host.ipv4 + debug/firehose flags) + N child CLIENT spans 'child-span-NN', 123us fakeSpanDuration each, parent total = ChildSpans*fakeSpanDuration, cyclic attr_NN/val_NN keys mod attr_keys/attr_values; simulate_one_trace + simulate_traces (workers*traces, services suffix). 2026-05-30 TDD RED->GREEN (tests/tracegen_tdd.rs, 7 cases). The standalone cmd/tracegen binary + OTLP exporter stay scope_cut (standalone-cli-binaries)."
 
+[[mapped]]
+name = "storage-cassandra"
+upstream = "plugin/storage/cassandra/spanstore/dbmodel/{model,converter,tag_filter}.go"
+local = "src/storage_cassandra.rs"
+note = "Cassandra db-model codec line-port: DbSpan from_domain/to_domain (16-byte big-endian TraceID, StartTime+Duration in microseconds per model.TimeAsEpochMicroseconds/DurationAsMicroseconds, span_hash), DbKeyValue typed encoding + AsString with value-type constants string/bool/int64/float64/binary + CHILD_OF/FOLLOWS_FROM reftypes, GetAllUniqueTags (combine process+span+log tags, sort, skip binary, dedupe adjacent → TagInsertion). 2026-05-30 TDD RED->GREEN (tests/cassandra_dbmodel_tdd.rs, 8 cases). The live gocql session + CQL DDL stay scope_cut (operational-storage-backends)."
+
+[[mapped]]
+name = "storage-elasticsearch"
+upstream = "plugin/storage/es/spanstore/dbmodel/{model,from_domain}.go"
+local = "src/storage_es.rs"
+note = "Elasticsearch db-model codec line-port: EsSpan document with model.TraceID/SpanID.String() hex IDs (high word dropped when zero), startTime+duration micros plus the startTimeMillis ES routing field, UPPERCASE CHILD_OF/FOLLOWS_FROM references, structured EsKeyValue tags array + Kibana flattened tag map (gated on all_tags_as_fields / tag_keys_as_fields, dots→@ DEFAULT_TAG_DOT_REPLACEMENT, binary excluded), date-rotated [prefix-]jaeger-span-YYYY-MM-DD index naming. 2026-05-30 TDD RED->GREEN (tests/es_dbmodel_tdd.rs, 9 cases). The live ES bulk HTTP client + ILM rollover stay scope_cut (operational-storage-backends)."
+
+[[mapped]]
+name = "storage-badger"
+upstream = "plugin/storage/badger/spanstore/writer.go (key layout)"
+local = "src/storage_badger.rs"
+note = "Badger key-encoding store line-port: byte-exact primary key [0x80|traceHigh|traceLow|startMicros|spanID] + secondary index key [(prefix&0x0f)|0x80|value|startMicros|traceHigh|traceLow] with per-index value bytes (service / service+operation / service+operation+duration8B / service+key+AsString tag), backed by an in-process BTreeMap reproducing Badger's sorted LSM ordering so write_span + get_trace + trace_ids_by_service prefix-scans genuinely read through the real layout. 2026-05-30 TDD RED->GREEN (tests/badger_keys_tdd.rs, 8 cases). The live Badger mmap LSM + value-log + GC stay scope_cut (operational-storage-backends)."
+
 # ─── Partial subsystems (2) ──────────────────────────────────────────────────
 
 [[partial]]
@@ -213,22 +258,10 @@ name = "clientcfg-remote-sampler"
 upstream = "pkg/clientcfg + cmd/agent/app/configmanager"
 note = "reqwest-based client for fetching remote sampler strategy is present (used by AdaptiveSampler), but the server-side strategy distribution endpoint (jaeger-agent → SDK fetch) is not exposed."
 
-# ─── Skipped subsystems (12 — out of MVP scope) ──────────────────────────────
-
-[[skipped]]
-name = "storage-cassandra"
-upstream = "plugin/storage/cassandra"
-reason = "Operational backend — requires cave-cassandra crate (not in workspace). In-memory store covers MVP; long-term ops backend routes via cave-store Phase 3 (BoltDB or S3 chunks)."
-
-[[skipped]]
-name = "storage-elasticsearch"
-upstream = "plugin/storage/es"
-reason = "Operational backend — depends on cave-search Manticore port. Deferred to Phase 3 obs-LTS unification."
-
-[[skipped]]
-name = "storage-badger"
-upstream = "plugin/storage/badger"
-reason = "Embedded LSM store. In-memory + retention GC covers MVP; Badger-equivalent embedded path can target cave-store sled-shim in Phase 3."
+# ─── Skipped subsystems (9 — out of MVP scope) ───────────────────────────────
+# NOTE: the cassandra / elasticsearch / badger *db-model codecs* were promoted
+# to [[mapped]] on 2026-05-30 (Wave 5) — only their live network/mmap drivers
+# remain operational and scope_cut. See [[scope_cuts]] operational-storage-backends.
 
 [[skipped]]
 name = "storage-kafka"
@@ -298,7 +331,7 @@ reason       = "Secondary archival writer (warm → cold) mirroring traces to a 
 
 [[scope_cuts]]
 group = "operational-storage-backends"
-reason = "cassandra / elasticsearch / badger / kafka / grpc-remote / scylladb / blackhole are operational deployment surfaces — cave-trace covers them in [[skipped]] (7 entries). MVP routes operational storage through cave-store (S3 surface) in Phase 3."
+reason = "kafka / grpc-remote / scylladb / blackhole are operational deployment surfaces — cave-trace covers them in [[skipped]] (4 entries). The cassandra / elasticsearch / badger db-model *codecs* are now [[mapped]] in-crate (src/storage_cassandra.rs, src/storage_es.rs, src/storage_badger.rs); only their live network/mmap *drivers* remain scope_cut here. MVP routes operational storage through cave-store (S3 surface) in Phase 3."
 phase = "Phase 3 — cave-store / cave-search / cave-streams integration"
 
 [[scope_cuts]]
@@ -334,6 +367,18 @@ local    = "src/types.rs"
 [[files]]
 upstream = "internal/storage/v1/memory/memory.go"
 local    = "src/storage.rs"
+
+[[files]]
+upstream = "plugin/storage/cassandra/spanstore/dbmodel/converter.go"
+local    = "src/storage_cassandra.rs"
+
+[[files]]
+upstream = "plugin/storage/es/spanstore/dbmodel/from_domain.go"
+local    = "src/storage_es.rs"
+
+[[files]]
+upstream = "plugin/storage/badger/spanstore/writer.go"
+local    = "src/storage_badger.rs"
 
 [[files]]
 upstream = "internal/sampling/strategystore/static/strategy_store.go"
