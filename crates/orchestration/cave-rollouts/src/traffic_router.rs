@@ -65,6 +65,10 @@ pub enum TrafficProvider {
         mapping: String,
         namespace: String,
     },
+    AppMesh {
+        virtual_router: String,
+        namespace: String,
+    },
 }
 
 pub fn render_patch(
@@ -187,6 +191,32 @@ pub fn render_patch(
             "spec": {
                 "service": canary_service,
                 "weight": split.canary,
+            }
+        }),
+        TrafficProvider::AppMesh {
+            virtual_router,
+            namespace,
+        } => serde_json::json!({
+            "apiVersion": "appmesh.k8s.aws/v1beta2",
+            "kind": "VirtualRouter",
+            "metadata": { "name": virtual_router, "namespace": namespace },
+            "spec": {
+                "routes": [{
+                    "httpRoute": {
+                        "action": {
+                            "weightedTargets": [
+                                {
+                                    "virtualNodeRef": {"name": stable_service},
+                                    "weight": split.stable,
+                                },
+                                {
+                                    "virtualNodeRef": {"name": canary_service},
+                                    "weight": split.canary,
+                                },
+                            ]
+                        }
+                    }
+                }]
             }
         }),
     }
