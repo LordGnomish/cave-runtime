@@ -151,6 +151,47 @@ pub fn binpack(
     }
 }
 
+/// Aggregate the CPU (millis) / memory (MiB) a DaemonSet set reserves on
+/// *every* node. Mirrors `scheduler.calculateDaemonOverhead`.
+pub fn daemon_overhead(daemonset_pods: &[PodSpec]) -> (u32, u32) {
+    daemonset_pods.iter().fold((0, 0), |(cpu, mem), p| {
+        (cpu + p.cpu_millis, mem + p.memory_mib)
+    })
+}
+
+/// Binpack `pods` after reserving the `daemonset_pods` overhead on every
+/// candidate node — the upstream scheduler subtracts DaemonSet requests from
+/// each node's allocatable before packing application pods. Instance types too
+/// small to host the DaemonSet overhead are dropped; the resulting
+/// [`InstanceAssignment::remaining_cpu_millis`] / `remaining_memory_mib`
+/// therefore report capacity *after* both the DaemonSet and the assigned app
+/// pods.
+pub fn binpack_with_daemonset(
+    pods: &[PodSpec],
+    instances: &[InstanceType],
+    daemonset_pods: &[PodSpec],
+    node_taints: &[Taint],
+) -> BinpackResult {
+    let (ds_cpu, ds_mem) = daemon_overhead(daemonset_pods);
+    let reduced: Vec<InstanceType> = instances
+        .iter()
+        .filter(|i| i.cpu_millis >= ds_cpu && i.memory_mib >= ds_mem)
+        .map(|i| InstanceType {
+            cpu_millis: i.cpu_millis - ds_cpu,
+            memory_mib: i.memory_mib - ds_mem,
+            ..i.clone()
+        })
+        .collect();
+    if reduced.is_empty() && !pods.is_empty() {
+        return BinpackResult::NoFit {
+            reason: format!(
+                "no instance type can host the DaemonSet overhead (cpu={ds_cpu}, mem={ds_mem})"
+            ),
+        };
+    }
+    binpack(pods, &reduced, node_taints)
+}
+
 fn fits(a: &InstanceAssignment, p: &PodSpec) -> bool {
     a.remaining_cpu_millis >= p.cpu_millis && a.remaining_memory_mib >= p.memory_mib
 }
