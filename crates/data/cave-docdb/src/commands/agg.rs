@@ -129,6 +129,7 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
                             results
                         }
                     }
+                    "$unwind" => unwind_stage(results, stage_spec),
                     _ => results,
                 };
             }
@@ -152,6 +153,74 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
     resp.insert("cursor".to_string(), Value::Object(cursor));
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
+}
+
+/// `$unwind` — deconstruct an array field, emitting one document per element.
+///
+/// Accepts either the short form (`"$field"`) or the object form
+/// (`{ path: "$field", preserveNullAndEmptyArrays: bool, includeArrayIndex: "name" }`),
+/// matching MongoDB r7.0 / FerretDB semantics:
+///   * array values fan out, one output document per element;
+///   * a non-array, non-null scalar yields exactly one document, unchanged;
+///   * missing field, JSON null, or empty array drop the document unless
+///     `preserveNullAndEmptyArrays` is set, in which case the field is removed
+///     (or left null) and the document passes through once;
+///   * `includeArrayIndex` records the zero-based element offset (null for the
+///     preserved non-array path).
+fn unwind_stage(input: Vec<Document>, spec: &Value) -> Vec<Document> {
+    let (path_spec, preserve, include_index) = match spec {
+        Value::String(s) => (s.as_str(), false, None),
+        Value::Object(o) => (
+            o.get("path").and_then(|v| v.as_str()).unwrap_or(""),
+            o.get("preserveNullAndEmptyArrays")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            o.get("includeArrayIndex")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+        ),
+        _ => return input,
+    };
+    let field = path_spec.trim_start_matches('$');
+    if field.is_empty() {
+        return input;
+    }
+
+    let mut out = Vec::new();
+    for doc in input {
+        match doc.get(field) {
+            Some(Value::Array(elems)) if !elems.is_empty() => {
+                for (i, elem) in elems.iter().enumerate() {
+                    let mut d = doc.clone();
+                    d.insert(field.to_string(), elem.clone());
+                    if let Some(idx_name) = &include_index {
+                        d.insert(idx_name.clone(), Value::Number((i as i64).into()));
+                    }
+                    out.push(d);
+                }
+            }
+            // Empty array, JSON null, or missing field.
+            Some(Value::Array(_)) | Some(Value::Null) | None => {
+                if preserve {
+                    let mut d = doc.clone();
+                    d.remove(field);
+                    if let Some(idx_name) = &include_index {
+                        d.insert(idx_name.clone(), Value::Null);
+                    }
+                    out.push(d);
+                }
+            }
+            // Non-array, non-null scalar: emit unchanged (index is null).
+            Some(_) => {
+                let mut d = doc.clone();
+                if let Some(idx_name) = &include_index {
+                    d.insert(idx_name.clone(), Value::Null);
+                }
+                out.push(d);
+            }
+        }
+    }
+    out
 }
 
 fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>) -> Vec<Document> {
