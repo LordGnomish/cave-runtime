@@ -248,6 +248,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
     },
+    /// MLX array/autograd/nn toolkit (ml-explore/mlx parity; CPU backend)
+    Mlx {
+        #[command(subcommand)]
+        cmd: MlxCmd,
+    },
     /// Distributed key-value store (etcd v3 replacement; etcdctl parity)
     Etcd {
         #[command(subcommand)]
@@ -2654,6 +2659,23 @@ enum LocalLlmCmd {
 }
 
 #[derive(Subcommand)]
+enum MlxCmd {
+    /// Print cave-mlx + pinned upstream MLX parity version
+    Version,
+    /// List the implemented capability surface
+    Info,
+    /// Run the autograd+Adam affine-fit demo
+    Demo {
+        /// Number of optimization steps
+        #[arg(long, default_value_t = 100)]
+        steps: usize,
+        /// Learning rate
+        #[arg(long, default_value_t = 0.1)]
+        lr: f32,
+    },
+}
+
+#[derive(Subcommand)]
 enum DaemonSubCmd {
     /// Start the daemon in the foreground (runs cave-local-llm-daemon start)
     Start,
@@ -4295,6 +4317,32 @@ source_root = "src"
                 Ok(())
             }
         },
+
+        // ── MLX ───────────────────────────────────────────────────────────────
+        Commands::Mlx { cmd } => {
+            // Delegate to the standalone `cave-mlx` binary (keeps cave-cli free
+            // of the heavy array stack), mirroring the local-llm daemon spawn.
+            let mut args: Vec<String> = Vec::new();
+            match cmd {
+                MlxCmd::Version => args.push("version".into()),
+                MlxCmd::Info => args.push("info".into()),
+                MlxCmd::Demo { steps, lr } => {
+                    args.push("demo".into());
+                    args.push("--steps".into());
+                    args.push(steps.to_string());
+                    args.push("--lr".into());
+                    args.push(lr.to_string());
+                }
+            }
+            let status = std::process::Command::new("cave-mlx")
+                .args(&args)
+                .status()
+                .map_err(|e| anyhow::anyhow!("failed to run cave-mlx: {e}"))?;
+            if !status.success() {
+                return Err(anyhow::anyhow!("cave-mlx exited with {status}"));
+            }
+            Ok(())
+        }
 
         // ── etcd ──────────────────────────────────────────────────────────────
         Commands::Etcd { cmd } => match cmd {
