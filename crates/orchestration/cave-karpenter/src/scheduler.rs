@@ -10,6 +10,7 @@
 //! pending.
 
 use crate::models::{NodeClaim, NodeClaimSpec, NodePool, Requirement, RequirementOperator};
+use crate::nodepool_utils::ordered_by_weight;
 
 /// Schedule decision: which NodePool produced a NodeClaim, or why none did.
 #[derive(Debug, Clone)]
@@ -22,7 +23,9 @@ pub enum ScheduleOutcome {
 /// `pod_reqs` are `(label_key, label_value)` pairs the pod requested via
 /// `nodeSelector` / `requiredDuringSchedulingIgnoredDuringExecution`.
 pub fn schedule_first_match(pools: &[NodePool], pod_reqs: &[(String, String)]) -> ScheduleOutcome {
-    for pool in pools {
+    // Upstream evaluates NodePools highest-weight-first (OrderByWeight); the
+    // first *matching* pool in that order wins, not input order.
+    for pool in ordered_by_weight(pools).iter() {
         if pool_satisfies(pool, pod_reqs) {
             let claim = NodeClaim {
                 name: format!("{}-claim", pool.name),
