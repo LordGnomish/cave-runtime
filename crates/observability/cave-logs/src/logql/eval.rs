@@ -106,6 +106,9 @@ pub fn apply_pipeline(
             PipelineStage::Drop(d) => {
                 apply_drop(&d.labels, &mut extra);
             }
+            PipelineStage::Keep(k) => {
+                apply_keep(&k.labels, &mut extra);
+            }
         }
     }
 
@@ -334,6 +337,18 @@ fn apply_drop(entries: &[DropKeepLabel], labels: &mut HashMap<String, String>) {
             DropKeepLabel::Matcher(m) => &m.name == name && drop_keep_matcher_passes(value, m),
         });
         !targeted
+    });
+}
+
+/// `| keep` — retain a label only if some entry approves it (bare name approves
+/// the label; a matcher approves only when the label's value passes). All other
+/// labels — including the original stream labels — are removed.
+fn apply_keep(entries: &[DropKeepLabel], labels: &mut HashMap<String, String>) {
+    labels.retain(|name, value| {
+        entries.iter().any(|e| match e {
+            DropKeepLabel::Name(n) => n == name,
+            DropKeepLabel::Matcher(m) => &m.name == name && drop_keep_matcher_passes(value, m),
+        })
     });
 }
 

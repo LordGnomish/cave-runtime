@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use super::ast::{
     self, BinOp, BinaryExpr, CompareOp, Decolorize, DropKeepLabel, DropLabels, Grouping,
-    LabelFilter, LabelFilterValue, LabelFormat, LabelMatcher, LineFilter, LineFormat, LogQuery,
-    LogRangeAggregation, MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query, RangeAgg,
-    StreamSelector, UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
+    KeepLabels, LabelFilter, LabelFilterValue, LabelFormat, LabelMatcher, LineFilter, LineFormat,
+    LogQuery, LogRangeAggregation, MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query,
+    RangeAgg, StreamSelector, UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
 };
 use super::lexer::{Lexer, Token};
 
@@ -294,6 +294,11 @@ impl Parser {
                 self.advance();
                 let labels = self.parse_drop_keep_list()?;
                 Ok(PipelineStage::Drop(DropLabels { labels }))
+            }
+            Some(Token::Keep) => {
+                self.advance();
+                let labels = self.parse_drop_keep_list()?;
+                Ok(PipelineStage::Keep(KeepLabels { labels }))
             }
             // Label filter: `| label op value`
             Some(Token::Ident(_)) => {

@@ -138,6 +138,13 @@ pub struct DropLabels {
     pub labels: Vec<DropKeepLabel>,
 }
 
+/// Keep labels stage: `| keep level, status="500"` — retains only matching
+/// labels and removes everything else.
+#[derive(Debug, Clone)]
+pub struct KeepLabels {
+    pub labels: Vec<DropKeepLabel>,
+}
+
 /// A single stage in the log pipeline.
 #[derive(Debug, Clone)]
 pub enum PipelineStage {
@@ -149,6 +156,7 @@ pub enum PipelineStage {
     Decolorize(Decolorize),
     Unwrap(UnwrapExpr),
     Drop(DropLabels),
+    Keep(KeepLabels),
 }
 
 // ── Log query ────────────────────────────────────────────────────────────────
