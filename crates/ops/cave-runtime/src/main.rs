@@ -393,6 +393,11 @@ async fn main() -> anyhow::Result<()> {
         .layer(axum::middleware::from_fn(admin_realms_persona_gate))
         // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution
         .merge(portal::router())
+        // Custom 404 for unmatched routes — styled HTML page for browser
+        // navigation (e.g. a stale `/portal/<gone>` bookmark), JSON for
+        // `/api/*` clients. Wrapped by `api_no_cache_layer` below so the
+        // error page is never cached either.
+        .fallback(not_found)
         // JWT auth middleware
         .layer(axum::middleware::from_fn(
             |req: axum::extract::Request, next: axum::middleware::Next| async move {
@@ -416,6 +421,12 @@ async fn main() -> anyhow::Result<()> {
                     "/ready".into(),
                     "/api/modules".into(),
                     "/api/health".into(),
+                    // Public parity snapshot — portal-web and external
+                    // dashboards fetch `docs/parity/parity-index.json` here
+                    // without a session. The route existed since portal-v3 but
+                    // was never bypassed, so it 401'd for every unauthenticated
+                    // caller (the broken half of the 2026-05-27 ray).
+                    "/api/parity".into(),
                     "/portal/".into(),
                     "/api/portal/".into(),
                     "/api/auth/".into(),
@@ -501,6 +512,24 @@ async fn main() -> anyhow::Result<()> {
 
 async fn portal() -> impl IntoResponse {
     Html(PORTAL_HTML)
+}
+
+/// Styled fallback page for unmatched non-API routes (custom 404).
+static PORTAL_404_HTML: &str = include_str!("portal_error.html");
+
+/// Custom 404 fallback: a styled HTML page for browser navigation, JSON for
+/// `/api/*` clients. Reached for any route not matched by the merged routers.
+async fn not_found(uri: axum::http::Uri) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+    if uri.path().starts_with("/api/") {
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({ "error": "not_found", "path": uri.path() })),
+        )
+            .into_response();
+    }
+    (StatusCode::NOT_FOUND, Html(PORTAL_404_HTML)).into_response()
 }
 
 async fn health() -> axum::Json<serde_json::Value> {
