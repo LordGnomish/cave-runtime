@@ -20,3 +20,9 @@ pub mod pooling;
 
 /// Embedding model registry — per-model cards (dims, ctx, pooling, prefixes).
 pub mod registry;
+
+/// Lightweight word tokenizer for token accounting and context truncation.
+pub mod tokenize;
+
+/// Dynamic token-budget batching (max batch size + max tokens per batch).
+pub mod batch;
