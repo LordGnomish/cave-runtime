@@ -18,6 +18,7 @@
 
 pub mod catalog;
 pub mod context;
+pub mod cse;
 pub mod data_source;
 pub mod dataframe;
 pub mod dml;
@@ -34,6 +35,7 @@ pub mod window;
 
 pub use catalog::SessionCatalog;
 pub use context::SessionContext;
+pub use cse::CommonSubexprAnalysis;
 pub use data_source::{CsvSource, MemTable, TableProvider};
 pub use dataframe::DataFrame;
 pub use error::{Error, Result};
