@@ -78,6 +78,30 @@ impl Tree {
     }
 }
 
+impl Tree {
+    /// The minimum `total` a node must have to appear when the flame graph is
+    /// capped at `max_nodes` — i.e. the `max_nodes`-th largest node total, or
+    /// `0` if the tree has fewer than `max_nodes` nodes (no cap needed).
+    /// Ports `tree.go` minValue.
+    pub fn min_value(&self, _max_nodes: i64) -> i64 {
+        // RED placeholder
+        0
+    }
+
+    /// Total node count (every node in the forest). Ports `tree.go` size.
+    pub fn size(&self) -> usize {
+        // RED placeholder
+        0
+    }
+
+    /// Cap the flame graph at `max_nodes`: subtrees whose `total` is below the
+    /// [`min_value`](Self::min_value) threshold collapse into a synthetic
+    /// `"other"` sibling carrying their summed weight.
+    pub fn truncate(&mut self, _max_nodes: i64) {
+        // RED placeholder
+    }
+}
+
 /// Merge `src` nodes into the sorted `dst` child list, recursing into
 /// matching children.
 fn merge_children(dst: &mut Vec<Node>, src: &[Node]) {
@@ -214,5 +238,54 @@ mod tests {
         let names: Vec<&str> = a.root.iter().map(|n| n.name.as_str()).collect();
         assert_eq!(names, vec!["a", "z"]);
         assert_eq!(a.total(), 2);
+    }
+
+    // node totals: a=10, b=8, c=5, d=3  -> sorted desc [10, 8, 5, 3]
+    fn mv_tree() -> Tree {
+        let mut t = Tree::new();
+        t.insert_stack(10, &["a"]);
+        t.insert_stack(5, &["b", "c"]);
+        t.insert_stack(3, &["b", "d"]);
+        t
+    }
+
+    #[test]
+    fn size_counts_all_nodes() {
+        assert_eq!(mv_tree().size(), 4);
+        assert_eq!(Tree::new().size(), 0);
+    }
+
+    #[test]
+    fn min_value_is_nth_largest_total() {
+        let t = mv_tree();
+        assert_eq!(t.min_value(1), 10);
+        assert_eq!(t.min_value(2), 8);
+        assert_eq!(t.min_value(3), 5);
+        assert_eq!(t.min_value(4), 3);
+    }
+
+    #[test]
+    fn min_value_zero_when_fewer_nodes_than_cap() {
+        let t = mv_tree();
+        assert_eq!(t.min_value(5), 0);
+        assert_eq!(t.min_value(0), 0);
+    }
+
+    #[test]
+    fn truncate_collapses_below_threshold_into_other() {
+        let mut t = mv_tree();
+        t.truncate(2); // threshold = min_value(2) = 8
+        // total weight is preserved
+        assert_eq!(t.total(), 18);
+        // root keeps a(10) and b(8)
+        assert_eq!(t.root.len(), 2);
+        assert_eq!(t.root[0].name, "a");
+        let b = &t.root[1];
+        assert_eq!(b.name, "b");
+        // c(5) and d(3) both below 8 -> collapsed into one "other"
+        assert_eq!(b.children.len(), 1);
+        assert_eq!(b.children[0].name, "other");
+        assert_eq!(b.children[0].total, 8);
+        assert_eq!(b.children[0].self_value, 8);
     }
 }
