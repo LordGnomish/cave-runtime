@@ -44,6 +44,108 @@ impl OpMsg {
 }
 
 const OPCODE: i32 = 2013;
+const OP_QUERY: i32 = 2004;
+const OP_REPLY: i32 = 1;
+
+/// Legacy OP_QUERY message (opcode 2004). Pre-OP_MSG drivers still open a
+/// connection by sending an `isMaster`/`hello` query against `<db>.$cmd`;
+/// FerretDB decodes that frame to negotiate the wire version before switching
+/// the session to OP_MSG. This is the decode half plus an OP_REPLY encoder for
+/// the handshake response — clean-room from the public MongoDB wire spec.
+#[derive(Debug, Clone)]
+pub struct OpQuery {
+    pub flags: i32,
+    pub full_collection_name: String,
+    pub number_to_skip: i32,
+    pub number_to_return: i32,
+    pub query: Document,
+    pub return_fields_selector: Option<Document>,
+}
+
+/// Decode a legacy OP_QUERY frame, returning the request id and parsed query.
+pub fn decode_op_query(bytes: &[u8]) -> Result<(i32, OpQuery), WireError> {
+    if bytes.len() < 16 {
+        return Err(WireError::WireError("header too short".to_string()));
+    }
+    let message_length = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+    if bytes.len() < message_length {
+        return Err(WireError::WireError("incomplete message".to_string()));
+    }
+    let request_id = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+    let opcode = i32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
+    if opcode != OP_QUERY {
+        return Err(WireError::WireError(format!(
+            "invalid opcode: {} (expected OP_QUERY 2004)",
+            opcode
+        )));
+    }
+
+    let mut pos = 16;
+    let flags = read_i32(bytes, &mut pos)?;
+    let (full_collection_name, consumed) = read_cstring(&bytes[pos..])?;
+    pos += consumed;
+    let number_to_skip = read_i32(bytes, &mut pos)?;
+    let number_to_return = read_i32(bytes, &mut pos)?;
+
+    let query = bson::decode_doc(&bytes[pos..]).map_err(|e| WireError::BsonError(e.to_string()))?;
+    let query_len = bson::encode_doc(&query)
+        .map_err(|e| WireError::BsonError(e.to_string()))?
+        .len();
+    pos += query_len;
+
+    // The returnFieldsSelector document is optional.
+    let return_fields_selector = if pos < message_length {
+        Some(bson::decode_doc(&bytes[pos..]).map_err(|e| WireError::BsonError(e.to_string()))?)
+    } else {
+        None
+    };
+
+    Ok((
+        request_id,
+        OpQuery {
+            flags,
+            full_collection_name,
+            number_to_skip,
+            number_to_return,
+            query,
+            return_fields_selector,
+        },
+    ))
+}
+
+/// Encode an OP_REPLY (opcode 1) carrying the handshake response documents.
+pub fn encode_op_reply(
+    docs: &[Document],
+    request_id: i32,
+    response_to: i32,
+) -> Result<Vec<u8>, WireError> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&0i32.to_le_bytes()); // responseFlags
+    payload.extend_from_slice(&0i64.to_le_bytes()); // cursorID (0 = no cursor)
+    payload.extend_from_slice(&0i32.to_le_bytes()); // startingFrom
+    payload.extend_from_slice(&(docs.len() as i32).to_le_bytes()); // numberReturned
+    for doc in docs {
+        let encoded = bson::encode_doc(doc).map_err(|e| WireError::BsonError(e.to_string()))?;
+        payload.extend_from_slice(&encoded);
+    }
+
+    let mut msg = Vec::new();
+    msg.extend_from_slice(&((16 + payload.len()) as u32).to_le_bytes());
+    msg.extend_from_slice(&request_id.to_le_bytes());
+    msg.extend_from_slice(&response_to.to_le_bytes());
+    msg.extend_from_slice(&OP_REPLY.to_le_bytes());
+    msg.extend_from_slice(&payload);
+    Ok(msg)
+}
+
+fn read_i32(bytes: &[u8], pos: &mut usize) -> Result<i32, WireError> {
+    if *pos + 4 > bytes.len() {
+        return Err(WireError::WireError("truncated i32".to_string()));
+    }
+    let v = i32::from_le_bytes([bytes[*pos], bytes[*pos + 1], bytes[*pos + 2], bytes[*pos + 3]]);
+    *pos += 4;
+    Ok(v)
+}
 
 pub fn encode_op_msg(
     reply: &OpMsg,
