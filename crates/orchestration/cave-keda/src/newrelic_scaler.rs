@@ -134,4 +134,69 @@ mod tests {
         ]];
         assert_eq!(NewRelicScaler::extract_metric(&rows, false).unwrap(), 4.0);
     }
+
+    fn md(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn from_metadata_parses_required_fields_and_defaults() {
+        let s = NewRelicScaler::from_metadata(&md(&[
+            ("account", "12345"),
+            ("nrql", "SELECT count(*) FROM Transaction"),
+            ("threshold", "100"),
+        ]))
+        .unwrap();
+        assert_eq!(s.account, 12345);
+        assert_eq!(s.nrql, "SELECT count(*) FROM Transaction");
+        assert_eq!(s.threshold, 100.0);
+        // region defaults to "US" when absent (parseNewRelicMetadata default).
+        assert_eq!(s.region, "US");
+        // activationThreshold default=0; noDataError optional default false.
+        assert_eq!(s.activation_threshold, 0.0);
+        assert!(!s.no_data_error);
+    }
+
+    #[test]
+    fn from_metadata_honours_explicit_overrides() {
+        let s = NewRelicScaler::from_metadata(&md(&[
+            ("account", "7"),
+            ("nrql", "SELECT 1"),
+            ("threshold", "5"),
+            ("region", "EU"),
+            ("activationThreshold", "2.5"),
+            ("noDataError", "true"),
+        ]))
+        .unwrap();
+        assert_eq!(s.region, "EU");
+        assert_eq!(s.activation_threshold, 2.5);
+        assert!(s.no_data_error);
+    }
+
+    #[test]
+    fn from_metadata_requires_account_nrql_threshold() {
+        assert!(NewRelicScaler::from_metadata(&md(&[("nrql", "x"), ("threshold", "1")])).is_err());
+        assert!(
+            NewRelicScaler::from_metadata(&md(&[("account", "1"), ("threshold", "1")])).is_err()
+        );
+        assert!(NewRelicScaler::from_metadata(&md(&[("account", "1"), ("nrql", "x")])).is_err());
+        // non-integer account is rejected.
+        assert!(
+            NewRelicScaler::from_metadata(&md(&[
+                ("account", "x"),
+                ("nrql", "y"),
+                ("threshold", "1")
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn metric_name_is_normalized_scaler_name() {
+        let s = NewRelicScaler::new(1, "SELECT 1");
+        assert_eq!(s.metric_name(), "new-relic");
+    }
 }
