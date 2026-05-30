@@ -344,6 +344,38 @@ upstream_name = "Lex"
 local_name    = "tokenize"
 file          = "src/promql/lexer.rs"
 
+# 2026-05-30 cont2 — additional PromQL functions (depth within functions.go).
+
+[[functions]]
+upstream_name = "double_exponential_smoothing"
+local_name    = "double_exponential_smoothing"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "sort_by_label"
+local_name    = "sort_by_label"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "sort_by_label_desc"
+local_name    = "sort_by_label"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "ts_of_min_over_time"
+local_name    = "ts_of_min_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "ts_of_max_over_time"
+local_name    = "ts_of_max_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "ts_of_last_over_time"
+local_name    = "ts_of_last_over_time"
+file          = "src/promql/functions.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -465,6 +497,24 @@ local_test    = "parity_multitenant_federation_relabel_external_only_label"
 [[tests]]
 upstream_test = "web/federate_test.go::TestEnforceFilter"
 local_test    = "parity_multitenant_enforce_filter_idempotent"
+
+# 2026-05-30 cont2 — strict-TDD parity ports (depth, count-neutral).
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestDoubleExponentialSmoothing"
+local_test    = "double_exponential_smoothing_matches_upstream_recurrence"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestSortByLabel"
+local_test    = "sort_by_label_orders_ascending"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestTimestampFunctions"
+local_test    = "ts_of_max_over_time_returns_timestamp_of_peak"
+
+[[tests]]
+upstream_test = "tsdb/db_test.go::TestDB_Snapshot_ChunksOutsideOfCompactedRange"
+local_test    = "delete_removes_samples_in_interval"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
