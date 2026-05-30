@@ -40,6 +40,7 @@ pub mod sampling;
 pub mod spm;
 pub mod storage;
 pub mod traceql;
+pub mod tracegen;
 pub mod types;
 
 pub use error::{Result, TraceError};
