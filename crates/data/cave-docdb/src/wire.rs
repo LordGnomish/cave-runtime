@@ -260,4 +260,73 @@ mod tests {
         let opcode = i32::from_le_bytes([encoded[12], encoded[13], encoded[14], encoded[15]]);
         assert_eq!(opcode, 2013);
     }
+
+    /// Build a legacy OP_QUERY frame (opcode 2004) the way a pre-OP_MSG driver
+    /// sends its `isMaster` / `hello` handshake against `admin.$cmd`.
+    fn build_op_query(req_id: i32, ns: &str, query: &Document) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&0i32.to_le_bytes()); // flags
+        payload.extend_from_slice(ns.as_bytes()); // fullCollectionName
+        payload.push(0);
+        payload.extend_from_slice(&0i32.to_le_bytes()); // numberToSkip
+        payload.extend_from_slice(&(-1i32).to_le_bytes()); // numberToReturn
+        payload.extend_from_slice(&bson::encode_doc(query).unwrap()); // query doc
+
+        let mut msg = Vec::new();
+        msg.extend_from_slice(&((16 + payload.len()) as u32).to_le_bytes());
+        msg.extend_from_slice(&req_id.to_le_bytes());
+        msg.extend_from_slice(&0i32.to_le_bytes()); // responseTo
+        msg.extend_from_slice(&2004i32.to_le_bytes()); // OP_QUERY
+        msg.extend_from_slice(&payload);
+        msg
+    }
+
+    #[test]
+    fn test_decode_op_query_handshake() {
+        let mut q = Document::new();
+        q.insert("isMaster".to_string(), Value::Number(1.into()));
+        let frame = build_op_query(11, "admin.$cmd", &q);
+
+        let (req_id, query) = decode_op_query(&frame).unwrap();
+        assert_eq!(req_id, 11);
+        assert_eq!(query.full_collection_name, "admin.$cmd");
+        assert_eq!(query.number_to_skip, 0);
+        assert_eq!(query.number_to_return, -1);
+        assert_eq!(
+            query.query.get("isMaster"),
+            Some(&Value::Number(1.into()))
+        );
+    }
+
+    #[test]
+    fn test_decode_op_query_rejects_non_2004_opcode() {
+        // Hand an OP_MSG frame to the OP_QUERY decoder — must be rejected.
+        let mut doc = Document::new();
+        doc.insert("ping".to_string(), Value::Number(1.into()));
+        let frame = encode_op_msg(&OpMsg::new(doc), 1, 0).unwrap();
+        assert!(decode_op_query(&frame).is_err());
+    }
+
+    #[test]
+    fn test_encode_op_reply_header_and_body() {
+        let mut doc = Document::new();
+        doc.insert("ismaster".to_string(), Value::Bool(true));
+        doc.insert("ok".to_string(), Value::Number(1.into()));
+
+        let reply = encode_op_reply(&[doc], 99, 11).unwrap();
+        // Header: messageLength, requestID, responseTo, opcode(=1, OP_REPLY).
+        assert!(reply.len() >= 36); // 16 header + 20 reply prefix minimum
+        let opcode = i32::from_le_bytes([reply[12], reply[13], reply[14], reply[15]]);
+        assert_eq!(opcode, 1);
+        let response_to = i32::from_le_bytes([reply[8], reply[9], reply[10], reply[11]]);
+        assert_eq!(response_to, 11);
+        // numberReturned sits at offset 16(header)+4(flags)+8(cursorID)+4(startingFrom)=32.
+        let number_returned =
+            i32::from_le_bytes([reply[32], reply[33], reply[34], reply[35]]);
+        assert_eq!(number_returned, 1);
+        // The single reply document round-trips back from its offset (36).
+        let body = bson::decode_doc(&reply[36..]).unwrap();
+        assert_eq!(body.get("ok"), Some(&Value::Number(1.into())));
+        assert_eq!(body.get("ismaster"), Some(&Value::Bool(true)));
+    }
 }
