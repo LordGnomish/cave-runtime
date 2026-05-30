@@ -22,17 +22,17 @@ source_sha = "v1.36.0"   # latest stable Kubernetes release tag
 # leader-election main, informer plumbing (cave-apiserver pushes events),
 # winkernel mode, /metrics + /healthz HTTP servers (delegated to
 # cave-metrics + cave-runtime), Service-IP allocator (cave-apiserver).
-mapped_count          = 18
-partial_count         = 2
-skipped_count         = 14
+mapped_count          = 19
+partial_count         = 0
+skipped_count         = 15
 unmapped_count        = 0  # 2026-05-21: real iptables-restore + nft -f subprocess backends formally reclassified as scope_cuts to cave-runtime host-preflight layer (the backend trait is open; cave-runtime supplies the privileged subprocess invocation, this crate emits the textual payload).
 total                 = 34
 fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 34/34
-honest_ratio          = 0.9412  # (mapped + skipped) / total            = 32/34
-adr_justified_ratio   = 1.0      # 14 skipped + 0 unmapped: legacy userspace mode, IPVS direct (→cave-net eBPF), iptables-restore + nft -f subprocesses (host-preflight: cave-runtime privileged worker), leader-election main, informer plumbing (→cave-apiserver), winkernel (out-of-launch-scope: Linux only), /metrics + /healthz (parallel-track: cave-metrics + cave-runtime), Service-IP allocator (→cave-apiserver)
+honest_ratio          = 1.0000  # (mapped + skipped) / total            = 34/34  (2026-05-30: IPv6 dual-stack ClusterCIDR partial→mapped via real IpCidr/DetectLocalByCIDR TDD; DSR partial→scope_cut, see below)
+adr_justified_ratio   = 1.0      # 15 skipped + 0 unmapped: legacy userspace mode, IPVS direct (→cave-net eBPF), iptables-restore + nft -f subprocesses (host-preflight: cave-runtime privileged worker), leader-election main, informer plumbing (→cave-apiserver), winkernel (out-of-launch-scope: Linux only), /metrics + /healthz (parallel-track: cave-metrics + cave-runtime), Service-IP allocator (→cave-apiserver), DSR direct-server-return (→cave-net eBPF / winkernel — not a Linux iptables/nftables datapath feature)
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-30"
 infra_only            = false
 
 # 2026-05-21 scope_cuts — both delegated to cave-runtime host-preflight layer;
@@ -48,6 +48,17 @@ note         = "Backend trait open; cave-runtime owns the privileged `iptables-r
 upstream_pkg = "pkg/proxy/nftables/proxier.go:nft -f subprocess"
 reason       = "host-preflight"
 note         = "Backend trait open; cave-runtime owns the privileged `nft -f` invocation"
+
+# 2026-05-30 scope_cut — DSR (Direct-Server-Return) was carried as a partial
+# but is NOT a Linux iptables/nftables kube-proxy datapath feature: upstream
+# implements DSR only in IPVS direct-routing mode and Windows winkernel, both
+# of which are already scope_cut from this crate (IPVS direct → cave-net eBPF;
+# winkernel → out-of-launch-scope, Linux only). The honest classification is a
+# scope_cut to the cave-net eBPF / IPVS-compat layer, not a stub in this crate.
+[[scope_cuts]]
+upstream_pkg = "pkg/proxy/ipvs DSR / winkernel direct-server-return"
+reason       = "parallel-track"
+note         = "DSR is IPVS-direct-routing + winkernel only; Linux iptables/nftables proxiers do not implement it. Delegated to cave-net eBPF IPVS-compat layer (same track as IPVS direct emission)."
 
 [module]
 name        = "cave-kube-proxy"
@@ -135,6 +146,24 @@ file          = "src/healthcheck.rs"
 upstream_name = "ShouldSkipService"
 local_name    = "ServicePortInfo::should_skip"
 file          = "src/service.rs"
+
+# 2026-05-30: IPv6 dual-stack ClusterCIDR — closes the prior IPv6-cluster-CIDR
+# partial. The v6 cluster CIDR is now a parsed `IpCidr` consumed by a
+# family-aware local-endpoint detector (was a dead `Option<String>` hook).
+[[functions]]
+upstream_name = "ParseCIDRs"                       # k8s.io/utils/net
+local_name    = "IpCidr::parse_list"
+file          = "src/service.rs"
+
+[[functions]]
+upstream_name = "GetClusterIPByFamily"             # pkg/proxy/util/utils.go
+local_name    = "ProxyConfig::cluster_cidr_for_family"
+file          = "src/proxy_config.rs"
+
+[[functions]]
+upstream_name = "DetectLocalByCIDR"                # pkg/proxy/topology.go
+local_name    = "ProxyConfig::detect_local_by_cidr"
+file          = "src/proxy_config.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 # Integration tests live under crates/cave-kube-proxy/tests/. Each test

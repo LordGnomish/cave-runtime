@@ -61,11 +61,11 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_24() {
+fn gate_3_last_audit_2026_05_30() {
     let m = read_manifest();
     assert!(
-        has_kv(&m, "last_audit", "\"2026-05-24\""),
-        "last_audit must be 2026-05-24 in [parity] block (bumped by line-by-line uplift ray)"
+        has_kv(&m, "last_audit", "\"2026-05-30\""),
+        "last_audit must be 2026-05-30 in [parity] block (bumped by honest_ratio uplift ray)"
     );
 }
 

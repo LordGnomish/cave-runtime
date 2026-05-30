@@ -1,12 +1,12 @@
 # cave-kube-proxy — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2 boundary uplift 2026-05-21
+**Status:** 9/9 PASS — honest_ratio uplift 2026-05-30
 **Upstream:** kubernetes/kubernetes @ v1.36.0 (Apache-2.0)
 **source_sha:** v1.36.0
 **fill_ratio:** 1.0000 (34/34)
-**honest_ratio:** 0.9412 (32/34)
+**honest_ratio:** 1.0000 (34/34)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-21
+**last_audit:** 2026-05-30
 
 ## Headline
 
@@ -14,11 +14,27 @@ cave-kube-proxy is the Cave Runtime reimplementation of the upstream `kube-proxy
 component. After the 2026-05-19 deep-port (`proxy_config`/`topology`/
 `sync_runner`/`conntrack`/`metrics` added) the crate landed at 0.9412 with two
 honest unmapped backend-trait gaps (real `iptables-restore` + `nft -f`
-subprocess). The 2026-05-21 boundary uplift formally reclassifies those two as
+subprocess). The 2026-05-21 boundary uplift formally reclassified those two as
 `[[scope_cuts]]` against the cave-runtime host-preflight layer — the trait
 emits the textual payload, cave-runtime's privileged worker owns the subprocess
-fork. fill_ratio 0.9412 → **1.0000**, honest_ratio 0.8824 → 0.9412, workspace
-floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
+fork.
+
+**2026-05-30 honest_ratio uplift (0.9412 → 1.0000):** the two remaining
+partials are closed honestly.
+
+* **IPv6 dual-stack ClusterCIDR (partial → mapped):** the v6 cluster CIDR was a
+  dead `Option<String>` hook. It is now a parsed `IpCidr` (family-aware CIDR
+  type with strict family-matched containment) consumed by
+  `ProxyConfig::detect_local_by_cidr` (`DetectLocalByCIDR`) and
+  `cluster_cidr_for_family` (`GetClusterIPByFamily`). Two strict-TDD cycles
+  (RED→GREEN), +19 tests.
+* **DSR direct-server-return (partial → scope_cut):** DSR is **not** a Linux
+  iptables/nftables kube-proxy datapath feature — upstream implements it only
+  in IPVS direct-routing mode and Windows winkernel, both already scope_cut
+  from this crate. Reclassified as a `parallel-track` scope_cut to the cave-net
+  eBPF IPVS-compat layer rather than carried as a fictional partial.
+
+mapped 18 → **19**, partial 2 → **0**, skipped 14 → **15**, total 34 (unchanged).
 
 ## In-scope surface coverage
 
@@ -36,8 +52,7 @@ floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
 | Conntrack helpers        | `src/conntrack.rs`       | mapped   | `pkg/proxy/conntrack/conntrack.go:32`               |
 | Metrics surface          | `src/metrics.rs`         | mapped   | `pkg/proxy/metrics/metrics.go:34`                   |
 | Error type taxonomy      | `src/error.rs`           | mapped   | derived                                             |
-| IPv6 cluster CIDR plumb. | `src/proxy_config.rs`    | partial  | `pkg/proxy/apis/config/types.go:107`                |
-| DSR direct-return path   | (cross-cuts iptables)    | partial  | `pkg/proxy/iptables/proxier.go` DSR comment block   |
+| IPv6 dual-stack ClusterCIDR | `src/service.rs` + `src/proxy_config.rs` | mapped | `apis/config/types.go:107` / `topology.go` DetectLocalByCIDR / `util/utils.go` GetClusterIPByFamily |
 
 ## Scope cuts (counted as `skipped`)
 
@@ -56,9 +71,10 @@ floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
   set; the real sysctl write lives in cave-runtime host preflight.
 * GRO/GSO knobs — kernel-side tunables, host preflight concern.
 * Service-IP allocator — handled by cave-apiserver REST registry.
-* IPv6 NodePort bind selection — partial, follow-up.
-* Service-event coalescing across slices in flight during a sync — partial,
-  documented in `sync_runner::sync_proxy_rules` doc-comment.
+* DSR (Direct-Server-Return) — **2026-05-30:** not a Linux iptables/nftables
+  kube-proxy datapath feature (upstream DSR is IPVS-direct-routing + winkernel
+  only). Delegated to the cave-net eBPF IPVS-compat layer, same track as IPVS
+  direct emission.
 
 ## 8-gate Charter v2 result
 
@@ -66,7 +82,7 @@ floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
 |------|--------------------------------------------------|--------|
 | 1    | SPDX coverage 100% of src/*.rs                   | PASS   |
 | 2    | source_sha pinned (v1.36.0)                      | PASS   |
-| 3    | last_audit = "2026-05-19"                        | PASS   |
+| 3    | last_audit = "2026-05-30"                        | PASS   |
 | 4    | parity_ratio_source = "manifest"                 | PASS   |
 | 5    | fill_ratio ≥ 0.95 (measured 1.0000)              | PASS   |
 | 6    | mapped + partial + skipped + unmapped == total   | PASS   |
@@ -74,21 +90,20 @@ floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
 | 8    | PARITY_REPORT.md exists                          | PASS   |
 | 9    | Charter v2 composite re-check                    | PASS   |
 
-**Net: 8/8 PASS + composite (9/9).**
+**Net: 8/8 PASS + composite (9/9). honest_ratio 1.0000.**
 
-## Test footprint after deep-port
+## Test footprint
 
-* Lib tests: 34 (was 1 — the pre-existing `MODULE_NAME` constant test). New
-  modules add 6+6+6+6+5 = 29 unit tests across topology, sync_runner,
-  proxy_config, conntrack, metrics.
-* Integration tests: 8 (unchanged) under `crates/cave-kube-proxy/tests/`.
+* Lib tests: 34.
+* Integration tests: 10 files under `crates/compute/cave-kube-proxy/tests/`,
+  including the 2026-05-30 dual-stack additions: `dual_stack_cidr.rs` (12) +
+  `dual_stack_detect_local.rs` (7) = +19 tests.
 * `tests/parity_self_audit.rs`: 9 assertions PASS (this report's gates).
 
 ## Follow-up cuts (next wave)
 
-* IPv6 ClusterCIDR-driven NodePort bind selection.
-* DSR (Direct-Server-Return) flow rendering — wire the iptables MARK + SNAT
-  rules behind a `dsr_enabled` flag in ProxyConfig.
+* IPv6 ClusterCIDR-driven NodePort bind selection (NodePort allocator is still
+  IPv4-only; `IpCidr` is now available to generalise it).
 * Real `iptables-restore` + `nft -f` runtime backends — `IptablesBackend` /
   `NftablesBackend` trait + cave-runtime host adapter.
 * `/metrics` Prometheus scrape registration in cave-metrics.
