@@ -16,14 +16,14 @@ source_sha = "0ab1452144d8f4d57c50b37ce50dad218868e950"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.7143
-adr_justified_ratio = 1.0      # 7 scope_cuts (React UI → cave-portal-ui, pod lifecycle → cave-cri/kubelet, metrics → cave-metrics, semaphore/mutex/rbac → cave-permission, CronWorkflow → cave-knative, GC → cave-controller-manager, suspend/resume persist → Phase 2 cave-db + cave-controller-manager wakeup) + 8 skipped (same: 7 originals + 1 formalized 2026-05-28 for suspend/resume durable persist) all parallel-track per ADR-RUNTIME-STACK-001.
+honest_ratio        = 0.8214
+adr_justified_ratio = 1.0      # 2026-05-30 cont2: 3 skipped→mapped (durable suspend/resume persist, CronWorkflow, semaphore/mutex sync — all in-crate algorithmic, ported strict-TDD). 5 skipped remain, all genuine scope_cuts: React UI → cave-portal-ui, pod lifecycle → cave-cri/kubelet, metrics → cave-metrics, sync RBAC/access-control → cave-permission, TTL/GC → cave-controller-manager — parallel-track per ADR-RUNTIME-STACK-001.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 20
+mapped_count        = 23
 partial_count       = 0
-skipped_count       = 8
+skipped_count       = 5
 unmapped_count      = 0
 total               = 28
 
@@ -50,7 +50,7 @@ total               = 28
 
 [module]
 name        = "cave-workflows"
-description = "Argo Workflows parity — Workflow + Template CRDs (Container / Script / Resource / Suspend / DAG / Steps), Parameter + Artifact pipelines, RetryStrategy, pure-function executor reducer"
+description = "Argo Workflows parity — Workflow + Template CRDs (Container / Script / Resource / Suspend / DAG / Steps), Parameter + Artifact pipelines, RetryStrategy, pure-function executor reducer, CronWorkflow scheduling, semaphore/mutex synchronization, durable offload-status persistence + resume"
 source_root = "src"
 
 [[mapped]]
@@ -160,6 +160,22 @@ name = "argo-events-eventbus-crd"
 upstream = "argoproj/argo-events pkg/apis/eventbus/v1alpha1/types.go"
 note = "EventBus CRD with JetStream (version + replicas) + Kafka (brokers + topic prefix) backends; Event envelope (CloudEvents-compatible); src/events.rs."
 
+# ─── 2026-05-30 cont2 — 3 skipped→mapped (strict-TDD) ───────────────────────
+[[mapped]]
+name = "workflow-suspend-resume-persist"
+upstream = "persist/sqldb/offload_node_status_repo.go + workflow archive + util.ResumeWorkflow"
+note = "Durable persistence port: OffloadStore (idempotent (uid,version) save, fnv-32a nodeStatusVersion, 5-min retention GC of superseded rows), WorkflowArchive (terminal-only, namespace + AND label-selector query), durable_resume (rehydrate offloaded nodes, Suspended→Running). NodeStatusRepo trait is the cave-rdbms SQL swap point; cave-workflows owns the reducer not the wire driver. src/persistence.rs (12 tests)."
+
+[[mapped]]
+name = "cron-workflow"
+upstream = "pkg/apis/workflow/v1alpha1/cron_workflow_types.go + workflow/cron"
+note = "CronWorkflowSpec/Status + CronSchedule (5-field parse: */n steps, a-b ranges, a,b lists, Vixie dom/dow OR semantics, Sunday 0|7) + next-fire field-skip + evaluate() run/skip/replace honoring suspend + startingDeadlineSeconds + ConcurrencyPolicy(Allow/Forbid/Replace) + history_to_prune (3 successful / 1 failed defaults). src/cron.rs (14 tests). Reclaimed from cave-knative scope_cut — schedule policy is in-crate algorithmic."
+
+[[mapped]]
+name = "semaphore-mutex-sync"
+upstream = "workflow/sync/sync_manager.go (Semaphore + Mutex)"
+note = "SyncManager: counting semaphore + binary mutex (limit-1 semaphore), holderKey namespace/workflow[/node], priority+creation-FIFO pending queue with front-of-queue fairness, idempotent acquire, release/release_all per workflow, N/limit waiting message. src/sync.rs (9 tests). RBAC/access-control for lock usage stays cave-permission."
+
 [[scope_cuts]]
 group = "cave-portal-ui"
 reason = "Argo Workflows React UI (~30k LOC) maps onto cave-portal-ui — cave-workflows exposes JSON only."
@@ -177,34 +193,25 @@ items = ["prometheus-metrics-collector"]
 
 [[scope_cuts]]
 group = "cave-permission"
-reason = "Semaphore + Mutex synchronization + RBAC enforcement are general primitives owned by cave-permission."
-items = ["semaphore-mutex-rbac"]
-
-[[scope_cuts]]
-group = "cave-knative"
-reason = "CronWorkflow (time-triggered workflow submission) overlaps with cave-knative's eventing PingSource — landed there for a single cron scheduler instead of duplicating."
-items = ["cron-workflow-scheduler"]
+reason = "The semaphore + mutex *lock algorithm* is now mapped in-crate (src/sync.rs); RBAC/access-control deciding *who may use* a lock remains a general primitive owned by cave-permission."
+items = ["sync-rbac-access-control"]
 
 [[scope_cuts]]
 group = "cave-controller-manager"
-reason = "Node-pruning GC + completed-workflow TTL belong in the controller-manager GC loop."
+reason = "Node-pruning GC + completed-workflow TTL belong in the controller-manager GC loop. (CronWorkflow history-limit *computation* is mapped via cron.history_to_prune; the controller-manager owns the actual deletion loop.)"
 items = ["completed-workflow-gc"]
 
-# ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
-# workflow-suspend-resume-persist is architectural Phase 2 (cave-db
-# schema + cave-controller-manager wakeup signal), not an algorithmic
-# gap. ADR-justified per ADR-RUNTIME-PARITY-100-PCT-001 §1.
-
-[[scope_cuts]]
-group = "cave-db + cave-controller-manager"
-reason = "Suspend / Resume currently survives the executor reducer only — durable persistence (cave-db wiring so a Suspended workflow can resume across restarts) is Phase 2. Requires cave-db schema for workflow snapshots (workflow_id, state JSON, suspended_at, resume_token) + cave-controller-manager wakeup signal."
-items = ["workflow-suspend-resume-persist"]
-
-[[skipped]]
-name         = "workflow-suspend-resume-persist"
-upstream     = "workflow/controller/operator.go (Suspend + Resume durable state)"
-scope_cut_to = "cave-db + cave-controller-manager (Phase 2)"
-reason       = "In-memory Suspend/Resume reducer is mapped; cross-restart durable persistence is a Phase 2 cross-crate integration, not a cave-workflows algorithmic gap."
+# ─── 2026-05-30 cont2 ───────────────────────────────────────────────────────
+# Reclaimed from skipped→mapped (strict-TDD, in-crate algorithmic ports):
+#   * workflow-suspend-resume-persist (was cave-db + cave-controller-manager
+#     Phase 2 scope_cut + formal [[skipped]]) → src/persistence.rs. The
+#     NodeStatusRepo trait is the cave-rdbms SQL swap point; the reducer
+#     (version hashing, idempotent save, retention GC, durable resume) is
+#     genuinely cave-workflows-owned, mirroring Argo's persist/sqldb package.
+#   * cron-workflow (was cave-knative scope_cut) → src/cron.rs. Cron parsing +
+#     next-fire + concurrency-policy decision is pure algorithm.
+#   * semaphore-mutex sync (was the lock half of the cave-permission scope_cut)
+#     → src/sync.rs. Lock fairness/queueing is workflow/sync, in-crate.
 
 [portal_ui]
 upstream_ui  = "Argo Workflows UI"
