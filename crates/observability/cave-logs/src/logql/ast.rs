@@ -8,6 +8,7 @@
 //!   - Log range aggregations and vector aggregations
 //!   - Binary operations between metric queries
 
+use super::ip::IpPattern;
 use std::time::Duration;
 
 /// A label matcher operator.
@@ -50,6 +51,10 @@ pub enum LineFilter {
     Matches(String),
     /// `!~ "regex"`
     NotMatches(String),
+    /// `|= ip("…")` — line contains an address matching the pattern.
+    IpMatch(IpPattern),
+    /// `!= ip("…")` — line contains no address matching the pattern.
+    IpNotMatch(IpPattern),
 }
 
 /// Log parser stage.

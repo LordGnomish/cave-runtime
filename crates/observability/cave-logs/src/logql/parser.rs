@@ -96,6 +96,24 @@ impl Parser {
         }
     }
 
+    /// After a `|=`/`!=` filter operator, detect and consume an `ip("…")`
+    /// argument. Returns `Ok(None)` (consuming nothing) when the next tokens
+    /// are not an `ip(` call, so the caller falls back to a string filter.
+    fn try_parse_ip_filter(&mut self) -> Result<Option<crate::logql::ip::IpPattern>, ParseError> {
+        let is_ip_call = matches!(self.peek(), Some(Token::Ident(s)) if s == "ip")
+            && matches!(self.peek2(), Some(Token::LParen));
+        if !is_ip_call {
+            return Ok(None);
+        }
+        self.advance(); // ip
+        self.expect(&Token::LParen)?;
+        let pat = self.expect_str()?;
+        self.expect(&Token::RParen)?;
+        let parsed = crate::logql::ip::IpPattern::parse(&pat)
+            .map_err(|e| ParseError::Other(format!("invalid ip() pattern: {e}")))?;
+        Ok(Some(parsed))
+    }
+
     // ── parsing ──────────────────────────────────────────────────────────────
 
     fn parse(&mut self) -> Result<Query, ParseError> {
@@ -207,13 +225,21 @@ impl Parser {
             match self.peek() {
                 Some(Token::PipeEq) => {
                     self.advance();
-                    let s = self.expect_str()?;
-                    stages.push(PipelineStage::LineFilter(LineFilter::Contains(s)));
+                    if let Some(pat) = self.try_parse_ip_filter()? {
+                        stages.push(PipelineStage::LineFilter(LineFilter::IpMatch(pat)));
+                    } else {
+                        let s = self.expect_str()?;
+                        stages.push(PipelineStage::LineFilter(LineFilter::Contains(s)));
+                    }
                 }
                 Some(Token::PipeNeq) => {
                     self.advance();
-                    let s = self.expect_str()?;
-                    stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                    if let Some(pat) = self.try_parse_ip_filter()? {
+                        stages.push(PipelineStage::LineFilter(LineFilter::IpNotMatch(pat)));
+                    } else {
+                        let s = self.expect_str()?;
+                        stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                    }
                 }
                 Some(Token::PipeTilde) => {
                     self.advance();
@@ -233,8 +259,12 @@ impl Parser {
                 // `!= "text"` used as a pipeline filter (Loki 2.x shorthand)
                 Some(Token::Neq) => {
                     self.advance();
-                    let s = self.expect_str()?;
-                    stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                    if let Some(pat) = self.try_parse_ip_filter()? {
+                        stages.push(PipelineStage::LineFilter(LineFilter::IpNotMatch(pat)));
+                    } else {
+                        let s = self.expect_str()?;
+                        stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                    }
                 }
                 Some(Token::NotRe) => {
                     self.advance();

@@ -125,6 +125,8 @@ fn apply_line_filter(line: &str, lf: &LineFilter) -> bool {
         LineFilter::NotContains(s) => !line.contains(s.as_str()),
         LineFilter::Matches(pat) => Regex::new(pat).map(|r| r.is_match(line)).unwrap_or(false),
         LineFilter::NotMatches(pat) => Regex::new(pat).map(|r| !r.is_match(line)).unwrap_or(true),
+        LineFilter::IpMatch(pat) => pat.line_matches(line),
+        LineFilter::IpNotMatch(pat) => !pat.line_matches(line),
     }
 }
 
