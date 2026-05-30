@@ -2651,6 +2651,9 @@ enum LocalLlmCmd {
     },
     /// Show queue JSON summary
     Queue,
+    /// Show the vLLM-parity inference-engine surface (PagedAttention / quant /
+    /// sampling) exposed by the `cave-local-llm vllm` subcommand
+    Vllm,
 }
 
 #[derive(Subcommand)]
@@ -4292,6 +4295,16 @@ source_root = "src"
                     summary[status] = serde_json::json!(n);
                 }
                 println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+                Ok(())
+            }
+            LocalLlmCmd::Vllm => {
+                println!("cave-local-llm — vLLM-parity inference engine (vllm-project/vllm, Apache-2.0)");
+                println!("  paged:   cave-local-llm vllm paged --prompt-tokens <n> [--gpu-blocks N] [--block-size N]");
+                println!("  quant:   cave-local-llm vllm quant --method awq|gptq|fp8 --bits <b> --in-features <i> --out-features <o>");
+                println!("  sample:  cave-local-llm vllm sample --temperature <t> --top-p <p> --top-k <k> --n <n>");
+                println!("  engine:  PagedAttention block manager · continuous-batching scheduler ·");
+                println!("           SamplingParams · AWQ/GPTQ/FP8 quant · speculative decode · multi-LoRA");
+                println!("  docs:    docs/local-llm/README.md");
                 Ok(())
             }
         },
