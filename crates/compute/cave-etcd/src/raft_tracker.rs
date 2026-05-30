@@ -68,23 +68,61 @@ impl Inflights {
     /// Panics if the window is already [`full`](Inflights::full) — callers must
     /// gate on `full()` first, exactly as etcd does.
     pub fn add(&mut self, inflight: u64) {
-        unimplemented!()
+        if self.full() {
+            panic!("cannot add into a full inflights window");
+        }
+        let mut next = self.start + self.count;
+        if next >= self.size {
+            next -= self.size;
+        }
+        // Grow the buffer lazily up to `size` — etcd amortises allocation the
+        // same way rather than pre-sizing the (possibly large) window.
+        if next >= self.buffer.len() {
+            self.buffer.resize(next + 1, 0);
+        }
+        self.buffer[next] = inflight;
+        self.count += 1;
     }
 
     /// Free all in-flight entries with index `<= to` (an acknowledgement).
     pub fn free_le(&mut self, to: u64) {
-        unimplemented!()
+        if self.count == 0 || to < self.buffer[self.start] {
+            // Out-of-order or duplicate ack covering nothing live.
+            return;
+        }
+        let mut i = 0;
+        let mut idx = self.start;
+        while i < self.count {
+            if to < self.buffer[idx] {
+                // Reached an entry not yet acknowledged.
+                break;
+            }
+            i += 1;
+            idx += 1;
+            if idx >= self.size {
+                idx -= self.size;
+            }
+        }
+        self.count -= i;
+        self.start = idx;
+        if self.count == 0 {
+            // Reset to the head so the buffer reuses cleanly without wrapping.
+            self.start = 0;
+        }
     }
 
     /// Free the first (oldest) in-flight entry — used when a single message is
     /// known to have been received.
     pub fn free_first_one(&mut self) {
-        unimplemented!()
+        if self.count == 0 {
+            return;
+        }
+        self.free_le(self.buffer[self.start]);
     }
 
     /// True when no further messages may be sent (window saturated).
     pub fn full(&self) -> bool {
-        unimplemented!()
+        self.count == self.size
     }
 
     /// Number of in-flight messages currently tracked.
