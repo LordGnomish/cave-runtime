@@ -191,6 +191,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/datasources/{id}/health", get(datasource_health))
         // Unified query
         .route("/api/ds/query", post(ds_query))
+        // Server-side expression evaluation (__expr__ datasource)
+        .route("/api/ds/query/expr", post(ds_query_expr))
         // Annotations
         .route(
             "/api/annotations",
@@ -745,6 +747,36 @@ async fn ds_query(State(state): State<AppState>, Json(req): Json<DsQueryRequest>
     }
 
     Json(response).into_response()
+}
+
+// ─── Server-side expressions (Grafana __expr__ datasource) ─────────────────────
+
+#[derive(serde::Deserialize)]
+struct ExprEvalRequest {
+    /// Upstream datasource results, keyed by refId.
+    #[serde(default)]
+    vars: std::collections::HashMap<String, crate::expressions::ExprValue>,
+    /// The expression command to evaluate against `vars`.
+    command: crate::expressions::ExprCommand,
+}
+
+#[derive(serde::Serialize)]
+struct ExprEvalResponse {
+    result: crate::expressions::ExprValue,
+}
+
+/// `POST /api/ds/query/expr` — evaluate a single server-side expression node
+/// (reduce / resample / math / threshold / classic condition) against the
+/// supplied upstream results, exactly like Grafana's `__expr__` datasource.
+async fn ds_query_expr(Json(req): Json<ExprEvalRequest>) -> Response {
+    match crate::expressions::evaluate(&req.command, &req.vars) {
+        Ok(result) => Json(ExprEvalResponse { result }).into_response(),
+        Err(e) => (
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e })),
+        )
+            .into_response(),
+    }
 }
 
 // ─── Annotations ─────────────────────────────────────────────────────────────

@@ -12,7 +12,8 @@
 
 /// The reduction function applied to a series to produce a single number.
 /// Mirrors `mathexp.ReducerID`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ReducerId {
     Sum,
     Mean,
@@ -169,7 +170,7 @@ pub fn reduce_series(reducer: ReducerId, vals: &[Option<f64>]) -> Option<f64> {
 
 /// Maps points before/after reduction. Mirrors the `ReduceMapper` interface
 /// implementations `DropNonNumber` and `ReplaceNonNumberWithValue`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReduceMapper {
     /// Drop nil / NaN / Inf points entirely.
     DropNonNumber,
@@ -227,7 +228,8 @@ pub fn reduce_series_mapped(
 
 /// Upsampling strategy when a resample bucket has no source points.
 /// Mirrors `mathexp.Upsampler`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Upsampler {
     /// Use the last seen value (`pad`).
     Pad,
@@ -339,7 +341,8 @@ pub fn resample(
 
 /// Reducer used inside a classic condition. Unlike the `mathexp` reducers,
 /// these skip nulls and return a null result for all-null series.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ClassicReducer {
     Avg,
     Sum,
@@ -528,7 +531,8 @@ pub fn classic_reduce(reducer: ClassicReducer, vals: &[Option<f64>]) -> Option<f
 }
 
 /// Classic-condition evaluator. Mirrors `classic.evaluator` implementations.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Evaluator {
     Threshold { typ: String, threshold: f64 },
     Ranged { typ: String, lower: f64, upper: f64 },
@@ -560,7 +564,8 @@ pub fn eval_condition(e: &Evaluator, reduced: Option<f64>) -> bool {
 }
 
 /// Logical operator joining successive conditions in a classic command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ConditionOperator {
     And,
     Or,
@@ -572,6 +577,318 @@ pub fn combine_conditions(b1: bool, b2: bool, op: ConditionOperator) -> bool {
     match op {
         ConditionOperator::Or | ConditionOperator::LogicOr => b1 || b2,
         ConditionOperator::And => b1 && b2,
+    }
+}
+
+// ── math binary operators — pkg/expr/mathexp/exp.go binaryOp ────────────────
+
+/// Apply a binary math operator to two scalars, faithfully reproducing
+/// Grafana's `binaryOp`: short-circuit `||`/`&&`, NaN propagation, and
+/// comparison/logical ops returning 1.0 or 0.0.
+pub fn math_binop_scalar(op: &str, a: f64, b: f64) -> Result<f64, String> {
+    // Short circuit before the NaN check.
+    match op {
+        "||" if a != 0.0 => return Ok(1.0),
+        "&&" if a == 0.0 => return Ok(0.0),
+        _ => {}
+    }
+    if a.is_nan() || b.is_nan() {
+        return Ok(f64::NAN);
+    }
+    let r = match op {
+        "+" => a + b,
+        "*" => a * b,
+        "-" => a - b,
+        "/" => a / b,
+        "**" => a.powf(b),
+        "%" => a % b,
+        "==" => (a == b) as i32 as f64,
+        ">" => (a > b) as i32 as f64,
+        "!=" => (a != b) as i32 as f64,
+        "<" => (a < b) as i32 as f64,
+        ">=" => (a >= b) as i32 as f64,
+        "<=" => (a <= b) as i32 as f64,
+        "||" => (a != 0.0 || b != 0.0) as i32 as f64,
+        "&&" => (a != 0.0 && b != 0.0) as i32 as f64,
+        _ => return Err(format!("expr: unknown operator {op}")),
+    };
+    Ok(r)
+}
+
+/// Number-vs-Number binary op: a null (`None`) operand yields a null result
+/// (`biScalarNumber` semantics), otherwise applies [`math_binop_scalar`].
+pub fn math_binop(op: &str, a: Option<f64>, b: Option<f64>) -> Result<Option<f64>, String> {
+    match (a, b) {
+        (Some(x), Some(y)) => Ok(Some(math_binop_scalar(op, x, y)?)),
+        _ => {
+            // Validate the operator even when short-circuiting to null.
+            math_binop_scalar(op, 0.0, 0.0)?;
+            Ok(None)
+        }
+    }
+}
+
+// ── DataFrame integration ───────────────────────────────────────────────────
+
+/// Extract the `time` and `number` columns from a Grafana-shaped time-series
+/// DataFrame into `(times, values)`, with JSON `null` mapped to `None`.
+pub fn extract_number_series(
+    frame: &crate::models::DataFrame,
+) -> (Vec<i64>, Vec<Option<f64>>) {
+    let time_idx = frame
+        .schema
+        .fields
+        .iter()
+        .position(|f| f.field_type == "time");
+    let num_idx = frame
+        .schema
+        .fields
+        .iter()
+        .position(|f| f.field_type == "number");
+
+    let times = match time_idx.and_then(|i| frame.data.values.get(i)) {
+        Some(col) => col.iter().map(json_to_i64).collect(),
+        None => Vec::new(),
+    };
+    let vals = match num_idx.and_then(|i| frame.data.values.get(i)) {
+        Some(col) => col.iter().map(json_to_f64).collect(),
+        None => Vec::new(),
+    };
+    (times, vals)
+}
+
+fn json_to_i64(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_f64().map(|f| f as i64))
+        .unwrap_or(0)
+}
+
+fn json_to_f64(v: &serde_json::Value) -> Option<f64> {
+    if v.is_null() {
+        None
+    } else {
+        v.as_f64()
+    }
+}
+
+/// Build a single-value "Number" DataFrame for a refId, with `None` rendered
+/// as a JSON `null`.
+pub fn number_frame(ref_id: &str, value: Option<f64>) -> crate::models::DataFrame {
+    use crate::models::{DataFrame, DataFrameData, DataFrameSchema, FieldSchema};
+    let cell = match value {
+        Some(f) => serde_json::json!(f),
+        None => serde_json::Value::Null,
+    };
+    DataFrame {
+        schema: DataFrameSchema {
+            ref_id: ref_id.to_string(),
+            name: ref_id.to_string(),
+            fields: vec![FieldSchema {
+                name: ref_id.to_string(),
+                field_type: "number".to_string(),
+                type_info: None,
+                labels: None,
+                config: None,
+            }],
+            meta: None,
+        },
+        data: DataFrameData {
+            values: vec![vec![cell]],
+            entities: None,
+        },
+    }
+}
+
+/// Read the single value from a Number frame (the first number field, row 0).
+pub fn value_of_number_frame(frame: &crate::models::DataFrame) -> Option<f64> {
+    let num_idx = frame
+        .schema
+        .fields
+        .iter()
+        .position(|f| f.field_type == "number")?;
+    let col = frame.data.values.get(num_idx)?;
+    json_to_f64(col.first()?)
+}
+
+// ── high-level cross-refId expression pipeline ──────────────────────────────
+
+/// A runtime value flowing through the expression graph — either a time
+/// series or a reduced single number (`None` = null).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
+pub enum ExprValue {
+    Series {
+        times: Vec<i64>,
+        vals: Vec<Option<f64>>,
+    },
+    Number(Option<f64>),
+}
+
+impl ExprValue {
+    /// Coerce to a single number: a Series is reduced via [`reduce_series`]
+    /// (used where the model expects a scalar but received a series).
+    fn as_number(&self, reducer: ReducerId) -> Option<f64> {
+        match self {
+            ExprValue::Number(v) => *v,
+            ExprValue::Series { vals, .. } => reduce_series(reducer, vals),
+        }
+    }
+}
+
+/// A math operand — a reference to another node's result, or a literal.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Operand {
+    Ref(String),
+    Lit(f64),
+}
+
+/// A single condition within a classic-condition command.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ClassicCond {
+    pub input: String,
+    pub reducer: ClassicReducer,
+    pub evaluator: Evaluator,
+    pub operator: ConditionOperator,
+}
+
+/// A server-side expression command referencing upstream results by refId.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ExprCommand {
+    Reduce {
+        input: String,
+        reducer: ReducerId,
+        mapper: Option<ReduceMapper>,
+    },
+    Resample {
+        input: String,
+        from: i64,
+        to: i64,
+        interval: i64,
+        downsampler: ReducerId,
+        upsampler: Upsampler,
+    },
+    MathBinary {
+        left: Operand,
+        op: String,
+        right: Operand,
+    },
+    Threshold {
+        input: String,
+        evaluator: Evaluator,
+    },
+    ClassicCondition {
+        conditions: Vec<ClassicCond>,
+    },
+}
+
+fn lookup<'a>(
+    vars: &'a std::collections::HashMap<String, ExprValue>,
+    ref_id: &str,
+) -> Result<&'a ExprValue, String> {
+    vars.get(ref_id)
+        .ok_or_else(|| format!("expression references unknown refId '{ref_id}'"))
+}
+
+/// Evaluate one expression command against the map of upstream results.
+pub fn evaluate(
+    cmd: &ExprCommand,
+    vars: &std::collections::HashMap<String, ExprValue>,
+) -> Result<ExprValue, String> {
+    match cmd {
+        ExprCommand::Reduce {
+            input,
+            reducer,
+            mapper,
+        } => {
+            let v = lookup(vars, input)?;
+            let vals = match v {
+                ExprValue::Series { vals, .. } => vals.as_slice(),
+                ExprValue::Number(n) => {
+                    // Reducing a number returns the number unchanged.
+                    return Ok(ExprValue::Number(*n));
+                }
+            };
+            let result = match mapper {
+                Some(m) => reduce_series_mapped(*reducer, vals, m),
+                None => reduce_series(*reducer, vals),
+            };
+            Ok(ExprValue::Number(result))
+        }
+        ExprCommand::Resample {
+            input,
+            from,
+            to,
+            interval,
+            downsampler,
+            upsampler,
+        } => {
+            let v = lookup(vars, input)?;
+            match v {
+                ExprValue::Series { times, vals } => {
+                    let (t, vv) =
+                        resample(times, vals, *from, *to, *interval, *downsampler, *upsampler)?;
+                    Ok(ExprValue::Series { times: t, vals: vv })
+                }
+                ExprValue::Number(_) => {
+                    Err("resample input must be a series".to_string())
+                }
+            }
+        }
+        ExprCommand::MathBinary { left, op, right } => {
+            let resolve = |o: &Operand| -> Result<Option<f64>, String> {
+                match o {
+                    Operand::Lit(f) => Ok(Some(*f)),
+                    Operand::Ref(r) => Ok(lookup(vars, r)?.as_number(ReducerId::Last)),
+                }
+            };
+            let a = resolve(left)?;
+            let b = resolve(right)?;
+            Ok(ExprValue::Number(math_binop(op, a, b)?))
+        }
+        ExprCommand::Threshold { input, evaluator } => {
+            let v = lookup(vars, input)?;
+            let num = v.as_number(ReducerId::Last);
+            // A null input is no-data (nil); otherwise fire → 1.0 else 0.0.
+            if num.is_none() {
+                return Ok(ExprValue::Number(None));
+            }
+            let firing = eval_condition(evaluator, num);
+            Ok(ExprValue::Number(Some(if firing { 1.0 } else { 0.0 })))
+        }
+        ExprCommand::ClassicCondition { conditions } => {
+            let mut is_firing = false;
+            let mut is_nodata = false;
+            for (i, cond) in conditions.iter().enumerate() {
+                if is_firing && cond.operator == ConditionOperator::LogicOr {
+                    break;
+                }
+                let v = lookup(vars, &cond.input)?;
+                let number = match v {
+                    ExprValue::Number(n) => *n,
+                    ExprValue::Series { vals, .. } => classic_reduce(cond.reducer, vals),
+                };
+                let cond_firing = eval_condition(&cond.evaluator, number);
+                let cond_nodata = number.is_none();
+                if i == 0 {
+                    is_firing = cond_firing;
+                    is_nodata = cond_nodata;
+                } else {
+                    is_firing = combine_conditions(is_firing, cond_firing, cond.operator);
+                    is_nodata = combine_conditions(is_nodata, cond_nodata, cond.operator);
+                }
+            }
+            // isNoData is checked first (both can be true simultaneously).
+            let value = if is_nodata {
+                None
+            } else if is_firing {
+                Some(1.0)
+            } else {
+                Some(0.0)
+            };
+            Ok(ExprValue::Number(value))
+        }
     }
 }
 

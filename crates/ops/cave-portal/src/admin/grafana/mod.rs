@@ -58,12 +58,25 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GrafanaVie
   <a href="#grafana-datasources">Datasources</a>
   <a href="#grafana-explore">Explore</a>
   <a href="#grafana-alerts">Alerts</a>
+  <a href="#grafana-expressions">Expressions</a>
 </nav>
 {dashboards}
 {panels}
 {datasources}
 {explore}
-{alerts}"##,
+{alerts}
+<section id="grafana-expressions" class="mb-6">
+  <h2 class="text-lg font-semibold mb-2">Server-side expressions</h2>
+  <p class="text-sm text-gray-600 mb-2">
+    The <code>__expr__</code> datasource evaluates expressions over the results
+    of other queries by <code>refId</code> — reduce, resample, math, threshold,
+    and classic conditions — entirely server-side.
+  </p>
+  <pre class="bg-gray-50 p-2 rounded text-xs overflow-x-auto">POST /api/ds/query/expr
+{{"vars":{{"A":{{"type":"number","data":10}},"B":{{"type":"number","data":4}}}},
+ "command":{{"type":"mathBinary","left":{{"ref":"A"}},"op":"-","right":{{"ref":"B"}}}}}}</pre>
+  <p class="text-xs text-gray-500 mt-1">cavectl: <code>cavectl dashboard expr --request '&lt;json&gt;'</code></p>
+</section>"##,
         dashboards = dashboards_html,
         panels = panels_html,
         datasources = datasources_html,
@@ -107,9 +120,11 @@ mod tests {
             "#grafana-datasources",
             "#grafana-explore",
             "#grafana-alerts",
+            "#grafana-expressions",
         ] {
             assert!(html.contains(anchor), "missing anchor {anchor}");
         }
+        assert!(html.contains("/api/ds/query/expr"));
         assert!(html.contains("grafana.com/grafana/dashboards"));
     }
 

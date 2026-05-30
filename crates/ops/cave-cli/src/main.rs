@@ -579,6 +579,13 @@ enum DashboardCmd {
     List,
     Get,
     Import,
+    /// Evaluate a server-side expression (Grafana __expr__): reduce / resample
+    /// / math / threshold / classic condition over upstream results.
+    Expr {
+        /// Full ExprEvalRequest JSON: {"vars":{...},"command":{...}}.
+        #[arg(long)]
+        request: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4723,6 +4730,10 @@ source_root = "src"
             DashboardCmd::List => c.get("/api/dashboard/list").await,
             DashboardCmd::Get => c.get("/api/dashboard/get").await,
             DashboardCmd::Import => c.get("/api/dashboard/import").await,
+            DashboardCmd::Expr { request } => {
+                let body: serde_json::Value = serde_json::from_str(&request)?;
+                c.post("/api/ds/query/expr", body).await
+            }
         },
         Commands::Deploy { cmd } => match cmd {
             DeployCmd::App { cmd } => match cmd {
