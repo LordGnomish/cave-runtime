@@ -21,7 +21,7 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All 66 upstream projects tracked by cave-runtime.
+/// All 108 upstream projects tracked by cave-runtime.
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // KUBERNETES CORE (reimplemented as cave-* crates)
@@ -1001,6 +1001,15 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         github_repo: "ollama/ollama",
         cave_module: "cave-local-llm",
         track_features: "local inference daemon, modelfile, REST API, GGUF runtime",
+        check_frequency: "biweekly",
+        category: "ai",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "MLX",
+        github_repo: "ml-explore/mlx",
+        cave_module: "cave-mlx",
+        track_features: "N-dim array, broadcasting ops, matmul, reverse-mode autograd, nn modules, SGD/Adam/AdamW optimizers (CPU backend)",
         check_frequency: "biweekly",
         category: "ai",
         phase: 2,
