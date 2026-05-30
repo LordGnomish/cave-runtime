@@ -1055,4 +1055,51 @@ mod tests {
         assert_eq!(streams[0].values.len(), 1);
         assert!(streams[0].values[0].1.contains("10.0.0.9"));
     }
+
+    #[test]
+    fn ip_label_filter_matches_on_label_value() {
+        use super::super::parser::Parser;
+        let store = LogStore::new();
+        let t = 1_000_000_000i64;
+        store
+            .push(
+                "tenant",
+                make_labels(&[("app", "gw"), ("addr", "192.168.4.5")]),
+                vec![LogEntry::new(t, "inside")],
+            )
+            .unwrap();
+        store
+            .push(
+                "tenant",
+                make_labels(&[("app", "gw"), ("addr", "10.0.0.9")]),
+                vec![LogEntry::new(t + 1, "outside")],
+            )
+            .unwrap();
+        let eval = Evaluator::new(store);
+
+        let q = match Parser::parse_query(r#"{app="gw"} | addr = ip("192.168.0.0/16")"#).unwrap() {
+            Query::Log(lq) => lq,
+            _ => panic!("expected log query"),
+        };
+        let data = eval.eval_log_query("tenant", &q, 0, t + 10, 100, Direction::Forward);
+        let QueryData::Streams(streams) = data else {
+            panic!("expected streams");
+        };
+        // Only the 192.168.4.5 stream survives.
+        assert_eq!(streams.len(), 1);
+        assert_eq!(streams[0].values[0].1, "inside");
+
+        // `!=` selects the complement.
+        let qn = match Parser::parse_query(r#"{app="gw"} | addr != ip("192.168.0.0/16")"#).unwrap()
+        {
+            Query::Log(lq) => lq,
+            _ => panic!("expected log query"),
+        };
+        let data = eval.eval_log_query("tenant", &qn, 0, t + 10, 100, Direction::Forward);
+        let QueryData::Streams(streams) = data else {
+            panic!("expected streams");
+        };
+        assert_eq!(streams.len(), 1);
+        assert_eq!(streams[0].values[0].1, "outside");
+    }
 }

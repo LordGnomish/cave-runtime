@@ -980,6 +980,38 @@ mod tests {
     }
 
     #[test]
+    fn parse_ip_label_filter() {
+        let q = Parser::parse_query(r#"{app="x"} | addr = ip("192.168.0.0/16")"#).unwrap();
+        if let Query::Log(lq) = q {
+            match &lq.pipeline[0] {
+                PipelineStage::LabelFilter(lf) => {
+                    assert_eq!(lf.label, "addr");
+                    assert!(matches!(lf.value, LabelFilterValue::Ip(_)));
+                }
+                other => panic!("expected label filter, got {other:?}"),
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
+    fn parse_ip_label_filter_neq() {
+        let q = Parser::parse_query(r#"{app="x"} | remote != ip("10.0.0.0/8")"#).unwrap();
+        if let Query::Log(lq) = q {
+            match &lq.pipeline[0] {
+                PipelineStage::LabelFilter(lf) => {
+                    assert_eq!(lf.op, CompareOp::Neq);
+                    assert!(matches!(lf.value, LabelFilterValue::Ip(_)));
+                }
+                other => panic!("expected label filter, got {other:?}"),
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
     fn parse_line_format() {
         let q =
             Parser::parse_query(r#"{app="x"} | line_format "{{.method}} {{.status}}""#).unwrap();
