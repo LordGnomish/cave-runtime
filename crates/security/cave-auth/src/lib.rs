@@ -40,6 +40,7 @@ pub mod password_hash;
 pub mod okta;
 pub mod persistence;
 pub mod rbac;
+pub mod role_utils;
 pub mod saml;
 pub mod token_exchange;
 pub mod tokens;
