@@ -13,6 +13,12 @@
 # fill_ratio = (mapped + skipped) / total
 # 2026-05-29 Charter v2 close: all 22 manifest items genuinely implemented;
 # 11 additional Falco/Trivy surface areas scope-cut to companion crates.
+# 2026-05-30 honest-uplift (strict TDD): ported the OpenVEX statement filter
+# (trivy/pkg/vex/vex.go OpenVEX.Filter + openvex/go-vex Matches/PurlMatches/
+# SortStatements) — a pure in-memory matcher — into src/trivy/vex.rs. The
+# prior "SBOM attestation + VEX" skip is narrowed to attestation/CycloneDX-VEX
+# BOM-Link, which genuinely remains cross-crate (cave-container-scan/cave-sign).
+# mapped 22→23, total 33→34, honest_ratio 0.6667→0.6765.
 
 [upstream]
 org        = "falcosecurity"
@@ -36,31 +42,31 @@ url        = "https://github.com/aquasecurity/trivy"
 name          = "cave-security"
 description   = "Integrated Falco-style rule engine + Trivy-style vulnerability scanner for cave-runtime"
 source_root   = "src"
-rs_loc        = 6350
-tests_passing = 76
+rs_loc        = 6664
+tests_passing = 79
 
 [parity]
-# 2026-05-29 Charter v2 close.
-#   Counted surface: 22 directly-implemented items (11 Falco + 11 Trivy) +
+# 2026-05-30 honest-uplift (strict TDD).
+#   Counted surface: 23 directly-implemented items (11 Falco + 12 Trivy) +
 #   11 scope-cut items (advanced Falco kernel/plugin/gRPC surface → cave-falco;
-#   full Trivy OCI/NVD/Rego surface → cave-container-scan/cave-policy).
+#   full Trivy OCI/NVD/Rego/attestation surface → cave-container-scan/cave-policy/cave-sign).
 #
-#   fill_ratio  = (mapped=22 + skipped=11) / total=33 = 1.0000
-#   honest_ratio = mapped/total = 22/33 = 0.6667
+#   fill_ratio  = (mapped=23 + skipped=11) / total=34 = 1.0000
+#   honest_ratio = mapped/total = 23/34 = 0.6765
 #
-#   All 22 mapped items have real idiomatic Rust implementations (non-stub);
+#   All 23 mapped items have real idiomatic Rust implementations (non-stub);
 #   skipped items are architecturally parallel-tracked to companion crates.
-mapped_count        = 22
+mapped_count        = 23
 partial_count       = 0
 skipped_count       = 11
 unmapped_count      = 0
-total               = 33
-fill_ratio          = 1.0    # (mapped + skipped) / total = 33/33 — all remaining gaps scope-cut to cave-falco/cave-container-scan per ADR-RUNTIME-PARITY-100-PCT-001 §5
-honest_ratio        = 0.6667 # mapped/total = 22/33 (Falco kernel + advanced Trivy surface owned by companion crates)
+total               = 34
+fill_ratio          = 1.0    # (mapped + skipped) / total = 34/34 — all remaining gaps scope-cut to cave-falco/cave-container-scan/cave-sign per ADR-RUNTIME-PARITY-100-PCT-001 §5
+honest_ratio        = 0.6765 # mapped/total = 23/34 (Falco kernel + advanced Trivy surface owned by companion crates)
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
-last_audit          = "2026-05-29"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 # ── Mapped (22) ─────────────────────────────────────────────────────────────
@@ -178,6 +184,11 @@ upstream = "pkg/result/ignore.go"
 local    = "src/trivy/ignore.rs"
 note     = "IgnoreConfig: .trivyignore parsing, CVE/filepath/layer ignore rules"
 
+[[mapped]]
+upstream = "pkg/vex/vex.go (OpenVEX.Filter) + openvex/go-vex pkg/vex/{vex.go,statement.go,product.go,component.go}"
+local    = "src/trivy/vex.rs"
+note     = "OpenVEX statement filter: Status, VexStatement.matches, OpenVexDocument.matches/filter, SortStatements (latest-wins), PurlMatches (type/namespace/name/version/qualifier compare). Pure in-memory matcher; drops vulns marked not_affected/fixed. TDD 2026-05-30 (tests/vex_filter_tdd.rs, 7 cases)"
+
 # ── Skipped (11) ─────────────────────────────────────────────────────────────
 # Advanced Falco surface — scope-cut to cave-falco (parallel-track)
 
@@ -227,8 +238,8 @@ category  = "parallel-track"
 owner     = "cave-container-scan"
 
 [[skipped]]
-upstream  = "pkg/attestation/ + pkg/vex/ (SBOM attestation + VEX)"
-reason    = "SBOM attestation (Cosign/Rekor) and VEX 0.2.0 integration — sub-component owned by cave-container-scan + cave-sign"
+upstream  = "pkg/attestation/ (SBOM attestation) + pkg/vex/ CycloneDX-VEX BOM-Link decode"
+reason    = "SBOM attestation (Cosign/Rekor signing/verification) and the CycloneDX-VEX BOM-Link parsing path (sbom.IsCycloneDXJSON + cyclonedx.DecodeJSON) — genuinely cross-crate (signing → cave-sign, OCI/CycloneDX decode → cave-container-scan). NOTE 2026-05-30: the OpenVEX statement-filter half of pkg/vex was line-ported in-crate to src/trivy/vex.rs (now mapped); only the attestation/signing + CycloneDX-VEX decode remain scope-cut."
 category  = "sub-component"
 owner     = "cave-container-scan"
 
