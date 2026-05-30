@@ -20,3 +20,5 @@ cave-artifacts = { path = "../cave-artifacts" }
 
 [dev-dependencies]
 proptest = "1"
+# Async storage methods are re-exported from cave-artifacts; tests await them.
+tokio = { workspace = true }
