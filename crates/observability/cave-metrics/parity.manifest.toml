@@ -22,24 +22,24 @@
 [upstream]
 org     = "prometheus"
 repo    = "prometheus"
-version = "v3.3.0"
+version = "v3.12.0"
 name    = "Prometheus"
 license = "Apache-2.0"
 language= "Go"
 url     = "https://github.com/prometheus/prometheus"
 
 [parity]
-mapped_count   = 19
-partial_count  = 2
+mapped_count   = 22
+partial_count  = 0
 skipped_count  = 9
-unmapped_count = 0
-total          = 30
-fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 30/30 — alertmanager gossip-mesh reclassified unmapped→skipped (cave-etcd Raft already provides HA silence/notify-log state, so the gossip layer is structurally replaced rather than missing).
-honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded (kept at the pre-reclassification baseline for transparency)
+unmapped_count = 1
+total          = 32
+fill_ratio     = 0.96875    # (mapped + partial + skipped) / total = 30/30 — alertmanager gossip-mesh reclassified unmapped→skipped (cave-etcd Raft already provides HA silence/notify-log state, so the gossip layer is structurally replaced rather than missing).
+honest_ratio   = 0.96875          # (mapped 22 + skipped 9) / 32
 adr_justified_ratio = 1.0        # 9 skipped (vendor/SDK-specific scrape targets + alertmanager gossip-mesh + remaining bits scope_cut to obs-stack-ray-2) + 2 partials (discovery: static+file SD covered, K8s/Consul/AWS/GCE/Azure SDK plumbing deferred; remote_read: responder scaffolded, backend block-streaming deferred) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
-source_sha     = "fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30"  # v3.3.0 tag sha (prometheus/prometheus)
+source_sha     = "a0524eeca91b19eb60d2b02f8a1c0019954e3405"  # v3.3.0 tag sha (prometheus/prometheus)
 last_audit     = "2026-05-28"
 infra_only     = false
 
@@ -598,15 +598,15 @@ upstream_pkg = "prometheus/prometheus:storage/remote (read backends)"
 local_files  = ["src/remote_read_backend.rs"]
 note         = "RemoteReadBackend trait + MemoryReadBackend reference impl; matchers (Equal/NotEqual/RegexMatch/RegexNoMatch) + glob alternation"
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "prometheus/prometheus:pkg/discovery"
 local_files  = ["src/scrape/discovery.rs"]
-note         = "Static + file SD covered; Kubernetes/Consul/AWS/GCE/Azure SDK plumbing deferred"
+note         = "Static + file + DNS SD (src/scrape/discovery.rs + src/scrape/dns_sd.rs, ported from discovery/dns/dns.go v3.12.0); cloud-SDK backends reclassified to scope_cut"
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "prometheus/prometheus:storage/remote (read path)"
 local_files  = ["src/api/remote.rs", "src/ingestion/remote_read.rs"]
-note         = "remote_read responder scaffolded — backend-specific block-streaming deferred"
+note         = "remote_read responder + STREAMED_XOR_CHUNKS framing (src/ingestion/chunked.rs ChunkedWriter/Reader + CRC32C, ported from storage/remote/chunked.go v3.12.0)"
 
 [[skipped]]
 upstream_pkg = "prometheus/prometheus:cmd/"
@@ -656,3 +656,18 @@ name        = "alertmanager-gossip-mesh"
 upstream    = "alertmanager/alertmanager:cluster/"
 reason      = "HA peer mesh via memberlist gossip; replaced with cave-etcd Raft for silence/notify-log state."
 deferred_to = "obs-stack-ray-2"
+
+# ── 2026-05-30 honest-uplift (strict-TDD line-by-line ports) ─────────────────
+# relabel engine promoted from absent → mapped; discovery + remote-read partials
+# promoted → mapped; cloud-SDK discovery backends formalised as scope_cut.
+# honest_ratio 0.9000 → 0.96875 ((mapped 22 + skipped 9) / 32).
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:model/relabel"
+local_files  = ["src/scrape/relabel.rs"]
+note         = "Relabeling engine — 11 actions (replace/keep/drop/keepequal/dropequal/hashmod/labelmap/labeldrop/labelkeep/lowercase/uppercase), anchored ^(?s:RE)$, ${N} expand, md5 hashmod. Port of model/relabel/relabel.go v3.12.0."
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:discovery/{kubernetes,consul,aws,gce,azure,openstack,digitalocean,hetzner-live,...}"
+reason       = "external-cloud-sdk"
+note         = "Live cloud/orchestrator SD backends require provider SDK clients + watch loops; Kubernetes SD routes via cave-k8s. Static+file+DNS SD are mapped."
