@@ -38,3 +38,6 @@ pub mod nn;
 
 /// Group-wise affine quantization — `mx.quantize` / `mx.dequantize` analog.
 pub mod quant;
+
+/// Convolution + pooling — `mx.conv1d` / `mx.conv2d` and pooling layers.
+pub mod conv;
