@@ -40,7 +40,7 @@ honest_ratio          = 1.0000  # (mapped + skipped) / total            = 34/34
 adr_justified_ratio   = 1.0000  # all 22 scope_cuts cite an ADR-justified category: host-preflight (4) / go-bootstrap (4) / stdlib-analog (2) / kernel (2, ADR-RUNTIME-SANDBOX-NO-FFI-001) / hardware-passthrough (2, out-of-launch-scope) / deprecated-upstream (3, out-of-scope-subsystem) / parallel-track sibling-delegated (3) / Phase-2-deferred (2, out-of-launch-scope).
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-21"
+last_audit            = "2026-05-30"
 infra_only            = false
 
 [module]
@@ -50,11 +50,14 @@ source_root = "src"
 pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target
 
-# 4-track status (honest):
-#   Backend     : 1/4 — scaffold (this crate, models + store + lifecycle stub)
-#   Portal      : 0/4 — admin page not yet wired
-#   cavectl     : 0/4 — `cavectl kubevirt` subcommand not yet wired
-#   Observ.     : 0/4 — alerts + dashboard not yet authored
+# 4-track status (honest, refreshed 2026-05-30):
+#   Backend     : 4/4 — models + store + full virt-{controller,handler,launcher}
+#                       + libvirt + migration + cdi + instancetype + snapshot
+#                       + virt-api; 166 lib tests.
+#   Portal      : 4/4 — admin page mounted at /admin/kubevirt
+#                       (cave-portal/src/admin/kubevirt.rs).
+#   cavectl     : 4/4 — `cavectl kubevirt {vms,vmis,migrate}` → /api/kubevirt/*.
+#   Observ.     : 0/4 — alerts + dashboard delegated to cave-metrics/cave-oncall.
 
 # ── File mappings ────────────────────────────────────────────────────────────
 [[files]]
@@ -149,6 +152,22 @@ file          = "src/cdi.rs"
 upstream_name = "NodeLabeller.Run"
 local_name    = "virt_handler::NodeFingerprint::to_labels"
 file          = "src/virt_handler.rs"
+
+# 2026-05-30 depth ports (count-neutral): VM printable-status machine + start backoff.
+[[functions]]
+upstream_name = "VMController.setPrintableStatus"
+local_name    = "virt_controller::evaluate_printable_status"
+file          = "src/virt_controller.rs"
+
+[[functions]]
+upstream_name = "calculateStartBackoffTime"
+local_name    = "virt_controller::calculate_start_backoff_time"
+file          = "src/virt_controller.rs"
+
+[[functions]]
+upstream_name = "startFailureBackoffTimeLeft"
+local_name    = "virt_controller::start_failure_backoff_time_left"
+file          = "src/virt_controller.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 [[tests]]
