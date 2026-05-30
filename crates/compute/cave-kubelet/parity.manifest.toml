@@ -36,14 +36,19 @@ source_sha = "v1.36.0"
 #   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
 #   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
-mapped_count   = 28
-partial_count  = 1
+mapped_count   = 29
+partial_count  = 0
 skipped_count  = 10
 unmapped_count = 0
 total          = 39
 fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 39/39 — all in-scope packages addressed; pkg/kubelet/checkpoint/ reclassified unmapped→skipped per ADR-RUNTIME-PARITY-100-PCT-001 §5 (cave-cri already owns the CRIU runtime hook; kubelet-side endpoint is alpha-gated upstream and not required by any current cave-runtime workload)
-honest_ratio   = 0.9487
-adr_justified_ratio = 1.0      # 10 skipped (go-bootstrap/stdlib-analog/parallel-track + checkpoint API deferred to alpha-stabilisation per ADR §5) + 1 partial all architecturally justified
+# 2026-05-30 honest close: the last [[partial]] (pkg/kubelet/cm/util/cgroups/)
+# was promoted to [[mapped]] by landing the production Cgroupv2FsBackend —
+# the deferred real-filesystem writer — plus serialize_value/parse_value
+# implementing the libcontainer/cgroups/fs2 v2 wire format. honest_ratio
+# (= (mapped+skipped)/total = 39/39) now reaches 1.0 with zero partials.
+honest_ratio   = 1.0
+adr_justified_ratio = 1.0      # 10 skipped (go-bootstrap/stdlib-analog/parallel-track + checkpoint API deferred to alpha-stabilisation per ADR §5) — all architecturally justified; no partials remain
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 last_audit     = "2026-05-28"
 infra_only     = false
@@ -194,10 +199,10 @@ upstream_pkg = "pkg/kubelet/prober/"
 local_files  = ["src/prober.rs"]
 note         = "k8s-core push 2026-05-13: ProberCoordinator on top of probe::ProberManager — concurrency control via cave_kernel::semaphore (default 16 concurrent probes), restart-coordination ledger (suppresses duplicate liveness-restart fan-out, auto-clears on safety window), readiness flip dedupe. 17 deterministic tests."
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
 local_files  = ["src/cgroups.rs"]
-note         = "k8s-streams-mesh batch 2026-05-13: cgroup v2 unified-hierarchy writer abstraction. CgroupBackend trait + InMemoryCgroups impl (production Cgroupv2FsBackend that touches /sys/fs/cgroup is deferred), QosTier slice naming (kubepods.slice / kubepods-burstable.slice / kubepods-besteffort.slice), pod_cgroup_path + container_cgroup_path conventions matching upstream, validation on cpu.max zero quota + empty cpuset. 12 tests."
+note         = "k8s-streams-mesh batch 2026-05-13 + honest close 2026-05-30: cgroup v2 unified-hierarchy writer. CgroupBackend trait with TWO impls — InMemoryCgroups (tests) AND the production Cgroupv2FsBackend that writes control files into the v2 hierarchy rooted at a configurable mount (/sys/fs/cgroup in prod). serialize_value/parse_value implement the libcontainer/cgroups/fs2 v2 wire format (memory.max/cpu.max/cpuset.cpus/pids.max, \"max\" sentinels, \"$QUOTA $PERIOD\" cpu.max), with shared validate_value short-circuiting bad writes before any dir is materialised. QosTier slice naming, pod_cgroup_path + container_cgroup_path conventions, idempotent remove. v2 only — no v1 legacy hierarchy. 27 tests."
 
 [[mapped]]
 upstream_pkg = "pkg/kubelet/lifecycle/"
