@@ -18,6 +18,7 @@ pub mod routes;
 pub mod routes_api;
 pub mod solvers;
 pub mod store;
+pub mod webhook_validation;
 
 use axum::Router;
 
