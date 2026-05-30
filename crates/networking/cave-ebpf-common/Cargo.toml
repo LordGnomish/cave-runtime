@@ -1,13 +1,14 @@
 [package]
 name = "cave-ebpf-common"
-description = "Shared eBPF types and BPF map definitions"
+description = "Shared eBPF types + userspace port of the grafana/beyla eBPF auto-instrumentation pipeline"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+# OTLP/JSON trace export (otlp module) emits serde_json::Value.
+serde_json = { workspace = true }
 
 [dev-dependencies]
 proptest = "1"
-serde_json = { workspace = true }
