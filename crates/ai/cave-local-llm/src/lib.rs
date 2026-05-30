@@ -52,3 +52,6 @@ pub mod vllm_scheduler;
 
 /// vLLM SamplingParams — sampling contract, validation, OpenAI mapping.
 pub mod vllm_sampling;
+
+/// vLLM weight-quant configs — AWQ/GPTQ/FP8 layout, pack factor, ratios.
+pub mod vllm_quant;
