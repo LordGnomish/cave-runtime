@@ -112,6 +112,67 @@ pub fn pki_tree() -> Vec<CertBaseName> {
     ]
 }
 
+/// Subject-alternative-name set for a serving certificate, split into DNS
+/// names and IP addresses the way kubeadm's `certutil.AltNames` is.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AltNames {
+    pub dns_names: Vec<String>,
+    pub ip_addresses: Vec<String>,
+}
+
+impl AltNames {
+    /// Append a SAN, routing it to `ip_addresses` when it parses as an IP and
+    /// to `dns_names` otherwise. Duplicates (in either bucket) are dropped so
+    /// the cert carries each name once.
+    fn push(&mut self, value: &str) {
+        if value.is_empty() {
+            return;
+        }
+        if value.parse::<std::net::IpAddr>().is_ok() {
+            if !self.ip_addresses.iter().any(|v| v == value) {
+                self.ip_addresses.push(value.to_string());
+            }
+        } else if !self.dns_names.iter().any(|v| v == value) {
+            self.dns_names.push(value.to_string());
+        }
+    }
+}
+
+/// Compute the kube-apiserver serving-cert SANs for a tenant control plane,
+/// mirroring kubeadm's `GetAPIServerAltNames`:
+///
+///   * the four standard `kubernetes[.default[.svc[.<dns_domain>]]]` DNS names,
+///   * the in-cluster apiserver service IP and the loopback address,
+///   * the control-plane endpoint (routed to DNS or IP by parse), and
+///   * any operator-supplied extra cert-SANs (also DNS/IP routed).
+///
+/// All entries are de-duplicated, preserving first-seen order.
+pub fn apiserver_cert_sans(
+    service_dns_domain: &str,
+    service_ip: &str,
+    control_plane_endpoint: Option<&str>,
+    extra_sans: &[String],
+) -> AltNames {
+    let mut names = AltNames::default();
+    // Standard kubeadm DNS names.
+    names.push("kubernetes");
+    names.push("kubernetes.default");
+    names.push("kubernetes.default.svc");
+    names.push(&format!("kubernetes.default.svc.{service_dns_domain}"));
+    // In-cluster service IP + loopback.
+    names.push(service_ip);
+    names.push("127.0.0.1");
+    // Control-plane endpoint, routed by DNS-vs-IP parse.
+    if let Some(ep) = control_plane_endpoint {
+        names.push(ep);
+    }
+    // Operator-supplied extras.
+    for san in extra_sans {
+        names.push(san);
+    }
+    names
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
