@@ -219,4 +219,20 @@ mod tests {
         assert!(html.contains("/admin/auth/saml/metadata.xml"));
         assert!(html.contains("Download SP metadata"));
     }
+
+    #[test]
+    fn render_emits_inclusive_namespaces_prefix_list_field() {
+        // The built-in exc-c14n InclusiveNamespaces PrefixList is
+        // configurable from the SAML broker page so strict IdPs
+        // (ADFS/Shibboleth) can be matched byte-for-byte.
+        let ctx = RequestCtx::developer("acme", &[]);
+        let html = render(&ctx).unwrap();
+        assert!(html.contains(r#"name="inclusiveNamespaces""#), "field missing");
+        assert!(html.contains("InclusiveNamespaces"), "label missing");
+    }
+
+    #[test]
+    fn default_config_has_empty_inclusive_namespaces() {
+        assert!(default_config().inclusive_namespaces.is_empty());
+    }
 }
