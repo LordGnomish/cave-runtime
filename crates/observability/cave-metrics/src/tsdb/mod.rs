@@ -249,6 +249,9 @@ pub struct Tsdb {
     index: Arc<RwLock<InvertedIndex>>,
     /// Sealed immutable blocks.
     blocks: Arc<RwLock<Vec<Block>>>,
+    /// Deletion tombstones: fingerprint → list of (mint, maxt) intervals whose
+    /// samples are masked from reads. Port of prometheus `tsdb/tombstones`.
+    tombstones: Arc<RwLock<HashMap<u64, Vec<(i64, i64)>>>>,
 }
 
 impl Tsdb {
@@ -258,6 +261,7 @@ impl Tsdb {
             head: Arc::new(RwLock::new(HashMap::new())),
             index: Arc::new(RwLock::new(InvertedIndex::default())),
             blocks: Arc::new(RwLock::new(Vec::new())),
+            tombstones: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -316,13 +320,26 @@ impl Tsdb {
             }
         }
 
-        // Sort each series by timestamp and deduplicate.
-        let mut result: Vec<(Labels, Vec<Sample>)> = out.into_values().collect();
-        for (_, samps) in &mut result {
-            samps.sort_by_key(|s| s.timestamp_ms);
-            samps.dedup_by_key(|s| s.timestamp_ms);
-        }
-        result
+        // Mask tombstoned samples, then sort + deduplicate each series.
+        let tombstones = self.tombstones.read();
+        out.into_iter()
+            .filter_map(|(fp, (labels, mut samps))| {
+                if let Some(intervals) = tombstones.get(&fp) {
+                    samps.retain(|s| {
+                        !intervals
+                            .iter()
+                            .any(|(lo, hi)| s.timestamp_ms >= *lo && s.timestamp_ms <= *hi)
+                    });
+                }
+                samps.sort_by_key(|s| s.timestamp_ms);
+                samps.dedup_by_key(|s| s.timestamp_ms);
+                if samps.is_empty() {
+                    None
+                } else {
+                    Some((labels, samps))
+                }
+            })
+            .collect()
     }
 
     /// Get the latest sample for each series at `ts_ms` within a lookback window.
@@ -387,6 +404,21 @@ impl Tsdb {
             .filter_map(|fp| head.get(&fp).map(|s| s.labels.clone()))
             .filter(|labels| matchers.iter().all(|m| m.matches(labels)))
             .collect()
+    }
+
+    /// Delete (tombstone) samples in `[mint, maxt]` for every series matching
+    /// `matchers`. Faithful to prometheus `DB.Delete`: the series and its other
+    /// samples remain; reads simply skip the tombstoned interval. A delete whose
+    /// matchers select nothing is a no-op.
+    pub fn delete(&self, matchers: &[LabelMatcher], mint: i64, maxt: i64) {
+        let fps = self.index.read().matching(matchers);
+        if fps.is_empty() {
+            return;
+        }
+        let mut tombstones = self.tombstones.write();
+        for fp in fps {
+            tombstones.entry(fp).or_default().push((mint, maxt));
+        }
     }
 
     /// Remove samples older than `retention_ms`.
