@@ -23,6 +23,7 @@ pub mod types;
 
 pub mod cloud_volume_controller;
 pub mod node_controller;
+pub mod node_helpers;
 pub mod node_lifecycle;
 pub mod route_controller;
 pub mod route_ipam;
