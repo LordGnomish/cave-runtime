@@ -71,6 +71,7 @@ pub struct SplunkScaler {
     pub value_field: String,
     pub target_value: i64,
     pub activation_value: i64,
+    pub unsafe_ssl: bool,
     current_value: f64,
 }
 
@@ -82,8 +83,72 @@ impl SplunkScaler {
             value_field: value_field.to_string(),
             target_value: 1,
             activation_value: 0,
+            unsafe_ssl: false,
             current_value: 0.0,
         }
+    }
+
+    /// Port of `parseSplunkMetadata` (+ the `splunk.NewClient` credential
+    /// guards it delegates to).
+    ///
+    /// triggerMetadata: `host` (validated as a URL), `savedSearchName`,
+    /// `valueField`, `targetValue` (int), `activationValue` (int) are required;
+    /// `unsafeSsl` is an optional bool defaulting to `false`. authParams:
+    /// `username` is required and `apiToken`/`password` are optional but
+    /// mutually exclusive.
+    pub fn from_metadata(meta: &HashMap<String, String>) -> Result<Self, String> {
+        let host = meta
+            .get("host")
+            .ok_or_else(|| "host is required".to_string())?;
+        Self::validate_host(host)?;
+
+        let username = meta.get("username").map(String::as_str).unwrap_or("");
+        let api_token = meta.get("apiToken").map(String::as_str).unwrap_or("");
+        let password = meta.get("password").map(String::as_str).unwrap_or("");
+        Self::validate_credentials(username, api_token, password)
+            .map_err(|e| format!("{e:?}"))?;
+
+        let saved_search_name = meta
+            .get("savedSearchName")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "savedSearchName is required".to_string())?
+            .clone();
+        let value_field = meta
+            .get("valueField")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "valueField is required".to_string())?
+            .clone();
+        let target_value = meta
+            .get("targetValue")
+            .ok_or_else(|| "targetValue is required".to_string())?
+            .parse::<i64>()
+            .map_err(|_| "targetValue must be an integer".to_string())?;
+        let activation_value = meta
+            .get("activationValue")
+            .ok_or_else(|| "activationValue is required".to_string())?
+            .parse::<i64>()
+            .map_err(|_| "activationValue must be an integer".to_string())?;
+        let unsafe_ssl = match meta.get("unsafeSsl") {
+            Some(v) => v
+                .parse::<bool>()
+                .map_err(|_| "unsafeSsl must be a bool".to_string())?,
+            None => false,
+        };
+
+        Ok(Self {
+            username: username.to_string(),
+            saved_search_name,
+            value_field,
+            target_value,
+            activation_value,
+            unsafe_ssl,
+            current_value: 0.0,
+        })
+    }
+
+    /// Port of the scaler metric name: `splunk-{savedSearchName}`, normalized.
+    pub fn metric_name(&self) -> String {
+        format!("splunk-{}", self.saved_search_name)
     }
 
     /// Port of `splunk.NewClient` credential guards:
