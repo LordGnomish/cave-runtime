@@ -172,9 +172,29 @@ impl Tree {
     /// Build a tree from Brendan-Gregg "folded"/collapsed text — the inverse of
     /// [`collapsed`](Self::collapsed). Each non-blank line is
     /// `frame1;frame2;... <count>`; malformed lines are skipped.
-    pub fn from_collapsed(_text: &str) -> Tree {
-        // RED placeholder
-        Tree::new()
+    pub fn from_collapsed(text: &str) -> Tree {
+        let mut t = Tree::new();
+        for raw in text.lines() {
+            let line = raw.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let sep = match line.rfind(' ') {
+                Some(i) => i,
+                None => continue,
+            };
+            let count: i64 = match line[sep + 1..].trim().parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let stack_str = line[..sep].trim();
+            if stack_str.is_empty() {
+                continue;
+            }
+            let stack: Vec<&str> = stack_str.split(';').map(|s| s.trim()).collect();
+            t.insert_stack(count, &stack);
+        }
+        t
     }
 
     /// Render the tree as Brendan-Gregg "folded"/collapsed stacks: one line per
