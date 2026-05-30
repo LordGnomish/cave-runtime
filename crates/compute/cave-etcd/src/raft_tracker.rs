@@ -29,6 +29,8 @@
 
 #![allow(clippy::needless_range_loop)]
 
+use std::collections::{BTreeMap, BTreeSet};
+
 /// A sliding window of in-flight `MsgApp` message indices.
 ///
 /// Mirrors etcd `tracker.Inflights`. The window holds at most `size` entries.
@@ -395,6 +397,202 @@ mod progress_tests {
         // Snapshot: always paused.
         pr.become_snapshot(9);
         assert!(pr.is_paused());
+    }
+}
+
+/// Outcome of counting election votes against the voter configuration.
+///
+/// Mirrors etcd `quorum.VoteResult`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VoteResult {
+    /// Not enough votes counted yet to decide either way.
+    Pending,
+    /// A quorum has rejected the candidate.
+    Lost,
+    /// A quorum has granted the candidate.
+    Won,
+}
+
+/// Resolve a vote tally against a single majority configuration.
+///
+/// Mirrors etcd `quorum.MajorityConfig.VoteResult`. An empty configuration is
+/// vacuously [`Won`](VoteResult::Won).
+fn majority_vote_result(voters: &BTreeSet<u64>, votes: &BTreeMap<u64, bool>) -> VoteResult {
+    if voters.is_empty() {
+        return VoteResult::Won;
+    }
+    let quorum = voters.len() / 2 + 1;
+    let mut granted = 0usize;
+    let mut missing = 0usize;
+    for v in voters {
+        match votes.get(v) {
+            Some(true) => granted += 1,
+            Some(false) => {}
+            None => missing += 1,
+        }
+    }
+    if granted >= quorum {
+        VoteResult::Won
+    } else if granted + missing >= quorum {
+        VoteResult::Pending
+    } else {
+        VoteResult::Lost
+    }
+}
+
+/// The leader-side replication tracker: per-follower [`Progress`] plus the
+/// campaign vote ledger, resolved against a (possibly joint) voter config.
+///
+/// Mirrors etcd `tracker.ProgressTracker` (`raft/tracker/tracker.go`).
+#[derive(Clone, Debug)]
+pub struct ProgressTracker {
+    /// Incoming voter configuration (C_new during a joint change).
+    incoming: BTreeSet<u64>,
+    /// Outgoing voter configuration (C_old; empty when not in a joint change).
+    outgoing: BTreeSet<u64>,
+    /// Non-voting learners.
+    learners: BTreeSet<u64>,
+    /// Per-peer replication progress.
+    pub progress: BTreeMap<u64, Progress>,
+    /// Recorded campaign votes (`true` = granted), first write wins.
+    votes: BTreeMap<u64, bool>,
+    /// Flow-control window size for newly tracked peers.
+    max_inflight: usize,
+}
+
+impl ProgressTracker {
+    /// Create an empty tracker whose followers get an `max_inflight`-deep window.
+    pub fn new(max_inflight: usize) -> Self {
+        Self {
+            incoming: BTreeSet::new(),
+            outgoing: BTreeSet::new(),
+            learners: BTreeSet::new(),
+            progress: BTreeMap::new(),
+            votes: BTreeMap::new(),
+            max_inflight,
+        }
+    }
+
+    /// Add a voting member, creating its [`Progress`].
+    pub fn add_voter(&mut self, id: u64) {
+        self.incoming.insert(id);
+        self.progress
+            .entry(id)
+            .or_insert_with(|| Progress::new(1, self.max_inflight));
+    }
+
+    /// Add a non-voting learner, creating its [`Progress`].
+    pub fn add_learner(&mut self, id: u64) {
+        self.learners.insert(id);
+        let mut pr = Progress::new(1, self.max_inflight);
+        pr.is_learner = true;
+        self.progress.insert(id, pr);
+    }
+
+    /// Enter a joint configuration: the current voters become `C_old` and
+    /// `incoming` becomes the proposed `C_new`.
+    pub fn make_joint(&mut self, outgoing: &[u64]) {
+        self.outgoing = outgoing.iter().copied().collect();
+    }
+
+    /// Record a vote from `id`. The first vote recorded for a member wins;
+    /// later votes for the same member are ignored (matching etcd).
+    pub fn record_vote(&mut self, id: u64, granted: bool) {
+        unimplemented!()
+    }
+
+    /// Count votes among voters, excluding learners. Returns
+    /// `(granted, rejected)`.
+    pub fn tally_votes(&self) -> (usize, usize) {
+        unimplemented!()
+    }
+
+    /// Resolve the recorded votes against the joint voter configuration.
+    pub fn vote_result(&self) -> VoteResult {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tracker_tests {
+    use super::*;
+
+    fn voters(t: &mut ProgressTracker, ids: &[u64]) {
+        for &id in ids {
+            t.add_voter(id);
+        }
+    }
+
+    #[test]
+    fn single_config_majority_grant_wins() {
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[1, 2, 3]);
+        t.record_vote(1, true);
+        assert_eq!(t.vote_result(), VoteResult::Pending);
+        t.record_vote(2, true);
+        assert_eq!(t.vote_result(), VoteResult::Won);
+    }
+
+    #[test]
+    fn single_config_majority_reject_loses() {
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[1, 2, 3]);
+        t.record_vote(1, false);
+        t.record_vote(2, false);
+        assert_eq!(t.vote_result(), VoteResult::Lost);
+    }
+
+    #[test]
+    fn record_vote_first_write_wins() {
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[1, 2, 3]);
+        t.record_vote(1, true);
+        t.record_vote(1, false); // ignored
+        let (granted, rejected) = t.tally_votes();
+        assert_eq!((granted, rejected), (1, 0));
+    }
+
+    #[test]
+    fn tally_excludes_learners() {
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[1, 2, 3]);
+        t.add_learner(9);
+        t.record_vote(1, true);
+        t.record_vote(9, true); // learner vote does not count toward tally
+        let (granted, rejected) = t.tally_votes();
+        assert_eq!((granted, rejected), (1, 0));
+        // And a learner can never push a 3-voter config to Won on its own.
+        t.record_vote(9, true);
+        assert_eq!(t.vote_result(), VoteResult::Pending);
+    }
+
+    #[test]
+    fn joint_config_requires_both_majorities() {
+        // C_old = {1,2,3}, C_new = {3,4,5}. A candidate must win BOTH.
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[3, 4, 5]); // incoming = C_new
+        t.make_joint(&[1, 2, 3]); // outgoing = C_old
+        // Win C_old (1,2) but only 1 vote in C_new → Pending overall.
+        t.record_vote(1, true);
+        t.record_vote(2, true);
+        t.record_vote(3, true); // shared member, counts in both
+        assert_eq!(t.vote_result(), VoteResult::Pending);
+        // Add a second C_new vote → both majorities satisfied → Won.
+        t.record_vote(4, true);
+        assert_eq!(t.vote_result(), VoteResult::Won);
+    }
+
+    #[test]
+    fn joint_config_lost_in_one_is_lost() {
+        let mut t = ProgressTracker::new(4);
+        voters(&mut t, &[3, 4, 5]);
+        t.make_joint(&[1, 2, 3]);
+        // Rejected by a majority of C_old → Lost regardless of C_new.
+        t.record_vote(1, false);
+        t.record_vote(2, false);
+        t.record_vote(4, true);
+        t.record_vote(5, true);
+        assert_eq!(t.vote_result(), VoteResult::Lost);
     }
 }
 
