@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 
 use cave_mlx::array::Array;
 use cave_mlx::autograd::Tape;
+use cave_mlx::conv;
 use cave_mlx::nn::Linear;
 use cave_mlx::optim::{Adam, Optimizer};
 
@@ -40,6 +41,8 @@ enum Command {
         #[arg(long, default_value_t = 0.1)]
         lr: f32,
     },
+    /// Run a small channel-last conv2d + 2x2 max-pool over a sample image.
+    Conv,
 }
 
 fn main() {
@@ -56,10 +59,35 @@ fn main() {
             println!("  ops     : add/sub/mul/div (broadcast), matmul, transpose,");
             println!("            sum/mean/max, exp/log/sqrt, relu/sigmoid/tanh, softmax");
             println!("  autograd: reverse-mode Tape/Var (add/sub/mul/matmul/relu/sigmoid/tanh/sum/mean)");
-            println!("  nn      : Linear, Activation");
+            println!("  conv    : conv1d/conv2d (channel-last), max_pool2d/avg_pool2d");
+            println!("  nn      : Linear, Conv2d, Activation");
             println!("  optim   : Sgd (momentum/decay), Adam, AdamW");
         }
         Command::Demo { steps, lr } => run_demo(steps, lr),
+        Command::Conv => run_conv(),
+    }
+}
+
+/// Convolve a 4x4 single-channel image with a 2x2 box kernel, then 2x2 max-pool.
+fn run_conv() {
+    // NHWC input (1,4,4,1) = 1..=16.
+    let data: Vec<f32> = (1..=16).map(|v| v as f32).collect();
+    let x = Array::new(data, &[1, 4, 4, 1]).unwrap();
+    // Box filter (C_out=1, KH=2, KW=2, C_in=1).
+    let w = Array::new(vec![1.0; 4], &[1, 2, 2, 1]).unwrap();
+    let y = conv::conv2d(&x, &w, (1, 1), (0, 0)).unwrap();
+    println!("conv2d 2x2-box over 4x4 image -> shape {:?}", y.shape());
+    print_hw(y.data(), 3, 3);
+    let p = conv::max_pool2d(&x, (2, 2), (2, 2));
+    println!("max_pool2d 2x2 stride 2     -> shape {:?}", p.shape());
+    print_hw(p.data(), 2, 2);
+}
+
+/// Print a flat single-channel buffer as an HxW grid.
+fn print_hw(data: &[f32], h: usize, w: usize) {
+    for r in 0..h {
+        let row: Vec<String> = (0..w).map(|c| format!("{:>5.1}", data[r * w + c])).collect();
+        println!("  [{}]", row.join(" "));
     }
 }
 

@@ -1009,7 +1009,7 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         name: "MLX",
         github_repo: "ml-explore/mlx",
         cave_module: "cave-mlx",
-        track_features: "N-dim array, broadcasting ops, matmul, reverse-mode autograd, nn modules, SGD/Adam/AdamW optimizers (CPU backend)",
+        track_features: "N-dim array, broadcasting ops, matmul, conv1d/conv2d + pooling, reverse-mode autograd, nn modules (Linear/Conv2d), SGD/Adam/AdamW optimizers (CPU backend)",
         check_frequency: "biweekly",
         category: "ai",
         phase: 2,
