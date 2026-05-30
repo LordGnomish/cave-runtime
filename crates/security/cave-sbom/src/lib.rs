@@ -21,6 +21,7 @@
 
 use std::sync::Arc;
 
+pub mod audit;
 pub mod components;
 pub mod engine;
 pub mod models;
