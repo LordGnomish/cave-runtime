@@ -145,6 +145,7 @@ MIT:
   - langfuse/langfuse
   - louislam/uptime-kuma
   - microsoft/presidio
+  - ml-explore/mlx          (cave-mlx; upstream copyright 2023 Apple Inc.)
   - nobl9/nobl9-go
   - ollama/ollama
   - twisted/towncrier

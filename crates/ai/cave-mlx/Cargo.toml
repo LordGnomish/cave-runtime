@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-mlx"
+description = "Cave MLX — pure-Rust N-dim array, autograd, nn, and optimizers (ml-explore/mlx parity, CPU backend)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-mlx"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["mlx", "tensor", "autograd", "nn", "machine-learning"]
+categories = ["science", "mathematics", "command-line-utilities"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-mlx"
+path = "src/bin/cave-mlx.rs"
+
+[dependencies]
+thiserror = { workspace = true }
+rand = { workspace = true }
+clap = { workspace = true, features = ["env"] }
+
+[dev-dependencies]
+proptest = "1"
