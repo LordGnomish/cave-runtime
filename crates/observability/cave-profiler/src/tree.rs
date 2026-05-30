@@ -151,6 +151,26 @@ fn truncate_children(nodes: &mut Vec<Node>, min: i64) {
     *nodes = kept;
 }
 
+/// A node in an A/B diff flame graph: the same frame's `total` weight on the
+/// left (baseline) and right (comparison) side. Ports the alignment in
+/// `pkg/model/flamegraph_diff.go`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiffNode {
+    pub name: String,
+    pub left: i64,
+    pub right: i64,
+    pub children: Vec<DiffNode>,
+}
+
+impl Tree {
+    /// Diff two trees, aligning frames by name at each level into a combined
+    /// tree carrying the left and right `total` per frame.
+    pub fn diff(_left: &Tree, _right: &Tree) -> Vec<DiffNode> {
+        // RED placeholder
+        Vec::new()
+    }
+}
+
 /// Merge `src` nodes into the sorted `dst` child list, recursing into
 /// matching children.
 fn merge_children(dst: &mut Vec<Node>, src: &[Node]) {
@@ -336,5 +356,52 @@ mod tests {
         assert_eq!(b.children[0].name, "other");
         assert_eq!(b.children[0].total, 8);
         assert_eq!(b.children[0].self_value, 8);
+    }
+
+    #[test]
+    fn diff_aligns_frames_left_and_right() {
+        let mut left = Tree::new();
+        left.insert_stack(10, &["main", "foo"]);
+        let mut right = Tree::new();
+        right.insert_stack(4, &["main", "foo"]);
+        right.insert_stack(6, &["main", "bar"]);
+
+        let d = Tree::diff(&left, &right);
+        assert_eq!(d.len(), 1);
+        let main = &d[0];
+        assert_eq!(main.name, "main");
+        assert_eq!(main.left, 10);
+        assert_eq!(main.right, 10);
+        // children union sorted: bar then foo
+        assert_eq!(main.children.len(), 2);
+        assert_eq!(main.children[0].name, "bar");
+        assert_eq!(main.children[0].left, 0);
+        assert_eq!(main.children[0].right, 6);
+        assert_eq!(main.children[1].name, "foo");
+        assert_eq!(main.children[1].left, 10);
+        assert_eq!(main.children[1].right, 4);
+    }
+
+    #[test]
+    fn diff_identical_trees_match() {
+        let mut a = Tree::new();
+        a.insert_stack(5, &["x", "y"]);
+        let d = Tree::diff(&a, &a);
+        assert_eq!(d[0].name, "x");
+        assert_eq!(d[0].left, d[0].right);
+        assert_eq!(d[0].children[0].left, 5);
+        assert_eq!(d[0].children[0].right, 5);
+    }
+
+    #[test]
+    fn diff_left_only_branch_has_zero_right() {
+        let mut left = Tree::new();
+        left.insert_stack(3, &["only_left"]);
+        let right = Tree::new();
+        let d = Tree::diff(&left, &right);
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].name, "only_left");
+        assert_eq!(d[0].left, 3);
+        assert_eq!(d[0].right, 0);
     }
 }
