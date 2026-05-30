@@ -34,6 +34,7 @@ pub mod error;
 pub mod gateway;
 pub mod llm_gateway_adapter;
 pub mod memory;
+pub mod orchestrator;
 pub mod planner;
 pub mod prompt;
 pub mod provider_tools;
@@ -50,6 +51,7 @@ pub use gateway::{
     AnthropicStubGateway, CompletionRequest, CompletionResponse, LlmGateway, OllamaGateway,
 };
 pub use memory::{FileStore, InMemoryStore, MemoryProvider, MemoryRecord, SqliteStore};
+pub use orchestrator::{Orchestrator, OrchestrationReport, RuntimeFactory, Subtask, WorkerResult};
 pub use planner::{HeuristicPlanner, Plan, PlanStep, Planner};
 pub use prompt::{
     AnthropicPrompt, OllamaPrompt, OpenAiPrompt, OpenRouterPrompt, PromptContext, ProviderKind,
