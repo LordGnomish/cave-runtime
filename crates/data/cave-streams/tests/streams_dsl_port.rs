@@ -10,7 +10,7 @@
 //! record through the operator graph; `drain_output` collects what reached a
 //! sink; `store_get` queries a materialized state store.
 
-use cave_streams::kafka_streams_dsl::{DslPredicate, Record, StreamsBuilder};
+use cave_streams::kafka_streams_dsl::{DslPredicate, Record, StreamsBuilder, TimeWindows};
 
 fn rec_values(recs: &[Record]) -> Vec<Vec<u8>> {
     recs.iter().map(|r| r.value.clone()).collect()
@@ -410,4 +410,80 @@ fn ktable_map_values_transforms_changelog() {
         rec_values(&app.drain_output("out")),
         vec![b"count=1".to_vec()]
     );
+}
+
+// ─── Cycle 4: windowed aggregation (TimeWindows) ─────────────────────────────
+
+#[test]
+fn tumbling_windows_count_resets_at_window_boundary() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .windowed_by(TimeWindows::of_size_ms(10)) // tumbling: advance == size
+        .count("wc")
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"_", 1); // window [0,10)  -> 1
+    app.pipe_input("in", b"k", b"_", 7); // window [0,10)  -> 2
+    app.pipe_input("in", b"k", b"_", 11); // window [10,20) -> 1
+
+    // Per-window tallies queried by (key, window_start).
+    assert_eq!(app.windowed_store_get("wc", b"k", 0), Some(b"2".to_vec()));
+    assert_eq!(app.windowed_store_get("wc", b"k", 10), Some(b"1".to_vec()));
+
+    // A tumbling window assigns each record to exactly one window, so there
+    // is one changelog record per input.
+    let out = app.drain_output("out");
+    assert_eq!(rec_values(&out), vec![b"1".to_vec(), b"2".to_vec(), b"1".to_vec()]);
+}
+
+#[test]
+fn hopping_windows_overlap_so_a_record_lands_in_several() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .windowed_by(TimeWindows::of_size_ms(10).advance_by_ms(5)) // hopping
+        .count("hc")
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    // ts=12 lands in windows starting at 5 ([5,15)) and 10 ([10,20)).
+    app.pipe_input("in", b"k", b"_", 12);
+
+    assert_eq!(app.windowed_store_get("hc", b"k", 5), Some(b"1".to_vec()));
+    assert_eq!(app.windowed_store_get("hc", b"k", 10), Some(b"1".to_vec()));
+    assert_eq!(app.windowed_store_get("hc", b"k", 0), None); // [0,10) excludes 12
+
+    // One changelog record per matched window, emitted in ascending start order.
+    assert_eq!(app.drain_output("out").len(), 2);
+}
+
+#[test]
+fn windowed_aggregate_accumulates_within_each_window() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .windowed_by(TimeWindows::of_size_ms(100))
+        .aggregate(
+            "wsum",
+            || b"0".to_vec(),
+            |_k, value, current| {
+                let cur: i64 = String::from_utf8_lossy(current).parse().unwrap_or(0);
+                let add: i64 = String::from_utf8_lossy(value).parse().unwrap_or(0);
+                (cur + add).to_string().into_bytes()
+            },
+        )
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"3", 10); // window [0,100): 3
+    app.pipe_input("in", b"k", b"4", 50); // window [0,100): 7
+    app.pipe_input("in", b"k", b"5", 120); // window [100,200): 5
+
+    assert_eq!(app.windowed_store_get("wsum", b"k", 0), Some(b"7".to_vec()));
+    assert_eq!(app.windowed_store_get("wsum", b"k", 100), Some(b"5".to_vec()));
 }
