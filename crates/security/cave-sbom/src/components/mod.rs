@@ -6,6 +6,8 @@
 //! Component / Project management — version graph, identity hashing,
 //! comparable semver-ish ordering.
 
+pub mod hierarchy;
+
 use crate::models::ComponentType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
