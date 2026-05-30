@@ -108,6 +108,13 @@ pub enum EscalationStepType {
     NotifyUser { username: String },
     NotifyTeam { team_id: Uuid },
     Wait { minutes: u32 },
+    /// `STEP_NOTIFY_IF_TIME` — continue escalation only when the current UTC
+    /// time-of-day falls within `[from_minute, to_minute)` (minutes since
+    /// midnight). Outside the window the chain pauses until the window opens.
+    NotifyIfTime { from_minute: u32, to_minute: u32 },
+    /// `STEP_NOTIFY_IF_NUM_ALERTS_IN_TIME_WINDOW` — continue only when more than
+    /// `num_alerts` alerts have arrived in the trailing `window_minutes`.
+    NotifyIfNumAlertsInWindow { num_alerts: u32, window_minutes: u32 },
     RepeatFromStart,
 }
 

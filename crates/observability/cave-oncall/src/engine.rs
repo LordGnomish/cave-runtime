@@ -311,6 +311,26 @@ impl EscalationRun {
     }
 }
 
+/// Whether `now_minute` lies inside the notify-if-time window
+/// `[from_minute, to_minute)`, all expressed as minutes-since-midnight UTC.
+///
+/// Port of `eta_for_escalation_step_notify_if_time` (engine/apps/alerts/
+/// escalation_snapshot/utils.py): the helper returns `None` — meaning the step
+/// fires immediately — exactly when "now" is inside the window, and otherwise
+/// returns a future ETA (the step pauses). The three upstream branches:
+///
+///   * normal window (`from < to`):   `from <= now < to`
+///   * overnight window (`from > to`): `now >= from || now < to`
+///   * degenerate (`from == to`):      a point window, only `now == from`
+pub fn within_notify_window(from_minute: u32, to_minute: u32, now_minute: u32) -> bool {
+    use std::cmp::Ordering;
+    match from_minute.cmp(&to_minute) {
+        Ordering::Less => from_minute <= now_minute && now_minute < to_minute,
+        Ordering::Greater => now_minute >= from_minute || now_minute < to_minute,
+        Ordering::Equal => now_minute == from_minute,
+    }
+}
+
 /// Validate a rotation configuration for basic sanity.
 pub fn validate_rotation(rot: &Rotation) -> Result<(), OnCallError> {
     if rot.users.is_empty() {
