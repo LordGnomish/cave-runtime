@@ -32,6 +32,41 @@ pub fn add_to_node_addresses(addresses: &mut Vec<NodeAddress>, add_addresses: &[
     }
 }
 
+// ─── component-helpers node/util/ips.go ──────────────────────────────────────
+
+/// `ParseIPSloppy` — tolerant IP parse matching `k8s.io/utils/net`: IPv4
+/// octets with leading zeros (e.g. `010.000.000.001`) are accepted and read as
+/// decimal, IPv6 uses the strict parser.
+pub fn parse_ip_sloppy(s: &str) -> Option<IpAddr> {
+    if s.contains(':') {
+        return s.parse::<Ipv6Addr>().ok().map(IpAddr::V6);
+    }
+    let octets: Vec<&str> = s.split('.').collect();
+    if octets.len() != 4 {
+        return None;
+    }
+    let mut bytes = [0u8; 4];
+    for (i, oct) in octets.iter().enumerate() {
+        if oct.is_empty() || !oct.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let v: u32 = oct.parse().ok()?;
+        if v > 255 {
+            return None;
+        }
+        bytes[i] = v as u8;
+    }
+    Some(IpAddr::V4(Ipv4Addr::from(bytes)))
+}
+
+/// `ParseNodeIPAnnotation` — parses the `alpha.kubernetes.io/provided-node-ip`
+/// annotation value into one IP, or a dual-stack pair. Equivalent to
+/// `parseNodeIP(nodeIP, allowDual=true, sloppy=false)`.
+pub fn parse_node_ip_annotation(node_ip: &str) -> Result<Vec<IpAddr>, String> {
+    let _ = node_ip;
+    unimplemented!("RED: parse_node_ip_annotation")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +117,74 @@ mod tests {
             ],
         );
         assert_eq!(addrs.len(), 1);
+    }
+
+    // ── parse_node_ip_annotation ──
+
+    #[test]
+    fn parse_node_ip_single_v4() {
+        let r = parse_node_ip_annotation("10.0.0.1").unwrap();
+        assert_eq!(r, vec!["10.0.0.1".parse::<IpAddr>().unwrap()]);
+    }
+
+    #[test]
+    fn parse_node_ip_single_v6() {
+        let r = parse_node_ip_annotation("2001:db8::1").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(r[0].is_ipv6());
+    }
+
+    #[test]
+    fn parse_node_ip_dual_stack_pair_ok() {
+        let r = parse_node_ip_annotation("10.0.0.1,2001:db8::1").unwrap();
+        assert_eq!(r.len(), 2);
+        assert!(r[0].is_ipv4() && r[1].is_ipv6());
+    }
+
+    #[test]
+    fn parse_node_ip_two_same_family_rejected() {
+        let e = parse_node_ip_annotation("10.0.0.1,10.0.0.2").unwrap_err();
+        assert_eq!(e, "must contain either a single IP or a dual-stack pair of IPs");
+    }
+
+    #[test]
+    fn parse_node_ip_three_rejected() {
+        let e = parse_node_ip_annotation("10.0.0.1,2001:db8::1,2001:db8::2").unwrap_err();
+        assert_eq!(e, "must contain either a single IP or a dual-stack pair of IPs");
+    }
+
+    #[test]
+    fn parse_node_ip_dual_stack_unspecified_rejected() {
+        let e = parse_node_ip_annotation("0.0.0.0,2001:db8::1").unwrap_err();
+        assert_eq!(e, "dual-stack node IP cannot include '0.0.0.0' or '::'");
+    }
+
+    #[test]
+    fn parse_node_ip_single_unspecified_allowed() {
+        // Only the dual-stack path forbids the unspecified address.
+        let r = parse_node_ip_annotation("0.0.0.0").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(r[0].is_unspecified());
+    }
+
+    #[test]
+    fn parse_node_ip_unparseable_rejected() {
+        let e = parse_node_ip_annotation("garbage").unwrap_err();
+        assert_eq!(e, "could not parse \"garbage\"");
+    }
+
+    #[test]
+    fn parse_node_ip_empty_rejected() {
+        // sloppy=false → empty string still enters the parse loop and fails.
+        let e = parse_node_ip_annotation("").unwrap_err();
+        assert_eq!(e, "could not parse \"\"");
+    }
+
+    #[test]
+    fn parse_ip_sloppy_forgives_leading_zeros() {
+        assert_eq!(
+            parse_ip_sloppy("010.000.000.001"),
+            Some("10.0.0.1".parse::<IpAddr>().unwrap())
+        );
     }
 }
