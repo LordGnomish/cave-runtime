@@ -4,6 +4,55 @@
 //! Integration tests for the Sift forensic-analysis layer
 //! (grafana/sift companion port). One test module per analyzer.
 
+// ─── Shared event-builder helpers ───────────────────────────────────────────
+#[allow(dead_code)]
+mod common {
+    use cave_forensics::events::KernelEvent;
+    use cave_forensics::events::process_exec::{ProcessExecEvent, ProcessExitEvent};
+    use cave_forensics::process::{Credentials, Namespaces, Process};
+    use chrono::{DateTime, TimeZone, Utc};
+
+    pub fn ts(s: i64) -> DateTime<Utc> {
+        Utc.timestamp_opt(s, 0).unwrap()
+    }
+
+    pub fn proc(binary: &str, container: Option<&str>) -> Process {
+        Process {
+            exec_id: format!("{binary}-{:?}", container),
+            pid: 100,
+            pid_in_ns: 1,
+            binary: binary.into(),
+            arguments: String::new(),
+            cwd: "/".into(),
+            credentials: Credentials::default(),
+            namespaces: Namespaces::default(),
+            parent_exec_id: None,
+            container_id: container.map(|c| c.into()),
+            pod_name: container.map(|c| format!("pod-{c}")),
+            pod_namespace: Some("default".into()),
+            start_time: ts(0),
+            end_time: None,
+        }
+    }
+
+    pub fn exec(binary: &str, container: Option<&str>, at: i64) -> KernelEvent {
+        KernelEvent::ProcessExec(ProcessExecEvent {
+            process: proc(binary, container),
+            ancestors: vec![],
+            observed_at: ts(at),
+        })
+    }
+
+    pub fn exit(binary: &str, container: Option<&str>, status: i32, signal: Option<i32>, at: i64) -> KernelEvent {
+        KernelEvent::ProcessExit(ProcessExitEvent {
+            process: proc(binary, container),
+            status,
+            signal,
+            observed_at: ts(at),
+        })
+    }
+}
+
 // ─── Cycle 1: Sift "Error Pattern Logs" — drain-style log clustering ────────
 mod error_pattern {
     use cave_forensics::sift::error_pattern::{
@@ -62,5 +111,83 @@ mod error_pattern {
     fn test_dominant_error_pattern_none_when_no_errors() {
         let lines = ["GET /health 200 ok", "served 12 requests"];
         assert!(dominant_error_pattern(&lines).is_none());
+    }
+}
+
+// ─── Cycle 2: Sift "Kube Crashes" — crashloop detection ─────────────────────
+mod crashloop {
+    use super::common::{exec, exit};
+    use cave_forensics::models::ForensicSeverity;
+    use cave_forensics::sift::crashloop::detect_crashloops;
+
+    #[test]
+    fn test_detects_repeated_abnormal_exits_in_window() {
+        // 4 non-zero exits of the same container in 30s, window=60s,
+        // min_restarts=3 → one crashloop finding.
+        let events = vec![
+            exit("/app", Some("c1"), 1, None, 0),
+            exit("/app", Some("c1"), 1, None, 10),
+            exit("/app", Some("c1"), 137, Some(9), 20),
+            exit("/app", Some("c1"), 1, None, 30),
+        ];
+        let f = detect_crashloops(&events, 60, 3);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].key, "c1");
+        assert_eq!(f[0].restarts, 4);
+    }
+
+    #[test]
+    fn test_clean_exits_are_not_crashes() {
+        // status 0 + no signal = graceful; below threshold → no finding.
+        let events = vec![
+            exit("/app", Some("c1"), 0, None, 0),
+            exit("/app", Some("c1"), 0, None, 10),
+            exit("/app", Some("c1"), 0, None, 20),
+            exit("/app", Some("c1"), 0, None, 30),
+        ];
+        assert!(detect_crashloops(&events, 60, 3).is_empty());
+    }
+
+    #[test]
+    fn test_exits_outside_window_do_not_accumulate() {
+        // 3 crashes but spread over 5 minutes; window=60s → no single
+        // 60s span holds >= 3, so no finding.
+        let events = vec![
+            exit("/app", Some("c1"), 1, None, 0),
+            exit("/app", Some("c1"), 1, None, 120),
+            exit("/app", Some("c1"), 1, None, 300),
+        ];
+        assert!(detect_crashloops(&events, 60, 3).is_empty());
+    }
+
+    #[test]
+    fn test_keys_separated_per_container() {
+        let events = vec![
+            exit("/app", Some("c1"), 1, None, 0),
+            exit("/app", Some("c1"), 1, None, 5),
+            exit("/app", Some("c1"), 1, None, 10),
+            exit("/app", Some("c2"), 1, None, 0),
+        ];
+        let f = detect_crashloops(&events, 60, 3);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].key, "c1");
+    }
+
+    #[test]
+    fn test_severity_scales_with_restart_count() {
+        let many: Vec<_> = (0..10).map(|i| exit("/app", Some("c1"), 1, None, i * 2)).collect();
+        let f = detect_crashloops(&many, 60, 3);
+        assert_eq!(f[0].severity, ForensicSeverity::Critical);
+    }
+
+    #[test]
+    fn test_exec_events_are_ignored() {
+        // Pure exec churn (no exits) is not a crashloop.
+        let events = vec![
+            exec("/app", Some("c1"), 0),
+            exec("/app", Some("c1"), 5),
+            exec("/app", Some("c1"), 10),
+        ];
+        assert!(detect_crashloops(&events, 60, 3).is_empty());
     }
 }
