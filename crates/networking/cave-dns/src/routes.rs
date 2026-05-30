@@ -9,6 +9,7 @@ use axum::{
 
 use crate::{
     api::{
+        corefile::validate_corefile,
         records::{RecordState, batch_records, create_record, delete_record, list_records},
         zones::{ZoneState, create_zone, delete_zone, export_zone, get_zone, list_zones},
     },
@@ -44,5 +45,9 @@ pub fn create_router(zones: Arc<ZoneManager>) -> Router {
         )
         .with_state(record_state);
 
-    zone_router.merge(record_router)
+    // Stateless Corefile validation surface (portal / cavectl).
+    let corefile_router = Router::new()
+        .route("/api/v1/corefile/validate", post(validate_corefile));
+
+    zone_router.merge(record_router).merge(corefile_router)
 }
