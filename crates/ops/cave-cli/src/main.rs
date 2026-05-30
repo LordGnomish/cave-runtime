@@ -967,6 +967,8 @@ enum OncallCmd {
     Incidents,
     /// List supported per-source webhook integrations
     Integrations,
+    /// List the RBAC permission catalog with basic-role fallbacks
+    Roles,
 }
 #[derive(Subcommand)]
 enum SearchCmd {
@@ -4919,6 +4921,7 @@ source_root = "src"
             OncallCmd::Rotations => c.get("/api/oncall/rotations").await,
             OncallCmd::Incidents => c.get("/api/oncall/incidents").await,
             OncallCmd::Integrations => c.get("/api/oncall/integrations").await,
+            OncallCmd::Roles => c.get("/api/oncall/rbac/permissions").await,
         },
         Commands::Search { cmd } => match cmd {
             SearchCmd::Indexes => c.get("/api/search/indexes").await,

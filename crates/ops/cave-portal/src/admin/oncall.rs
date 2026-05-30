@@ -66,6 +66,12 @@ pub fn supported_integrations() -> [&'static str; 5] {
     ]
 }
 
+/// The Grafana OnCall basic-role ladder (LegacyAccessControlRole), surfaced
+/// read-only. Mirrors `cave_oncall::rbac::Role` — lower value = more access.
+pub fn role_ladder() -> [(&'static str, u8); 4] {
+    [("admin", 0), ("editor", 1), ("viewer", 2), ("none", 3)]
+}
+
 pub fn unique_oncallers(rows: &[OncallShift]) -> Vec<String> {
     use std::collections::BTreeSet;
     let mut set: BTreeSet<String> = BTreeSet::new();
@@ -89,6 +95,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, OncallView
             escape(s)
         ))
         .collect();
+    let role_chips: String = role_ladder()
+        .iter()
+        .map(|(name, lvl)| format!(
+            r#"<span class="px-2 py-1 mr-2 rounded bg-amber-100 text-amber-800 text-sm">{} <strong>({})</strong></span>"#,
+            escape(name), lvl
+        ))
+        .collect();
     let table_rows: Vec<Vec<String>> = rows
         .iter()
         .map(|r| {
@@ -110,6 +123,8 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, OncallView
   <div class="mb-4">{chips}</div>
   <h2 class="text-lg font-semibold mb-2">Alert integrations</h2>
   <div class="mb-4">{integrations}</div>
+  <h2 class="text-lg font-semibold mb-2">Access roles</h2>
+  <div class="mb-4">{roles}</div>
   <h2 class="text-lg font-semibold mb-2">Shifts ({n})</h2>
   {tbl}
 </section>"#,
@@ -117,6 +132,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, OncallView
         u = oncallers.len(),
         chips = chips,
         integrations = integration_chips,
+        roles = role_chips,
         tbl = table(&["rotation", "oncaller", "start", "end"], &table_rows),
     );
     Ok(page_shell_full(
@@ -202,6 +218,15 @@ mod tests {
         assert!(html.contains("Alert integrations"));
         for slug in supported_integrations() {
             assert!(html.contains(slug), "integration {slug} missing from page");
+        }
+    }
+
+    #[test]
+    fn render_lists_access_roles() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::OncallRead])).unwrap();
+        assert!(html.contains("Access roles"));
+        for (name, _) in role_ladder() {
+            assert!(html.contains(name), "role {name} missing from page");
         }
     }
 

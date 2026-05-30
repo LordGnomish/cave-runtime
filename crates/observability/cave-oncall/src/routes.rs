@@ -30,6 +30,7 @@ pub struct OnCallStore {
     pub alerts: Arc<RwLock<HashMap<Uuid, Alert>>>,
     pub silences: Arc<RwLock<HashMap<Uuid, Silence>>>,
     pub incident_links: Arc<RwLock<HashMap<Uuid, IncidentLink>>>,
+    pub invitations: Arc<RwLock<crate::invitations::InvitationStore>>,
 }
 
 impl OnCallStore {
@@ -44,6 +45,7 @@ impl OnCallStore {
             alerts: Arc::new(RwLock::new(HashMap::new())),
             silences: Arc::new(RwLock::new(HashMap::new())),
             incident_links: Arc::new(RwLock::new(HashMap::new())),
+            invitations: Arc::new(RwLock::new(crate::invitations::InvitationStore::default())),
         }
     }
 }
@@ -155,6 +157,12 @@ pub fn create_router(state: Arc<OnCallStore>) -> Router {
         // Integrations (per-source webhook receivers — Grafana OnCall parity)
         .route("/api/oncall/integrations", get(list_integrations))
         .route("/api/oncall/integrations/{slug}", post(webhook_integration))
+        // RBAC — permission catalog with basic-role fallbacks
+        .route("/api/oncall/rbac/permissions", get(list_permissions))
+        // Invitations — invite a user to join an alert group
+        .route("/api/oncall/alerts/{id}/invitations", get(list_invitations))
+        .route("/api/oncall/alerts/{id}/invite", post(invite_user))
+        .route("/api/oncall/invitations/{id}/stop", post(stop_invitation))
         // Stats
         .route("/api/oncall/stats", get(stats))
         .with_state(state)
@@ -873,6 +881,84 @@ async fn webhook_integration(
         StatusCode::CREATED,
         Json(serde_json::json!({ "status": "created", "alert_id": alert_id, "integration": slug })),
     )
+}
+
+// RBAC — list the permission catalog with each permission's RBAC value and
+// basic-role fallback (Grafana OnCall parity).
+async fn list_permissions() -> Json<serde_json::Value> {
+    let perms: Vec<serde_json::Value> = crate::rbac::catalog()
+        .into_iter()
+        .map(|p| {
+            serde_json::json!({
+                "value": p.value(),
+                "resource": p.resource,
+                "action": p.action,
+                "fallback_role": p.fallback_role,
+            })
+        })
+        .collect();
+    Json(serde_json::json!({ "permissions": perms }))
+}
+
+#[derive(Debug, Deserialize)]
+struct InviteRequest {
+    invitee: String,
+    author: String,
+}
+
+// Invitations
+async fn list_invitations(
+    AxumState(store): AxumState<Arc<OnCallStore>>,
+    Path(alert_id): Path<Uuid>,
+) -> Json<serde_json::Value> {
+    let invites = store.invitations.read().await;
+    let active: Vec<serde_json::Value> = invites
+        .active_for(alert_id)
+        .into_iter()
+        .map(|i| {
+            serde_json::json!({
+                "id": i.id,
+                "invitee": i.invitee,
+                "author": i.author,
+                "attempt": i.attempt,
+                "attempts_left": i.attempts_left(),
+            })
+        })
+        .collect();
+    Json(serde_json::json!({ "invitations": active }))
+}
+
+async fn invite_user(
+    AxumState(store): AxumState<Arc<OnCallStore>>,
+    Path(alert_id): Path<Uuid>,
+    Json(req): Json<InviteRequest>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if !store.alerts.read().await.contains_key(&alert_id) {
+        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "alert not found" })));
+    }
+    let (outcome, id) = store
+        .invitations
+        .write()
+        .await
+        .invite_user(&req.invitee, alert_id, &req.author);
+    let kind = match outcome {
+        crate::invitations::InvitationOutcome::Invite => "invite",
+        crate::invitations::InvitationOutcome::ReInvite => "re_invite",
+    };
+    (
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "id": id, "outcome": kind })),
+    )
+}
+
+async fn stop_invitation(
+    AxumState(store): AxumState<Arc<OnCallStore>>,
+    Path(id): Path<Uuid>,
+) -> StatusCode {
+    match store.invitations.write().await.stop_invitation(id) {
+        Ok(()) => StatusCode::NO_CONTENT,
+        Err(_) => StatusCode::NOT_FOUND,
+    }
 }
 
 // Stats
