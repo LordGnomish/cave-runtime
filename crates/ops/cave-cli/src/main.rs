@@ -2888,6 +2888,13 @@ enum CriCmd {
     Info,
     /// Show CRI runtime version (crictl version)
     Version,
+    /// Compute the OCI layer diff between two rootfs dirs (containerd DiffService)
+    Diff {
+        /// Lower (parent snapshot) directory
+        lower: String,
+        /// Upper (current rootfs) directory
+        upper: String,
+    },
     /// Show parity vs upstream containerd CRI
     Parity,
 }
@@ -4408,6 +4415,9 @@ source_root = "src"
             CriCmd::Rmp { id } => c.delete(&format!("/api/cri/sandboxes/{id}")).await,
             CriCmd::Info => c.get("/api/cri/status").await,
             CriCmd::Version => c.get("/api/cri/version").await,
+            CriCmd::Diff { lower, upper } => {
+                c.post("/api/cri/diff", json!({ "lower": lower, "upper": upper })).await
+            }
             CriCmd::Parity => c.get("/api/cri/parity").await,
         },
 

@@ -162,9 +162,58 @@ pub fn create_router(state: Arc<CriState>) -> Router {
             "/api/cri/cgroup/v2/devices/program",
             post(assemble_v2_devices_program),
         )
+        // Layer diff production (core/diff/walking differ — Compare path)
+        .route("/api/cri/diff", post(diff_layers))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
+}
+
+// ── Layer diff (production) ─────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct DiffRequest {
+    /// Parent snapshot directory (the layer below).
+    lower: String,
+    /// Current rootfs directory (the layer above).
+    upper: String,
+}
+
+/// Compute the OCI layer that turns `lower` into `upper`. Mirrors
+/// containerd's `DiffService.Diff`: returns the diff id (sha256 of the
+/// uncompressed tar), the compressed/uncompressed sizes, and a summary
+/// of the change set. The bytes themselves are written by the content
+/// store; this surfaces the metadata a caller commits to a snapshot.
+async fn diff_layers(Json(req): Json<DiffRequest>) -> Response {
+    match crate::diff::diff_layer(std::path::Path::new(&req.lower), std::path::Path::new(&req.upper))
+    {
+        Ok(layer) => {
+            let changes: Vec<serde_json::Value> = layer
+                .changes
+                .iter()
+                .map(|c| {
+                    let kind = match c.kind {
+                        crate::diff::ChangeKind::Add => "add",
+                        crate::diff::ChangeKind::Modify => "modify",
+                        crate::diff::ChangeKind::Delete => "delete",
+                    };
+                    serde_json::json!({ "kind": kind, "path": c.path.to_string_lossy() })
+                })
+                .collect();
+            Json(serde_json::json!({
+                "diff_id": format!("{}:{}", layer.diff_id.algorithm().as_str(), layer.diff_id.hex()),
+                "uncompressed_size": layer.uncompressed_len,
+                "compressed_size": layer.tar_gz.len(),
+                "change_count": layer.changes.len(),
+                "changes": changes,
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() })))
+                .into_response()
+        }
+    }
 }
 
 // ── Parity ────────────────────────────────────────────────────────────────────

@@ -88,7 +88,12 @@ pub fn render_list_page(state: &AdminState, ctx: &RequestCtx) -> Result<String, 
         .collect();
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Sandboxes ({n})</h2>{tbl}
-<div class="mt-4">{btn}</div></section>"#,
+<div class="mt-4">{btn}</div></section>
+<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Layer diff</h2>
+<p class="text-sm text-gray-600">Compute the OCI layer that turns a parent
+snapshot into a rootfs (containerd <code>DiffService.Diff</code> / walking
+differ). <code>POST /api/cri/diff</code> with <code>{{lower, upper}}</code>
+returns the diff id, sizes, and the add/modify/delete change set.</p></section>"#,
         n = rows.len(),
         tbl = table(&["sandbox", "pod", "state"], &table_rows),
         btn = htmx_button("/admin/cri?refresh=1", "main", "Refresh"),
@@ -184,5 +189,18 @@ mod tests {
         assert!(html.contains("Sandboxes (2)"));
         assert!(html.contains("hx-get=\"/admin/cri?refresh=1\""));
         assert!(!html.contains("sb-evil"));
+    }
+
+    #[test]
+    fn render_list_page_surfaces_layer_diff_endpoint() {
+        let (_cite, _t) = portal_test_ctx!(
+            "plugins/kubernetes/src/components/Pods/PodsPage.tsx",
+            "PodsPage",
+            "acme"
+        );
+        let state = AdminState::seeded();
+        let html = render_list_page(&state, &ctx(&[Permission::CriRead])).unwrap();
+        assert!(html.contains("Layer diff"));
+        assert!(html.contains("POST /api/cri/diff"));
     }
 }
