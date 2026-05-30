@@ -4,6 +4,7 @@
 //! Layouts mirror upstream MLX exactly:
 //!   * conv1d  input  `(N, L, C_in)`   weight `(C_out, K, C_in)`   -> `(N, L_out, C_out)`
 //!   * conv2d  input  `(N, H, W, C_in)` weight `(C_out, KH, KW, C_in)` -> `(N, H_out, W_out, C_out)`
+//!
 //! with `L_out = (L + 2*pad - K)/stride + 1` (dilation = 1).
 
 use cave_mlx::array::Array;
