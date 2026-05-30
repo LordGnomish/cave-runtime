@@ -1,12 +1,12 @@
 # cave-local-llm — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2; honest_ratio uplift 2026-05-28 (strict-TDD)
+**Status:** 8/8 PASS — Charter v2; honest_ratio uplift 2026-05-30 (strict-TDD)
 **Upstream:** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
 **source_sha:** v0.3.0
-**fill_ratio:** 1.0000 (29/29)
-**honest_ratio:** 0.9655 (28/29)
+**fill_ratio:** 1.0000 (31/31)
+**honest_ratio:** 0.9677 (30/31)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-28
+**last_audit:** 2026-05-30
 
 ## Headline
 
@@ -32,6 +32,8 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 | `src/openai_compat.rs`  | /v1/{chat,completions,embeddings,models} + SSE chat streaming | mapped | docs/openai.md                    |
 | `src/gguf.rs`           | GGUF header + metadata reader (no tensor data) | mapped   | fs/ggml/{ggml,gguf}.go              |
 | `src/quant.rs`          | GGUF FileType quant helpers (Q4/Q5/Q8, bits/weight, size) | mapped | fs/ggml/type.go                 |
+| `src/modelfile.rs`      | Modelfile parser (FROM/PARAMETER/TEMPLATE/SYSTEM/ADAPTER/LICENSE/MESSAGE + multiline + round-trip) | mapped | parser/parser.go |
+| `src/ollama_extras.rs` (create) | /api/create client builder from a parsed Modelfile | mapped | api/types.go::CreateRequest |
 | `src/prompt_template.rs`| `{{ var }}` / `{{ if }}` / `{{ range }}` subset | mapped | docs/template.md           |
 | `src/backend.rs`        | InferenceBackend trait + adapters    | mapped   | (cave-side abstraction)             |
 | `src/manifest.rs`       | model manifest reader                | mapped   | derived                             |
