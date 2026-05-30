@@ -23,16 +23,16 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.6304   # (mapped + partial) / total = 29/46
+honest_ratio         = 0.6522   # (mapped + partial) / total = 30/46
 adr_justified_ratio  = 1.00     # every [[partial]] + [[skipped]] cites one of the 8 standard scope-cut labels from the umbrella ADR
 adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153"
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-24"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 26
+mapped_count         = 27
 partial_count        = 3
-skipped_count        = 17
+skipped_count        = 16
 unmapped_count       = 0
 total                = 46
 
@@ -143,6 +143,14 @@ local    = "src/providers/google.rs"
 [[files]]
 upstream = "litellm/llms/together_ai/chat/transformation.py"
 local    = "src/providers/together.rs"
+
+[[files]]
+upstream = "litellm/llms/replicate/chat/transformation.py"
+local    = "src/providers/replicate.rs"
+
+[[files]]
+upstream = "litellm/llms/huggingface/chat/transformation.py"
+local    = "src/providers/huggingface.rs"
 
 [[files]]
 upstream = "litellm/secret_managers/main.py"
@@ -327,6 +335,12 @@ name = "provider-together-fireworks"
 # expose /v1/chat/completions with passthrough request/response bodies.
 
 [[mapped]]
+name = "provider-replicate-huggingface"
+# Replicate predictions-poll adapter (src/providers/replicate.rs) +
+# HuggingFace text-generation adapter (src/providers/huggingface.rs).
+# Both members fully ported with pure request/response transforms.
+
+[[mapped]]
 name = "provider-vertex-google"
 # generateContent request/response transform (shared by Gemini API +
 # Vertex AI). Credential resolution (Gemini ?key= vs Vertex GCP-SA OAuth
@@ -414,11 +428,6 @@ reason = "Azure OpenAI — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
 
 [[skipped]]
-name   = "provider-replicate-huggingface"
-reason = "Replicate + HuggingFace Inference Endpoints — provider matrix Phase 2"
-cut_to = "cave-llm-gateway-phase-2"
-
-[[skipped]]
 name   = "provider-groq-deepseek"
 reason = "Groq + DeepSeek — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
@@ -492,8 +501,7 @@ cut_to = "cave-portal-api"
 
 [[scope_cuts]]
 group   = "cloud-saas-matrix"
-members = ["provider-bedrock", "provider-azure-openai",
-           "provider-replicate-huggingface", "provider-groq-deepseek"]
+members = ["provider-bedrock", "provider-azure-openai", "provider-groq-deepseek"]
 reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plus all three local backends"
 
 [[scope_cuts]]
