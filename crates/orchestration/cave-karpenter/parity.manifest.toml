@@ -152,6 +152,10 @@ upstream = "pkg/apis/v1/nodeclaim_validation.go"
 local    = "src/validation.rs"
 
 [[files]]
+upstream = "pkg/apis/v1/nodepool_validation.go"
+local    = "src/nodepool_validation.rs"
+
+[[files]]
 upstream = "pkg/controllers/provisioning/batcher/batcher.go"
 local    = "src/batcher.rs"
 

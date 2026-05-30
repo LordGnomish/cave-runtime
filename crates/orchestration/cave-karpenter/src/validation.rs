@@ -64,8 +64,14 @@ pub struct ValidationError {
 }
 
 impl ValidationError {
-    fn append(&mut self, msg: impl Into<String>) {
+    pub(crate) fn append(&mut self, msg: impl Into<String>) {
         self.messages.push(msg.into());
+    }
+
+    /// Absorb another error's messages (mirrors `multierr.Append` over a
+    /// nested combine). Used by the fan-out validators.
+    pub(crate) fn absorb(&mut self, other: ValidationError) {
+        self.messages.extend(other.messages);
     }
 
     /// The individual failure messages, in append order.
@@ -78,7 +84,7 @@ impl ValidationError {
         self.messages.is_empty()
     }
 
-    fn into_result(self) -> Result<(), ValidationError> {
+    pub(crate) fn into_result(self) -> Result<(), ValidationError> {
         if self.messages.is_empty() {
             Ok(())
         } else {
@@ -250,6 +256,21 @@ pub fn is_valid_label_value(value: &str) -> Vec<String> {
 }
 
 // ── Requirement validation ───────────────────────────────────────────────────
+
+/// `(*NodeClaimTemplateSpec).validateRequirements`: validates every
+/// requirement, aggregating each failure under the "in requirements, restricted"
+/// wrapper upstream uses.
+pub fn validate_requirements(reqs: &[NodeSelectorRequirement]) -> Result<(), ValidationError> {
+    let mut errs = ValidationError::default();
+    for req in reqs {
+        if let Err(e) = validate_requirement(req) {
+            for msg in e.messages() {
+                errs.append(format!("invalid value: {msg} in requirements, restricted"));
+            }
+        }
+    }
+    errs.into_result()
+}
 
 /// `ValidateRequirement`: validates a single node-selector requirement. The key
 /// is normalized first (beta → stable). Errors are aggregated; an empty result
