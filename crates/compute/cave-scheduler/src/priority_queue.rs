@@ -12,9 +12,10 @@
 //! cluster snapshot changes).
 
 use crate::framework::Pod;
+use crate::scheduling_heap::Heap;
 use chrono::{DateTime, Duration, Utc};
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::HashMap;
 
 /// PriorityClass — non-preemptive priority value attached to a pod.
 #[derive(Debug, Clone)]
@@ -53,7 +54,7 @@ impl PartialOrd for QueuedPod {
 }
 impl Ord for QueuedPod {
     fn cmp(&self, other: &Self) -> Ordering {
-        // BinaryHeap is max-heap → higher priority first; older pods first on tie.
+        // Max-heap order → higher priority first; older pods first on tie.
         self.pod
             .spec
             .priority
@@ -63,8 +64,18 @@ impl Ord for QueuedPod {
     }
 }
 
+/// `true` if `a` should pop ahead of `b` in the active queue — the heap's
+/// `less` predicate, derived from the max-heap [`Ord`] above.
+fn active_less(a: &QueuedPod, b: &QueuedPod) -> bool {
+    a.cmp(b) == Ordering::Greater
+}
+
 pub struct PriorityQueue {
-    active: BinaryHeap<QueuedPod>,
+    /// Backed by the key-indexed scheduling heap (keyed by pod uid) so that a
+    /// pod already enqueued can be updated in place or deleted by uid, and a
+    /// re-add of the same uid does not duplicate — mirrors upstream's `activeQ`
+    /// (`pkg/scheduler/internal/queue/scheduling_queue.go`).
+    active: Heap<QueuedPod>,
     backoff: Vec<QueuedPod>,
     unschedulable: HashMap<String, QueuedPod>,
     /// Persistent failure counter per pod uid — survives transitions between
@@ -77,7 +88,7 @@ pub struct PriorityQueue {
 impl PriorityQueue {
     pub fn new() -> Self {
         Self {
-            active: BinaryHeap::new(),
+            active: Heap::new(|q: &QueuedPod| q.pod.uid.clone(), active_less),
             backoff: vec![],
             unschedulable: HashMap::new(),
             attempts_by_uid: HashMap::new(),
@@ -108,13 +119,45 @@ impl PriorityQueue {
         self.unschedulable.len()
     }
 
+    /// Enqueue `pod` into `active`. A re-add of a uid already present updates
+    /// it in place rather than duplicating (upstream `activeQ.Add`).
     pub fn add(&mut self, pod: Pod) {
-        self.active.push(QueuedPod {
+        // Preserve the original enqueue time on re-add so FIFO-within-priority
+        // ordering is stable across an idempotent add.
+        let enqueued_at = self
+            .active
+            .get_by_key(&pod.uid)
+            .map(|q| q.enqueued_at)
+            .unwrap_or_else(Utc::now);
+        self.active.add(QueuedPod {
             pod,
-            enqueued_at: Utc::now(),
+            enqueued_at,
             backoff_until: None,
             attempts: 0,
         });
+    }
+
+    /// Update an already-enqueued pod in place — re-fixes its heap position
+    /// without changing its enqueue time (upstream `activeQ.Update`). If the
+    /// pod is not currently active it is added.
+    pub fn update(&mut self, pod: Pod) {
+        let enqueued_at = self
+            .active
+            .get_by_key(&pod.uid)
+            .map(|q| q.enqueued_at)
+            .unwrap_or_else(Utc::now);
+        self.active.update(QueuedPod {
+            pod,
+            enqueued_at,
+            backoff_until: None,
+            attempts: 0,
+        });
+    }
+
+    /// Delete a pod from `active` by uid (upstream `activeQ.Delete`). Returns
+    /// `true` if a pod was removed.
+    pub fn delete(&mut self, pod: &Pod) -> bool {
+        self.active.delete_by_key(&pod.uid)
     }
 
     /// Pop the highest-priority pod from `active`. Returns None if empty.
@@ -165,7 +208,7 @@ impl PriorityQueue {
         let mut keep: Vec<QueuedPod> = vec![];
         for q in self.backoff.drain(..) {
             if q.backoff_until.map_or(true, |t| t <= now) {
-                self.active.push(QueuedPod {
+                self.active.add(QueuedPod {
                     backoff_until: None,
                     ..q
                 });
@@ -180,7 +223,7 @@ impl PriorityQueue {
     pub fn move_all_unschedulable(&mut self, now: DateTime<Utc>) {
         for (_, mut q) in self.unschedulable.drain() {
             q.enqueued_at = now;
-            self.active.push(q);
+            self.active.add(q);
         }
     }
 }
