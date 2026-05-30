@@ -10,6 +10,7 @@
 pub mod agent_manager;
 pub mod attestor;
 pub mod bundle;
+pub mod cgroup;
 pub mod controller;
 pub mod error;
 pub mod events;
