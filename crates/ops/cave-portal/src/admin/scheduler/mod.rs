@@ -19,6 +19,7 @@ use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
 pub mod bindings;
+pub mod config;
 pub mod events;
 pub mod nodescores;
 pub mod plugins;
@@ -49,6 +50,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerV
     let bindings_html = bindings::render_section(state, ctx)?;
     let nodescores_html = nodescores::render_section(state, ctx)?;
     let events_html = events::render_section(state, ctx)?;
+    let config_html = config::render_section(state, ctx)?;
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
   kube-scheduler Web UI parity (cave-scheduler).
@@ -60,17 +62,20 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerV
   <a href="#scheduler-bindings">Bindings</a>
   <a href="#scheduler-nodescores">Node scores</a>
   <a href="#scheduler-events">Events</a>
+  <a href="#scheduler-config">Config</a>
 </nav>
 {queue}
 {plugins}
 {bindings}
 {nodescores}
-{events}"##,
+{events}
+{config}"##,
         queue = queue_html,
         plugins = plugins_html,
         bindings = bindings_html,
         nodescores = nodescores_html,
         events = events_html,
+        config = config_html,
     );
     Ok(page_shell_full(
         ctx,
