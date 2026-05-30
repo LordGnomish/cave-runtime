@@ -28,6 +28,7 @@ pub mod discover;
 pub mod loader;
 pub mod map;
 pub mod probe;
+pub mod process;
 pub mod ringbuf;
 
 /// Syscall audit event from eBPF.
