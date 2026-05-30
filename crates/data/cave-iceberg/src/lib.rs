@@ -44,7 +44,7 @@ pub mod writer;
 pub use catalog::Catalog;
 pub use error::{Error, Result};
 pub use expr::{Predicate, Reference, Term};
-pub use file_io::{FileIo, MemFileIo};
+pub use file_io::{FileIo, LocalFileIo, MemFileIo};
 pub use manifest::{
     DataFile, DataFileContent, FileFormat, Manifest, ManifestEntry, ManifestEntryStatus,
 };

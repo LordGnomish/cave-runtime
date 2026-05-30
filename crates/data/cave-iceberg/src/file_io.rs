@@ -77,6 +77,59 @@ impl FileIo for MemFileIo {
     }
 }
 
+/// Filesystem-backed FileIO. Resolves `file://` URIs and bare paths to
+/// local disk via `std::fs`, creating parent directories on write. This
+/// is the local backend that pairs with the in-memory `MemFileIo`; the
+/// cloud object-store backends (S3 / GCS / ADLS) remain an explicit
+/// scope_cut behind cave-store.
+#[derive(Debug, Clone, Default)]
+pub struct LocalFileIo;
+
+impl LocalFileIo {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Strip an optional `file://` scheme, yielding a local filesystem
+    /// path.
+    fn resolve(path: &str) -> &str {
+        path.strip_prefix("file://").unwrap_or(path)
+    }
+}
+
+#[async_trait]
+impl FileIo for LocalFileIo {
+    async fn read(&self, path: &str) -> Result<Vec<u8>> {
+        let p = Self::resolve(path);
+        std::fs::read(p).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => Error::NotFound(path.to_string()),
+            _ => Error::Io(e.to_string()),
+        })
+    }
+
+    async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<()> {
+        let p = Self::resolve(path);
+        if let Some(parent) = std::path::Path::new(p).parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|e| Error::Io(e.to_string()))?;
+            }
+        }
+        std::fs::write(p, bytes).map_err(|e| Error::Io(e.to_string()))
+    }
+
+    async fn exists(&self, path: &str) -> Result<bool> {
+        Ok(std::path::Path::new(Self::resolve(path)).exists())
+    }
+
+    async fn delete(&self, path: &str) -> Result<()> {
+        let p = Self::resolve(path);
+        std::fs::remove_file(p).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => Error::NotFound(path.to_string()),
+            _ => Error::Io(e.to_string()),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
