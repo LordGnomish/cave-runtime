@@ -17,6 +17,7 @@ pub mod loadbalance;
 pub mod log;
 pub mod loop_detect;
 pub mod metrics;
+pub mod minimal;
 pub mod prometheus;
 pub mod ready;
 pub mod reload;
