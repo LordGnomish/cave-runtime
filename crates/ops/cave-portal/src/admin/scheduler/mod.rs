@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn render_includes_all_five_tabs() {
+    fn render_includes_all_six_tabs() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::SchedulerRead])).unwrap();
         for anchor in [
             "#scheduler-queue",
@@ -109,6 +109,7 @@ mod tests {
             "#scheduler-bindings",
             "#scheduler-nodescores",
             "#scheduler-events",
+            "#scheduler-config",
         ] {
             assert!(html.contains(anchor));
         }
