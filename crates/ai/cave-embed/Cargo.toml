@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-embed — high-throughput embedding service (OpenAI /v1/embeddings-compatible).
+# Upstream reference: michaelfeil/infinity (MIT) — embedding/reranker server patterns
+# plus sentence-transformers pooling/normalization conventions.
+# cave-embed is AGPL-3.0-or-later.
+
+[package]
+name = "cave-embed"
+description = "Cave embedding service — OpenAI /v1/embeddings + reranker, model registry, dynamic batching, pooling, quantization, result cache"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-embed"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["embeddings", "sentence-transformers", "reranker", "openai", "infinity"]
+categories = ["api-bindings", "text-processing", "science"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
