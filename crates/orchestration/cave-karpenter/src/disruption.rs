@@ -20,6 +20,9 @@ use std::time::{Duration, SystemTime};
 /// Why a node was flagged for disruption.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DisruptionReason {
+    /// Node has no reschedulable pods (zero utilisation) — the
+    /// highest-confidence consolidation reason. Maps to upstream `"empty"`.
+    Empty,
     /// Underutilised compared to the pool's `consolidation_policy` threshold.
     Consolidation,
     /// Node was launched with a now-stale NodePool template hash.
@@ -29,6 +32,12 @@ pub enum DisruptionReason {
     /// Node is permanently unhealthy and should be replaced.
     Unhealthy,
 }
+
+/// `ConsolidationPolicyWhenEmpty` — only empty nodes are consolidated.
+pub const CONSOLIDATION_POLICY_WHEN_EMPTY: &str = "WhenEmpty";
+/// `ConsolidationPolicyWhenEmptyOrUnderutilized` — empty *and* underutilised
+/// nodes are consolidated (the upstream default when the field is unset).
+pub const CONSOLIDATION_POLICY_WHEN_EMPTY_OR_UNDERUTILIZED: &str = "WhenEmptyOrUnderutilized";
 
 /// One disruption decision against a specific NodeClaim.
 #[derive(Debug, Clone)]
@@ -68,6 +77,7 @@ impl Decision {
 
 fn budget_cap_for(disruption: &Disruption, reason: DisruptionReason, total: usize) -> usize {
     let reason_str = match reason {
+        DisruptionReason::Empty => "Empty",
         DisruptionReason::Consolidation => "Underutilized",
         DisruptionReason::Drift => "Drifted",
         DisruptionReason::Expiration => "Expired",
@@ -111,6 +121,63 @@ pub fn consolidation_candidates(claims: &[NodeClaim], threshold: f64) -> Vec<Dec
             ),
         })
         .collect()
+}
+
+/// Flag NodeClaims with zero utilisation (no reschedulable pods) as `Empty` —
+/// the highest-confidence consolidation reason. Mirrors
+/// `pkg/controllers/disruption/emptiness.go::ShouldDisrupt`.
+pub fn empty_candidates(claims: &[NodeClaim]) -> Vec<Decision> {
+    claims
+        .iter()
+        .filter(|c| c.utilization == 0.0 && !c.terminated)
+        .map(|c| Decision {
+            claim_name: c.name.clone(),
+            reason: DisruptionReason::Empty,
+            message: "node has no reschedulable pods".to_string(),
+        })
+        .collect()
+}
+
+/// Compute consolidation decisions honouring the pool's
+/// `Disruption.consolidation_policy`. Empty nodes are always `Empty`; under
+/// `WhenEmptyOrUnderutilized` (the default for an unset policy) non-empty nodes
+/// at or below `underutilized_threshold` are additionally flagged
+/// `Consolidation`. Under `WhenEmpty` only empties are returned. Mirrors the
+/// policy branch in `pkg/controllers/disruption/consolidation.go`.
+pub fn consolidation_decisions(
+    claims: &[NodeClaim],
+    disruption: &Disruption,
+    underutilized_threshold: f64,
+) -> Vec<Decision> {
+    let empty_only = disruption
+        .consolidation_policy
+        .as_deref()
+        .map(|p| p == CONSOLIDATION_POLICY_WHEN_EMPTY)
+        .unwrap_or(false);
+
+    let mut out = Vec::new();
+    for c in claims {
+        if c.terminated {
+            continue;
+        }
+        if c.utilization == 0.0 {
+            out.push(Decision {
+                claim_name: c.name.clone(),
+                reason: DisruptionReason::Empty,
+                message: "node has no reschedulable pods".to_string(),
+            });
+        } else if !empty_only && c.utilization <= underutilized_threshold {
+            out.push(Decision {
+                claim_name: c.name.clone(),
+                reason: DisruptionReason::Consolidation,
+                message: format!(
+                    "node utilization {:.2} <= threshold {:.2}",
+                    c.utilization, underutilized_threshold
+                ),
+            });
+        }
+    }
+    out
 }
 
 /// Flag NodeClaims whose `template_hash` differs from their NodePool's
