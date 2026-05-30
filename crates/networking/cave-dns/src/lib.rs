@@ -35,3 +35,4 @@ pub fn router(zones: Arc<zone::ZoneManager>) -> Router {
 }
 pub mod bufsize;
 pub mod acl;
+pub mod dns64;
