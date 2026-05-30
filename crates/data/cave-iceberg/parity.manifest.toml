@@ -38,17 +38,17 @@ url      = "https://github.com/apache/iceberg-rust"
 # decomposed into 24 distinct subsystems below. Counts (mapped +
 # partial + skipped + unmapped) sum to total. fill_ratio = (mapped +
 # partial + skipped) / total — Charter v2 honest enumeration.
-mapped_count   = 16
-partial_count  = 3
+mapped_count   = 17
+partial_count  = 2
 skipped_count  = 5
 unmapped_count = 0
 total          = 24
 fill_ratio     = 1.0000
-honest_ratio   = 0.6667
-adr_justified_ratio = 1.0      # 5 skipped (vendor catalogs Glue/HMS/SQL, datafusion-adapter, integration-tests) + partials (write-side, avro-wire, predicate-pushdown-parquet, v3-format) all deferred to lakehouse-ray-2 per ADR-147
+honest_ratio   = 0.7083
+adr_justified_ratio = 1.0      # 5 skipped (vendor catalogs Glue/HMS/SQL, datafusion-adapter, integration-tests) + partials (file-io-cross-crate, v3-format) all deferred to lakehouse-ray-2 per ADR-147
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147"
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
@@ -56,7 +56,7 @@ name        = "cave-iceberg"
 description = "Sovereign Apache Iceberg table format — read-side reimplementation"
 source_root = "src"
 
-# ─── Mapped (14) ─────────────────────────────────────────────────────────────
+# ─── Mapped (17) ─────────────────────────────────────────────────────────────
 
 [[mapped]]
 upstream = "crates/iceberg/src/spec/schema.rs"
@@ -128,7 +128,12 @@ upstream = "crates/iceberg/src/expr/predicate.rs"
 local    = "src/expr.rs"
 notes    = "Predicate AST (Compare/And/Or/Not + IsNull/IsNotNull) + JSON-row evaluator + short-circuit boolean semantics."
 
-# ─── Partial (3) ─────────────────────────────────────────────────────────────
+[[mapped]]
+upstream = "crates/iceberg/src/expr/visitors/inclusive_metrics_evaluator.rs"
+local    = "src/metrics_eval.rs"
+notes    = "InclusiveMetricsEvaluator — manifest-time data-file pruning. Decides purely from a DataFile's value/null counts + lower/upper bounds whether a file might contain matching rows (ROWS_MIGHT_MATCH) or can be pruned (ROWS_CANNOT_MATCH). Decodes Iceberg single-value binary bounds (LE int/long/double, UTF-8 string). visit_{equal,less_than,greater_than,is_null,not_null} + And/Or AST walk. Wave-4 promotion of partition_spec bound-pruning partial 2026-05-30 (tests/metrics_pruning_tdd.rs)."
+
+# ─── Partial (2) ─────────────────────────────────────────────────────────────
 
 [[partial]]
 upstream = "crates/iceberg/src/spec/table_metadata.rs (v3 spec)"
@@ -139,11 +144,6 @@ notes    = "FormatVersion::V3 variant accepted at parse-time and round-trips; v3
 upstream = "crates/iceberg/src/io/"
 local    = "src/file_io.rs"
 notes    = "FileIO async trait + MemFileIo impl. Real S3/MinIO/GCS impls live in cave-store; the cross-crate wiring lands in v0.2."
-
-[[partial]]
-upstream = "crates/iceberg/src/spec/partition_spec.rs"
-local    = "src/table_metadata.rs"
-notes    = "PartitionSpec + PartitionField shape carried; transform application against actual row values for partition-pruning is wired (see src/transform.rs) but manifest-time bound pruning is not yet hooked into ScanBuilder."
 
 # ─── Skipped — alt-language / vendor catalog / write-only (5) ────────────────
 
@@ -167,7 +167,7 @@ reason   = "Iceberg ↔ DataFusion adapter — sibling crate cave-datafusion liv
 upstream = "crates/iceberg-integration-tests/"
 reason   = "Integration test harness against external services (REST server, MinIO) — replaced by cave-store-native test fixtures"
 
-# ─── Unmapped (2) — honest port gaps for lakehouse-ray-2 ─────────────────────
+# ─── Mapped (write-side, Wave-3 promotions) ──────────────────────────────────
 
 [[mapped]]
 upstream = "crates/iceberg/src/writer/"

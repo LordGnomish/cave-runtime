@@ -28,6 +28,7 @@ pub mod file_io;
 pub mod manifest;
 pub mod manifest_list;
 pub mod memory_catalog;
+pub mod metrics_eval;
 pub mod namespace;
 pub mod rest_catalog;
 pub mod scan;
@@ -49,6 +50,7 @@ pub use manifest::{
 };
 pub use manifest_list::{ManifestFile, ManifestList, ManifestListContent};
 pub use memory_catalog::MemoryCatalog;
+pub use metrics_eval::InclusiveMetricsEvaluator;
 pub use namespace::{Namespace, NamespaceIdent};
 pub use rest_catalog::RestCatalog;
 pub use scan::{FileScanTask, ScanBuilder};
