@@ -34,6 +34,7 @@ pub mod scaledjob;
 pub mod scaledobject;
 pub mod scaler;
 pub mod scaling_modifiers;
+pub mod splunk_scaler;
 pub mod trigger_authentication;
 
 pub use aws_sqs_scaler::AwsSqsScaler;
@@ -54,6 +55,7 @@ pub use scaledjob::{ScaledJob, ScalingStrategy};
 pub use scaledobject::ScaledObject;
 pub use scaler::{Scaler, ScalerTrait, ScalingModifiers, replicas_from_metric};
 pub use scaling_modifiers::{ScalingModifiersEvaluator, Trigger};
+pub use splunk_scaler::{SearchResponse, SplunkScaler, SplunkValidationError};
 pub use trigger_authentication::{EnvTargetRef, SecretTargetRef, TriggerAuthentication};
 
 #[cfg(test)]
