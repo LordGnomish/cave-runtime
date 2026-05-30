@@ -35,12 +35,14 @@
 //! * CDATA sections are reserialised as escaped character data
 //!   (Canonical XML 1.0 §3.4).
 //!
+//! * `InclusiveNamespaces` prefix lists (xml-exc-c14n §2.2) are
+//!   supported via [`exc_c14n_with_prefixes`]; the plain
+//!   [`exc_c14n`] uses the visibly-utilised algorithm only.
+//!
 //! ## Known limitations
 //!
 //! * No DTD / entity resolution. SAML messages don't carry
 //!   either.
-//! * `InclusiveNamespaces`-prefix lists are not yet parsed; the
-//!   plain visibly-utilised algorithm is used.
 
 use std::collections::BTreeMap;
 
@@ -54,6 +56,43 @@ use super::SamlError;
 /// shape used by [`super::signature::SignedDocument`] —
 /// `fn(&[u8]) -> Result<Vec<u8>, SamlError>`.
 pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
+    exc_c14n_inner(xml, &std::collections::HashSet::new())
+}
+
+/// Canonicalize `xml` with exclusive c14n plus an
+/// `InclusiveNamespaces` prefix list (xml-exc-c14n §2.2).
+///
+/// Each token in `prefixes` names a namespace prefix that is
+/// processed *inclusive-style*: its in-scope declaration is
+/// retained at the apex element even when it is not visibly
+/// utilised by that element or its attributes. The special token
+/// `"#default"` refers to the default (no-prefix) namespace.
+///
+/// Strict third-party IdPs (e.g. ADFS, Shibboleth) frequently
+/// sign with an `<ec:InclusiveNamespaces PrefixList="…">`
+/// parameter on the `<ds:Transform>`; passing the same list here
+/// reproduces their signed octet stream without an external
+/// canonicalizer.
+pub fn exc_c14n_with_prefixes(xml: &[u8], prefixes: &[&str]) -> Result<Vec<u8>, SamlError> {
+    // Map the "#default" token to the empty-string prefix used
+    // internally for the default namespace.
+    let set: std::collections::HashSet<String> = prefixes
+        .iter()
+        .map(|p| {
+            if *p == "#default" {
+                String::new()
+            } else {
+                (*p).to_string()
+            }
+        })
+        .collect();
+    exc_c14n_inner(xml, &set)
+}
+
+fn exc_c14n_inner(
+    xml: &[u8],
+    inclusive: &std::collections::HashSet<String>,
+) -> Result<Vec<u8>, SamlError> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().expand_empty_elements = true;
@@ -76,7 +115,7 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
                 // Without-comments profile.
             }
             Event::Start(e) => {
-                let frame = build_frame(&e, &ns_stack)?;
+                let frame = build_frame(&e, &ns_stack, inclusive)?;
                 emit_start(&mut out, &e, &frame)?;
                 ns_stack.push(frame.declared);
             }
@@ -89,7 +128,7 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
                 // not fire — but if quick-xml ever yields one
                 // (eg. inside a CDATA edge case) we expand it
                 // manually.
-                let frame = build_frame(&e, &ns_stack)?;
+                let frame = build_frame(&e, &ns_stack, inclusive)?;
                 let name_bytes = e.name().as_ref().to_vec();
                 let name_str = std::str::from_utf8(&name_bytes)
                     .map_err(|err| SamlError::Parse(format!("c14n empty name: {err}")))?
@@ -191,6 +230,7 @@ struct NsDeclLocal {
 fn build_frame(
     e: &BytesStart<'_>,
     ns_stack: &[Vec<NsDeclLocal>],
+    inclusive: &std::collections::HashSet<String>,
 ) -> Result<ElementFrame, SamlError> {
     let elem_name = std::str::from_utf8(e.name().as_ref())
         .map_err(|err| SamlError::Parse(format!("c14n elem: {err}")))?
@@ -242,7 +282,12 @@ fn build_frame(
     // frame.
     let mut namespaces_out: Vec<(String, String)> = Vec::new();
     for d in &declared {
-        if !used_prefixes.contains(&d.prefix) {
+        // A declaration is emitted when it is visibly utilised
+        // (plain exc-c14n) *or* when its prefix is in the
+        // `InclusiveNamespaces` list (xml-exc-c14n §2.2 — listed
+        // prefixes are processed inclusive-style and retained
+        // even when unused).
+        if !used_prefixes.contains(&d.prefix) && !inclusive.contains(&d.prefix) {
             continue;
         }
         // Inherited?
