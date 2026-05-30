@@ -48,16 +48,16 @@ source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.7105
-adr_justified_ratio = 1.0      # 11 skipped (4 operational storage backends kafka/grpc-remote/scylladb/blackhole → cave-store/cave-streams Phase 3 / 3 standalone CLIs (ingester/remote-storage) + es-tooling → in-process / sampling-leader-election + jaeger-v2-otel binary out-of-launch / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical. The cassandra/elasticsearch/badger *db-model codecs* are now mapped in-crate (live network drivers stay scope_cut).
+honest_ratio        = 0.7692
+adr_justified_ratio = 1.0      # 9 skipped (3 operational storage backends grpc-remote/scylladb/blackhole → cave-store/cave-streams Phase 3 / 3 standalone CLIs (ingester/remote-storage) + jaeger-v2-otel binary out-of-launch / sampling-leader-election → cave-ha Phase 3 / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical. The cassandra/elasticsearch/badger/kafka *codecs* + the esmapping-generator render logic are now mapped in-crate (live network drivers + transport + CLI binaries stay scope_cut). The Tempo service-graph metrics processor is a mapped Tempo-compat subsystem.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 25
+mapped_count        = 28
 partial_count       = 2
-skipped_count       = 11
+skipped_count       = 9
 unmapped_count      = 0
-total               = 38
+total               = 39
 
 # 2026-05-21 Charter v2 deep-port close — claude/cave-trace-deep-port-2026-05-21:
 #   * Existing 9 742 LOC scaffold (27 src/.rs files, 106 unit tests) measured
@@ -109,13 +109,47 @@ total               = 38
 #     legacy [parity].ratio=0.0 placeholder).
 #   * 2 unmapped (agent-grpc-forwarder + storage-archival) preserved as honest
 #     gaps for Phase 3.
+#
+# 2026-05-30 honest-uplift (Wave 6 strict-TDD, claude/cave-trace-honest-cont2):
+#   three more line-portable algorithms promoted/added, each RED test commit →
+#   GREEN impl commit (never together):
+#     * NEW mapped 'tempo-servicegraph-metrics' (grafana/tempo
+#       modules/generator/processor/servicegraphs) → src/servicegraph.rs:
+#       client/server (and producer/consumer) edge matching keyed on
+#       (trace_id, connecting span id), edge completeness, TTL expiry of
+#       unmatched halves, per-(client,server) request_total/request_failed_total
+#       + server/client latency histograms on Tempo default buckets, Prometheus
+#       exposition. Wired GET /tempo/api/metrics/servicegraph.
+#       tests/servicegraph_tdd.rs (9 cases). Tempo-compat subsystem (consistent
+#       with the existing tempo-search-rest-api + traceql-engine mapped
+#       Tempo-compat subsystems). mapped+1, total 38→39.
+#     * es-tooling skipped→mapped 'es-index-mapping-generator' (jaeger
+#       plugin/storage/es/mappings/mapping.go MappingBuilder driven by
+#       cmd/esmapping-generator) → src/storage_es.rs::MappingBuilder: shards/
+#       replicas substitution, prefix-aware index_patterns + ILM rollover_alias
+#       gated on use_ilm, ES8 composable vs ES7 legacy template envelopes, and
+#       the canonical jaeger-span/service/dependencies document mappings.
+#       tests/es_mapping_tdd.rs (8 cases). The es-index-cleaner + es-rollover
+#       operational tools stay scope_cut (standalone-cli-binaries).
+#     * storage-kafka skipped→mapped 'storage-kafka-marshaller' (jaeger
+#       plugin/storage/kafka/{marshaller,unmarshaller,writer}.go) →
+#       src/storage_kafka.rs: jsonpb model.Span JSON codec (hex IDs, CHILD_OF/
+#       FOLLOWS_FROM references, vType-typed tags, RFC3339 startTime,
+#       google.protobuf.Duration fractional-seconds string), JSON round-trip,
+#       trace-ID partition key. tests/kafka_marshaller_tdd.rs (8 cases). The
+#       live sarama AsyncProducer + ingester consumer group + protobuf binary
+#       marshaller stay scope_cut (operational-storage-backends).
+#   mapped 25→28, skipped 11→9, total 38→39, honest_ratio 0.7105→0.7692.
+#   grpc-remote/scylladb/blackhole transport + CLI binaries +
+#   sampling-leader-election + jaeger-v2 + agent-grpc-forwarder +
+#   storage-archival stay honestly cut.
 
 [module]
 name        = "cave-trace"
 description = "Distributed tracing — Jaeger reimplementation + OTLP/Zipkin/OpenCensus ingestion + Tempo TraceQL search + SPM"
 source_root = "src"
 
-# ─── Mapped subsystems (22) ──────────────────────────────────────────────────
+# ─── Mapped subsystems (28) ──────────────────────────────────────────────────
 
 [[mapped]]
 name = "span-model"
@@ -246,6 +280,24 @@ upstream = "plugin/storage/badger/spanstore/writer.go (key layout)"
 local = "src/storage_badger.rs"
 note = "Badger key-encoding store line-port: byte-exact primary key [0x80|traceHigh|traceLow|startMicros|spanID] + secondary index key [(prefix&0x0f)|0x80|value|startMicros|traceHigh|traceLow] with per-index value bytes (service / service+operation / service+operation+duration8B / service+key+AsString tag), backed by an in-process BTreeMap reproducing Badger's sorted LSM ordering so write_span + get_trace + trace_ids_by_service prefix-scans genuinely read through the real layout. 2026-05-30 TDD RED->GREEN (tests/badger_keys_tdd.rs, 8 cases). The live Badger mmap LSM + value-log + GC stay scope_cut (operational-storage-backends)."
 
+[[mapped]]
+name = "tempo-servicegraph-metrics"
+upstream = "grafana/tempo modules/generator/processor/servicegraphs (servicegraphs.go + store/store.go + edge.go)"
+local = "src/servicegraph.rs"
+note = "Tempo metrics-generator service-graph processor line-port: CLIENT/PRODUCER spans contribute the caller half of an edge keyed by (trace_id, span_id), SERVER/CONSUMER spans the callee half keyed by (trace_id, parent_span_id); an edge completes when both services are known → per-(client,server) request_total + request_failed_total counters and server/client latency histograms (Tempo default buckets 0.1..12.8s) are observed and the edge evicted; unmatched halves expire after the configured TTL (Tempo default wait 10s) and are counted. Prometheus exposition uses Tempo's traces_service_graph_request_* metric names. Wired GET /tempo/api/metrics/servicegraph. 2026-05-30 TDD RED->GREEN (tests/servicegraph_tdd.rs, 9 cases). The live Prometheus remote-write exporter + generator WAL stay in cave-metrics / Phase 3. Tempo-compat subsystem (Apache-2.0)."
+
+[[mapped]]
+name = "es-index-mapping-generator"
+upstream = "plugin/storage/es/mappings/mapping.go (MappingBuilder) + cmd/esmapping-generator/app/renderer"
+local = "src/storage_es.rs"
+note = "Elasticsearch index-template render line-port: MappingBuilder substitutes shards/replicas, builds prefix-aware index_patterns + (when use_ilm) the index.lifecycle.name + rollover_alias settings, and selects the version-specific envelope — ES>=8 composable (priority + template:{settings,mappings}) vs ES7 legacy (top-level settings/mappings/aliases + order) — wrapping the canonical jaeger-span/service/dependencies document mappings (keyword IDs, startTimeMillis epoch_millis date routing field, nested tags/logs/references/process, date_detection=false). 2026-05-30 TDD RED->GREEN (tests/es_mapping_tdd.rs, 8 cases). The es-index-cleaner + es-rollover operational tools + the live PUT _index_template HTTP call stay scope_cut (standalone-cli-binaries / operational-storage-backends)."
+
+[[mapped]]
+name = "storage-kafka-marshaller"
+upstream = "plugin/storage/kafka/{marshaller,unmarshaller,writer}.go"
+local = "src/storage_kafka.rs"
+note = "Kafka span codec line-port: KafkaSpanCodec marshals/unmarshals the jsonpb model.Span representation a writer serialises before handing bytes to the transport — hex traceID/spanID (model.TraceID/SpanID.String), CHILD_OF reference synthesised from parent_span_id + FOLLOWS_FROM from links, vType-discriminated tags (STRING->vStr / BOOL->vBool / INT64->vInt64 string / FLOAT64->vFloat64 / BINARY->vBinary base64), RFC3339-nanos startTime, google.protobuf.Duration fractional-seconds string with 3/6/9-digit grouping (format_proto_duration/parse_proto_duration) — plus the writer.go partition key span.TraceID.String() that keeps a trace's spans on one partition. 2026-05-30 TDD RED->GREEN (tests/kafka_marshaller_tdd.rs, 8 cases). The live sarama AsyncProducer + the ingester consumer group + the protobuf binary marshaller stay scope_cut (operational-storage-backends)."
+
 # ─── Partial subsystems (2) ──────────────────────────────────────────────────
 
 [[partial]]
@@ -258,15 +310,13 @@ name = "clientcfg-remote-sampler"
 upstream = "pkg/clientcfg + cmd/agent/app/configmanager"
 note = "reqwest-based client for fetching remote sampler strategy is present (used by AdaptiveSampler), but the server-side strategy distribution endpoint (jaeger-agent → SDK fetch) is not exposed."
 
-# ─── Skipped subsystems (9 — out of MVP scope) ───────────────────────────────
-# NOTE: the cassandra / elasticsearch / badger *db-model codecs* were promoted
-# to [[mapped]] on 2026-05-30 (Wave 5) — only their live network/mmap drivers
-# remain operational and scope_cut. See [[scope_cuts]] operational-storage-backends.
-
-[[skipped]]
-name = "storage-kafka"
-upstream = "plugin/storage/kafka"
-reason = "Async durable buffer between collector + ingester. cave-streams provides the workspace Kafka surface; bridge crate (cave-trace ↔ cave-streams) is Phase 3."
+# ─── Skipped subsystems (7 — out of MVP scope) ───────────────────────────────
+# NOTE: the cassandra / elasticsearch / badger *db-model codecs* (Wave 5) + the
+# kafka *marshaller codec* + the esmapping-generator *render logic* (Wave 6)
+# were promoted to [[mapped]] on 2026-05-30 — only their live network/mmap
+# drivers, the Kafka transport, and the es-cleaner/rollover CLIs remain
+# operational and scope_cut. See [[scope_cuts]] operational-storage-backends +
+# standalone-cli-binaries.
 
 [[skipped]]
 name = "storage-grpc-remote"
@@ -286,7 +336,7 @@ reason = "Null sink for benchmarking. TraceStore default + retention=0 covers th
 [[skipped]]
 name = "cmd-ingester-binary"
 upstream = "cmd/ingester"
-reason = "Standalone Kafka consumer binary draining storage-kafka into a span store. Skipped jointly with storage-kafka — Phase 3 cave-streams bridge."
+reason = "Standalone Kafka consumer binary draining the Kafka topic into a span store. The span codec it relies on is mapped (storage-kafka-marshaller); the consumer-group process + sarama transport remain operational — Phase 3 cave-streams bridge."
 
 [[skipped]]
 name = "cmd-remote-storage-binary"
@@ -294,9 +344,9 @@ upstream = "cmd/remote-storage"
 reason = "Standalone gRPC plugin host. Skipped jointly with storage-grpc-remote."
 
 [[skipped]]
-name = "es-tooling"
-upstream = "cmd/es-index-cleaner + cmd/es-rollover + cmd/esmapping-generator"
-reason = "Elasticsearch-specific operational tooling. Out of scope without storage-elasticsearch."
+name = "es-operational-tooling"
+upstream = "cmd/es-index-cleaner + cmd/es-rollover"
+reason = "Elasticsearch operational maintenance CLIs (delete old indices / roll the write alias). The esmapping-generator render logic is now mapped (es-index-mapping-generator); these two remain operational binaries — out of scope without the live ES driver."
 
 [[skipped]]
 name = "sampling-leader-election"
@@ -331,12 +381,12 @@ reason       = "Secondary archival writer (warm → cold) mirroring traces to a 
 
 [[scope_cuts]]
 group = "operational-storage-backends"
-reason = "kafka / grpc-remote / scylladb / blackhole are operational deployment surfaces — cave-trace covers them in [[skipped]] (4 entries). The cassandra / elasticsearch / badger db-model *codecs* are now [[mapped]] in-crate (src/storage_cassandra.rs, src/storage_es.rs, src/storage_badger.rs); only their live network/mmap *drivers* remain scope_cut here. MVP routes operational storage through cave-store (S3 surface) in Phase 3."
+reason = "grpc-remote / scylladb / blackhole are operational deployment surfaces — cave-trace covers them in [[skipped]] (3 entries). The cassandra / elasticsearch / badger db-model *codecs* (src/storage_cassandra.rs, src/storage_es.rs, src/storage_badger.rs) + the kafka span *marshaller codec* (src/storage_kafka.rs) are now [[mapped]] in-crate; only their live network/mmap *drivers* + the Kafka sarama transport / ingester consumer group remain scope_cut here. MVP routes operational storage through cave-store (S3 surface) in Phase 3."
 phase = "Phase 3 — cave-store / cave-search / cave-streams integration"
 
 [[scope_cuts]]
 group = "standalone-cli-binaries"
-reason = "cmd/ingester + cmd/remote-storage + cmd/tracegen + es-tooling are standalone binaries — cave-trace runs inside cave-runtime, not as separate processes. Their data-plane behaviors map to in-process functions."
+reason = "cmd/ingester + cmd/remote-storage + cmd/tracegen + cmd/es-index-cleaner + cmd/es-rollover are standalone binaries — cave-trace runs inside cave-runtime, not as separate processes. Their data-plane behaviors map to in-process functions (tracegen → synthetic-trace-generator, esmapping-generator → es-index-mapping-generator); the remaining operational binaries stay cut."
 phase = "Phase 3 — only if cave-runtime composition demands process splits"
 
 [[scope_cuts]]
@@ -379,6 +429,14 @@ local    = "src/storage_es.rs"
 [[files]]
 upstream = "plugin/storage/badger/spanstore/writer.go"
 local    = "src/storage_badger.rs"
+
+[[files]]
+upstream = "plugin/storage/kafka/marshaller.go"
+local    = "src/storage_kafka.rs"
+
+[[files]]
+upstream = "grafana/tempo modules/generator/processor/servicegraphs/servicegraphs.go"
+local    = "src/servicegraph.rs"
 
 [[files]]
 upstream = "internal/sampling/strategystore/static/strategy_store.go"
@@ -717,6 +775,11 @@ local_path    = "/api/v2/spans"
 kind          = "http"
 upstream_path = "OpenCensus /v1/traces"
 local_path    = "/oc/v1/traces"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "tempo /api/metrics/servicegraph (metrics-generator service graph)"
+local_path    = "/tempo/api/metrics/servicegraph"
 
 [portal_ui]
 upstream_ui  = "Jaeger UI"
