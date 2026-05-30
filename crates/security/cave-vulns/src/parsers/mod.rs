@@ -10,6 +10,7 @@ use crate::finding::Finding;
 
 pub mod bandit;
 pub mod cyclonedx_vex;
+pub mod generic;
 pub mod nuclei;
 pub mod sarif;
 pub mod semgrep;
