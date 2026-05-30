@@ -1,12 +1,35 @@
 # cave-local-llm — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2; honest_ratio uplift 2026-05-28 (strict-TDD)
-**Upstream:** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
+**Status:** 8/8 PASS — Charter v2; vLLM engine port 2026-05-30 (strict-TDD)
+**Upstream (primary):** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
+**Upstream (engine):** vllm-project/vllm (Apache-2.0) — PagedAttention / scheduler / sampling / quant / spec-decode / LoRA
 **source_sha:** v0.3.0
-**fill_ratio:** 1.0000 (29/29)
-**honest_ratio:** 0.9655 (28/29)
+**fill_ratio:** 1.0000 (35/35)
+**honest_ratio:** 0.9714 (34/35)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-28
+**last_audit:** 2026-05-30
+
+## vLLM engine port (2026-05-30, strict-TDD, 6 RED→GREEN cycles, +61 tests)
+
+Six pure-Rust modules port vLLM's inference-engine **control logic** (the GPU
+dequant / attention / matmul kernels remain out of scope — hardware-dependent):
+
+| Module                       | vLLM upstream                                   | Tests | Status |
+|------------------------------|-------------------------------------------------|-------|--------|
+| `src/vllm_paged_attention.rs`| `core/block_manager.py` BlockSpaceManager       | 15    | mapped |
+| `src/vllm_scheduler.rs`      | `core/scheduler.py` Scheduler + SchedulingBudget| 9     | mapped |
+| `src/vllm_sampling.rs`       | `sampling_params.py` SamplingParams             | 14    | mapped |
+| `src/vllm_quant.rs`          | `layers/quantization/{awq,gptq,fp8}.py`         | 11    | mapped |
+| `src/vllm_spec_decode.rs`    | `layers/rejection_sampler.py`                   | 5     | mapped |
+| `src/vllm_lora.rs`           | `lora/worker_manager.py` (LRU LoRA pool)        | 7     | mapped |
+
+Coverage: PagedAttention block alloc / ref-counted copy-on-write / fork / free
+/ GPU↔CPU swap / watermark admission; continuous-batching prefill + one-token
+decode + recompute preemption; SamplingParams `_verify_args` + greedy/random
+classification + OpenAI mapping; AWQ/GPTQ/FP8 pack factor + group scales +
+fp16 compression ratio; rejection-sampling accept/recovery/bonus + acceptance
+stats; multi-LoRA scaling + rank-bound registration + LRU slot pool + forward
+delta `scaling·(B(Ax))`. Wired via `cave-local-llm vllm {paged,quant,sample}`.
 
 ## Headline
 

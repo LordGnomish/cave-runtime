@@ -1,5 +1,10 @@
 # parity.manifest.toml — cave-local-llm
-# Upstream: ollama/ollama  https://github.com/ollama/ollama
+# Upstream (primary): ollama/ollama   https://github.com/ollama/ollama   (MIT)
+# Upstream (engine):  vllm-project/vllm https://github.com/vllm-project/vllm (Apache-2.0)
+#
+# cave-local-llm is a dual-upstream crate: the Ollama HTTP surface + OpenAI-compat
+# client (MIT) plus a pure-Rust port of vLLM's inference-engine control logic
+# (Apache-2.0). The vLLM NOTICE attribution is carried in the workspace NOTICE.
 
 [upstream]
 org        = "ollama"
@@ -7,6 +12,14 @@ repo       = "ollama"
 version    = "v0.3.0"
 license    = "MIT"
 source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
+
+# Second tracked upstream — vLLM engine port (2026-05-30, strict-TDD).
+[upstream_vllm]
+org        = "vllm-project"
+repo       = "vllm"
+version    = "v0.6.x"
+license    = "Apache-2.0"
+note       = "PagedAttention block manager, continuous-batching scheduler, SamplingParams, AWQ/GPTQ/FP8 quant configs, speculative-decode rejection sampler, multi-LoRA manager — pure-Rust control logic; GPU kernels remain out of scope (no-backcompat hardware dependency)."
 
 [parity]
 # 2026-05-19 Charter v2 deep-port — cave-local-llm covers the in-scope
@@ -34,6 +47,22 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # GGUF layout were re-validated against ollama HEAD 11be8f6a; all are additive
 # and present at/before the pinned v0.3.0 baseline.
 #
+# 2026-05-30 vLLM engine port (strict-TDD, 6 RED->GREEN cycles, +61 tests):
+# added six pure-Rust mapped modules porting vLLM's inference-engine control
+# logic (vllm-project/vllm, Apache-2.0) — vllm_paged_attention.rs
+# (BlockSpaceManager + BlockAllocator: alloc, ref-counted copy-on-write
+# append, fork, free, GPU<->CPU swap, watermark admission), vllm_scheduler.rs
+# (SchedulingBudget + continuous-batching schedule(): prefill admission,
+# one-token-per-seq decode, recompute preemption), vllm_sampling.rs
+# (SamplingParams + _verify_args + greedy/random classification + OpenAI
+# mapping), vllm_quant.rs (AWQ/GPTQ/FP8 config metadata: pack factor, group
+# scales, packed sizing, fp16 compression ratio), vllm_spec_decode.rs
+# (rejection sampler: accept iff u<=min(1,p/q), residual recovery token,
+# bonus token, acceptance stats), vllm_lora.rs (LoRARequest scaling, rank-
+# bound registration, max_loras slot pool + LRU eviction, forward delta
+# scaling*(B(Ax))). These map the engine's *control plane* — GPU dequant /
+# attention / matmul kernels stay out of scope (hardware-dependent).
+#
 # Partial (1): daemon graceful-shutdown — the loop already handles SIGTERM +
 # a stop-signal file (daemon.rs); SIGINT/full in-flight drain is still owned
 # by the cave-runtime host. Kept honest (not inflated to mapped).
@@ -45,17 +74,17 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # (trait open for extension), embedding-recall RAG store (cave-hermes),
 # KV-cache eviction state machine (runtime-internal), JSON-mode response
 # validation, /api/version surface in extras.
-mapped_count          = 18
+mapped_count          = 24  # 2026-05-30: +6 vLLM engine modules (PagedAttention, scheduler, sampling, quant, spec-decode, LoRA)
 partial_count         = 1
 skipped_count         = 10
 unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
-total                 = 29  # 2026-05-28: +2 (gguf reader + quant helpers) decomposed from the llama.cpp-adapters scope-cut and now mapped
-fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 29/29
-honest_ratio          = 0.9655  # (mapped + skipped) / total            = 28/29
+total                 = 35  # 2026-05-30: +6 vLLM mapped modules (was 29)
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 35/35
+honest_ratio          = 0.9714  # (mapped + skipped) / total            = 34/35
 adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-28"
+last_audit            = "2026-05-30"
 infra_only            = false
 
 # adr_justified_ratio breakdown (2026-05-28):
@@ -135,6 +164,37 @@ file          = "src/gguf.rs"
 upstream_name = "fs/ggml.ParseFileType / FileType.String"
 local_name    = "QuantType::{from_file_type,from_str,name}"
 file          = "src/quant.rs"
+
+# 2026-05-30 vLLM engine port (vllm-project/vllm, Apache-2.0) — strict-TDD.
+[[functions]]
+upstream_name = "vllm.core.block_manager.BlockSpaceManager"
+local_name    = "BlockSpaceManager"
+file          = "src/vllm_paged_attention.rs"
+
+[[functions]]
+upstream_name = "vllm.core.scheduler.Scheduler + SchedulingBudget"
+local_name    = "Scheduler"
+file          = "src/vllm_scheduler.rs"
+
+[[functions]]
+upstream_name = "vllm.sampling_params.SamplingParams"
+local_name    = "SamplingParams"
+file          = "src/vllm_sampling.rs"
+
+[[functions]]
+upstream_name = "vllm.model_executor.layers.quantization.{awq,gptq,fp8}"
+local_name    = "QuantConfig"
+file          = "src/vllm_quant.rs"
+
+[[functions]]
+upstream_name = "vllm.model_executor.layers.rejection_sampler.RejectionSampler"
+local_name    = "RejectionSampler"
+file          = "src/vllm_spec_decode.rs"
+
+[[functions]]
+upstream_name = "vllm.lora.worker_manager.LRUCacheWorkerLoRAManager"
+local_name    = "LoRAManager"
+file          = "src/vllm_lora.rs"
 
 [[surfaces]]
 kind          = "http"

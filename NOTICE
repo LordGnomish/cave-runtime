@@ -126,6 +126,7 @@ Apache-2.0:
   - strimzi/strimzi-kafka-operator
   - tektoncd/pipeline
   - thanos-io/thanos
+  - vllm-project/vllm        (cave-local-llm; engine port — PagedAttention/scheduler/sampling/quant/spec-decode/LoRA)
   - vmware-tanzu/velero
   - zaproxy/zaproxy          (cave-dast; v2.14.0)
 
