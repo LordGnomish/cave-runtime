@@ -157,4 +157,85 @@ mod tests {
         assert!(v.leader().is_none());
         assert_eq!(v.epoch(), ControllerEpoch(3));
     }
+
+    // ── KIP-853: dynamic KRaft quorum reconfiguration ──────────────────────
+
+    #[test]
+    fn add_voter_grows_set_and_bumps_epoch() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        v.elect(1, ControllerEpoch(4)).unwrap();
+        v.add_voter(4, ControllerEpoch(5)).unwrap();
+        assert!(v.contains(4));
+        assert_eq!(v.size(), 4);
+        // A reconfiguration is itself a quorum-committed event — the
+        // epoch advances so stale leaders observing the old set fence out.
+        assert_eq!(v.epoch(), ControllerEpoch(5));
+        // Leadership is preserved across the membership change.
+        assert_eq!(v.leader(), Some(1));
+    }
+
+    #[test]
+    fn add_existing_voter_is_rejected() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        assert!(v.add_voter(2, ControllerEpoch(5)).is_err());
+        assert_eq!(v.size(), 3);
+    }
+
+    #[test]
+    fn add_voter_rejects_stale_epoch() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        v.elect(1, ControllerEpoch(5)).unwrap();
+        assert!(v.add_voter(4, ControllerEpoch(5)).is_err());
+        assert!(!v.contains(4));
+    }
+
+    #[test]
+    fn add_voter_is_one_at_a_time_quorum_change() {
+        // KIP-853 follows Raft single-server changes: the new quorum
+        // (4 nodes, majority 3) overlaps the old quorum (3 nodes,
+        // majority 2) so no split-brain window exists.
+        let mut v = VoterSet::new([1, 2, 3]);
+        assert_eq!(v.quorum(), 2);
+        v.add_voter(4, ControllerEpoch(1)).unwrap();
+        assert_eq!(v.quorum(), 3);
+    }
+
+    #[test]
+    fn remove_voter_shrinks_set_and_bumps_epoch() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        v.elect(1, ControllerEpoch(2)).unwrap();
+        v.remove_voter(3, ControllerEpoch(3)).unwrap();
+        assert!(!v.contains(3));
+        assert_eq!(v.size(), 2);
+        assert_eq!(v.epoch(), ControllerEpoch(3));
+        assert_eq!(v.leader(), Some(1));
+    }
+
+    #[test]
+    fn remove_unknown_voter_is_rejected() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        assert!(v.remove_voter(9, ControllerEpoch(5)).is_err());
+        assert_eq!(v.size(), 3);
+    }
+
+    #[test]
+    fn remove_last_voter_is_rejected() {
+        // A quorum cannot shrink to zero — the controller would lose
+        // its metadata log forever. Upstream guards this too.
+        let mut v = VoterSet::new([1]);
+        assert!(v.remove_voter(1, ControllerEpoch(5)).is_err());
+        assert_eq!(v.size(), 1);
+    }
+
+    #[test]
+    fn remove_current_leader_steps_down() {
+        let mut v = VoterSet::new([1, 2, 3]);
+        v.elect(2, ControllerEpoch(2)).unwrap();
+        v.remove_voter(2, ControllerEpoch(3)).unwrap();
+        assert!(!v.contains(2));
+        // The removed node was the leader — the set has no leader until
+        // the surviving voters elect a new one.
+        assert!(v.leader().is_none());
+        assert_eq!(v.epoch(), ControllerEpoch(3));
+    }
 }
