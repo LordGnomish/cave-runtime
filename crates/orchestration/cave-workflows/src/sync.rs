@@ -81,6 +81,50 @@ impl Lock {
             queue: Vec::new(),
         }
     }
+
+    /// Enqueue a request if it is neither already queued nor already holding.
+    fn add_to_queue(&mut self, key: &str, priority: i32, creation: DateTime<Utc>) {
+        if self.holders.contains(key) || self.queue.iter().any(|q| q.key == key) {
+            return;
+        }
+        self.queue.push(QueueItem {
+            key: key.to_string(),
+            priority,
+            creation,
+        });
+    }
+
+    /// Try to acquire for `key`. Succeeds if already holding, or if `key` is
+    /// at the front of the priority-ordered queue and capacity remains.
+    fn try_acquire(&mut self, key: &str) -> bool {
+        if self.holders.contains(key) {
+            return true;
+        }
+        if self.holders.len() >= self.limit {
+            return false;
+        }
+        // Order: higher priority first, then earlier creation, then key.
+        self.queue.sort_by(|a, b| {
+            b.priority
+                .cmp(&a.priority)
+                .then(a.creation.cmp(&b.creation))
+                .then(a.key.cmp(&b.key))
+        });
+        match self.queue.first() {
+            Some(front) if front.key == key => {
+                let k = front.key.clone();
+                self.queue.retain(|q| q.key != k);
+                self.holders.insert(k);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn release(&mut self, key: &str) {
+        self.holders.remove(key);
+        self.queue.retain(|q| q.key != key);
+    }
 }
 
 /// Lock manager mirroring Argo's `SyncManager`.
@@ -99,23 +143,43 @@ impl SyncManager {
     /// `Acquired` without changing the holder count.
     pub fn try_acquire(
         &mut self,
-        _sync: &SyncRef,
-        _holder_key: &str,
-        _priority: i32,
-        _creation: DateTime<Utc>,
+        sync: &SyncRef,
+        holder_key: &str,
+        priority: i32,
+        creation: DateTime<Utc>,
     ) -> AcquireResult {
-        unimplemented!()
+        let name = sync.name().to_string();
+        let limit = sync.limit();
+        let lock = self.locks.entry(name.clone()).or_insert_with(|| Lock::new(limit));
+        // A semaphore's size may change between reconciles.
+        lock.limit = limit;
+        lock.add_to_queue(holder_key, priority, creation);
+        if lock.try_acquire(holder_key) {
+            AcquireResult::Acquired
+        } else {
+            AcquireResult::Waiting(format!(
+                "Waiting for {name} lock. Lock status: {}/{}",
+                lock.holders.len(),
+                lock.limit
+            ))
+        }
     }
 
     /// Release a single holder from a named lock.
-    pub fn release(&mut self, _lock_name: &str, _holder_key: &str) {
-        unimplemented!()
+    pub fn release(&mut self, lock_name: &str, holder_key: &str) {
+        if let Some(lock) = self.locks.get_mut(lock_name) {
+            lock.release(holder_key);
+        }
     }
 
     /// Release every hold and queued request belonging to a workflow
     /// (`namespace/workflow` prefix), across all locks.
-    pub fn release_all(&mut self, _workflow_prefix: &str) {
-        unimplemented!()
+    pub fn release_all(&mut self, workflow_prefix: &str) {
+        let matches = |key: &str| key == workflow_prefix || key.starts_with(&format!("{workflow_prefix}/"));
+        for lock in self.locks.values_mut() {
+            lock.holders.retain(|h| !matches(h));
+            lock.queue.retain(|q| !matches(&q.key));
+        }
     }
 
     /// Number of current holders of a lock (0 if unknown).
