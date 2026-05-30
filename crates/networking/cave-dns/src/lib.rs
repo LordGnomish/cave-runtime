@@ -37,3 +37,4 @@ pub mod bufsize;
 pub mod acl;
 pub mod dns64;
 pub mod ixfr;
+pub mod secondary_refresh;
