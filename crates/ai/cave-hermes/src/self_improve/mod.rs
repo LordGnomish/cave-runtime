@@ -20,3 +20,4 @@
 //! | upstream changelog watch + hot-patch ingest   | [`upstream`]    |
 
 pub mod observe;
+pub mod tune;
