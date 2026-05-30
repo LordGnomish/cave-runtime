@@ -29,3 +29,9 @@ pub mod batch;
 
 /// Pluggable embedding backend trait + deterministic reference HashEmbedder.
 pub mod backend;
+
+/// OpenAI `/v1/embeddings` request/response types.
+pub mod api;
+
+/// Embedding service — orchestrates registry + backend + tokenizer.
+pub mod service;
