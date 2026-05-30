@@ -14,7 +14,7 @@
 //! `Call` variant + its per-row evaluation, and the end-to-end SQL path
 //! `SELECT upper(b) FROM t`, before the variant exists (RED).
 
-use cave_datafusion::functions::FunctionRegistry;
+use cave_datafusion::functions::{FunctionRegistry, ScalarFnHandle};
 use cave_datafusion::physical_expr::PhysicalExpr;
 use cave_datafusion::row::{Row, Value};
 use cave_datafusion::schema::{DataType, Field, SchemaRef, TableSchema};
@@ -27,7 +27,7 @@ fn physical_call_evaluates_function_per_row() {
     let upper = reg.lookup_scalar("upper").expect("upper registered").fun.clone();
     let call = PhysicalExpr::Call {
         name: "upper".into(),
-        fun: upper,
+        fun: ScalarFnHandle(upper),
         args: vec![PhysicalExpr::Column { index: 0 }],
     };
     let row = Row::new(vec![Value::Utf8("hello".into())]);
@@ -40,7 +40,7 @@ fn physical_call_threads_multiple_args() {
     let concat = reg.lookup_scalar("concat").expect("concat registered").fun.clone();
     let call = PhysicalExpr::Call {
         name: "concat".into(),
-        fun: concat,
+        fun: ScalarFnHandle(concat),
         args: vec![
             PhysicalExpr::Column { index: 0 },
             PhysicalExpr::Literal {

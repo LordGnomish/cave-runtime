@@ -12,6 +12,7 @@
 //! filter / project / sort / aggregate execution.
 
 use crate::error::{Error, Result};
+use crate::functions::ScalarFnHandle;
 use crate::row::{Row, Value};
 use crate::schema::DataType;
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,21 @@ pub enum PhysicalExpr {
         expr: Box<PhysicalExpr>,
         to: DataType,
     },
+    /// Row-level scalar function invocation — the lowered form of a
+    /// `LogicalExpr::Function` whose arguments are not all literals.
+    ///
+    /// Upstream: `datafusion-physical-expr/src/scalar_function.rs`
+    /// (`ScalarFunctionExpr`). Each argument is evaluated against the row,
+    /// then the function is invoked over the resulting values. The closure
+    /// is `#[serde(skip)]`-ed (a function pointer can't round-trip through
+    /// JSON); a deserialized `Call` carries the `Default` stub and must be
+    /// re-bound against a `FunctionRegistry` before execution.
+    Call {
+        name: String,
+        #[serde(skip)]
+        fun: ScalarFnHandle,
+        args: Vec<PhysicalExpr>,
+    },
 }
 
 impl PhysicalExpr {
@@ -89,6 +105,13 @@ impl PhysicalExpr {
             Self::Cast { expr, to } => {
                 let v = expr.evaluate(row)?;
                 cast(&v, *to)
+            }
+            Self::Call { fun, args, .. } => {
+                let vals: Vec<Value> = args
+                    .iter()
+                    .map(|a| a.evaluate(row))
+                    .collect::<Result<_>>()?;
+                fun.call(&vals)
             }
         }
     }

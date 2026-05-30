@@ -19,6 +19,51 @@ use std::sync::Arc;
 
 pub type ScalarFn = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
+/// A scalar function reference that can live inside a `PhysicalExpr`.
+///
+/// The bare `ScalarFn` (an `Arc<dyn Fn>`) implements neither `Debug`,
+/// `PartialEq`, `Default`, nor serde, so embedding it directly in
+/// `PhysicalExpr` (which derives all four) is impossible. This newtype
+/// supplies the missing impls: `Debug` prints an opaque placeholder,
+/// equality is carried by the surrounding `Call`'s `name` field (two
+/// handles always compare equal — function identity is the name), and
+/// `Default` yields an "unresolved" stub used when a `PhysicalExpr::Call`
+/// is deserialized (the closure is `#[serde(skip)]`-ed and must be
+/// re-bound against a `FunctionRegistry` before execution).
+#[derive(Clone)]
+pub struct ScalarFnHandle(pub ScalarFn);
+
+impl ScalarFnHandle {
+    pub fn call(&self, args: &[Value]) -> Result<Value> {
+        (self.0)(args)
+    }
+}
+
+impl std::fmt::Debug for ScalarFnHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<scalar-fn>")
+    }
+}
+
+impl PartialEq for ScalarFnHandle {
+    // Function identity is carried by the enclosing `Call { name, .. }`;
+    // the closure itself is not comparable, so handles compare equal.
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Default for ScalarFnHandle {
+    fn default() -> Self {
+        ScalarFnHandle(Arc::new(|_| {
+            Err(Error::Plan(
+                "scalar function not resolved (deserialized PhysicalExpr::Call needs re-binding)"
+                    .into(),
+            ))
+        }))
+    }
+}
+
 #[derive(Clone)]
 pub struct ScalarFunction {
     pub name: String,

@@ -368,27 +368,39 @@ impl SessionContext {
             }),
             LogicalExpr::Alias { expr, .. } => self.lower_expr(expr, schema),
             LogicalExpr::Function { name, args } => {
-                // Scalar function — call eagerly with literal args, or
-                // wrap arg evaluation via the registry. For the MVP we
-                // only support constant-arg invocations during lowering;
-                // row-level scalar function invocation requires a more
-                // structured PhysicalExpr::Call variant, which is deferred.
+                // Scalar function. Lower each argument; if every argument
+                // folds to a literal, invoke eagerly at plan time (constant
+                // folding). Otherwise emit a `PhysicalExpr::Call` carrying
+                // the resolved function for per-row invocation by the
+                // executor (port of `ScalarFunctionExpr`).
                 let f = self
                     .functions
                     .lookup_scalar(name)
                     .ok_or_else(|| Error::Plan(format!("unknown scalar function: {}", name)))?;
-                let evaluated: Vec<Value> = args
+                let lowered_args: Vec<PhysicalExpr> = args
                     .iter()
-                    .map(|a| match a {
-                        LogicalExpr::Literal { value } => Ok(value.clone()),
-                        _ => Err(Error::Plan(format!(
-                            "scalar function `{}` only supports literal args in MVP",
-                            name
-                        ))),
-                    })
+                    .map(|a| self.lower_expr(a, schema))
                     .collect::<Result<_>>()?;
-                let val = (f.fun)(&evaluated)?;
-                Ok(PhysicalExpr::Literal { value: val })
+                if lowered_args
+                    .iter()
+                    .all(|a| matches!(a, PhysicalExpr::Literal { .. }))
+                {
+                    let evaluated: Vec<Value> = lowered_args
+                        .iter()
+                        .map(|a| match a {
+                            PhysicalExpr::Literal { value } => value.clone(),
+                            _ => unreachable!("guarded by all-literal check"),
+                        })
+                        .collect();
+                    let val = (f.fun)(&evaluated)?;
+                    Ok(PhysicalExpr::Literal { value: val })
+                } else {
+                    Ok(PhysicalExpr::Call {
+                        name: name.clone(),
+                        fun: crate::functions::ScalarFnHandle(f.fun.clone()),
+                        args: lowered_args,
+                    })
+                }
             }
         }
     }
