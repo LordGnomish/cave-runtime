@@ -23,3 +23,6 @@
 
 /// N-dimensional dense array (`Array`) — the MLX `mx.array` analog.
 pub mod array;
+
+/// Eager array operations — elementwise, broadcast, reductions, matmul.
+pub mod ops;
