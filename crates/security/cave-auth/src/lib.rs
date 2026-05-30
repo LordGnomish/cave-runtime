@@ -22,6 +22,7 @@ pub mod admin_idp;
 pub mod audit;
 pub mod auth_middleware;
 pub mod auth_routes;
+pub mod brute_force;
 pub mod claims;
 pub mod dpop;
 pub mod email_listener;
