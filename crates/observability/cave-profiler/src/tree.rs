@@ -83,23 +83,72 @@ impl Tree {
     /// capped at `max_nodes` — i.e. the `max_nodes`-th largest node total, or
     /// `0` if the tree has fewer than `max_nodes` nodes (no cap needed).
     /// Ports `tree.go` minValue.
-    pub fn min_value(&self, _max_nodes: i64) -> i64 {
-        // RED placeholder
-        0
+    pub fn min_value(&self, max_nodes: i64) -> i64 {
+        if max_nodes < 1 {
+            return 0;
+        }
+        // Collect every node's total via DFS.
+        let mut totals: Vec<i64> = Vec::new();
+        let mut stack: Vec<&Node> = self.root.iter().collect();
+        while let Some(n) = stack.pop() {
+            totals.push(n.total);
+            stack.extend(n.children.iter());
+        }
+        let max_nodes = max_nodes as usize;
+        if totals.len() < max_nodes {
+            return 0;
+        }
+        // Descending sort; the max_nodes-th largest is the threshold (heap top).
+        totals.sort_unstable_by(|a, b| b.cmp(a));
+        totals[max_nodes - 1]
     }
 
     /// Total node count (every node in the forest). Ports `tree.go` size.
     pub fn size(&self) -> usize {
-        // RED placeholder
-        0
+        let mut count = 0;
+        let mut stack: Vec<&Node> = self.root.iter().collect();
+        while let Some(n) = stack.pop() {
+            count += 1;
+            stack.extend(n.children.iter());
+        }
+        count
     }
 
     /// Cap the flame graph at `max_nodes`: subtrees whose `total` is below the
     /// [`min_value`](Self::min_value) threshold collapse into a synthetic
     /// `"other"` sibling carrying their summed weight.
-    pub fn truncate(&mut self, _max_nodes: i64) {
-        // RED placeholder
+    pub fn truncate(&mut self, max_nodes: i64) {
+        let min = self.min_value(max_nodes);
+        if min <= 0 {
+            return;
+        }
+        truncate_children(&mut self.root, min);
     }
+}
+
+/// Collapse below-threshold subtrees in `nodes` into a single `"other"` sibling.
+fn truncate_children(nodes: &mut Vec<Node>, min: i64) {
+    let mut kept: Vec<Node> = Vec::with_capacity(nodes.len());
+    let mut other = 0i64;
+    for mut n in nodes.drain(..) {
+        if n.total < min {
+            // Whole subtree weight folds into "other".
+            other += n.total;
+        } else {
+            truncate_children(&mut n.children, min);
+            kept.push(n);
+        }
+    }
+    if other > 0 {
+        kept.push(Node {
+            name: "other".to_string(),
+            self_value: other,
+            total: other,
+            children: Vec::new(),
+        });
+        kept.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+    *nodes = kept;
 }
 
 /// Merge `src` nodes into the sorted `dst` child list, recursing into
