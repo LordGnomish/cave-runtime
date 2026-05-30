@@ -169,6 +169,14 @@ impl Tree {
         diff_level(&left.root, &right.root)
     }
 
+    /// Build a tree from Brendan-Gregg "folded"/collapsed text — the inverse of
+    /// [`collapsed`](Self::collapsed). Each non-blank line is
+    /// `frame1;frame2;... <count>`; malformed lines are skipped.
+    pub fn from_collapsed(_text: &str) -> Tree {
+        // RED placeholder
+        Tree::new()
+    }
+
     /// Render the tree as Brendan-Gregg "folded"/collapsed stacks: one line per
     /// frame with non-zero self weight, root-first frames joined by `;` then a
     /// space and the self count. Ports `tree.go` WriteCollapsed.
@@ -497,5 +505,37 @@ mod tests {
     #[test]
     fn collapsed_empty_tree_is_empty() {
         assert_eq!(Tree::new().collapsed(), "");
+    }
+
+    #[test]
+    fn from_collapsed_parses_folded_text() {
+        let t = Tree::from_collapsed("a;b 10\na;c 5\na 2\n");
+        assert_eq!(t.total(), 17);
+        let a = &t.root[0];
+        assert_eq!(a.name, "a");
+        assert_eq!(a.self_value, 2);
+        assert_eq!(a.children.len(), 2);
+        assert_eq!(a.children[0].name, "b");
+        assert_eq!(a.children[0].self_value, 10);
+        assert_eq!(a.children[1].name, "c");
+        assert_eq!(a.children[1].self_value, 5);
+    }
+
+    #[test]
+    fn from_collapsed_skips_blank_and_malformed() {
+        let t = Tree::from_collapsed("\n   \nq 9\nbroken_no_count\n");
+        assert_eq!(t.total(), 9);
+        assert_eq!(t.root.len(), 1);
+        assert_eq!(t.root[0].name, "q");
+    }
+
+    #[test]
+    fn collapsed_round_trips_through_from_collapsed() {
+        let mut t = Tree::new();
+        t.insert_stack(3, &["x", "y"]);
+        t.insert_stack(4, &["x", "z"]);
+        t.insert_stack(1, &["w"]);
+        let round = Tree::from_collapsed(&t.collapsed());
+        assert_eq!(round, t);
     }
 }
