@@ -68,9 +68,61 @@ const VALID_ROLES: [&str; 3] = ["system", "user", "assistant"];
 
 impl Modelfile {
     /// Parse a Modelfile from source text. Cite parser.go `ParseFile`.
-    pub fn parse(_input: &str) -> Result<Modelfile, ModelfileError> {
-        // RED placeholder — implemented in the GREEN commit.
-        unimplemented!("Modelfile::parse")
+    pub fn parse(input: &str) -> Result<Modelfile, ModelfileError> {
+        let mut commands = Vec::new();
+        // Work on physical lines but allow a triple-quoted value to absorb
+        // following lines until its closing delimiter.
+        let lines: Vec<&str> = input.lines().collect();
+        let mut i = 0;
+        while i < lines.len() {
+            let line = lines[i];
+            let trimmed = line.trim_start();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                i += 1;
+                continue;
+            }
+            // Split keyword from the remainder.
+            let (keyword, rest) = split_first_word(trimmed);
+            let keyword = keyword.to_ascii_lowercase();
+
+            match keyword.as_str() {
+                "from" => {
+                    let value = read_value(rest, &lines, &mut i)?;
+                    commands.push(Command { name: "model".into(), args: value });
+                }
+                "license" | "template" | "system" | "adapter" => {
+                    let value = read_value(rest, &lines, &mut i)?;
+                    commands.push(Command { name: keyword, args: value });
+                }
+                "parameter" => {
+                    // First token of the remainder is the parameter name; the
+                    // rest is its value. Cite parser.go PARAMETER handling.
+                    let (pname, prest) = split_first_word(rest);
+                    let name = pname.to_ascii_lowercase();
+                    let value = read_value(prest, &lines, &mut i)?;
+                    commands.push(Command { name, args: value });
+                }
+                "message" => {
+                    let (role, mrest) = split_first_word(rest);
+                    let role = role.to_ascii_lowercase();
+                    if !VALID_ROLES.contains(&role.as_str()) {
+                        return Err(ModelfileError::InvalidMessageRole(role));
+                    }
+                    let content = read_value(mrest, &lines, &mut i)?;
+                    commands.push(Command {
+                        name: "message".into(),
+                        args: format!("{role}: {content}"),
+                    });
+                }
+                other => return Err(ModelfileError::InvalidCommand(other.to_string())),
+            }
+            i += 1;
+        }
+
+        if !commands.iter().any(|c| c.name == "model") {
+            return Err(ModelfileError::MissingFrom);
+        }
+        Ok(Modelfile { commands })
     }
 
     /// The base model named by the first `FROM` command, if any.
@@ -122,14 +174,96 @@ impl Modelfile {
     /// Serialise back to canonical Modelfile text. Cite parser.go
     /// `Command.String()` / `File.String()`.
     pub fn to_modelfile_string(&self) -> String {
-        // RED placeholder — implemented in the GREEN commit.
-        unimplemented!("Modelfile::to_modelfile_string")
+        const RESERVED: [&str; 6] = ["model", "system", "template", "adapter", "license", "message"];
+        let mut out = String::new();
+        for cmd in &self.commands {
+            let line = match cmd.name.as_str() {
+                // FROM keeps its argument bare (model refs have no spaces).
+                "model" => format!("FROM {}", cmd.args),
+                "message" => match split_message(&cmd.args) {
+                    Some((role, content)) => format!("MESSAGE {role} {}", quote(content)),
+                    None => format!("MESSAGE {}", quote(&cmd.args)),
+                },
+                name if RESERVED.contains(&name) => {
+                    format!("{} {}", name.to_ascii_uppercase(), quote(&cmd.args))
+                }
+                // Anything else is a PARAMETER; the command name is its key.
+                name => format!("PARAMETER {name} {}", quote(&cmd.args)),
+            };
+            out.push_str(&line);
+            out.push('\n');
+        }
+        out
     }
 }
 
 /// Split a stored `message` arg `"role: content"` into its parts.
 fn split_message(args: &str) -> Option<(&str, &str)> {
     args.split_once(": ").map(|(r, c)| (r, c))
+}
+
+/// Quote a value for serialization, using a triple-quote literal when the
+/// value spans multiple lines (so it round-trips through [`Modelfile::parse`]).
+fn quote(value: &str) -> String {
+    if value.contains('\n') {
+        format!("\"\"\"{value}\"\"\"")
+    } else {
+        format!("\"{value}\"")
+    }
+}
+
+/// Split off the first whitespace-delimited token, returning `(token, rest)`
+/// where `rest` has its leading whitespace trimmed.
+fn split_first_word(s: &str) -> (&str, &str) {
+    let s = s.trim_start();
+    match s.find(char::is_whitespace) {
+        Some(idx) => (&s[..idx], s[idx..].trim_start()),
+        None => (s, ""),
+    }
+}
+
+/// Read a command value starting at `rest` (the text after the keyword on line
+/// `*i`). Handles bare values, single-quoted values, and `"""…"""` triple-quoted
+/// values that may span subsequent lines. On a multiline read, `*i` is advanced
+/// to the line holding the closing delimiter.
+fn read_value(
+    rest: &str,
+    lines: &[&str],
+    i: &mut usize,
+) -> Result<String, ModelfileError> {
+    let rest = rest.trim_start();
+
+    // Triple-quoted literal — may close on the same line or a later one.
+    if let Some(after_open) = rest.strip_prefix("\"\"\"") {
+        if let Some(end) = after_open.find("\"\"\"") {
+            return Ok(after_open[..end].to_string());
+        }
+        // Spans multiple physical lines.
+        let mut buf = String::from(after_open);
+        let mut j = *i + 1;
+        while j < lines.len() {
+            buf.push('\n');
+            if let Some(end) = lines[j].find("\"\"\"") {
+                buf.push_str(&lines[j][..end]);
+                *i = j;
+                return Ok(buf);
+            }
+            buf.push_str(lines[j]);
+            j += 1;
+        }
+        return Err(ModelfileError::UnterminatedQuote);
+    }
+
+    // Single-quoted literal — single line.
+    if let Some(after_open) = rest.strip_prefix('"') {
+        match after_open.find('"') {
+            Some(end) => return Ok(after_open[..end].to_string()),
+            None => return Err(ModelfileError::UnterminatedQuote),
+        }
+    }
+
+    // Bare value — the trimmed remainder of the line.
+    Ok(rest.trim_end().to_string())
 }
 
 #[cfg(test)]
