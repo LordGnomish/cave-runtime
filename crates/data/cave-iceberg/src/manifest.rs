@@ -23,6 +23,8 @@ pub enum FileFormat {
     Parquet,
     Avro,
     Orc,
+    /// Puffin — the v3 sidecar format used for deletion vectors.
+    Puffin,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -74,6 +76,18 @@ pub struct DataFile {
     /// Iceberg's "equality-ids" for equality-delete files.
     #[serde(default)]
     pub equality_ids: Vec<i32>,
+    /// v3 deletion-vector field 143 — the data file every delete in this
+    /// (Puffin) vector references. A deletion vector targets exactly one
+    /// data file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub referenced_data_file: Option<String>,
+    /// v3 deletion-vector field 144 — byte offset where the vector blob
+    /// begins inside the Puffin file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<i64>,
+    /// v3 deletion-vector field 145 — length of the vector blob in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_size_in_bytes: Option<i64>,
 }
 
 impl DataFile {
@@ -95,7 +109,38 @@ impl DataFile {
             split_offsets: Vec::new(),
             sort_order_id: None,
             equality_ids: Vec::new(),
+            referenced_data_file: None,
+            content_offset: None,
+            content_size_in_bytes: None,
         }
+    }
+
+    /// Construct a v3 **deletion vector** — a Puffin-format
+    /// position-delete file targeting a single data file. `content_offset`
+    /// / `content_size_in_bytes` locate the vector blob inside the Puffin
+    /// container.
+    pub fn deletion_vector(
+        file_path: impl Into<String>,
+        referenced_data_file: impl Into<String>,
+        content_offset: i64,
+        content_size_in_bytes: i64,
+    ) -> Self {
+        Self {
+            content: DataFileContent::PositionDeletes,
+            file_format: FileFormat::Puffin,
+            referenced_data_file: Some(referenced_data_file.into()),
+            content_offset: Some(content_offset),
+            content_size_in_bytes: Some(content_size_in_bytes),
+            ..Self::new(file_path, FileFormat::Puffin)
+        }
+    }
+
+    /// True iff this file is a v3 deletion vector — a Puffin
+    /// position-delete file that references a target data file.
+    pub fn is_deletion_vector(&self) -> bool {
+        self.content == DataFileContent::PositionDeletes
+            && self.file_format == FileFormat::Puffin
+            && self.referenced_data_file.is_some()
     }
 }
 
