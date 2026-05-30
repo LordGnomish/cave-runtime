@@ -110,11 +110,15 @@ impl CreateRequest {
     ///
     /// [`Modelfile`]: crate::modelfile::Modelfile
     pub fn from_modelfile(
-        _model: impl Into<String>,
-        _mf: &crate::modelfile::Modelfile,
+        model: impl Into<String>,
+        mf: &crate::modelfile::Modelfile,
     ) -> Self {
-        // RED placeholder — implemented in the GREEN commit.
-        unimplemented!("CreateRequest::from_modelfile")
+        Self {
+            model: model.into(),
+            modelfile: mf.to_modelfile_string(),
+            stream: None,
+            quantize: None,
+        }
     }
 }
 
