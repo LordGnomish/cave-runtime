@@ -1006,6 +1006,15 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 2,
     },
     TrackedProject {
+        name: "vLLM (engine)",
+        github_repo: "vllm-project/vllm",
+        cave_module: "cave-local-llm",
+        track_features: "PagedAttention block manager, continuous-batching scheduler, SamplingParams, AWQ/GPTQ/FP8 quant, speculative decode, multi-LoRA",
+        check_frequency: "biweekly",
+        category: "ai",
+        phase: 2,
+    },
+    TrackedProject {
         name: "Grafana OnCall (engine)",
         github_repo: "grafana/oncall",
         cave_module: "cave-oncall",
