@@ -177,4 +177,86 @@ mod tests {
         };
         assert_eq!(r.first_value().unwrap(), 1.5);
     }
+
+    fn md(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn from_metadata_parses_required_and_defaults() {
+        let s = DynatraceScaler::from_metadata(&md(&[
+            ("host", "https://abc.live.dynatrace.com"),
+            ("metricSelector", "builtin:service.requestCount.total"),
+            ("token", "dt0c01.SECRET"),
+            ("threshold", "1000"),
+        ]))
+        .unwrap();
+        assert_eq!(s.host, "https://abc.live.dynatrace.com");
+        assert_eq!(s.metric_selector, "builtin:service.requestCount.total");
+        assert_eq!(s.token, "dt0c01.SECRET");
+        assert_eq!(s.threshold, 1000.0);
+        // from defaults to now-2h; activationThreshold optional → 0.
+        assert_eq!(s.from_timestamp, "now-2h");
+        assert_eq!(s.activation_threshold, 0.0);
+    }
+
+    #[test]
+    fn from_metadata_overrides_from_and_activation() {
+        let s = DynatraceScaler::from_metadata(&md(&[
+            ("host", "https://x"),
+            ("metricSelector", "m"),
+            ("token", "t"),
+            ("threshold", "5"),
+            ("from", "now-30m"),
+            ("activationThreshold", "3"),
+        ]))
+        .unwrap();
+        assert_eq!(s.from_timestamp, "now-30m");
+        assert_eq!(s.activation_threshold, 3.0);
+    }
+
+    #[test]
+    fn from_metadata_requires_host_selector_token_threshold() {
+        assert!(
+            DynatraceScaler::from_metadata(&md(&[
+                ("metricSelector", "m"),
+                ("token", "t"),
+                ("threshold", "1")
+            ]))
+            .is_err()
+        );
+        assert!(
+            DynatraceScaler::from_metadata(&md(&[
+                ("host", "h"),
+                ("token", "t"),
+                ("threshold", "1")
+            ]))
+            .is_err()
+        );
+        assert!(
+            DynatraceScaler::from_metadata(&md(&[
+                ("host", "h"),
+                ("metricSelector", "m"),
+                ("threshold", "1")
+            ]))
+            .is_err()
+        );
+        assert!(
+            DynatraceScaler::from_metadata(&md(&[
+                ("host", "h"),
+                ("metricSelector", "m"),
+                ("token", "t")
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn metric_name_is_dynatrace() {
+        let s = DynatraceScaler::new("h", "m", "t");
+        assert_eq!(s.metric_name(), "dynatrace");
+    }
 }
