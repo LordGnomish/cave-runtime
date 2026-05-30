@@ -41,7 +41,10 @@ fn html_loader_strips_tags_scripts_and_decodes_entities() {
     assert!(text.contains("done"));
     assert!(!text.contains("alert"), "script body must be dropped");
     assert!(!text.contains("color:red"), "style body must be dropped");
-    assert!(!text.contains('<'), "no residual tags");
+    // No residual markup tags (decoded "&lt;3" legitimately yields "<3").
+    assert!(!text.contains("<h1"), "no residual tags");
+    assert!(!text.contains("</p>"), "no residual tags");
+    assert!(!text.contains("<body"), "no residual tags");
 }
 
 #[test]
