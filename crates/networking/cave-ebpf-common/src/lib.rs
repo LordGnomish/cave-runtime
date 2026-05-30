@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod loader;
 pub mod map;
+pub mod ringbuf;
 
 /// Syscall audit event from eBPF.
 #[derive(Debug, Clone, Serialize, Deserialize)]
