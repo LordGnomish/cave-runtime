@@ -173,6 +173,67 @@ pub fn apiserver_cert_sans(
     names
 }
 
+/// The expiry deadline, in days, that triggers rotation. Upstream
+/// `CertificateLifecycle.Reconcile` builds `deadline = time.Now().AddDate(0,0,1)`
+/// and rotates when that deadline is past the certificate's `NotAfter`.
+pub const ROTATION_DEADLINE_DAYS: i64 = 1;
+
+/// How a watched Secret's certificate is extracted for the expiry check.
+/// Selected by the `kamaji.clastix.io/certificate` controller label; only
+/// these two strategies are reconciled (`sets.New("x509","kubeconfig")`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RotationStrategy {
+    /// A bare Secret whose data values contain a PEM/DER x509 certificate.
+    X509,
+    /// A kubeconfig Secret; the embedded client-certificate is checked.
+    Kubeconfig,
+}
+
+impl RotationStrategy {
+    /// Parse the controller label value, returning `None` for any unsupported
+    /// strategy (upstream skips reconciliation in that case).
+    pub fn from_label(value: &str) -> Option<RotationStrategy> {
+        match value {
+            "x509" => Some(RotationStrategy::X509),
+            "kubeconfig" => Some(RotationStrategy::Kubeconfig),
+            _ => None,
+        }
+    }
+
+    /// The label value carried on the watched Secret.
+    pub fn label(&self) -> &'static str {
+        match self {
+            RotationStrategy::X509 => "x509",
+            RotationStrategy::Kubeconfig => "kubeconfig",
+        }
+    }
+}
+
+/// True when the certificate falls inside the one-day rotation deadline —
+/// i.e. `now + 1 day` is at or after `not_after`. Mirrors the upstream
+/// `deadline.After(crt.NotAfter)` guard (expired certs return true too).
+pub fn needs_rotation(
+    not_after: chrono::DateTime<chrono::Utc>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    let deadline = now + chrono::Duration::days(ROTATION_DEADLINE_DAYS);
+    deadline > not_after
+}
+
+/// The interval after which the certificate should be re-checked: the time
+/// from the rotation deadline to `not_after`. Returns `None` for a cert that
+/// is already inside the deadline (it rotates now, no requeue).
+pub fn requeue_after(
+    not_after: chrono::DateTime<chrono::Utc>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Option<chrono::Duration> {
+    if needs_rotation(not_after, now) {
+        return None;
+    }
+    let deadline = now + chrono::Duration::days(ROTATION_DEADLINE_DAYS);
+    Some(not_after - deadline)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
