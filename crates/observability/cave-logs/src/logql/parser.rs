@@ -476,6 +476,23 @@ impl Parser {
         }
     }
 
+    /// After the `[range]`, optionally consume an `offset <duration>` modifier.
+    fn try_parse_offset(&mut self) -> Result<Option<Duration>, ParseError> {
+        if let Some(Token::Offset) = self.peek() {
+            self.advance();
+            match self.advance() {
+                Some(Token::DurationLit(ns)) => Ok(Some(Duration::from_nanos(*ns))),
+                Some(t) => Err(ParseError::Unexpected {
+                    got: format!("{:?}", t),
+                    expected: "duration after offset".into(),
+                }),
+                None => Err(ParseError::Eof("duration after offset".into())),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
     fn parse_range_agg(&mut self) -> Result<LogRangeAggregation, ParseError> {
         let agg = match self.advance() {
             Some(Token::Rate) => RangeAgg::Rate,
@@ -516,6 +533,7 @@ impl Parser {
                     None => return Err(ParseError::Eof("duration".into())),
                 };
                 self.expect(&Token::RBracket)?;
+                let offset = self.try_parse_offset()?;
                 self.expect(&Token::RParen)?;
                 let grouping = self.try_parse_grouping()?;
                 return Ok(LogRangeAggregation {
@@ -523,6 +541,7 @@ impl Parser {
                     query,
                     range: Duration::from_nanos(range_ns),
                     grouping,
+                    offset,
                 });
             }
             Some(t) => {
@@ -548,6 +567,7 @@ impl Parser {
             None => return Err(ParseError::Eof("duration".into())),
         };
         self.expect(&Token::RBracket)?;
+        let offset = self.try_parse_offset()?;
         self.expect(&Token::RParen)?;
         let grouping = self.try_parse_grouping()?;
 
@@ -556,6 +576,7 @@ impl Parser {
             query,
             range: Duration::from_nanos(range_ns),
             grouping,
+            offset,
         })
     }
 

@@ -197,6 +197,8 @@ pub struct LogRangeAggregation {
     pub range: Duration,
     /// Optional `by(...)` grouping for unwrap expressions.
     pub grouping: Option<Grouping>,
+    /// Optional `offset <duration>` modifier — shifts the lookup window back.
+    pub offset: Option<Duration>,
 }
 
 // ── Vector aggregations ──────────────────────────────────────────────────────

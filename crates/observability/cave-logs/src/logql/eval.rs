@@ -455,6 +455,12 @@ impl Evaluator {
             .store
             .matching_fps(tenant, |labels| labels_match(labels, &ra.query.selector));
 
+        // `offset <d>` shifts the lookup window back by `d`; results are then
+        // re-plotted on the original time axis (PromQL/LogQL semantics).
+        let offset_ns = ra.offset.map(|d| d.as_nanos() as i64).unwrap_or(0);
+        let start_ns = start_ns - offset_ns;
+        let end_ns = end_ns - offset_ns;
+
         // Compute buckets across all matching streams.
         let buckets = match ra.agg {
             RangeAgg::Rate => {
@@ -503,7 +509,7 @@ impl Evaluator {
         let values: Vec<(f64, String)> = buckets
             .into_iter()
             .filter(|(_, v)| *v != 0.0)
-            .map(|(ts, v)| (ts as f64 / 1e9, format!("{:.6}", v)))
+            .map(|(ts, v)| ((ts + offset_ns) as f64 / 1e9, format!("{:.6}", v)))
             .collect();
 
         QueryData::Matrix(vec![MatrixResult { metric, values }])
