@@ -20,10 +20,26 @@ const AUDIT_YEAR_PREFIX: &str = "2026-";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 
 fn workspace_root() -> PathBuf {
+    // Walk up from the crate manifest dir until we find the Cargo.toml that
+    // declares `[workspace]`. Theme-reorg moved this crate from
+    // `crates/cave-datafusion` to `crates/data/cave-datafusion`, so a fixed
+    // pop-count is fragile; locate the workspace root structurally instead.
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
-    p.pop();
-    p.pop();
-    p
+    loop {
+        if fs::read_to_string(p.join("Cargo.toml"))
+            .map(|s| s.contains("[workspace]"))
+            .unwrap_or(false)
+        {
+            return p;
+        }
+        if !p.pop() {
+            // Fallback to the historical pop-2 behavior.
+            let mut q: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+            q.pop();
+            q.pop();
+            return q;
+        }
+    }
 }
 
 fn manifest_text() -> String {
@@ -105,9 +121,14 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_cave_datafusion_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // Theme-reorg replaced explicit per-crate member paths with the
+    // `crates/*/*` glob (cave-datafusion now lives at
+    // `crates/data/cave-datafusion`). Accept either form.
     assert!(
-        cargo.contains("\"crates/cave-datafusion\""),
-        "root Cargo.toml [workspace.members] must list \"crates/cave-datafusion\""
+        cargo.contains("\"crates/cave-datafusion\"")
+            || cargo.contains("\"crates/*/*\"")
+            || cargo.contains("\"crates/data/cave-datafusion\""),
+        "root Cargo.toml [workspace.members] must list cave-datafusion (explicit path or crates/*/* glob)"
     );
 }
 
