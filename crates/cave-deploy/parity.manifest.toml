@@ -52,14 +52,14 @@ source_sha = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9459
-honest_ratio        = 0.6216
-last_audit          = "2026-05-22"
+fill_ratio          = 0.9730
+honest_ratio        = 0.7027
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 20
-partial_count       = 3
-skipped_count       = 12
-unmapped_count      = 2
+mapped_count        = 22
+partial_count       = 4
+skipped_count       = 10
+unmapped_count      = 1
 total               = 37
 
 # 2026-05-22 Charter v2 deep-port close — claude/cave-deploy-2026-05-22:
@@ -73,6 +73,25 @@ total               = 37
 #   * parity_ratio_source = "manifest" (manifest count is the source of truth).
 #   * 2 unmapped (helm-deps-resolution + argocd-cli-grpc) carried as honest
 #     gaps for Phase 2.
+#
+# 2026-05-30 honest-uplift cont2 — claude/cave-deploy-honest-cont2:
+#   * 3 strict-TDD RED→GREEN cycles (+36 integration tests + 4 inline units):
+#       - helm-deps-resolution  unmapped → mapped   (src/helm_deps.rs):
+#         Masterminds/semver subset + Chart.yaml dependency parse + Chart.lock
+#         resolution + condition/tags enabling. ArgoCD reposerver
+#         runHelmDependencyUpdate resolution algebra (no helm subprocess).
+#       - sync-windows-cron     skipped  → mapped   (src/sync_windows.rs):
+#         5-field cron parser + SyncWindows.{Active,CanSync,Matches} allow/deny
+#         precedence. Moved out of the cave-deploy-runtime-phase-2 scope_cut —
+#         pure logic, no subprocess needed.
+#       - image-updater         skipped  → partial  (src/image_updater.rs):
+#         write-back computation (image-list parse + strategy + allow-tags +
+#         helm/kustomize overrides). Registry-poll daemon stays deferred, so
+#         classified partial (not mapped). Moved out of cave-image-updater group.
+#   * Counts: mapped 20→22, partial 3→4, skipped 12→10, unmapped 2→1 (total 37).
+#   * fill_ratio  = (22 + 4 + 10) / 37 = 0.9730.
+#   * honest_ratio = (22 + 4) / 37     = 0.7027.
+#   * 1 unmapped remains: argocd-cli-grpc (gRPC-over-WebSocket tunnel) — Phase 2.
 
 [module]
 name        = "cave-deploy"
@@ -164,7 +183,7 @@ note = "Arc<RwLock> over Applications + ApplicationSets + AppProjects + Revision
 [[mapped]]
 name = "http-api-surface"
 upstream = "server/application/application.go + server/applicationset/applicationset.go + server/project/project.go + server/repocreds/repocreds.go + server/notification/notification.go + server/settings/settings.go"
-note = "17 HTTP endpoints under /api/deploy/* (apps + sync + rollback + diff + history + appsets + projects + repos + notifications + sso + webhook + health); src/routes.rs."
+note = "20 HTTP endpoints under /api/deploy/* (apps + sync + rollback + diff + history + appsets + projects + repos + notifications + sso + webhook + helm/resolve + sync-windows/evaluate + image-updater/select + health); src/routes.rs."
 
 [[mapped]]
 name = "notification-engine-mvp"
@@ -181,7 +200,17 @@ name = "sso-config-model"
 upstream = "util/settings/settings.go (SSO) + dex.config"
 note = "SSOConfig + SSOProvider (Dex / OIDC / GitHub / GitLab / Google / Microsoft / Okta) — runtime SSO delegated to cave-auth/keycloak; src/models.rs."
 
-# ─── Partial subsystems (3) — shape present, runtime deferred ───────────────
+[[mapped]]
+name = "helm-deps-resolution"
+upstream = "reposerver/repository/repository.go::runHelmDependencyUpdate (Helm pkg/downloader + Masterminds/semver)"
+note = "Umbrella (Helm-of-Helms) dependency resolution: Chart.yaml dependency parse + Masterminds/semver constraint subset (=, !=, <, >, <=, >=, ~, ^, x-ranges, comma-AND, ||-OR) + max-satisfying selection + content-digested Chart.lock generation + condition/tag enabling (processDependencyConditions/Tags). Pure-Rust — chart download/extraction stays deferred to Phase 2 cave-helm-runtime. src/helm_deps.rs; POST /api/deploy/helm/resolve."
+
+[[mapped]]
+name = "sync-windows-cron"
+upstream = "pkg/apis/application/v1alpha1/types.go::SyncWindows.{Active,CanSync,Matches,InactiveAllows} + controller/state.go"
+note = "Maintenance sync windows: 5-field cron parser (lists/ranges/steps, dom-OR-dow) + duration parse + window Active(now) + CanSync allow/deny precedence (auto vs manual) + selector glob (applications/namespaces/clusters). Pure logic, no external cron crate — moved out of cave-deploy-runtime-phase-2 scope_cut. src/sync_windows.rs; POST /api/deploy/sync-windows/evaluate."
+
+# ─── Partial subsystems (4) — shape present, runtime deferred ───────────────
 
 [[partial]]
 name = "helm-render-exec"
@@ -198,12 +227,12 @@ name = "kube-apply-client"
 upstream = "controller/sync.go::syncTask + util/kube/kubectl.go"
 note = "URL builders + tracking-label injection + sync-engine wave ordering are present; the kube::Client / Server-Side-Apply PATCH path is deferred to Phase 2 (cave-deploy-runtime) so the MVP stays dependency-light. Dry-run + diff paths are fully exercised."
 
-# ─── Skipped subsystems (12) — scope_cuts to other crates ───────────────────
+[[partial]]
+name = "image-updater"
+upstream = "argoproj-labs/argocd-image-updater pkg/image/{options,version}.go + pkg/argocd/update.go"
+note = "Write-back computation is ported: image-list annotation parse (alias=image:constraint), update strategies (semver / newest-build / alphabetical / digest incl. deprecated latest/name aliases), allow-tags regexp/any filter, max-satisfying tag selection, and Helm-parameter / Kustomize-image override computation. The registry-poll daemon (listing tags from container registries on a timer) stays deferred to Phase 2, so this is partial not mapped. src/image_updater.rs; POST /api/deploy/image-updater/select."
 
-[[scope_cuts]]
-group = "cave-image-updater"
-reason = "ArgoCD Image Updater is a separate runtime watching container registries for new tags and writing back to git. Lands as cave-image-updater Phase 2."
-items = ["image-updater"]
+# ─── Skipped subsystems (10) — scope_cuts to other crates ───────────────────
 
 [[scope_cuts]]
 group = "cave-notify"
@@ -227,10 +256,9 @@ items = ["argocd-dex-server-runtime"]
 
 [[scope_cuts]]
 group = "cave-deploy-runtime-phase-2"
-reason = "Operational k8s + helm + kustomize subprocess pipelines, multi-cluster cache replication, cron-driven sync windows, GPG commit-signature verification, jsonnet rendering, plugin generator runtime, pull-request generator (GitHub/GitLab/Bitbucket scanning), and scm-provider generator (org-wide repo scanning) all defer to a dedicated cave-deploy-runtime Phase 2 crate so the MVP stays dependency-light."
+reason = "Operational k8s + helm + kustomize subprocess pipelines, multi-cluster cache replication, GPG commit-signature verification, jsonnet rendering, plugin generator runtime, pull-request generator (GitHub/GitLab/Bitbucket scanning), and scm-provider generator (org-wide repo scanning) all defer to a dedicated cave-deploy-runtime Phase 2 crate so the MVP stays dependency-light. (Sync-window cron evaluation moved in-crate 2026-05-30 — pure logic, no subprocess.)"
 items = [
     "multi-cluster-federation",
-    "sync-windows-cron",
     "gpg-signature-verification",
     "jsonnet-render",
     "plugin-generator-runtime",
@@ -238,12 +266,7 @@ items = [
     "scm-provider-generator-runtime",
 ]
 
-# ─── Unmapped subsystems (2) — honest gaps preserved for Phase 2 ────────────
-
-[[unmapped]]
-name = "helm-deps-resolution"
-upstream = "reposerver/repository/repository.go::runHelmDependencyUpdate"
-note = "Multi-source Helm-of-Helms + Chart.lock resolution (umbrella charts pulling from multiple Helm repos) is in-scope but unimplemented. Honest gap — Phase 2."
+# ─── Unmapped subsystems (1) — honest gaps preserved for Phase 2 ────────────
 
 [[unmapped]]
 name = "argocd-cli-grpc"
@@ -307,6 +330,18 @@ local    = "src/routes.rs"
 [[files]]
 upstream = "util/errors/errors.go"
 local    = "src/error.rs"
+
+[[files]]
+upstream = "reposerver/repository/repository.go::runHelmDependencyUpdate"
+local    = "src/helm_deps.rs"
+
+[[files]]
+upstream = "pkg/apis/application/v1alpha1/types.go::SyncWindows"
+local    = "src/sync_windows.rs"
+
+[[files]]
+upstream = "argocd-image-updater pkg/image + pkg/argocd/update.go"
+local    = "src/image_updater.rs"
 
 # ─── Function mappings ───────────────────────────────────────────────────────
 
