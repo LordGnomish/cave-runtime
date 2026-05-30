@@ -377,4 +377,60 @@ mod tests {
         b.update_concurrency(3);
         assert_eq!(b.capacity(), 3);
     }
+
+    // ── Cycle 2: RequestStats time-weighted concurrency reporting ───────────
+
+    #[test]
+    fn stats_constant_concurrency_averages_to_that_level() {
+        let mut s = RequestStats::new(0.0);
+        s.request_in(0.0); // one request in flight from t=0
+        // report over [0, 10): concurrency was 1 the whole window
+        let r = s.report(10.0);
+        assert!((r.average_concurrency - 1.0).abs() < 1e-9);
+        assert_eq!(r.request_count, 1.0);
+    }
+
+    #[test]
+    fn stats_half_window_concurrency_averages_to_half() {
+        let mut s = RequestStats::new(0.0);
+        s.request_in(5.0); // in flight only for the second half of [0,10)
+        let r = s.report(10.0);
+        // weighted: 0*5 + 1*5 = 5 over a 10s window => 0.5
+        assert!((r.average_concurrency - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn stats_in_then_out_accumulates_weighted_area() {
+        let mut s = RequestStats::new(0.0);
+        s.request_in(0.0); // concurrency 1 at t=0
+        s.request_in(2.0); // concurrency 2 at t=2
+        s.request_out(4.0); // concurrency 1 at t=4
+        // over [0,8): 1*2 + 2*2 + 1*4 = 2+4+4 = 10 / 8 = 1.25
+        let r = s.report(8.0);
+        assert!(
+            (r.average_concurrency - 1.25).abs() < 1e-9,
+            "got {}",
+            r.average_concurrency
+        );
+        assert_eq!(r.request_count, 2.0);
+    }
+
+    #[test]
+    fn stats_report_resets_window_and_counts() {
+        let mut s = RequestStats::new(0.0);
+        s.request_in(0.0);
+        let _ = s.report(10.0);
+        // request still in flight, but counts reset; next window starts fresh
+        let r = s.report(20.0);
+        assert!((r.average_concurrency - 1.0).abs() < 1e-9);
+        assert_eq!(r.request_count, 0.0, "request_count resets each report");
+    }
+
+    #[test]
+    fn stats_idle_window_reports_zero() {
+        let mut s = RequestStats::new(0.0);
+        let r = s.report(10.0);
+        assert_eq!(r.average_concurrency, 0.0);
+        assert_eq!(r.request_count, 0.0);
+    }
 }
