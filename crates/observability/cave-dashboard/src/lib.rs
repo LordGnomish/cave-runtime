@@ -33,6 +33,7 @@
 //!   /api/users, /api/teams, /api/auth/keys, /api/v1/provisioning/*, …)
 //! - HTML renderer (dark-themed, Bootstrap-less, self-contained)
 
+pub mod access_control;
 pub mod alerting;
 pub mod auth;
 pub mod datasource;
