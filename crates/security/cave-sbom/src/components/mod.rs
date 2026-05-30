@@ -34,6 +34,9 @@ pub struct Project {
     /// upstream `BooleanDefaultTrueSerializer`. See [`Project::is_active`].
     #[serde(default, serialize_with = "serialize_active_default_true")]
     pub active: Option<bool>,
+    /// Tag names, sorted ascending. See [`crate::tags`].
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Mirror of `Project.BooleanDefaultTrueSerializer`: a null `active` is written
@@ -60,6 +63,7 @@ impl Project {
             last_bom_import: None,
             parent: None,
             active: None,
+            tags: Vec::new(),
         }
     }
 

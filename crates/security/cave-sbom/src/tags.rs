@@ -9,6 +9,72 @@
 //! `@Size(min=1,max=255)`, `@Pattern(PRINTABLE_CHARS)`. NOTE: there is **no**
 //! lowercase normalisation at this pin — case is preserved verbatim.
 
+use crate::components::Project;
+use serde::{Deserialize, Serialize};
+
+/// Maximum tag length — upstream `@Size(min=1, max=255)`.
+pub const MAX_TAG_LEN: usize = 255;
+
+/// Why a tag name was rejected. Mirrors upstream bean-validation failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TagError {
+    /// `@NotBlank` — empty after trimming.
+    Blank,
+    /// `@Size(max=255)` exceeded.
+    TooLong,
+    /// `@Pattern(PRINTABLE_CHARS)` — contains a control character.
+    NotPrintable,
+}
+
+/// Mirror of `org.dependencytrack.model.Tag`. Identity is by `name`
+/// (the in-memory reduction of upstream's id-based equality, since tag names
+/// are unique). Construction enforces the upstream validation chain.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Tag {
+    pub name: String,
+}
+
+impl Tag {
+    /// Build a validated tag: whitespace-trimmed, non-blank, ≤255 chars, no
+    /// control characters. Case is preserved verbatim.
+    pub fn new(raw: &str) -> Result<Self, TagError> {
+        let name = raw.trim();
+        if name.is_empty() {
+            return Err(TagError::Blank);
+        }
+        if name.chars().count() > MAX_TAG_LEN {
+            return Err(TagError::TooLong);
+        }
+        if name.chars().any(|c| c.is_control()) {
+            return Err(TagError::NotPrintable);
+        }
+        Ok(Self {
+            name: name.to_string(),
+        })
+    }
+}
+
+impl Project {
+    /// Add a tag (validated). Tags are kept sorted ascending by name and
+    /// de-duplicated — mirroring upstream's `ORDER BY name ASC` join.
+    pub fn add_tag(&mut self, raw: &str) -> Result<(), TagError> {
+        let tag = Tag::new(raw)?;
+        if !self.tags.contains(&tag.name) {
+            self.tags.push(tag.name);
+            self.tags.sort();
+        }
+        Ok(())
+    }
+}
+
+/// Projects carrying the exact (case-sensitive) tag `name`.
+pub fn projects_with_tag<'a>(projects: &'a [Project], name: &str) -> Vec<&'a Project> {
+    projects
+        .iter()
+        .filter(|p| p.tags.iter().any(|t| t == name))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
