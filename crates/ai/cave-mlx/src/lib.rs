@@ -29,3 +29,6 @@ pub mod ops;
 
 /// Reverse-mode automatic differentiation (`Tape` / `Var`).
 pub mod autograd;
+
+/// First-order optimizers — `Sgd` / `Adam` / `AdamW`.
+pub mod optim;
