@@ -3,6 +3,111 @@
 //! activator — cold-start request hold, capacity partitioning, load balancing.
 //! upstream: knative/serving knative-v1.22.0 — pkg/activator/net/{throttler,lb_policy}.go
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
+/// Per-revision concurrency ceiling — upstream `revisionMaxConcurrency`,
+/// equal to `queue.MaxBreakerCapacity` (`math.MaxInt32`).
+pub const REVISION_MAX_CONCURRENCY: i64 = i32::MAX as i64;
+
+/// `minOneOrValue` — division-safety floor preventing a zero quotient.
+pub fn min_one_or_value(num: i64) -> i64 {
+    if num > 1 {
+        num
+    } else {
+        1
+    }
+}
+
+/// Per-revision throttler — owns the breaker capacity the activator hands
+/// out for a single revision, partitioning total backend concurrency across
+/// the fleet of activator instances.
+#[derive(Debug, Clone)]
+pub struct RevisionThrottler {
+    /// `containerConcurrency` — 0 means unbounded (infinite breaker).
+    pub container_concurrency: i64,
+}
+
+impl RevisionThrottler {
+    /// Build a throttler for a revision with the given container concurrency.
+    pub fn new(container_concurrency: i64) -> Self {
+        Self {
+            container_concurrency,
+        }
+    }
+
+    /// Compute this activator's slice of the revision's total capacity.
+    ///
+    /// * pod-direct (`num_trackers > 0`): `cc * num_trackers`.
+    /// * ClusterIP (`num_trackers == 0`): `cc * backend / activators`, floored at 1.
+    /// * unbounded (`cc == 0`) or overflow past [`REVISION_MAX_CONCURRENCY`]
+    ///   with live backends: clamps to [`REVISION_MAX_CONCURRENCY`].
+    pub fn calculate_capacity(
+        &self,
+        backend_count: i64,
+        num_trackers: i64,
+        activator_count: i64,
+    ) -> i64 {
+        let mut target = if num_trackers > 0 {
+            self.container_concurrency * num_trackers
+        } else {
+            let t = self.container_concurrency * backend_count;
+            if t > 0 {
+                min_one_or_value(t / min_one_or_value(activator_count))
+            } else {
+                t
+            }
+        };
+        if backend_count > 0
+            && (self.container_concurrency == 0 || target > REVISION_MAX_CONCURRENCY)
+        {
+            target = REVISION_MAX_CONCURRENCY;
+        }
+        target
+    }
+}
+
+/// Breaker variant used when `containerConcurrency == 0` (unbounded).
+///
+/// Upstream's `infiniteBreaker` reports a capacity of 0 or 1 and uses a
+/// broadcast to unblock held requests once any backend is ready; we model
+/// the gate as an open/closed flag driven by the live backend count.
+#[derive(Debug)]
+pub struct InfiniteBreaker {
+    /// 0 (closed, scaled-to-zero) or 1 (open, backends available).
+    capacity: AtomicU32,
+}
+
+impl Default for InfiniteBreaker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InfiniteBreaker {
+    /// A closed (capacity-0) breaker.
+    pub fn new() -> Self {
+        Self {
+            capacity: AtomicU32::new(0),
+        }
+    }
+
+    /// Open the gate iff `backend_count > 0`, else close it.
+    pub fn update_concurrency(&self, backend_count: i64) {
+        let v = if backend_count > 0 { 1 } else { 0 };
+        self.capacity.store(v, Ordering::Release);
+    }
+
+    /// Reported capacity — 0 or 1.
+    pub fn capacity(&self) -> u32 {
+        self.capacity.load(Ordering::Acquire)
+    }
+
+    /// Whether a held request may proceed immediately.
+    pub fn has_capacity(&self) -> bool {
+        self.capacity() > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
