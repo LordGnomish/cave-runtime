@@ -30,6 +30,8 @@ pub mod priority_sort;
 pub mod profiles;
 pub mod routes;
 pub mod scheduler;
+// internal/heap — key-indexed heap backing the active queue (Update/Delete/AddIfNotPresent).
+pub mod scheduling_heap;
 pub mod topology;
 pub mod volume;
 pub mod volumezone_plugin;
