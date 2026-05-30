@@ -173,6 +173,38 @@ local    = "src/duration.rs"
 upstream = "vendor/github.com/robfig/cron/v3 (Budget.IsActive engine)"
 local    = "src/cron.rs"
 
+# ── cont4 deep-port (v1.12.1, 2026-05-30): apis/v1 tail + utils +
+#    controllers/nodepool + disruption emptiness + provisioning sim +
+#    cluster state. Descriptive mappings only — scalar counts stay pinned to
+#    the v1.4.0 subsystem baseline (anti-inflation); real progress is the LOC
+#    honest_ratio in docs/audit/cave-karpenter/2026-05-30-cont4-progress.md.
+[[files]]
+# NodePool.Hash() drift hash + the mitchellh/hashstructure FormatV2 engine it
+# depends on (FNV-1 / ordered+unordered combine / SlicesAsSets / IgnoreZeroValue).
+upstream = "pkg/apis/v1/nodepool.go (NodePool.Hash) + vendor/github.com/mitchellh/hashstructure/v2"
+local    = "src/hash.rs"
+
+[[files]]
+upstream = "pkg/utils/nodepool/nodepool.go (OrderByWeight)"
+local    = "src/nodepool_utils.rs"
+
+[[files]]
+upstream = "pkg/controllers/nodepool/hash/controller.go"
+local    = "src/hash_controller.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/emptiness.go (emptiness + ConsolidationPolicy gate)"
+local    = "src/disruption.rs"
+
+[[files]]
+# DaemonSet-overhead reservation in the provisioning scheduler.
+upstream = "pkg/controllers/provisioning/scheduling/scheduler.go (calculateDaemonOverhead)"
+local    = "src/binpack.rs"
+
+[[files]]
+upstream = "pkg/controllers/state/cluster.go + pkg/controllers/disruption/candidate.go"
+local    = "src/cluster_state.rs"
+
 [[files]]
 upstream = "pkg/controllers/provisioning/batcher/batcher.go"
 local    = "src/batcher.rs"

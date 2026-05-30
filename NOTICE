@@ -145,6 +145,7 @@ MIT:
   - langfuse/langfuse
   - louislam/uptime-kuma
   - microsoft/presidio
+  - mitchellh/hashstructure  (cave-karpenter; v2 FormatV2 — NodePool.Hash drift engine)
   - nobl9/nobl9-go
   - ollama/ollama
   - robfig/cron            (cave-karpenter; v3 — Budget.IsActive cron engine)
