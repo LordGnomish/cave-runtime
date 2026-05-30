@@ -33,18 +33,18 @@ language= "Go"
 url     = "https://github.com/grafana/loki"
 
 [parity]
-mapped_count   = 15
-partial_count  = 2
+mapped_count   = 16
+partial_count  = 1
 skipped_count  = 7
 unmapped_count = 0
 total          = 24
 fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 24/24 — every in-scope subsystem is addressed; the cross-ingester queue rebalancer was reclassified unmapped→skipped (mirrors the cross-querier scope_cut row — both deferred together to obs-stack-ray-2 since cave-logs runs single-process tokio mpsc).
-honest_ratio   = 0.8750          # (mapped 15 + skipped 6) / 24 — partial excluded
+honest_ratio   = 0.9583          # 2026-05-30 honest uplift — (mapped 16 + skipped 7) / 24. The compactor partial graduated to mapped: src/compactor.rs now executes the full merge+dedupe+retention loop (planning + retention-counting already existed). Only the cross-querier query-scheduler remains partial (genuinely multi-node; single-process already covered).
 adr_justified_ratio = 1.0        # 7 skipped (full-cluster sharding modes + multi-tenant gateway + cross-ingester queue rebalancer all deferred to obs-stack-ray-2 / cave-mesh) + 2 partials (compactor retention+dry_run; query-scheduler single-process) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "5b9f6a7d3e2c1b8a4f6e9c5d7a2b8e1f3c9d6e4a"  # v3.4.0 tag sha (grafana/loki)
-last_audit     = "2026-05-28"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
@@ -119,6 +119,12 @@ local    = "src/shipper.rs"
 [[files]]
 upstream = "pkg/ingester-rf1/ingester.go"
 local    = "src/ingester_rf1.rs"
+
+# Honest uplift (2026-05-30) — compactor execution loop
+
+[[files]]
+upstream = "pkg/compactor/compactor.go"
+local    = "src/compactor.rs"
 
 # LogQL (logql package)
 
@@ -252,6 +258,11 @@ local_name    = "plan_compaction"
 file          = "src/multitenant.rs"
 
 [[functions]]
+upstream_name = "Compactor.RunCompaction"
+local_name    = "compact"
+file          = "src/compactor.rs"
+
+[[functions]]
 upstream_name = "EvalAlerts"
 local_name    = "evaluate_all_alerts"
 file          = "src/alerting.rs"
@@ -371,6 +382,24 @@ local_test    = "forward_mode_basic"
 [[tests]]
 upstream_test = "clients/pkg/logentry/stages/msgpack_test.go::TestBasic"
 local_test    = "msgpack_reader_basic_types"
+
+# Honest uplift (2026-05-30) — compactor execution loop
+
+[[tests]]
+upstream_test = "pkg/compactor/compactor_test.go::TestCompaction"
+local_test    = "merge_overlapping_chunks_same_stream"
+
+[[tests]]
+upstream_test = "pkg/compactor/deletion/dedupe_test.go::TestDedupe"
+local_test    = "dedupe_identical_entries"
+
+[[tests]]
+upstream_test = "pkg/compactor/retention/retention_test.go::TestExpiry"
+local_test    = "retention_drops_expired_chunks"
+
+[[tests]]
+upstream_test = "pkg/compactor/compactor_test.go::TestIdempotent"
+local_test    = "compaction_is_idempotent"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
@@ -502,10 +531,10 @@ upstream_pkg = "grafana/loki:pkg/ingester-rf1 (replication factor 1 experimental
 local_files  = ["src/ingester_rf1.rs"]
 note         = "Segment lifecycle + size/age flush triggers + rf1 object-key naming (Wave-2 close-out 2026-05-19)"
 
-[[partial]]
-upstream_pkg = "grafana/loki:pkg/compactor (retention + dedupe)"
-local_files  = ["src/limits.rs"]
-note         = "Retention rules + dry_run_retention covered; full compaction loop deferred"
+[[mapped]]
+upstream_pkg = "grafana/loki:pkg/compactor (retention + dedupe + merge)"
+local_files  = ["src/compactor.rs", "src/limits.rs", "src/multitenant.rs"]
+note         = "Full compaction loop now executed: compact() merges chunks per (tenant, stream_fp), de-dupes identical (ts,line) entries, applies the retention cutoff, and re-encodes one chunk per group (idempotent). Planning (plan_compaction) + retention counting (dry_run_retention) already existed. Honest uplift 2026-05-30."
 
 [[partial]]
 upstream_pkg = "grafana/loki:pkg/scheduler (query-scheduler)"
