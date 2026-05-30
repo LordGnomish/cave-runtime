@@ -4,6 +4,7 @@
 //! Service discovery: static, file-based, and Kubernetes.
 
 pub mod discovery;
+pub mod dns_sd;
 pub mod manager;
 pub mod relabel;
 pub mod target;
