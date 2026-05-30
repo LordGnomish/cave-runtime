@@ -11,6 +11,7 @@
 //! - `rbac`      — Casbin RBAC role manager + rbac_api role-graph queries (role inheritance)
 
 pub mod catalog;
+pub mod enforcer;
 pub mod matchers;
 pub mod models;
 pub mod policy;
