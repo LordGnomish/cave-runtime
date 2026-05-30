@@ -75,14 +75,39 @@ allowance twins (`budget_allowed_disruptions_at` etc.) mirror Go's
 `clock.Clock` threading. The cont2 no-clock helpers are untouched, so their 14
 tests stay green. `BudgetError` gains `InvalidCron` / `InvalidDuration`.
 
+## Wave 3 — pkg/utils (start) ✅
+
+| Cycle | Module | Upstream file | RED SHA | GREEN SHA | Tests |
+|-------|--------|---------------|---------|-----------|-------|
+| 10 | `pretty`           | `pkg/utils/pretty/pretty.go`      | `c5cb52d0` | `6591e805` | 6  |
+| 11 | `pod`              | `pkg/utils/pod/scheduling.go`     | (RED)      | `a270c599` | 18 |
+
+**Cycle 10 — pretty.** `concise` (compact JSON), `slice`/`map` truncation with
+the `and N other(s)` tail, `taint` pretty-print, `to_snake_case` (both upstream
+regex passes — `(.)([A-Z][a-z]+)` then `([a-z0-9])([A-Z])` — reproduced by hand
+so the crate stays regex-free), and `sentence`.
+
+**Cycle 11 — pod.** A focused `corev1.Pod` reduction plus the pod-state
+predicate set the provisioning + disruption controllers gate on:
+`is_terminal`/`is_terminating`/`is_active`, `is_stuck_terminating` (clock),
+ownership GVK matchers (StatefulSet/DaemonSet/Node), `is_provisionable`,
+`is_reschedulable` (with the StatefulSet-terminating exception),
+`is_pod_eligible_for_forced_eviction`, `is_do_not_disrupt_active` (true /
+duration-window / invalid / absent / no-start-time fail-safe, clock),
+`is_disruptable`, `is_drainable`, `is_waiting_eviction`,
+`tolerates_disrupted_no_schedule_taint`, and the anti-affinity / DRA helpers.
+The `events.Recorder` emission inside `IsDoNotDisruptActive` is dropped
+(non-behavioral). Reuses `scheduling::taints::Toleration` and
+`duration::parse_duration`.
+
 ## Metrics
 
 | Metric | Ray #2 end | Ray #3 end | Δ |
 |--------|-----------|-----------|---|
-| cave `src` total LOC | 3,689 | 5,144 | +1,455 |
-| LOC honest_ratio (/34,772) | 0.1061 | **0.1479** | +0.0418 |
-| cave-karpenter active tests | 205 | **280** | +75 |
-| TDD cycles (this ray) | — | **5** | — |
+| cave `src` total LOC | 3,689 | 5,555 | +1,866 |
+| LOC honest_ratio (/34,772) | 0.1061 | **0.1597** | +0.0536 |
+| cave-karpenter active tests | 205 | **304** | +99 |
+| TDD cycles (this ray) | — | **7** | — |
 | manifest `mapped_count` | 19 | 19 | 0 (anti-inflation) |
 
 `pkg/apis/v1` is now substantially ported: CRD model (cont1/2), requirements,
@@ -100,10 +125,11 @@ hook-regenerated from the scalars, not the `[[files]]` count).
   field handling). Deferred — a self-contained effort.
 - NodePool/NodeClaim defaults are upstream no-ops (nothing to port).
 
-**Wave 3 — utils:** remaining `pkg/utils` helpers (~1.9K LOC) — e.g.
-`pkg/utils/pretty`, `pkg/utils/node`, `pkg/utils/pod`, `pkg/utils/nodeclaim`,
-`pkg/utils/nodepool`. Pure helpers are directly TDD-able; controller-runtime
-client paths are scope-cut.
+**Wave 3 — utils (continued):** `pkg/utils/pretty` ✅ + `pkg/utils/pod`
+(scheduling predicates) ✅ done this ray. Remaining: `pkg/utils/node`,
+`pkg/utils/nodeclaim`, `pkg/utils/nodepool`, `pkg/utils/pdb`,
+`pkg/utils/ringbuffer`, `pkg/utils/atomic`, `pkg/utils/env`. Pure helpers are
+directly TDD-able; controller-runtime client paths are scope-cut.
 
 **Wave 4 — controllers (large):** nodepool (555), disruption (3,092),
 provisioning sim (4,539), cluster state (3,017).
