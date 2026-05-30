@@ -17,3 +17,6 @@
 
 /// Token embedding pooling strategies (mean / CLS / max / last-token) + L2 norm.
 pub mod pooling;
+
+/// Embedding model registry — per-model cards (dims, ctx, pooling, prefixes).
+pub mod registry;
