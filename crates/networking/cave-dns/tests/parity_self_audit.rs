@@ -10,7 +10,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-28";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const FLOOR_HONEST_RATIO: f64 = 0.65;
 const COREDNS_VERSION: &str = "v1.14.3";

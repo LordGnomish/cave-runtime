@@ -30,15 +30,18 @@
 #   * Zone transfer (AXFR + IXFR + secondary plugin + SOA serial tracking)
 #   * Wire format (hickory-proto re-export + CoreDNS-compatible request/response model)
 #
+# Closed 2026-05-30 (were partial, now mapped — strict-TDD ports):
+#   * Corefile/Caddyfile lexer (src/corefile.rs — lexer.go tokeniser)
+#   * tsig.go HMAC zone-transfer signing (src/tsig.rs — RFC 8945, hmac-sha*)
+#
 # Out of MVP (skipped / Phase 2 — see [[scope_cuts]] + [[skipped]]):
-#   * Caddyfile lexer/parser (we accept the runtime config as serde JSON/TOML)
+#   * Caddyfile parser/import directive + plugin.cfg compile (cave-dns-corefile)
 #   * Plugin marketplace + external plugin loader (CGO-style dynamic plugins)
 #   * Live AWS Route 53 / Azure DNS / GCP Cloud DNS SDK clients
 #   * Live etcd watch + skydns/2 wire format
-#   * tsig.go HMAC zone-transfer keying (offline parser only)
 #   * federation / k8s_external 1.x legacy plugins (deprecated upstream)
-#   * full Caddyfile-style 'import' directive
 #   * file-watcher reload notifier (we have a poll-loop only)
+#   * DoQ 0-RTT QUIC listener (partial — needs the cave-net QUIC slot)
 
 [upstream]
 org        = "coredns"
@@ -64,13 +67,17 @@ source_sha = "vendored-by-coredns-v1.14.3"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.7917
-adr_justified_ratio = 1.0   # 12 skipped scope_cut: 10 to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 3 partial (DoQ 0-RTT, Caddyfile lexer, TSIG HMAC) honestly preserved.
+# honest_ratio rises +2/48 (0.7917 -> 0.8333) by genuinely closing 2 partials
+# into line-by-line ports: tsig-hmac-zone-transfer (src/tsig.rs, RFC 8945) and
+# caddyfile-corefile-parser (src/corefile.rs, lexer.go). 1 partial preserved
+# honestly (DoQ 0-RTT — needs the cave-net QUIC slot).
+honest_ratio        = 0.8333
+adr_justified_ratio = 1.0   # 12 skipped scope_cut: 10 to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 1 partial (DoQ 0-RTT) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 33
-partial_count       = 3
+mapped_count        = 35
+partial_count       = 1
 skipped_count       = 12
 unmapped_count      = 0
 total               = 48
@@ -280,7 +287,19 @@ upstream = "plugin/dnssec/dnssec.go + vendor/miekg/dns/dnssec.go"
 local_files = ["src/protocol/dnssec.rs", "src/dnssec/validator.rs", "src/dnssec/nsec.rs", "src/dnssec/nsec3.rs", "src/dnssec/dnskey.rs", "src/dnssec/rrsig.rs"]
 note = "NSEC + NSEC3 denial-of-existence + DNSKEY trust-anchor + RRSIG validator + offline signer."
 
-# ─── Partial subsystems (3) ─────────────────────────────────────────────────
+[[mapped]]
+name = "tsig-hmac-zone-transfer"
+upstream = "vendor/miekg/dns/tsig.go (tsigGenerate / tsigVerify)"
+local_files = ["src/tsig.rs"]
+note = "RFC 8945 TSIG transaction signatures — §4.3.3 variable digest, §5.3.1 request/response MAC binding, §5.2.3 fudge window; hmac-sha1/256/384/512 via ring. HMAC primitive validated against RFC 4231 / RFC 2202 vectors. Closes the 2026-05-30 partial."
+
+[[mapped]]
+name = "caddyfile-corefile-parser"
+upstream = "core/caddyfile/lexer.go (Caddy v1 lexer)"
+local_files = ["src/corefile.rs"]
+note = "Native Corefile tokeniser — whitespace-delimited tokens with 1-based line tracking, '#' line comments at token boundaries, double-quoted strings with backslash escapes (newline-spanning), and backtick literal strings. Closes the 2026-05-30 partial; serde JSON/TOML shim remains as an alternate input."
+
+# ─── Partial subsystems (1) ─────────────────────────────────────────────────
 
 [[partial]]
 name = "doq-quic-listener"
@@ -288,20 +307,6 @@ upstream = "core/dnsserver/server_quic.go (CoreDNS v1.13+)"
 local_files = ["src/server/doh.rs"]
 note = "DoQ session reuse: we accept the QUIC ALPN profile on the DoH HTTP/3 path but do not yet bind a dedicated 0-RTT listener. Phase 2 — cave-net QUIC slot."
 gap_reason = "QUIC 0-RTT pre-handshake binding deferred to dedicated cave-net QUIC slot; current code path reuses DoH"
-
-[[partial]]
-name = "caddyfile-corefile-parser"
-upstream = "core/caddyfile/parse.go"
-local_files = ["src/config.rs"]
-note = "We accept the runtime config as serde JSON/TOML; the Caddyfile lexer is a Phase 2 work item that ships behind a cave-dns-corefile sub-crate."
-gap_reason = "Caddyfile tokeniser deferred to dedicated cave-dns-corefile parser; serde JSON shim is functional for cave-runtime use"
-
-[[partial]]
-name = "tsig-hmac-zone-transfer"
-upstream = "vendor/miekg/dns/tsig.go"
-local_files = ["src/zone/transfer.rs"]
-note = "We parse the TSIG key name on zone-transfer requests but do not yet HMAC-sign the response. Phase 2 routes through cave-vault for the keyring."
-gap_reason = "HMAC signing deferred until cave-vault provides the zone-transfer keyring API"
 
 # ─── Skipped subsystems (10 — formalised Phase 2 cuts) ──────────────────────
 
