@@ -30,19 +30,37 @@ language= "Go"
 url     = "https://github.com/grafana/grafana"
 
 [parity]
-mapped_count   = 11
-partial_count  = 3
+mapped_count   = 14
+partial_count  = 0
 skipped_count  = 7
 unmapped_count = 0
 total          = 21
 fill_ratio     = 1.0000
-honest_ratio   = 0.8571          # (mapped 11 + skipped 7) / 21 — partial excluded
-adr_justified_ratio = 1.0        # 7 skipped (browser-UI / go-bootstrap / test-harness / stdlib-analog / parallel-track-shared-services) = standard categories; 3 partial (folder service / RBAC subset / mixed-datasource) honestly preserved.
+honest_ratio   = 1.0000          # (mapped 14 + skipped 7) / 21 — 3 partials resolved to mapped 2026-05-30
+adr_justified_ratio = 1.0        # 7 skipped (browser-UI / go-bootstrap / test-harness / stdlib-analog / parallel-track-shared-services) = standard categories.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source = "manifest"
 source_sha     = "a3e8f5d2c9b7a4f1e6d3c8b5a2f9e6d3c1b8a5f2"  # v11.5.0 tag sha (grafana/grafana)
-last_audit     = "2026-05-28"
+last_audit     = "2026-05-30"
 infra_only     = false
+
+# 2026-05-30 honest uplift — 3 [[partial]] → [[mapped]] via strict-TDD line-ports
+#   (grafana/grafana v11.5.0 line port, AGPL-3.0-or-later):
+#   * query / mixed-datasource expressions → src/expressions.rs
+#       pkg/expr {mathexp reducers + resample, classic conditions, exp.go math,
+#       cross-refId ExprCommand pipeline}. Wired POST /api/ds/query/expr,
+#       cavectl `dashboard expr`, portal Expressions section. 52 tests.
+#   * folder / standalone nested folder service → src/folder_service.rs
+#       pkg/services/folder {create/move/parents(root-first)/height/fullpath/
+#       delete, MaxNestedFolderDepth=4 + circular-reference}. Wired
+#       GET /api/folders/{uid}/parents|children + POST .../move, cavectl
+#       `dashboard folder-*`, portal note. 15 tests.
+#   * auth / Grafana-shaped RBAC subset → src/access_control.rs
+#       pkg/services/accesscontrol {scope split/build/prefix/wildcards,
+#       ValidateScope, scope match, Evaluator Permission/All/Any}. Wired
+#       POST /api/access-control/eval, cavectl `dashboard access-eval`,
+#       portal note. 13 tests. (Distinct from cave-auth identity RBAC.)
+#   honest_ratio 0.8571 → 1.0000; mapped 11 → 14; partial 3 → 0.
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
 #   * 3 new [[mapped]] subsystems via fresh Rust ports:
@@ -129,6 +147,20 @@ local    = "src/explore.rs"
 [[files]]
 upstream = "public/app/features/transformations"
 local    = "src/transformations.rs"
+
+# 2026-05-30 honest uplift — partial → mapped line-ports
+
+[[files]]
+upstream = "pkg/expr (mathexp/{reduce,resample}.go + classic/{reduce,evaluator,classic}.go + exp.go binaryOp)"
+local    = "src/expressions.rs"
+
+[[files]]
+upstream = "pkg/services/folder (model.go + folderimpl/folder.go)"
+local    = "src/folder_service.rs"
+
+[[files]]
+upstream = "pkg/services/accesscontrol (evaluator.go + scope.go + checker.go + ValidateScope)"
+local    = "src/access_control.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -431,20 +463,20 @@ upstream_pkg = "grafana/grafana:public/app/features/transformations (filter/redu
 local_files  = ["src/transformations.rs"]
 note         = "DataFrame transforms: filter (NoNulls/ValueBetween/EqualLabel), reduce (mean/sum/min/max/last/count), merge (concat tall + NaN-pad missing), rename (starts_with replacement), sort_by (asc/desc)."
 
-[[partial]]
-upstream_pkg = "grafana/grafana:pkg/services/folder"
-local_files  = ["src/models.rs", "src/store.rs"]
-note         = "Folder CRUD + dashboard-in-folder covered via store + models; standalone folder service deferred"
+[[mapped]]
+upstream_pkg = "grafana/grafana:pkg/services/folder (nested folder service)"
+local_files  = ["src/folder_service.rs", "src/models.rs", "src/store.rs"]
+note         = "2026-05-30: standalone nested folder service ported (folderimpl/folder.go) — create/move/get_parents(root-first)/get_height/fullpath/delete with MaxNestedFolderDepth=4 + circular-reference detection. Wired /api/folders/{uid}/{parents,children,move}."
 
-[[partial]]
-upstream_pkg = "grafana/grafana:pkg/services/auth (API keys + RBAC subset)"
-local_files  = ["src/auth.rs"]
-note         = "API key hash/generate covered; full RBAC role hierarchy covered via cave-auth — local module covers Grafana-shaped surface only"
+[[mapped]]
+upstream_pkg = "grafana/grafana:pkg/services/accesscontrol (RBAC evaluator)"
+local_files  = ["src/access_control.rs", "src/auth.rs"]
+note         = "2026-05-30: Grafana-shaped RBAC evaluator ported (evaluator.go + scope.go + ValidateScope) — scope split/build/prefix/wildcards, scope match, Evaluator Permission/All/Any over action->scopes. API-key hash/generate in auth.rs. Wired /api/access-control/eval. Distinct from cave-auth identity RBAC."
 
-[[partial]]
-upstream_pkg = "grafana/grafana:pkg/services/query (query proxy)"
-local_files  = ["src/query.rs"]
-note         = "Query proxy + datasource fan-out covered; mixed-datasource expressions deferred"
+[[mapped]]
+upstream_pkg = "grafana/grafana:pkg/expr + pkg/services/query (mixed-datasource expressions)"
+local_files  = ["src/expressions.rs", "src/query.rs"]
+note         = "2026-05-30: server-side expression engine ported (pkg/expr mathexp reducers + resample, classic conditions, exp.go math) — cross-refId ExprCommand pipeline (Reduce/Resample/MathBinary/Threshold/ClassicCondition) is the __expr__ datasource. Wired /api/ds/query/expr."
 
 [[skipped]]
 upstream_pkg = "grafana/grafana:public/app/ (React SPA)"
