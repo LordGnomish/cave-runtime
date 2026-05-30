@@ -234,6 +234,51 @@ pub fn requeue_after(
     Some(not_after - deadline)
 }
 
+/// Per-certificate status recorded on the TenantControlPlane, mirroring
+/// upstream `Status.Certificates.<Component>` (`SecretName` / `Checksum` /
+/// `LastUpdate`). Downstream resources compare `checksum` to decide whether a
+/// dependent cert (e.g. apiserver) must be re-issued after a CA rotation.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CertificateStatus {
+    pub secret_name: String,
+    pub checksum: String,
+    pub last_update: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl CertificateStatus {
+    /// Record the freshly reconciled Secret name, content checksum and update
+    /// timestamp (the upstream `UpdateTenantControlPlaneStatus` write).
+    pub fn record(
+        &mut self,
+        secret_name: &str,
+        checksum: &str,
+        when: chrono::DateTime<chrono::Utc>,
+    ) {
+        self.secret_name = secret_name.to_string();
+        self.checksum = checksum.to_string();
+        self.last_update = Some(when);
+    }
+}
+
+/// Decide whether a leaf certificate must be (re)generated.
+///
+/// Faithful to `APIServerCertificate.mutate`: the existing Secret is reused
+/// only when its recorded checksum matches the live resource's checksum (and
+/// is non-empty) *and* the CA still verifies the cert *and* the cert/key-pair
+/// is internally valid. Any mismatch — content drift, CA rotation, or a broken
+/// key-pair — forces re-issuance.
+pub fn should_regenerate(
+    prior_checksum: Option<&str>,
+    current_checksum: &str,
+    ca_valid: bool,
+    cert_valid: bool,
+) -> bool {
+    let checksum_matches =
+        !current_checksum.is_empty() && prior_checksum == Some(current_checksum);
+    let can_skip = checksum_matches && ca_valid && cert_valid;
+    !can_skip
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
