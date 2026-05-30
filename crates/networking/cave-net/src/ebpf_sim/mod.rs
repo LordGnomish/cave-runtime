@@ -33,6 +33,7 @@ pub mod bpf_lxc_sim;
 pub mod conntrack_sim;
 pub mod helpers;
 pub mod map;
+pub mod nat_sim;
 pub mod program;
 
 pub use bpf_host_sim::{HostProgram, HostVerdict};
@@ -40,4 +41,5 @@ pub use bpf_lxc_sim::{LxcEndpointInfo, LxcMap, LxcProgram};
 pub use conntrack_sim::{ConntrackEntry, ConntrackKey, ConntrackMap, CtAction, CtDirection};
 pub use helpers::{Helpers, MockClock};
 pub use map::{Map, MapError, MapKind};
+pub use nat_sim::{NatDir, NatEntry, NatError, NatMap, NatTarget, NatTuple, SNAT_COLLISION_RETRIES};
 pub use program::{Context, Program, Verdict};
