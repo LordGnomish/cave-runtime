@@ -464,4 +464,33 @@ mod tests {
         assert_eq!(blocks[0].keys, vec![".:53".to_string()]);
         assert_eq!(blocks[1].keys, vec!["example.com:1053".to_string()]);
     }
+
+    // ── Cycle 3: {$ENV} substitution (replaceEnvVars) ──────────────────────
+
+    #[test]
+    fn replace_env_vars_substitutes_known_reference() {
+        let env = |k: &str| (k == "CAVE_DNS_PORT").then(|| "1053".to_string());
+        assert_eq!(replace_env_vars(".:{$CAVE_DNS_PORT}", &env), ".:1053");
+    }
+
+    #[test]
+    fn replace_env_vars_unset_reference_becomes_empty() {
+        let env = |_: &str| None;
+        assert_eq!(replace_env_vars("{$NOPE}suffix", &env), "suffix");
+    }
+
+    #[test]
+    fn replace_env_vars_unterminated_is_left_intact() {
+        // No closing brace -> upstream leaves the text untouched.
+        let env = |_: &str| Some("x".to_string());
+        assert_eq!(replace_env_vars("{$OPEN", &env), "{$OPEN");
+    }
+
+    #[test]
+    fn parse_with_env_substitutes_address_port() {
+        let env = |k: &str| (k == "CAVE_DNS_PORT").then(|| "1053".to_string());
+        let blocks =
+            parse_with_env(".:{$CAVE_DNS_PORT}\n", Box::new(env)).expect("parse ok");
+        assert_eq!(blocks[0].keys, vec![".:1053".to_string()]);
+    }
 }
