@@ -352,7 +352,8 @@ impl Engine {
             "rate" | "irate" | "increase" | "delta" | "idelta" | "deriv" | "resets" | "changes"
             | "avg_over_time" | "min_over_time" | "max_over_time" | "sum_over_time"
             | "count_over_time" | "stddev_over_time" | "stdvar_over_time" | "last_over_time"
-            | "present_over_time" | "mad_over_time" => {
+            | "present_over_time" | "mad_over_time" | "ts_of_min_over_time"
+            | "ts_of_max_over_time" | "ts_of_last_over_time" => {
                 let rv = self.eval_range_vector_arg(call, ts_ms)?;
                 let iv: Vec<(Labels, f64)> = rv
                     .into_iter()
@@ -398,6 +399,33 @@ impl Engine {
                     .into_iter()
                     .filter_map(|(labels, samps)| {
                         fns::predict_linear(&samps, t).map(|v| (labels, v))
+                    })
+                    .collect();
+                Ok(QueryResult::InstantVector(iv))
+            }
+
+            "double_exponential_smoothing" => {
+                let sf = match call.args.get(1) {
+                    Some(Expr::NumberLiteral(v)) => *v,
+                    _ => {
+                        return Err(MetricsError::Eval(
+                            "double_exponential_smoothing: smoothing factor must be a number".into(),
+                        ));
+                    }
+                };
+                let tf = match call.args.get(2) {
+                    Some(Expr::NumberLiteral(v)) => *v,
+                    _ => {
+                        return Err(MetricsError::Eval(
+                            "double_exponential_smoothing: trend factor must be a number".into(),
+                        ));
+                    }
+                };
+                let rv = self.eval_range_vector_arg_at(call, 0, ts_ms)?;
+                let iv: Vec<(Labels, f64)> = rv
+                    .into_iter()
+                    .filter_map(|(labels, samps)| {
+                        fns::double_exponential_smoothing(&samps, sf, tf).map(|v| (labels, v))
                     })
                     .collect();
                 Ok(QueryResult::InstantVector(iv))
@@ -529,6 +557,20 @@ impl Engine {
             "sort_desc" => {
                 let iv = self.eval_iv_first(call, ts_ms)?;
                 Ok(QueryResult::InstantVector(fns::sort_desc(iv)))
+            }
+
+            "sort_by_label" | "sort_by_label_desc" => {
+                let iv = self.eval_iv_first(call, ts_ms)?;
+                let sort_labels: Vec<String> = (1..call.args.len())
+                    .filter_map(|i| self.string_arg(call, i).ok())
+                    .collect();
+                let label_refs: Vec<&str> = sort_labels.iter().map(|s| s.as_str()).collect();
+                let desc = call.func == "sort_by_label_desc";
+                Ok(QueryResult::InstantVector(fns::sort_by_label(
+                    iv,
+                    &label_refs,
+                    desc,
+                )))
             }
 
             // ── Label functions ────────────────────────────────────────────
@@ -689,6 +731,9 @@ impl Engine {
             "last_over_time" => fns::last_over_time(samps),
             "present_over_time" => fns::present_over_time(samps),
             "mad_over_time" => fns::mad_over_time(samps),
+            "ts_of_min_over_time" => fns::ts_of_min_over_time(samps),
+            "ts_of_max_over_time" => fns::ts_of_max_over_time(samps),
+            "ts_of_last_over_time" => fns::ts_of_last_over_time(samps),
             _ => None,
         }
     }

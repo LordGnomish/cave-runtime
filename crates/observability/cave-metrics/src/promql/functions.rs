@@ -416,3 +416,110 @@ pub fn sort_desc(mut pairs: Vec<(Labels, f64)>) -> Vec<(Labels, f64)> {
     pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     pairs
 }
+
+// ─── Holt-Winters / double exponential smoothing ──────────────────────────────
+
+fn calc_trend_value(i: usize, tf: f64, s0: f64, s1: f64, b: f64) -> f64 {
+    if i == 0 {
+        return b;
+    }
+    tf * (s1 - s0) + (1.0 - tf) * b
+}
+
+/// double_exponential_smoothing(): Holt-Winters double exponential smoothing.
+/// `sf` is the smoothing factor and `tf` the trend factor (both in (0,1)).
+/// Renamed from `holt_winters` in Prometheus 3.0 (promql/functions.go
+/// `funcDoubleExponentialSmoothing`). Needs at least two samples.
+pub fn double_exponential_smoothing(samples: &[Sample], sf: f64, tf: f64) -> Option<f64> {
+    let l = samples.len();
+    if l < 2 {
+        return None;
+    }
+    let mut s0 = 0.0_f64;
+    let mut s1 = samples[0].value;
+    let mut b = samples[1].value - samples[0].value;
+    for i in 1..l {
+        let x = sf * samples[i].value;
+        b = calc_trend_value(i - 1, tf, s0, s1, b);
+        let y = (1.0 - sf) * (s1 + b);
+        s0 = s1;
+        s1 = x + y;
+    }
+    Some(s1)
+}
+
+// ─── Timestamp-of extrema (Prometheus #15232) ─────────────────────────────────
+
+/// ts_of_max_over_time(): timestamp (seconds) of the maximum-valued sample.
+/// Ties resolve to the earliest such sample.
+pub fn ts_of_max_over_time(samples: &[Sample]) -> Option<f64> {
+    let mut best: Option<&Sample> = None;
+    for s in samples {
+        match best {
+            Some(b) if s.value <= b.value => {}
+            _ => best = Some(s),
+        }
+    }
+    best.map(|s| s.timestamp_ms as f64 / 1000.0)
+}
+
+/// ts_of_min_over_time(): timestamp (seconds) of the minimum-valued sample.
+/// Ties resolve to the earliest such sample.
+pub fn ts_of_min_over_time(samples: &[Sample]) -> Option<f64> {
+    let mut best: Option<&Sample> = None;
+    for s in samples {
+        match best {
+            Some(b) if s.value >= b.value => {}
+            _ => best = Some(s),
+        }
+    }
+    best.map(|s| s.timestamp_ms as f64 / 1000.0)
+}
+
+/// ts_of_last_over_time(): timestamp (seconds) of the last sample in the range.
+pub fn ts_of_last_over_time(samples: &[Sample]) -> Option<f64> {
+    samples.last().map(|s| s.timestamp_ms as f64 / 1000.0)
+}
+
+// ─── Sort by label (Prometheus #11299) ────────────────────────────────────────
+
+fn full_label_cmp(a: &Labels, b: &Labels) -> std::cmp::Ordering {
+    let mut ax: Vec<(String, String)> =
+        a.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+    let mut bx: Vec<(String, String)> =
+        b.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+    ax.sort();
+    bx.sort();
+    ax.cmp(&bx)
+}
+
+/// sort_by_label(): order an instant vector by the given label value(s),
+/// ascending; ties fall back to a full-label-set comparison so the order is
+/// deterministic. `desc` reverses the whole comparison. Port of
+/// promql/functions.go `funcSortByLabel` / `funcSortByLabelDesc`.
+pub fn sort_by_label(
+    mut pairs: Vec<(Labels, f64)>,
+    sort_labels: &[&str],
+    desc: bool,
+) -> Vec<(Labels, f64)> {
+    pairs.sort_by(|a, b| {
+        let mut ord = std::cmp::Ordering::Equal;
+        for &lbl in sort_labels {
+            let va = a.0.get(lbl).unwrap_or("");
+            let vb = b.0.get(lbl).unwrap_or("");
+            ord = va.cmp(vb);
+            if ord != std::cmp::Ordering::Equal {
+                break;
+            }
+        }
+        if ord == std::cmp::Ordering::Equal {
+            ord = full_label_cmp(&a.0, &b.0);
+        }
+        if desc {
+            ord.reverse()
+        } else {
+            ord
+        }
+    });
+    pairs
+}
