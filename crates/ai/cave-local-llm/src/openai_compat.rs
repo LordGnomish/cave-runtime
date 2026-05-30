@@ -374,7 +374,7 @@ fn build_sse_stream(
 ) -> impl Stream<Item = OllamaResult<OpenAiChatChunk>> + Send {
     let byte_stream = response
         .bytes_stream()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+        .map_err(std::io::Error::other);
 
     let reader = StreamReader::new(byte_stream);
     let framed = FramedRead::new(reader, LinesCodec::new());
