@@ -22,8 +22,14 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 /// entry whose `(type, address)` pair already exists. Mirrors upstream exactly:
 /// dedup key is the full `(Type, Address)` tuple, order is preserved.
 pub fn add_to_node_addresses(addresses: &mut Vec<NodeAddress>, add_addresses: &[NodeAddress]) {
-    let _ = (addresses, add_addresses);
-    unimplemented!("RED: add_to_node_addresses")
+    for add in add_addresses {
+        let exists = addresses
+            .iter()
+            .any(|existing| existing.address == add.address && existing.kind == add.kind);
+        if !exists {
+            addresses.push(add.clone());
+        }
+    }
 }
 
 #[cfg(test)]
