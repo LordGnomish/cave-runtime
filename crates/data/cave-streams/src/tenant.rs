@@ -314,4 +314,71 @@ mod tests {
                 .is_some()
         );
     }
+
+    // ── Per-namespace backlog quota enforcement ────────────────────────────
+    // cite: pulsar 4.2.0 broker BacklogQuotaManager / BacklogQuotaImpl
+
+    #[test]
+    fn backlog_under_size_limit_is_allowed() {
+        let q = BacklogQuota::size(1_000, RetentionAction::ProducerException);
+        // 500 bytes of backlog against a 1000-byte limit → no action.
+        assert_eq!(q.evaluate(500, 0), BacklogDecision::Allow);
+    }
+
+    #[test]
+    fn backlog_over_size_limit_holds_producer() {
+        let q = BacklogQuota::size(1_000, RetentionAction::ProducerRequestHold);
+        assert_eq!(q.evaluate(1_500, 0), BacklogDecision::HoldProducer);
+    }
+
+    #[test]
+    fn backlog_over_size_limit_rejects_producer() {
+        let q = BacklogQuota::size(1_000, RetentionAction::ProducerException);
+        assert_eq!(q.evaluate(2_000, 0), BacklogDecision::RejectProducer);
+    }
+
+    #[test]
+    fn backlog_over_size_limit_evicts_consumer_backlog() {
+        let q = BacklogQuota::size(1_000, RetentionAction::ConsumerBacklogEviction);
+        assert_eq!(q.evaluate(1_001, 0), BacklogDecision::EvictBacklog);
+    }
+
+    #[test]
+    fn backlog_at_exact_limit_is_allowed() {
+        // Pulsar trips strictly *above* the limit, not at it.
+        let q = BacklogQuota::size(1_000, RetentionAction::ProducerException);
+        assert_eq!(q.evaluate(1_000, 0), BacklogDecision::Allow);
+    }
+
+    #[test]
+    fn backlog_time_limit_trips_on_age() {
+        // Time-based quota: oldest unacked entry older than limit trips.
+        let q = BacklogQuota::time(60, RetentionAction::ProducerException);
+        assert_eq!(q.evaluate(0, 30), BacklogDecision::Allow);
+        assert_eq!(q.evaluate(0, 90), BacklogDecision::RejectProducer);
+    }
+
+    #[test]
+    fn zero_limit_means_unlimited() {
+        let q = BacklogQuota::size(0, RetentionAction::ProducerException);
+        assert_eq!(q.evaluate(1_000_000, 0), BacklogDecision::Allow);
+    }
+
+    #[test]
+    fn namespace_without_quota_allows_any_backlog() {
+        let ns = Namespace::new("t", "n");
+        assert!(ns.backlog_quota.is_none());
+        assert_eq!(
+            ns.evaluate_backlog(10_000_000, 999_999),
+            BacklogDecision::Allow
+        );
+    }
+
+    #[test]
+    fn namespace_with_quota_enforces_it() {
+        let mut ns = Namespace::new("t", "n");
+        ns.backlog_quota = Some(BacklogQuota::size(100, RetentionAction::ProducerRequestHold));
+        assert_eq!(ns.evaluate_backlog(50, 0), BacklogDecision::Allow);
+        assert_eq!(ns.evaluate_backlog(200, 0), BacklogDecision::HoldProducer);
+    }
 }
