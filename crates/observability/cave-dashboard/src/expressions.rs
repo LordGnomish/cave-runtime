@@ -548,4 +548,108 @@ mod tests {
         );
         assert!(r.is_err());
     }
+
+    // ── classic condition reducer (pkg/expr/classic/reduce.go) ──────────────
+
+    #[test]
+    fn test_classic_reducer_valid() {
+        for r in ["avg", "sum", "min", "max", "count", "last", "median", "diff", "diff_abs",
+                  "percent_diff", "percent_diff_abs", "count_non_null"] {
+            assert!(ClassicReducer::parse(r).is_some(), "{r} should be valid");
+        }
+        assert!(ClassicReducer::parse("bogus").is_none());
+    }
+
+    #[test]
+    fn test_classic_reduce_avg_skips_nulls() {
+        // avg divides by the count of valid points only.
+        assert_eq!(classic_reduce(ClassicReducer::Avg, &[Some(1.0), None, Some(3.0)]), Some(2.0));
+    }
+
+    #[test]
+    fn test_classic_reduce_sum_min_max_skip_nulls() {
+        assert_eq!(classic_reduce(ClassicReducer::Sum, &[Some(1.0), None, Some(3.0)]), Some(4.0));
+        assert_eq!(classic_reduce(ClassicReducer::Min, &[Some(3.0), None, Some(1.0)]), Some(1.0));
+        assert_eq!(classic_reduce(ClassicReducer::Max, &[Some(3.0), None, Some(1.0)]), Some(3.0));
+    }
+
+    #[test]
+    fn test_classic_reduce_all_null_is_none() {
+        // min/max over an all-null series produce a null result.
+        assert_eq!(classic_reduce(ClassicReducer::Min, &[None, None]), None);
+        assert_eq!(classic_reduce(ClassicReducer::Avg, &[None, None]), None);
+    }
+
+    #[test]
+    fn test_classic_reduce_empty_is_none() {
+        assert_eq!(classic_reduce(ClassicReducer::Sum, &[]), None);
+    }
+
+    #[test]
+    fn test_classic_reduce_count_counts_all_points() {
+        assert_eq!(classic_reduce(ClassicReducer::Count, &[Some(1.0), None, Some(3.0)]), Some(3.0));
+    }
+
+    #[test]
+    fn test_classic_reduce_count_non_null() {
+        assert_eq!(classic_reduce(ClassicReducer::CountNonNull, &[Some(1.0), None, Some(3.0)]), Some(2.0));
+        assert_eq!(classic_reduce(ClassicReducer::CountNonNull, &[None, None]), None);
+    }
+
+    #[test]
+    fn test_classic_reduce_last_non_null() {
+        assert_eq!(classic_reduce(ClassicReducer::Last, &[Some(1.0), Some(2.0), None]), Some(2.0));
+    }
+
+    #[test]
+    fn test_classic_reduce_diff_and_percent() {
+        // diff = newest - oldest (non-null); newest scanned from the end.
+        assert_eq!(classic_reduce(ClassicReducer::Diff, &[Some(1.0), None, Some(5.0)]), Some(4.0));
+        assert_eq!(classic_reduce(ClassicReducer::DiffAbs, &[Some(5.0), Some(1.0)]), Some(4.0));
+        // percent_diff = (newest - oldest) / |oldest| * 100
+        assert_eq!(classic_reduce(ClassicReducer::PercentDiff, &[Some(1.0), Some(5.0)]), Some(400.0));
+    }
+
+    // ── classic evaluator (pkg/expr/classic/evaluator.go) ───────────────────
+
+    #[test]
+    fn test_eval_threshold_gt_lt() {
+        let gt = Evaluator::Threshold { typ: "gt".into(), threshold: 10.0 };
+        assert!(eval_condition(&gt, Some(11.0)));
+        assert!(!eval_condition(&gt, Some(10.0)));
+        let lt = Evaluator::Threshold { typ: "lt".into(), threshold: 10.0 };
+        assert!(eval_condition(&lt, Some(9.0)));
+        assert!(!eval_condition(&lt, Some(10.0)));
+    }
+
+    #[test]
+    fn test_eval_threshold_null_is_false() {
+        let gt = Evaluator::Threshold { typ: "gt".into(), threshold: 10.0 };
+        assert!(!eval_condition(&gt, None));
+    }
+
+    #[test]
+    fn test_eval_within_and_outside_range() {
+        let within = Evaluator::Ranged { typ: "within_range".into(), lower: 10.0, upper: 100.0 };
+        assert!(eval_condition(&within, Some(50.0)));
+        assert!(!eval_condition(&within, Some(5.0)));
+        let outside = Evaluator::Ranged { typ: "outside_range".into(), lower: 10.0, upper: 100.0 };
+        assert!(eval_condition(&outside, Some(5.0)));
+        assert!(!eval_condition(&outside, Some(50.0)));
+    }
+
+    #[test]
+    fn test_eval_no_value() {
+        let nv = Evaluator::NoValue;
+        assert!(eval_condition(&nv, None));
+        assert!(!eval_condition(&nv, Some(1.0)));
+    }
+
+    #[test]
+    fn test_condition_operator_combine() {
+        assert!(!combine_conditions(true, false, ConditionOperator::And));
+        assert!(combine_conditions(true, false, ConditionOperator::Or));
+        assert!(combine_conditions(false, true, ConditionOperator::LogicOr));
+        assert!(combine_conditions(true, true, ConditionOperator::And));
+    }
 }
