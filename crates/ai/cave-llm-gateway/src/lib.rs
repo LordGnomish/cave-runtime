@@ -20,6 +20,7 @@ pub mod bench_wire;
 pub mod cache;
 pub mod capability;
 pub mod cost;
+pub mod embeddings;
 pub mod error;
 pub mod guardrails;
 pub mod health;
