@@ -46,3 +46,6 @@ pub mod quant;
 
 /// Pure-Rust Modelfile parser (FROM/PARAMETER/TEMPLATE/SYSTEM/ADAPTER/LICENSE/MESSAGE).
 pub mod modelfile;
+
+/// Graceful-shutdown controller — SIGINT/SIGTERM/stop-file drain state machine.
+pub mod shutdown;
