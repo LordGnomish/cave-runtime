@@ -53,13 +53,13 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
 honest_ratio        = 0.7000
-adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) + composition-revision-GC daemon (architecturally-superseded by in-memory ring bound); 1 partial (Healthy condition back-off) honestly preserved.
+adr_justified_ratio = 1.0     # 12 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) + composition-revision-GC daemon (architecturally-superseded by in-memory ring bound); 1 partial (Healthy condition back-off) honestly preserved. (2026-05-30: environment-configs reclassified skipped→mapped — pure in-memory EnvironmentConfig bag + env field-path patch, honestly in-crate not cave-apiserver.)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 26
+mapped_count        = 27
 partial_count       = 1
-skipped_count       = 13
+skipped_count       = 12
 unmapped_count      = 0
 total               = 40
 
@@ -77,10 +77,14 @@ total               = 40
 #       conditions, cli, observability, claim, engine, models, reconciler,
 #       error, routes, lib + parity_self_audit
 #   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
-#     = (26 + 1 + 12) / 40 = 0.9750.
-#   * honest_ratio = (mapped + partial) / total = 27 / 40 = 0.6750 — 12 cuts
+#     = (27 + 1 + 12) / 40 = 1.0000.
+#   * honest_ratio = (mapped + partial) / total = 28 / 40 = 0.7000 — 12 cuts
 #     are Phase 2 ownerships routed to existing crates (cave-artifacts /
 #     cave-apiserver / cave-cert / cave-llm-gateway).
+#   * 2026-05-30 honest uplift: environment-configs skip→mapped (src/environment.rs;
+#     was a no-op env patch stub, now a real in-memory EnvironmentConfig bag +
+#     buildEnvironment merge + From/ToEnvironmentFieldPath patch resolution).
+#     mapped 26→27, skipped 13→12; mapped/total 0.6500→0.6750.
 #   * source_sha pinned to crossplane v2.3.1 commit
 #     41c6f9c4729175cf0f953cbf267378b8734e8d27.
 
@@ -89,7 +93,7 @@ name        = "cave-crossplane"
 description = "Crossplane v2 control plane — XRDs, Compositions (pipeline + legacy), XRs, claims, Providers, Functions, XPKG package manager, condition propagation"
 source_root = "src"
 
-# ─── Mapped subsystems (26) ─────────────────────────────────────────────────
+# ─── Mapped subsystems (27) ─────────────────────────────────────────────────
 
 [[mapped]]
 name = "composition-v2-pipeline"
@@ -247,6 +251,12 @@ upstream_files = ["internal/xpkg/dep/manager.go", "internal/dag/dag.go"]
 local_files = ["src/xpkg/dependency.rs"]
 note = "Dependency resolver: DAG over Configuration → Provider/Function deps, cycle detection, topo-ordered install plan."
 
+[[mapped]]
+name = "environment-configs"
+upstream_files = ["apis/apiextensions/v1alpha1/environmentconfig_types.go", "internal/controller/apiextensions/composite/environment/environment.go", "internal/controller/apiextensions/composite/patches.go::PatchTypeFromEnvironmentFieldPath"]
+local_files = ["src/environment.rs"]
+note = "EnvironmentConfig key→value data bag + buildEnvironment ordered-override merge (later selected config wins) + FromEnvironmentFieldPath/ToEnvironmentFieldPath field-path patch resolution. Pure in-memory algorithm — no apiserver dependency. (2026-05-30 strict-TDD RED→GREEN: was [[skipped]] env-config no-op stub; converted to real tested mapped — tests/environment_tdd.rs, 6 cases.)"
+
 # ─── Partial subsystems (1) ─────────────────────────────────────────────────
 
 [[partial]]
@@ -256,7 +266,7 @@ local_files = ["src/conditions.rs"]
 note = "Ready + Synced + Healthy conditions propagated composed → XR → claim. Healthy condition wired but observed-generation gating + Last-Transition jitter back-off are simplified (full back-off matrix Phase 2)."
 gap_reason = "Observed-generation gating + condition transition back-off jitter simplified — full implementation deferred to Phase 2 once cave-apiserver issues generation increments natively."
 
-# ─── Skipped subsystems (12 — formalised scope cuts) ────────────────────────
+# ─── Skipped subsystems (11 — formalised scope cuts) ────────────────────────
 
 [[skipped]]
 name = "oci-registry-http-pull"
@@ -313,12 +323,6 @@ reason = "Real cloud provider managed resources (AWS S3 / Azure Blob / GCP Stora
 scope_cut_target = "cave-cloud"
 
 [[skipped]]
-name = "environment-configs"
-upstream_files = ["apis/apiextensions/v1alpha1/environmentconfig_types.go"]
-reason = "EnvironmentConfig (cluster-scoped key-value bag for compositions) — Phase 2 ConfigMap-style; PatchType::FromEnvironmentFieldPath kept as no-op stub for compatibility."
-scope_cut_target = "cave-apiserver"
-
-[[skipped]]
 name = "usage-tracking"
 upstream_files = ["apis/apiextensions/v1beta1/usage_types.go"]
 reason = "Usage resource (declares dependency between two resources to gate deletion) — Phase 2 covered by cave-apiserver finalizers."
@@ -348,7 +352,7 @@ members = ["oci-registry-http-pull", "helm-v3-oci-registry"]
 [[scope_cuts]]
 group = "kube-apiserver-integration"
 target_crate = "cave-apiserver"
-members = ["kube-apiserver-apply", "environment-configs", "usage-tracking"]
+members = ["kube-apiserver-apply", "usage-tracking"]
 
 [[scope_cuts]]
 group = "certificate-management"
