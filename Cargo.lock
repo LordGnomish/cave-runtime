@@ -1443,6 +1443,7 @@ dependencies = [
  "proptest",
  "regex",
  "reqwest",
+ "ring",
  "rustls",
  "rustls-pemfile",
  "serde",

@@ -68,12 +68,20 @@ impl HeaderPlugin {
     /// `header.go` applyRules(): mutate the supported flags on a message.
     fn apply(rules: &[HeaderRule], msg: &mut Message) {
         for rule in rules {
+            // hickory's flag setters return `&mut Message` (builder style), so
+            // each arm is a statement block to keep the match's type `()`.
             match rule.flag.as_str() {
-                "aa" => msg.set_authoritative(rule.state),
-                "ra" => msg.set_recursion_available(rule.state),
-                "rd" => msg.set_recursion_desired(rule.state),
+                "aa" => {
+                    msg.set_authoritative(rule.state);
+                }
+                "ra" => {
+                    msg.set_recursion_available(rule.state);
+                }
+                "rd" => {
+                    msg.set_recursion_desired(rule.state);
+                }
                 _ => {}
-            };
+            }
         }
     }
 }
