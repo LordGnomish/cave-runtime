@@ -47,6 +47,7 @@ pub async fn list_rules(State(state): State<Arc<MetricsState>>) -> Json<serde_js
                 "name": r.name,
                 "query": r.expr,
                 "duration": r.for_ms as f64 / 1000.0,
+                "keepFiringFor": r.keep_firing_for_ms as f64 / 1000.0,
                 "labels": r.labels.0,
                 "annotations": r.annotations.0,
                 "alerts": alerts,

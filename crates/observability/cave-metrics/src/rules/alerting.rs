@@ -35,10 +35,19 @@ pub struct AlertRule {
     pub expr: String,
     /// Minimum duration the condition must be true before firing (milliseconds).
     pub for_ms: i64,
+    /// Duration a resolved alert is retained in the Firing state before it is
+    /// removed (milliseconds). Prometheus `keep_firing_for` (PR #11827). 0 = off.
+    pub keep_firing_for_ms: i64,
     pub labels: Labels,
     pub annotations: Labels,
     /// State per label fingerprint: (state, first_seen_ms)
     pub active: HashMap<u64, (AlertState, i64)>,
+    /// For Firing series whose condition has resolved: the timestamp at which
+    /// resolution was first observed. Cleared if the series fires again.
+    pub keep_firing_since: HashMap<u64, i64>,
+    /// Last observed (labels, value) per fingerprint, used to keep emitting an
+    /// alert during its keep_firing_for grace window.
+    pub last_seen: HashMap<u64, (Labels, f64)>,
 }
 
 impl AlertRule {
@@ -47,9 +56,12 @@ impl AlertRule {
             name: name.into(),
             expr: expr.into(),
             for_ms,
+            keep_firing_for_ms: 0,
             labels: Labels::new(),
             annotations: Labels::new(),
             active: HashMap::new(),
+            keep_firing_since: HashMap::new(),
+            last_seen: HashMap::new(),
         }
     }
 
@@ -59,6 +71,11 @@ impl AlertRule {
     }
     pub fn with_annotations(mut self, annotations: Labels) -> Self {
         self.annotations = annotations;
+        self
+    }
+    /// Set the `keep_firing_for` grace duration (milliseconds).
+    pub fn with_keep_firing_for(mut self, keep_firing_for_ms: i64) -> Self {
+        self.keep_firing_for_ms = keep_firing_for_ms;
         self
     }
 
@@ -79,18 +96,44 @@ impl AlertRule {
             .map(|(l, _)| l.fingerprint())
             .collect();
 
-        // Remove fingerprints no longer active
-        self.active.retain(|fp, _| active_fps.contains(fp));
+        // Resolve fingerprints that are no longer active. A Firing series with a
+        // keep_firing_for window is retained (still emitted as Firing) until the
+        // grace period elapses; everything else is dropped immediately.
+        let resolved_fps: Vec<u64> = self
+            .active
+            .keys()
+            .copied()
+            .filter(|fp| !active_fps.contains(fp))
+            .collect();
+        for fp in resolved_fps {
+            let is_firing = matches!(self.active.get(&fp), Some((AlertState::Firing, _)));
+            if is_firing && self.keep_firing_for_ms > 0 {
+                let since = *self.keep_firing_since.entry(fp).or_insert(ts_ms);
+                if ts_ms - since >= self.keep_firing_for_ms {
+                    self.active.remove(&fp);
+                    self.keep_firing_since.remove(&fp);
+                    self.last_seen.remove(&fp);
+                }
+                // else: retain — still firing within the grace window.
+            } else {
+                self.active.remove(&fp);
+                self.keep_firing_since.remove(&fp);
+                self.last_seen.remove(&fp);
+            }
+        }
 
         let mut out = Vec::new();
 
         for (series_labels, value) in currently_active {
+            let fp = series_labels.fingerprint();
+            // The condition is true again → clear any pending resolution timer.
+            self.keep_firing_since.remove(&fp);
+            self.last_seen.insert(fp, (series_labels.clone(), value));
+
             let mut alert_labels = series_labels.clone();
             for (k, v) in self.labels.iter() {
                 alert_labels.insert(k, v);
             }
-
-            let fp = series_labels.fingerprint();
 
             let (state, first_seen_ms) = self
                 .active
@@ -116,6 +159,34 @@ impl AlertRule {
                 active_at_ms: *first_seen_ms,
                 fired_at_ms,
                 value,
+            });
+        }
+
+        // Emit alerts still held open by their keep_firing_for grace window.
+        for (fp, since) in &self.keep_firing_since {
+            let Some((state, first_seen_ms)) = self.active.get(fp) else {
+                continue;
+            };
+            if *state != AlertState::Firing {
+                continue;
+            }
+            let (series_labels, value) = match self.last_seen.get(fp) {
+                Some(v) => v,
+                None => continue,
+            };
+            let mut alert_labels = series_labels.clone();
+            for (k, v) in self.labels.iter() {
+                alert_labels.insert(k, v);
+            }
+            let _ = since;
+            out.push(FiringAlert {
+                name: self.name.clone(),
+                state: AlertState::Firing,
+                labels: alert_labels,
+                annotations: self.annotations.clone(),
+                active_at_ms: *first_seen_ms,
+                fired_at_ms: Some(*first_seen_ms + self.for_ms),
+                value: *value,
             });
         }
 
