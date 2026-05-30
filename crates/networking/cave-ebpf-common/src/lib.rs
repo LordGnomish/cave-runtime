@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 pub mod discover;
 pub mod loader;
 pub mod map;
+pub mod otlp;
 pub mod probe;
 pub mod process;
 pub mod ringbuf;
