@@ -23,18 +23,24 @@ source_sha = "v3.63.7"
 # 2026-05-29 fresh-impl: ported pkg/detectors/falsepositives.go (was un-enumerated) via strict-TDD
 #   (test 9a615000 RED → impl 6f45cc9e GREEN) — new src/detector.rs::falsepositives module +
 #   scan_filtered(). mapped 14→15, total 32→33. fill_ratio stays 1.0.
-mapped_count   = 15     # see [[files]] — detector framework + 9 builtin + custom_rules + baseline + decoders + precommit + archive + false-positive suppression
+# 2026-05-30 honest-uplift: ported pkg/sanitizer/utf8.go via strict-TDD
+#   (test 4f07957f RED → impl 6b24b9c8 GREEN) — new src/sanitizer.rs (sanitize_utf8 /
+#   sanitize_utf8_bytes: ToValidUTF8("❗") maximal-run coalescing + NUL strip). The earlier
+#   scope_cut wrongly claimed the sanitizer was "absorbed into builtin redact_match"; in fact
+#   upstream sanitizer.UTF8 is a UTF-8 validity/NUL sanitizer, not redaction — now a real port.
+#   mapped 15→16, skipped 16→15, total stays 33.
+mapped_count   = 16     # see [[files]] — detector framework + 9 builtin + custom_rules + baseline + decoders + precommit + archive + false-positive suppression + UTF-8 sanitizer
 partial_count  = 2      # see [[partials]] — Engine concurrent worker pool, Sources framework (filesystem only)
-skipped_count  = 16     # see [[scope_cuts]] — explicit subsystem deferrals (incl. feature-flag plumbing)
+skipped_count  = 15     # see [[scope_cuts]] — explicit subsystem deferrals (incl. feature-flag plumbing)
 unmapped_count = 0      # all gaps now ADR-justified scope_cuts
 total          = 33
-fill_ratio     = 1.0000  # (mapped + partial + skipped) / total = (15+2+16)/33 — feature-flag plumbing reclassified as scope_cut
-honest_ratio   = 0.4545  # mapped / total = 15/33
-adr_justified_ratio = 1.0000  # 16 scope_cuts: detector-volume (1, out-of-launch-scope: MVP ships 9 of 1000+) / source integrations 8 (parallel-track: cave-runtime fetcher / cave-portal GitHub / Phase 2 for gitlab/s3/gcs/azure/jenkins/postman) / output formats 2 (out-of-launch-scope: JUnit+SARIF Phase 2) / verifier framework (out-of-launch-scope) / giturl (parallel-track: cave-runtime upstream-fetcher) / sanitizer (absorbed into builtin redact_match) / notifier (parallel-track: cave-noti) / feature-flag plumbing (out-of-launch-scope: gated until experimental detectors land). 2 partials (engine-worker-pool, filesystem-source-only) defer to source integration Phase 2 — out-of-launch-scope.
+fill_ratio     = 1.0000  # (mapped + partial + skipped) / total = (16+2+15)/33
+honest_ratio   = 0.4848  # mapped / total = 16/33
+adr_justified_ratio = 1.0000  # 15 scope_cuts: detector-volume (1, out-of-launch-scope: MVP ships 9 of 1000+) / source integrations 8 (parallel-track: cave-runtime fetcher / cave-portal GitHub / Phase 2 for gitlab/s3/gcs/azure/jenkins/postman) / output formats 2 (out-of-launch-scope: JUnit+SARIF Phase 2) / verifier framework (out-of-launch-scope) / giturl (parallel-track: cave-runtime upstream-fetcher) / notifier (parallel-track: cave-noti) / feature-flag plumbing (out-of-launch-scope: gated until experimental detectors land). 2 partials (engine-worker-pool, filesystem-source-only) defer to source integration Phase 2 — out-of-launch-scope.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 ratio          = 0.9688  # legacy alias for parity-index
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 # ── Partial ports (real, documented narrow scope-cut) ────────────────────────
@@ -102,10 +108,6 @@ upstream = "pkg/giturl/giturl.go"
 reason   = "Git URL parsing covered by cave-runtime upstream-fetcher"
 
 [[scope_cuts]]
-upstream = "pkg/sanitizer/sanitizer.go"
-reason   = "Sanitization covered by builtin redact_match"
-
-[[scope_cuts]]
 upstream = "pkg/notifier/*"
 reason   = "Webhook export integration handled by cave-noti — out of cave-secrets MVP scope (kept as scope_cut, not unmapped, after parity-uplift-sec-stack-2026-05-19)"
 
@@ -121,6 +123,8 @@ reason   = "out-of-launch-scope — experimental-detector feature-flag plumbing 
 name        = "cave-secrets"
 description = "Secret scanner — TruffleHog-compatible detector framework with entropy + regex + verifier hooks"
 source_root = "src"
+rs_files    = 11
+rs_loc      = 2494
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
@@ -193,6 +197,10 @@ local    = "src/archive.rs"
 [[files]]
 upstream = "pkg/handlers/gzip.go"
 local    = "src/archive.rs"
+
+[[files]]
+upstream = "pkg/sanitizer/utf8.go"
+local    = "src/sanitizer.rs"  # sanitize_utf8 / sanitize_utf8_bytes: ToValidUTF8("❗") maximal-run coalescing + NUL strip (2026-05-30 honest-uplift, strict-TDD test 4f07957f RED → impl 6b24b9c8 GREEN)
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
