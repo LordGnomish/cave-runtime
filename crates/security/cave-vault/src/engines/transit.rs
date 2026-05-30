@@ -879,6 +879,63 @@ mod tests {
         assert!(key.versions.contains_key(&1));
     }
 
+    // ── Derived-key encryption (OpenBao keysutil DeriveKey, Kdf_hkdf_sha256) ──
+
+    #[test]
+    fn derived_key_round_trips_with_matching_context() {
+        let mut key = create_transit_key("d", KeyType::Aes256Gcm96).unwrap();
+        key.derived = true;
+        let kv = key.versions.get(&1).unwrap().clone();
+        let pt = b"derived secret payload";
+        let ct = transit_seal(&key, &kv, Some(b"app=billing"), pt).unwrap();
+        let out = transit_open(&key, &kv, Some(b"app=billing"), &ct).unwrap();
+        assert_eq!(out, pt);
+    }
+
+    #[test]
+    fn derived_key_rejects_wrong_context_on_decrypt() {
+        let mut key = create_transit_key("d", KeyType::Aes256Gcm96).unwrap();
+        key.derived = true;
+        let kv = key.versions.get(&1).unwrap().clone();
+        let ct = transit_seal(&key, &kv, Some(b"app=billing"), b"x").unwrap();
+        // A different context derives a different key — AEAD auth must fail.
+        assert!(transit_open(&key, &kv, Some(b"app=payroll"), &ct).is_err());
+    }
+
+    #[test]
+    fn derived_key_requires_context() {
+        let mut key = create_transit_key("d", KeyType::Aes256Gcm96).unwrap();
+        key.derived = true;
+        let kv = key.versions.get(&1).unwrap().clone();
+        let err = transit_seal(&key, &kv, None, b"x").unwrap_err();
+        assert!(
+            format!("{err:?}").contains("context"),
+            "missing-context error should mention 'context', got {err:?}"
+        );
+        // empty context is also rejected
+        assert!(transit_seal(&key, &kv, Some(b""), b"x").is_err());
+    }
+
+    #[test]
+    fn non_derived_key_round_trips_without_context() {
+        let key = create_transit_key("p", KeyType::Aes256Gcm96).unwrap();
+        let kv = key.versions.get(&1).unwrap().clone();
+        let pt = b"plain key payload";
+        let ct = transit_seal(&key, &kv, None, pt).unwrap();
+        assert_eq!(transit_open(&key, &kv, None, &ct).unwrap(), pt);
+    }
+
+    #[test]
+    fn hkdf_sha256_derive_is_deterministic_and_context_separated() {
+        let secret = [7u8; 32];
+        let a1 = hkdf_sha256_derive(&secret, b"ctx-a", 32).unwrap();
+        let a2 = hkdf_sha256_derive(&secret, b"ctx-a", 32).unwrap();
+        let b = hkdf_sha256_derive(&secret, b"ctx-b", 32).unwrap();
+        assert_eq!(a1, a2, "same secret+context must derive the same key");
+        assert_ne!(a1, b, "different context must derive a different key");
+        assert_eq!(a1.len(), 32);
+    }
+
     #[test]
     fn test_ed25519_key_sign_verify() {
         use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
