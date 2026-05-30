@@ -22,6 +22,7 @@ pub mod models;
 pub mod pipeline;
 pub mod project_store;
 pub mod proxy;
+pub mod quota;
 pub mod rbac;
 pub mod replication_reconciler;
 pub mod routes;
