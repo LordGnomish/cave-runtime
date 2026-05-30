@@ -32,3 +32,6 @@ pub mod ast;
 
 /// Recursive-descent parser (`syntax/parser`).
 pub mod parser;
+
+/// Component registration framework (`internal/component/registry.go`).
+pub mod component;
