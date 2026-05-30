@@ -26,6 +26,7 @@ pub mod parity_self_audit;
 pub mod process;
 pub mod routes;
 pub mod selectors;
+pub mod sift;
 pub mod store;
 pub mod tracing_policy;
 
