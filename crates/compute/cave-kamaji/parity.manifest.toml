@@ -37,31 +37,36 @@ source_sha  = "v1.0.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 14/14
-honest_ratio        = 0.8235  # mapped / total = 14/17
-last_audit          = "2026-05-19"
+fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 15/15
+honest_ratio        = 0.8824  # mapped / total = 15/17
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 14
+mapped_count        = 15
 partial_count       = 0
-skipped_count       = 3
+skipped_count       = 2
 unmapped_count      = 0
 total               = 17
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (14) + partial (0) + unmapped (0) = 14 in-scope subsystems
-#   14 / 14 = 1.0 (Wave-2 close-out 2026-05-19 promoted cluster-api partial → mapped)
+#   mapped (15) + partial (0) + unmapped (0) = 15 in-scope subsystems
+#   15 / 15 = 1.0
+#   Wave-2 close-out 2026-05-19 promoted cluster-api partial → mapped.
+#   Wave-7 (2026-05-30) promoted cert-controller skipped → mapped: the
+#   per-tenant PKI tree, apiserver SAN computation and rotation deadline are
+#   Kamaji-owned decision logic (cave-certs/cave-pki own only the x509 signing),
+#   so honest_ratio rises 0.8235 → 0.8824 (14/17 → 15/17).
 #
 # Supplementary LOC measurement (transparency):
-#   impl_lines               = ~750  (cave-kamaji src/, excl #[cfg(test)])
-#   upstream_in_scope_lines  = ~1300 (sum of subsystem in-scope LOC)
-#   ~750 / ~1300             = ~0.58 (LOC basis)
+#   impl_lines               = ~990  (cave-kamaji src/, excl #[cfg(test)])
+#   upstream_in_scope_lines  = ~1500 (sum of subsystem in-scope LOC)
+#   ~990 / ~1500             = ~0.66 (LOC basis)
 #
 # Per-subsystem in-scope LOC against v1.0.0 (Phase 2):
 #   api/v1alpha1/tenantcontrolplane_types.go                100 / 250
 #   api/v1alpha1/datastore_types.go                          80 / 130
 #   internal/controllers/tcp_controller.go                   60 / 600
 #   internal/utilities/kubeconfig.go                         50 / 100
-#   internal/resources/cert_controller.go (skipped)          0 / 400
+#   internal/kubeadm/certificates.go + cert lifecycle       120 / 400
 #   internal/datastore/{etcd,postgres,mysql}/*.go           150 / 250
 #   internal/resources/konnectivity/*.go                    100 / 220
 #   internal/webhook/{create,update}.go                      80 / 130
@@ -282,12 +287,12 @@ name = "cluster-api-integration"
 upstream = "internal/controllers/clusterapi"
 note = "CAPI bootstrap-provider shape: ControlPlaneEndpoint parse, InfrastructureRef, CapiBootstrapStatus, CapiTenantStatus, ready predicate. Wave-2 close-out 2026-05-19 — promoted partial → mapped via src/cluster_api.rs."
 
-# ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
-
-[[skipped]]
+[[mapped]]
 name = "cert-controller"
-upstream = "internal/resources/cert"
-reason = "cert-manager integration — cave-certs owns this surface; cave-kamaji emits cert CSRs through the cave-certs API."
+upstream = "internal/kubeadm/certificates.go + controllers/certificate_lifecycle_controller.go"
+note = "Per-tenant PKI decision layer (src/certs.rs): kubeadm cert tree (ca→apiserver/apiserver-kubelet-client, front-proxy-ca→front-proxy-client, sa key-pair) with signer chain + ext-key-usage; kubeadm GetAPIServerAltNames SAN computation; CertificateLifecycle 1-day rotation deadline (now+1d > NotAfter) with x509/kubeconfig strategies; checksum+CA-validity regeneration-skip predicate. Real x509 signing delegated to cave-certs/cave-pki. Wave-7 close-out 2026-05-30 — promoted skipped → mapped (4 strict-TDD cycles, 18 tests). Exposed via /api/kamaji/tenants/:id/certificates + cavectl kamaji tcp-certs."
+
+# ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
 [[skipped]]
 name = "metrics-export"
@@ -305,5 +310,5 @@ upstream_url = "https://kamaji.clastix.io/"
 status       = "phase-3"
 loc          = 164
 priority     = "P2"
-notes        = "Kamaji is CRD/CLI upstream; /admin/kamaji Phase 3 alongside multi-tenant data-plane."
-last_audit   = "2026-05-19"
+notes        = "Kamaji is CRD/CLI upstream; /admin/kamaji Phase 3 alongside multi-tenant data-plane. Cert PKI plan surfaced via /api/kamaji/tenants/:id/certificates + cavectl kamaji tcp-certs."
+last_audit   = "2026-05-30"

@@ -64,5 +64,9 @@ pub fn router(state: Arc<KamajiState>) -> Router {
             "/api/kamaji/tenants/{id}/kubeconfig",
             post(routes::get_kubeconfig),
         )
+        .route(
+            "/api/kamaji/tenants/{id}/certificates",
+            get(routes::get_certificates),
+        )
         .with_state(state)
 }

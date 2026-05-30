@@ -77,3 +77,67 @@ pub async fn get_kubeconfig(
         .map(Json)
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)
 }
+
+/// Return the per-tenant PKI plan: the kubeadm certificate tree, the computed
+/// kube-apiserver serving-cert SANs, and the rotation parameters the
+/// CertificateLifecycle controller enforces.
+pub async fn get_certificates(
+    State(state): State<Arc<KamajiState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let tcp = state.tenants.get(&id).ok_or(StatusCode::NOT_FOUND)?;
+    Ok(Json(cert_plan_json(tcp.value())))
+}
+
+/// Build the JSON cert plan for a tenant from the `certs` decision layer.
+fn cert_plan_json(tcp: &TenantControlPlane) -> serde_json::Value {
+    use crate::certs;
+
+    let tree: Vec<serde_json::Value> = certs::pki_tree()
+        .into_iter()
+        .map(|c| {
+            serde_json::json!({
+                "base_name": c.base_name(),
+                "is_ca": c.is_ca(),
+                "is_keypair": c.is_keypair(),
+                "signer": c.signer().map(|s| s.base_name()),
+                "ext_key_usage": c.ext_key_usage().map(|u| match u {
+                    certs::ExtKeyUsage::ServerAuth => "server-auth",
+                    certs::ExtKeyUsage::ClientAuth => "client-auth",
+                }),
+            })
+        })
+        .collect();
+
+    // Derive the apiserver control-plane endpoint host from the status, using
+    // kubeadm defaults for the in-cluster service IP + DNS domain.
+    let cp_host = tcp.status.api_server_endpoint.as_deref().map(|ep| {
+        ep.trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap_or(ep)
+            .split(':')
+            .next()
+            .unwrap_or(ep)
+            .to_string()
+    });
+    let sans = certs::apiserver_cert_sans("cluster.local", "10.96.0.1", cp_host.as_deref(), &[]);
+
+    serde_json::json!({
+        "tenant": tcp.name,
+        "namespace": tcp.namespace,
+        "pki_tree": tree,
+        "apiserver_sans": {
+            "dns_names": sans.dns_names,
+            "ip_addresses": sans.ip_addresses,
+        },
+        "rotation": {
+            "deadline_days": certs::ROTATION_DEADLINE_DAYS,
+            "strategies": [
+                certs::RotationStrategy::X509.label(),
+                certs::RotationStrategy::Kubeconfig.label(),
+            ],
+        },
+    })
+}

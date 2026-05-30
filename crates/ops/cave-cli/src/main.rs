@@ -1598,6 +1598,9 @@ enum KamajiCmd {
         #[arg(long)]
         target_version: String,
     },
+    /// Show a TCP's PKI plan: cert tree, apiserver SANs, rotation policy
+    #[command(name = "tcp-certs")]
+    TcpCerts { id: String },
 }
 
 #[derive(Subcommand)]
@@ -4630,6 +4633,10 @@ source_root = "src"
                     json!({ "target_version": target_version }),
                 )
                 .await
+            }
+            KamajiCmd::TcpCerts { id } => {
+                c.get(&format!("/api/kamaji/tenants/{}/certificates", urlencode(&id)))
+                    .await
             }
         },
 
