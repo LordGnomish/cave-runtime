@@ -20,7 +20,7 @@ pub struct Workflow {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WorkflowSpec {
     pub entrypoint: String,
     pub templates: Vec<Template>,

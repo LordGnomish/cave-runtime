@@ -18,6 +18,7 @@ pub mod engine;
 pub mod events;
 pub mod executor;
 pub mod models;
+pub mod persistence;
 pub mod routes;
 pub mod store;
 pub mod workflow_crd;
