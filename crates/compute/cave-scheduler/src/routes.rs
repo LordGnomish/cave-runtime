@@ -2,6 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! REST API routes for the scheduler.
 
+use crate::config_validation::KubeSchedulerConfiguration;
 use crate::models::*;
 use crate::scheduler::{self, SchedulerState};
 use axum::{
@@ -10,6 +11,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::Serialize;
 use std::sync::Arc;
 
 pub fn create_router(state: Arc<SchedulerState>) -> Router {
@@ -23,7 +25,39 @@ pub fn create_router(state: Arc<SchedulerState>) -> Router {
         .route("/api/scheduler/nodes/{name}/cordon", post(cordon_node))
         .route("/api/scheduler/nodes/{name}/uncordon", post(uncordon_node))
         .route("/api/scheduler/schedule", post(schedule_pod))
+        .route(
+            "/api/scheduler/config/validate",
+            post(validate_config_handler),
+        )
         .with_state(state)
+}
+
+/// Structured result of validating a posted [`KubeSchedulerConfiguration`].
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigValidateResponse {
+    pub valid: bool,
+    pub errors: Vec<String>,
+}
+
+/// Pure response builder behind `POST /api/scheduler/config/validate` — runs
+/// the upstream config validation rules and reports every violation.
+pub fn validate_config(cfg: &KubeSchedulerConfiguration) -> ConfigValidateResponse {
+    match cfg.validate() {
+        Ok(()) => ConfigValidateResponse {
+            valid: true,
+            errors: vec![],
+        },
+        Err(errors) => ConfigValidateResponse {
+            valid: false,
+            errors,
+        },
+    }
+}
+
+async fn validate_config_handler(
+    Json(cfg): Json<KubeSchedulerConfiguration>,
+) -> Json<ConfigValidateResponse> {
+    Json(validate_config(&cfg))
 }
 
 async fn health() -> Json<serde_json::Value> {
