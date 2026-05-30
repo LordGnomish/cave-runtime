@@ -335,6 +335,246 @@ pub fn resample(
     Ok((out_times, out_vals))
 }
 
+// ── classic conditions — pkg/expr/classic/{reduce,evaluator,classic}.go ─────
+
+/// Reducer used inside a classic condition. Unlike the `mathexp` reducers,
+/// these skip nulls and return a null result for all-null series.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClassicReducer {
+    Avg,
+    Sum,
+    Min,
+    Max,
+    Count,
+    Last,
+    Median,
+    Diff,
+    DiffAbs,
+    PercentDiff,
+    PercentDiffAbs,
+    CountNonNull,
+}
+
+impl ClassicReducer {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "avg" => Some(ClassicReducer::Avg),
+            "sum" => Some(ClassicReducer::Sum),
+            "min" => Some(ClassicReducer::Min),
+            "max" => Some(ClassicReducer::Max),
+            "count" => Some(ClassicReducer::Count),
+            "last" => Some(ClassicReducer::Last),
+            "median" => Some(ClassicReducer::Median),
+            "diff" => Some(ClassicReducer::Diff),
+            "diff_abs" => Some(ClassicReducer::DiffAbs),
+            "percent_diff" => Some(ClassicReducer::PercentDiff),
+            "percent_diff_abs" => Some(ClassicReducer::PercentDiffAbs),
+            "count_non_null" => Some(ClassicReducer::CountNonNull),
+            _ => None,
+        }
+    }
+}
+
+fn classic_diff(vals: &[Option<f64>], mut all_null: bool, mut value: f64, f: fn(f64, f64) -> f64) -> (bool, f64) {
+    let mut first = 0.0;
+    // newest non-null point, scanning from the end
+    let mut newest_idx: isize = -1;
+    for i in (0..vals.len()).rev() {
+        if !is_nil_or_nan(vals[i]) {
+            first = vals[i].unwrap();
+            all_null = false;
+            newest_idx = i as isize;
+            break;
+        }
+    }
+    if newest_idx >= 1 {
+        // oldest non-null point, scanning from the start
+        for &v in vals.iter() {
+            if !is_nil_or_nan(v) {
+                value = f(first, v.unwrap());
+                all_null = false;
+                break;
+            }
+        }
+    }
+    (all_null, value)
+}
+
+/// Reduce a series to a single number under classic-condition semantics.
+/// Returns `None` when the result is null (all-null series), matching
+/// `reducer.Reduce` which leaves the `Number` value unset.
+pub fn classic_reduce(reducer: ClassicReducer, vals: &[Option<f64>]) -> Option<f64> {
+    if vals.is_empty() {
+        return None;
+    }
+    let mut value = 0.0f64;
+    let mut all_null = true;
+
+    match reducer {
+        ClassicReducer::Avg => {
+            let mut valid = 0;
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                value += v.unwrap();
+                valid += 1;
+                all_null = false;
+            }
+            if valid > 0 {
+                value /= valid as f64;
+            }
+        }
+        ClassicReducer::Sum => {
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                value += v.unwrap();
+                all_null = false;
+            }
+        }
+        ClassicReducer::Min => {
+            value = f64::MAX;
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                all_null = false;
+                if value > v.unwrap() {
+                    value = v.unwrap();
+                }
+            }
+            if all_null {
+                value = 0.0;
+            }
+        }
+        ClassicReducer::Max => {
+            value = -f64::MAX;
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                all_null = false;
+                if value < v.unwrap() {
+                    value = v.unwrap();
+                }
+            }
+            if all_null {
+                value = 0.0;
+            }
+        }
+        ClassicReducer::Count => {
+            value = vals.len() as f64;
+            all_null = false;
+        }
+        ClassicReducer::Last => {
+            for &v in vals.iter().rev() {
+                if !is_nil_or_nan(v) {
+                    value = v.unwrap();
+                    all_null = false;
+                    break;
+                }
+            }
+        }
+        ClassicReducer::Median => {
+            let mut values: Vec<f64> = Vec::new();
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                all_null = false;
+                values.push(v.unwrap());
+            }
+            if !values.is_empty() {
+                values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let length = values.len();
+                if length % 2 == 1 {
+                    value = values[(length - 1) / 2];
+                } else {
+                    value = (values[(length / 2) - 1] + values[length / 2]) / 2.0;
+                }
+            }
+        }
+        ClassicReducer::Diff => {
+            (all_null, value) = classic_diff(vals, all_null, value, |n, o| n - o);
+        }
+        ClassicReducer::DiffAbs => {
+            (all_null, value) = classic_diff(vals, all_null, value, |n, o| (n - o).abs());
+        }
+        ClassicReducer::PercentDiff => {
+            (all_null, value) = classic_diff(vals, all_null, value, |n, o| (n - o) / o.abs() * 100.0);
+        }
+        ClassicReducer::PercentDiffAbs => {
+            (all_null, value) = classic_diff(vals, all_null, value, |n, o| ((n - o) / o * 100.0).abs());
+        }
+        ClassicReducer::CountNonNull => {
+            for &v in vals {
+                if is_nil_or_nan(v) {
+                    continue;
+                }
+                value += 1.0;
+            }
+            if value > 0.0 {
+                all_null = false;
+            }
+        }
+    }
+
+    if all_null {
+        return None;
+    }
+    Some(value)
+}
+
+/// Classic-condition evaluator. Mirrors `classic.evaluator` implementations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Evaluator {
+    Threshold { typ: String, threshold: f64 },
+    Ranged { typ: String, lower: f64, upper: f64 },
+    NoValue,
+}
+
+/// Evaluate a reduced value against a condition evaluator.
+/// A null (`None`) reduced value is only firing for the `no_value` evaluator.
+pub fn eval_condition(e: &Evaluator, reduced: Option<f64>) -> bool {
+    match e {
+        Evaluator::NoValue => reduced.is_none(),
+        Evaluator::Threshold { typ, threshold } => {
+            let Some(fv) = reduced else { return false };
+            match typ.as_str() {
+                "gt" => fv > *threshold,
+                "lt" => fv < *threshold,
+                _ => false,
+            }
+        }
+        Evaluator::Ranged { typ, lower, upper } => {
+            let Some(fv) = reduced else { return false };
+            match typ.as_str() {
+                "within_range" => (*lower < fv && *upper > fv) || (*upper < fv && *lower > fv),
+                "outside_range" => (*upper < fv && *lower < fv) || (*upper > fv && *lower > fv),
+                _ => false,
+            }
+        }
+    }
+}
+
+/// Logical operator joining successive conditions in a classic command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConditionOperator {
+    And,
+    Or,
+    LogicOr,
+}
+
+/// `compareWithOperator` — or / logic-or use OR, everything else uses AND.
+pub fn combine_conditions(b1: bool, b2: bool, op: ConditionOperator) -> bool {
+    match op {
+        ConditionOperator::Or | ConditionOperator::LogicOr => b1 || b2,
+        ConditionOperator::And => b1 && b2,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
