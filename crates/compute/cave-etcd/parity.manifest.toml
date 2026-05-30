@@ -52,17 +52,25 @@ url        = "https://github.com/etcd-io/etcd"
 # fill_ratio  = (mapped + partial + skipped) / total = (32+3+36)/71 = 71/71 = 1.0000
 # honest_ratio = (mapped + partial) / total = (32+3)/71 = 35/71 = 0.4930
 # adr_justified_ratio = 1.0 (all skipped have valid ADR category, unmapped=0)
+#
+# 2026-05-30 raft/tracker/ skipped(parallel-track) → mapped: the in-process
+# Progress/Inflights/ProgressTracker replication-tracking + vote-tally logic is
+# data-plane library surface (sibling of the already-mapped raft/confchange +
+# raft/quorum), NOT raft transport. 21 strict-TDD tests in src/raft_tracker.rs.
+# Counts: mapped 32→33, skipped 36→35, partial/unmapped/total unchanged.
+# fill_ratio   = (33+3+35)/71 = 71/71 = 1.0000
+# honest_ratio = (mapped + partial)/total = (33+3)/71 = 36/71 = 0.5070
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.4930
+honest_ratio        = 0.5070
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 32
+mapped_count        = 33
 partial_count       = 3
-skipped_count       = 36
+skipped_count       = 35
 unmapped_count      = 0
 total               = 71
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 [module]
@@ -123,6 +131,18 @@ local    = "src/store.rs"
 [[files]]
 upstream = "raft/quorum/joint.go"
 local    = "src/store.rs"
+
+[[files]]
+upstream = "raft/tracker/inflights.go"
+local    = "src/raft_tracker.rs"
+
+[[files]]
+upstream = "raft/tracker/progress.go"
+local    = "src/raft_tracker.rs"
+
+[[files]]
+upstream = "raft/tracker/tracker.go"
+local    = "src/raft_tracker.rs"
 
 # Snapshot streaming
 [[files]]
@@ -1069,9 +1089,10 @@ upstream_pkg = "raft/quorum/"
 local_files  = ["src/raft_joint_quorum.rs", "src/store.rs"]
 note         = "majority_committed_index() + joint_committed_index() implement JointConfig.CommittedIndex and MajorityConfig.CommittedIndex from raft/quorum/joint.go + majority.go. quorum_size()/quorum_size_for() provide the n/2+1 strict-majority helper."
 
-[[skipped]]
+[[mapped]]
 upstream_pkg = "raft/tracker/"
-reason       = "parallel-track"
+local_files  = ["src/raft_tracker.rs"]
+note         = "In-process leader-side replication tracking — Inflights sliding-window flow control (inflights.go), Progress Probe/Replicate/Snapshot state machine with match/next + maybe_update/maybe_decr_to (progress.go), and ProgressTracker vote ledger whose VoteResult resolves against the (possibly joint) voter config (tracker.go + quorum/joint.go VoteResult). Sibling of the already-mapped raft/confchange + raft/quorum data-plane; distinct from raft transport (rafthttp, parallel-track). 21 strict-TDD tests."
 
 [[skipped]]
 upstream_pkg = "raft/raftpb/"
