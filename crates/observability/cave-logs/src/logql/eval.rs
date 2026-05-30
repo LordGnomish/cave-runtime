@@ -1115,4 +1115,78 @@ mod tests {
         assert_eq!(streams.len(), 1);
         assert_eq!(streams[0].values[0].1, "outside");
     }
+
+    fn metric_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn label_replace_sets_dst_from_capture_group() {
+        let lr = LabelReplace {
+            inner: Box::new(MetricQuery::Literal(0.0)),
+            dst_label: "env".into(),
+            replacement: "$1".into(),
+            src_label: "app".into(),
+            regex: "(.*)-prod".into(),
+        };
+        let input = QueryData::Vector(vec![
+            VectorResult {
+                metric: metric_map(&[("app", "api-prod")]),
+                value: (1.0, "5".into()),
+            },
+            VectorResult {
+                metric: metric_map(&[("app", "other")]),
+                value: (1.0, "3".into()),
+            },
+        ]);
+        let QueryData::Vector(out) = apply_label_replace(input, &lr) else {
+            panic!("expected vector");
+        };
+        // First series matched → env="api"; second didn't match → unchanged.
+        assert_eq!(out[0].metric.get("env").map(String::as_str), Some("api"));
+        assert!(out[1].metric.get("env").is_none());
+    }
+
+    #[test]
+    fn label_replace_empty_replacement_removes_label() {
+        let lr = LabelReplace {
+            inner: Box::new(MetricQuery::Literal(0.0)),
+            dst_label: "drop_me".into(),
+            replacement: "".into(),
+            src_label: "app".into(),
+            regex: "(.*)".into(),
+        };
+        let input = QueryData::Vector(vec![VectorResult {
+            metric: metric_map(&[("app", "x"), ("drop_me", "stale")]),
+            value: (1.0, "1".into()),
+        }]);
+        let QueryData::Vector(out) = apply_label_replace(input, &lr) else {
+            panic!("expected vector");
+        };
+        assert!(out[0].metric.get("drop_me").is_none());
+    }
+
+    #[test]
+    fn label_replace_anchors_full_value() {
+        // Prometheus anchors the regex: it must match the WHOLE src value.
+        let lr = LabelReplace {
+            inner: Box::new(MetricQuery::Literal(0.0)),
+            dst_label: "out".into(),
+            replacement: "hit".into(),
+            src_label: "app".into(),
+            regex: "prod".into(),
+        };
+        let input = QueryData::Vector(vec![VectorResult {
+            metric: metric_map(&[("app", "myprodsvc")]),
+            value: (1.0, "1".into()),
+        }]);
+        let QueryData::Vector(out) = apply_label_replace(input, &lr) else {
+            panic!("expected vector");
+        };
+        // "prod" does not match the whole "myprodsvc" → unchanged.
+        assert!(out[0].metric.get("out").is_none());
+    }
 }

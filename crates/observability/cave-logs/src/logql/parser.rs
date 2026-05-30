@@ -990,6 +990,29 @@ mod tests {
     }
 
     #[test]
+    fn parse_label_replace() {
+        let q = Parser::parse_query(
+            r#"label_replace(sum(rate({app="x"}[5m])), "tier", "$1", "app", "(.+)")"#,
+        )
+        .unwrap();
+        match q {
+            Query::Metric(MetricQuery::LabelReplace(lr)) => {
+                assert_eq!(lr.dst_label, "tier");
+                assert_eq!(lr.replacement, "$1");
+                assert_eq!(lr.src_label, "app");
+                assert_eq!(lr.regex, "(.+)");
+                assert!(matches!(*lr.inner, MetricQuery::VectorAgg(_)));
+            }
+            other => panic!("expected label_replace, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_label_replace_bad_arity_errs() {
+        assert!(Parser::parse_query(r#"label_replace(sum(rate({a="b"}[1m])), "x")"#).is_err());
+    }
+
+    #[test]
     fn parse_ip_label_filter() {
         let q = Parser::parse_query(r#"{app="x"} | addr = ip("192.168.0.0/16")"#).unwrap();
         if let Query::Log(lq) = q {
