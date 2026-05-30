@@ -61,6 +61,10 @@ pub enum TrafficProvider {
         traefik_service: String,
         namespace: String,
     },
+    Ambassador {
+        mapping: String,
+        namespace: String,
+    },
 }
 
 pub fn render_patch(
@@ -174,6 +178,15 @@ pub fn render_patch(
                         {"name": canary_service, "weight": split.canary},
                     ]
                 }
+            }
+        }),
+        TrafficProvider::Ambassador { mapping, namespace } => serde_json::json!({
+            "apiVersion": "getambassador.io/v2",
+            "kind": "Mapping",
+            "metadata": { "name": format!("{mapping}-canary"), "namespace": namespace },
+            "spec": {
+                "service": canary_service,
+                "weight": split.canary,
             }
         }),
     }
