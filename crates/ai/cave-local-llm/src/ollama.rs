@@ -461,4 +461,67 @@ mod tests {
         let json = serde_json::to_string(&m).unwrap();
         assert!(!json.contains("images"), "got {json}");
     }
+
+    // ── Tool / function calling — cite api/types.go Tool, ToolFunction,
+    //    ToolCall, ToolCallFunction; ChatRequest.Tools, Message.ToolCalls. ─────
+    #[test]
+    fn test_chat_request_serializes_tools() {
+        let tool = Tool::function(
+            "get_weather",
+            "Get current weather for a city",
+            serde_json::json!({
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"]
+            }),
+        );
+        let req = ChatRequest {
+            model: "qwen3".into(),
+            messages: vec![ChatMessage {
+                role: "user".into(),
+                content: "weather in Paris".into(),
+                ..Default::default()
+            }],
+            tools: Some(vec![tool]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"tools\":["), "got {json}");
+        assert!(json.contains("\"type\":\"function\""), "got {json}");
+        assert!(json.contains("\"name\":\"get_weather\""), "got {json}");
+        assert!(json.contains("\"required\":[\"city\"]"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_request_omits_tools_when_none() {
+        let req = ChatRequest {
+            model: "m".into(),
+            messages: vec![],
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("tools"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_response_deserializes_tool_calls() {
+        let raw = r#"{"model":"qwen3","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"get_weather","arguments":{"city":"Paris"}}}]},"done":true}"#;
+        let resp: ChatResponse = serde_json::from_str(raw).unwrap();
+        let calls = resp.message.tool_calls.expect("tool_calls present");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].function.name, "get_weather");
+        assert_eq!(calls[0].function.arguments["city"], "Paris");
+    }
+
+    #[test]
+    fn test_tool_result_message_serializes_tool_name() {
+        let m = ChatMessage {
+            role: "tool".into(),
+            content: "{\"temp\":15}".into(),
+            tool_name: Some("get_weather".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"tool_name\":\"get_weather\""), "got {json}");
+    }
 }
