@@ -54,3 +54,38 @@ Baseline cave non-test src LOC: **1,887** → honest_ratio ≈ **0.0543**.
 Strict TDD per component: failing test commit → verify FAIL → impl commit
 → verify PASS. No combined test+impl commits. Checkpoint-push every few
 cycles. honest_ratio recomputed from LOC at the end.
+
+## Progress — 2026-05-30 ray (4 strict-TDD cycles)
+
+| Cycle | Module | Upstream file | cave LOC | Tests |
+| ----- | ------ | ------------- | -------: | ----: |
+| 1 | `scheduling::requirement` | `pkg/scheduling/requirement.go` | 384 | 12 |
+| 2 | `scheduling::requirements` | `pkg/scheduling/requirements.go` | 268 | 10 |
+| 3 | `scheduling::hostport` | `pkg/scheduling/hostportusage.go` | 155 | 8 |
+| 4 | `resources` (Quantity + Ceiling) | `pkg/utils/resources.go` + k8s PodRequests | 274 | 10 |
+
+- cave non-test src LOC: **1,887 → 2,970** (+1,083; new scheduling + resources).
+- LOC honest_ratio (cave src / upstream-core 34,772): **0.0543 → 0.0854**.
+- Crate test count: **114 → 154** (+40), all green, zero regressions.
+- Every cycle: separate `test(...)` RED commit then `feat(...)` GREEN commit.
+
+**Note on the repo parity metric.** This crate's `parity.manifest.toml` /
+`parity-index.json` use a *count-based* `honest_ratio` (mapped/total = 19/22
+= 0.8636) guarded by a self-consistent 9-assertion gate, and the index is
+regenerated from manifests by a post-commit hook. The LOC honest_ratio
+defined for this ray is a **different metric**; it is recorded here and in
+the index `cave_src_loc` field rather than overwriting the count-based ratio
+(which would break the gate and be reverted by the hook). At 0.0854 LOC the
+ray is far below the 0.95 merge gate, so the branch is pushed but **not
+merged** — honest in-progress state, not an early bail.
+
+## Remaining work to LOC 1.00 (≈ 31.8K Rust LOC)
+
+Priority order for continuation rays:
+1. `pkg/scheduling`: `volumeusage.go` (226), `taints.go` (81; needs k8s
+   toleration-matching port — no local corpus).
+2. `pkg/apis/v1`: NodePool budget `AllowedDisruptions`, defaults, CEL-equiv
+   validation (~2,000 LOC, has corpus).
+3. `pkg/utils`: remaining helpers (~1,900 LOC).
+4. `pkg/controllers/nodepool` (555), then disruption methods (3,092),
+   provisioning scheduler sim (4,539), cluster state graph (3,017).
