@@ -613,3 +613,63 @@ mod printable_status_tests {
         assert_eq!(PrintableStatus::Unschedulable.as_str(), "ErrorUnschedulable");
     }
 }
+
+#[cfg(test)]
+mod start_backoff_tests {
+    use super::*;
+
+    #[test]
+    fn backoff_is_interval_times_failcount_squared() {
+        // maxDelay=300 → interval = max(300/30, 10) = 10. base = 10 * n^2.
+        assert_eq!(calculate_start_backoff_time(1, 300), 10);
+        assert_eq!(calculate_start_backoff_time(2, 300), 40);
+        assert_eq!(calculate_start_backoff_time(3, 300), 90);
+        assert_eq!(calculate_start_backoff_time(4, 300), 160);
+        assert_eq!(calculate_start_backoff_time(5, 300), 250);
+    }
+
+    #[test]
+    fn backoff_caps_at_max_delay() {
+        // n=6 → 360 > 300 → capped.
+        assert_eq!(calculate_start_backoff_time(6, 300), 300);
+        assert_eq!(calculate_start_backoff_time(100, 300), 300);
+    }
+
+    #[test]
+    fn backoff_floors_failcount_and_interval() {
+        // failCount<=0 treated as 1; tiny maxDelay still uses minInterval=10.
+        assert_eq!(calculate_start_backoff_time(0, 300), 10);
+        // maxDelay=60 → interval = max(60/30=2, 10) = 10 → 10*4=40 for n=2.
+        assert_eq!(calculate_start_backoff_time(2, 60), 40);
+    }
+
+    #[test]
+    fn time_left_is_clamped_to_zero() {
+        // retry_after in the future → positive remaining.
+        assert_eq!(start_failure_backoff_time_left(Some(1_000), 900), 100);
+        // retry_after in the past → zero.
+        assert_eq!(start_failure_backoff_time_left(Some(1_000), 1_500), 0);
+        // no timestamp → zero.
+        assert_eq!(start_failure_backoff_time_left(None, 900), 0);
+    }
+
+    #[test]
+    fn record_increments_count_and_sets_retry_after() {
+        let first = record_start_failure(None, "uid-1", 1_000, 300);
+        assert_eq!(first.consecutive_fail_count, 1);
+        assert_eq!(first.last_failed_vmi_uid.as_deref(), Some("uid-1"));
+        // retry_after = now + base(1) = 1000 + 10.
+        assert_eq!(first.retry_after_timestamp, Some(1_010));
+
+        let second = record_start_failure(Some(first), "uid-2", 2_000, 300);
+        assert_eq!(second.consecutive_fail_count, 2);
+        assert_eq!(second.last_failed_vmi_uid.as_deref(), Some("uid-2"));
+        // retry_after = 2000 + base(2)=40.
+        assert_eq!(second.retry_after_timestamp, Some(2_040));
+    }
+
+    #[test]
+    fn default_max_backoff_is_300() {
+        assert_eq!(DEFAULT_MAX_START_BACKOFF_SECONDS, 300);
+    }
+}
