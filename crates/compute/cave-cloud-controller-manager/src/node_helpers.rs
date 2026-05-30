@@ -41,8 +41,38 @@ pub fn get_node_addresses_from_node_ip(
     provided_node_ip: &str,
     cloud_node_addresses: &[NodeAddress],
 ) -> Result<Vec<NodeAddress>, String> {
-    let _ = (provided_node_ip, cloud_node_addresses);
-    unimplemented!("RED: get_node_addresses_from_node_ip")
+    let node_ips = parse_node_ip_annotation(provided_node_ip)
+        .map_err(|e| format!("failed to parse node IP {:?}: {}", provided_node_ip, e))?;
+
+    let mut enforced: Vec<NodeAddress> = Vec::new();
+    let mut pinned_types: Vec<NodeAddressType> = Vec::new();
+
+    for node_ip in &node_ips {
+        let mut matched = false;
+        for addr in cloud_node_addresses {
+            if parse_ip_sloppy(&addr.address) == Some(*node_ip) {
+                enforced.push(addr.clone());
+                if !pinned_types.contains(&addr.kind) {
+                    pinned_types.push(addr.kind);
+                }
+                matched = true;
+            }
+        }
+        if !matched {
+            return Err(format!(
+                "failed to get node address from cloud provider that matches ip: {}",
+                node_ip
+            ));
+        }
+    }
+
+    for addr in cloud_node_addresses {
+        if !pinned_types.contains(&addr.kind) {
+            enforced.push(addr.clone());
+        }
+    }
+
+    Ok(enforced)
 }
 
 // ─── component-helpers node/util/ips.go ──────────────────────────────────────
