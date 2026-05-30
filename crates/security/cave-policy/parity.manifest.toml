@@ -51,19 +51,19 @@ source_root   = "src"
 
 [parity]
 fill_ratio            = 1.0
-honest_ratio          = 0.5962
-adr_justified_ratio   = 1.0      # 21 [[skipped]] (20 originals + kyverno_engine_response_stream formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified
+honest_ratio          = 0.6154
+adr_justified_ratio   = 1.0      # 20 [[skipped]] (19 cross-crate/Phase-2 + kyverno_engine_response_stream wire-format-detail formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001, ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
-mapped_count          = 28
+mapped_count          = 29
 partial_count         = 3
-skipped_count         = 21
+skipped_count         = 20
 unmapped_count        = 0
 total                 = 52
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-28"
+last_audit            = "2026-05-30"
 infra_only            = false
 
-# ─── MAPPED surfaces (27) ───────────────────────────────────────────────────
+# ─── MAPPED surfaces (29; incl. topdown_http_send below) ────────────────────
 
 # ---- OPA core (12) ----
 [[mapped]]
@@ -178,7 +178,7 @@ upstream = "kyverno: pkg/engine/variables/jmespath.go"
 local    = "src/kyverno/jmespath.rs"
 notes    = "JMESPath variable substitution (35k+ LoC — biggest single module)"
 
-# ---- Admission / Gatekeeper compat (3) ----
+# ---- Admission / Gatekeeper compat (4) ----
 [[mapped]]
 upstream = "k8s.io/api: admission/v1/types.go"
 local    = "src/admission/mod.rs"
@@ -193,6 +193,11 @@ notes    = "ConstraintTemplate CRD — Rego rego embedded + targets[].rego + lib
 upstream = "gatekeeper: apis/templates/v1/constraint_types.go"
 local    = "src/admission/mod.rs"
 notes    = "Constraint CRD — match/parameters → forwarded to Rego eval"
+
+[[mapped]]
+upstream = "gatekeeper: pkg/expansion/system.go + pkg/expansion/db.go + pkg/mutation/match/apply_to.go"
+local    = "src/expansion.rs"
+notes    = "Generator-resource expansion engine (2026-05-30 strict-TDD RED→GREEN tests/expansion_tdd.rs). Faithful port of the PURE core: Expand/expandResource/ValidateTemplate(self-edge)/mockNameForResource/ensureOwnerReference/expandRecursive(MAX_RECURSION_DEPTH=30) (system.go) + matchers/generators adjacency + templatesForGVK + directed-cycle detection (db.go; graph SCC primitive ported in-crate per ADR-RUNTIME-SANDBOX-NO-FFI-001, no new dep) + ApplyTo.matches/flatten (apply_to.go). Resources modeled as serde_json::Value (= unstructured.Unstructured); nil-mutation-system path honoured. 12 unit tests cover apply_to match/flatten, all 6 validation rejects incl. self-edge, deployment→pod expand (GVK rewrite + namespace inherit + mock name + ownerRef), no-match empty, two-hop recursive chain, and upsert-time cycle rejection. The controller drive-path (reconcile/readiness/periodic-audit) remains Phase-2 skipped (k8s-controller-runtime)."
 
 # ---- Engine legacy (2) ----
 [[mapped]]
@@ -303,11 +308,6 @@ reason        = "Image signature verification — delegates to cave-sign (Sigsto
 upstream      = "gatekeeper: pkg/audit/*"
 scope_cut_to  = "cave-policy-audit (Phase 2)"
 reason        = "Gatekeeper periodic-audit controller — depends on k8s-controller-runtime port"
-
-[[skipped]]
-upstream      = "gatekeeper: pkg/expansion/*"
-scope_cut_to  = "cave-policy-expansion (Phase 2)"
-reason        = "Expansion templates (resource enumeration) — deferred"
 
 [[skipped]]
 upstream      = "gatekeeper: pkg/readiness/*"
