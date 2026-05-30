@@ -8,3 +8,6 @@ pub mod zone;
 
 pub use manager::ZoneManager;
 pub use zone::{LookupResult, Zone};
+
+pub mod tsig;
+pub use tsig::TsigKey;

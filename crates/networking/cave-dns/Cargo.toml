@@ -59,6 +59,9 @@ etcd-client = "0.13"
 # futures utilities (join_all for spawned listeners)
 futures = "0.3"
 
+# HMAC-SHA256 for TSIG transaction signatures (RFC 8945)
+ring = "0.17"
+
 [dev-dependencies]
 proptest = "1"
 tokio    = { workspace = true }

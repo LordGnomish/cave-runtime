@@ -131,3 +131,18 @@ pub async fn check_serial(zone: &Zone, master: SocketAddr) -> DnsResult<Option<u
     }
     Ok(None)
 }
+
+/// Sign a serialized zone-transfer message with a TSIG key (RFC 8945).
+/// Used by the secondary/transfer path to authenticate AXFR/IXFR exchanges.
+pub fn sign_transfer_message(key: &crate::zone::tsig::TsigKey, wire: &[u8]) -> Vec<u8> {
+    key.sign(wire)
+}
+
+/// Verify a TSIG-signed zone-transfer message (constant-time).
+pub fn verify_transfer_message(
+    key: &crate::zone::tsig::TsigKey,
+    wire: &[u8],
+    mac: &[u8],
+) -> bool {
+    key.verify(wire, mac)
+}
