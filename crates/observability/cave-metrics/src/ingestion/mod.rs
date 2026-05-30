@@ -17,3 +17,5 @@ use crate::model::{Labels, Sample, TimeSeries};
 
 /// Parsed ingestion result: a batch of time series.
 pub type IngestedBatch = Vec<TimeSeries>;
+
+pub mod chunked;
