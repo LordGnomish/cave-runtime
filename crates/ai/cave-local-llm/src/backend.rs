@@ -151,6 +151,7 @@ impl InferenceBackend for OllamaBackend {
                 } else {
                     Some(serde_json::Value::Object(options))
                 },
+                tools: None,
             };
             let r = self.client.chat(chat_req).await?;
             Ok(BackendChatResponse {

@@ -111,9 +111,81 @@ pub struct ChatMessage {
     /// `Message.Images []ImageData`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub images: Option<Vec<String>>,
+    /// Tool calls emitted by the model in an assistant turn. Cite
+    /// api/types.go `Message.ToolCalls []ToolCall`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    /// Name of the tool this message is a result for. Cite api/types.go
+    /// `Message.ToolName`. Set on `role: "tool"` messages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    /// ID of the originating tool call. Cite api/types.go `Message.ToolCallID`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+// ── Tool / function calling types — cite api/types.go ─────────────────────────
+
+/// A tool the model may call. Cite api/types.go `Tool { Type, Function }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tool {
+    /// Tool kind; currently always `"function"`.
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    pub function: ToolFunction,
+}
+
+impl Tool {
+    /// Build a `function`-type tool from a name, description, and a JSON-Schema
+    /// `parameters` object (cite api/types.go `ToolFunctionParameters`, modelled
+    /// here as a `serde_json::Value` schema for fidelity without over-typing).
+    pub fn function(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: serde_json::Value,
+    ) -> Self {
+        Self {
+            tool_type: "function".to_string(),
+            function: ToolFunction {
+                name: name.into(),
+                description: Some(description.into()),
+                parameters,
+            },
+        }
+    }
+}
+
+/// Cite api/types.go `ToolFunction { Name, Description, Parameters }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunction {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// JSON-Schema parameter spec.
+    pub parameters: serde_json::Value,
+}
+
+/// A tool invocation produced by the model. Cite api/types.go
+/// `ToolCall { ID, Function ToolCallFunction }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub function: ToolCallFunction,
+}
+
+/// Cite api/types.go `ToolCallFunction { Index, Name, Arguments }`. Arguments
+/// is a free-form JSON object (upstream `ToolCallFunctionArguments`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallFunction {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<i32>,
+    pub name: String,
+    #[serde(default)]
+    pub arguments: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -121,6 +193,9 @@ pub struct ChatRequest {
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<serde_json::Value>,
+    /// Tools the model may call. Cite api/types.go `ChatRequest.Tools`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

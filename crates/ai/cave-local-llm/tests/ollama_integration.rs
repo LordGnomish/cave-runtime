@@ -209,6 +209,7 @@ async fn test_chat_returns_response() {
         }],
         stream: Some(false),
         options: None,
+        tools: None,
     };
 
     let resp = OllamaClient::new(base_url).chat(req).await.unwrap();
@@ -246,6 +247,7 @@ async fn test_chat_stream_collects_chunks() {
         }],
         stream: Some(true),
         options: None,
+        tools: None,
     };
 
     let stream = OllamaClient::new(base_url).chat_stream(req).await.unwrap();
