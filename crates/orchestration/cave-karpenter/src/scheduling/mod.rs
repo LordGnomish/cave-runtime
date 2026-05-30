@@ -10,6 +10,7 @@
 pub mod hostport;
 pub mod requirement;
 pub mod requirements;
+pub mod taints;
 pub mod volumeusage;
 
 pub use requirement::{NodeSelectorRequirement, Operator, Requirement};
