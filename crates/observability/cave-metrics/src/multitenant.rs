@@ -13,12 +13,74 @@
 //!
 //! Plus tenant cardinality helpers used by the `cardinality` API.
 
+use crate::error::{MetricsError, Result};
 use crate::model::{LabelMatcher, Labels, MatchOp};
 use std::collections::{HashMap, HashSet};
 
 pub const TENANT_LABEL: &str = "tenant_id";
 pub const DEFAULT_TENANT: &str = "anonymous";
 pub const X_SCOPE_ORG_ID: &str = "X-Scope-OrgID";
+
+/// Maximum permitted tenant-ID length, mirroring Mimir `tenant.MaxTenantIDLength`.
+pub const MAX_TENANT_ID_LENGTH: usize = 150;
+
+/// Whether a rune belongs to Mimir's safe tenant-ID character set:
+/// alphanumerics plus  `! - _ . * ' ( )`  (`pkg/tenant/tenant.go`).
+fn is_supported_tenant_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '!' | '-' | '_' | '.' | '*' | '\'' | '(' | ')')
+}
+
+/// Validate a single tenant ID per Mimir `tenant.ValidTenantID`: non-empty,
+/// at most [`MAX_TENANT_ID_LENGTH`] bytes, only safe characters, and never the
+/// path-unsafe `.` or `..`.
+pub fn valid_tenant_id(id: &str) -> Result<()> {
+    if id.is_empty() {
+        return Err(MetricsError::Parse("tenant ID is empty".into()));
+    }
+    if id.len() > MAX_TENANT_ID_LENGTH {
+        return Err(MetricsError::Parse(format!(
+            "tenant ID is too long: max {} bytes",
+            MAX_TENANT_ID_LENGTH
+        )));
+    }
+    if id == "." || id == ".." {
+        return Err(MetricsError::Parse(format!(
+            "tenant ID '{}' is an unsafe path segment",
+            id
+        )));
+    }
+    if let Some(bad) = id.chars().find(|c| !is_supported_tenant_char(*c)) {
+        return Err(MetricsError::Parse(format!(
+            "tenant ID '{}' contains unsupported character '{}'",
+            id, bad
+        )));
+    }
+    Ok(())
+}
+
+/// Parse a (possibly multi-tenant) `X-Scope-OrgID` header value into a
+/// validated, de-duplicated, sorted list of tenant IDs. Mirrors Mimir
+/// `tenant.TenantIDs` + `NormalizeTenantIDs`: tenants are separated by `|`,
+/// each is trimmed and validated, and an empty result is an error.
+pub fn parse_tenant_ids(header: &str) -> Result<Vec<String>> {
+    let mut ids: Vec<String> = header
+        .split('|')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    if ids.is_empty() {
+        return Err(MetricsError::Parse(
+            "no tenant ID present in X-Scope-OrgID".into(),
+        ));
+    }
+    for id in &ids {
+        valid_tenant_id(id)?;
+    }
+    ids.sort();
+    ids.dedup();
+    Ok(ids)
+}
 
 /// Pull `X-Scope-OrgID` from a header map (case-insensitive).
 pub fn tenant_from_headers(headers: &HashMap<String, String>) -> String {
