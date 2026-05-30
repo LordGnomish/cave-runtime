@@ -4302,8 +4302,13 @@ source_root = "src"
                 println!("  paged:   cave-local-llm vllm paged --prompt-tokens <n> [--gpu-blocks N] [--block-size N]");
                 println!("  quant:   cave-local-llm vllm quant --method awq|gptq|fp8 --bits <b> --in-features <i> --out-features <o>");
                 println!("  sample:  cave-local-llm vllm sample --temperature <t> --top-p <p> --top-k <k> --n <n>");
-                println!("  engine:  PagedAttention block manager · continuous-batching scheduler ·");
-                println!("           SamplingParams · AWQ/GPTQ/FP8 quant · speculative decode · multi-LoRA");
+                println!("  engine:  cave-local-llm vllm engine --prompt-tokens <n> --max-tokens <m> [--gpu-blocks N]");
+                println!("  prefix:  cave-local-llm vllm prefix --sequences <s> --prefix-blocks <b> [--blocks N]");
+                println!("  parallel: cave-local-llm vllm parallel --tp <t> --pp <p> --rank <r> --num-layers <l>");
+                println!("  modules: PagedAttention block manager · continuous-batching scheduler ·");
+                println!("           LLMEngine step loop + StopChecker · automatic prefix caching ·");
+                println!("           tensor/pipeline-parallel sharding · SamplingParams · AWQ/GPTQ/FP8 quant ·");
+                println!("           speculative decode · multi-LoRA");
                 println!("  docs:    docs/local-llm/README.md");
                 Ok(())
             }

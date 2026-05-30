@@ -63,6 +63,23 @@ note       = "PagedAttention block manager, continuous-batching scheduler, Sampl
 # scaling*(B(Ax))). These map the engine's *control plane* — GPU dequant /
 # attention / matmul kernels stay out of scope (hardware-dependent).
 #
+# 2026-05-30 vLLM engine port cont2 (strict-TDD, 3 RED->GREEN cycles, +32
+# tests): added three more pure-Rust mapped modules deepening the engine
+# control plane (vllm-project/vllm, Apache-2.0) — vllm_engine.rs (LLMEngine
+# continuous-batching step() loop + output-processor StopChecker: ties the
+# block manager, scheduling budget and SamplingParams together behind a
+# StepModel executor seam; eos no-append / stop-token-id included / min_tokens
+# suppression / max_tokens length cap, RequestOutput + finish reason),
+# vllm_prefix_cache.rs (automatic prefix caching: chained FNV content hashing
+# of full blocks, content-addressed ref-counted physical blocks, cross-seq
+# prefix sharing, freed-but-cached LRU evictor with re-hit + eviction-on-miss,
+# read-only is_cached probe, hit-rate stats), vllm_parallel.rs (tensor/pipeline
+# parallel sharding math: rank<->(tp,pp) topology + groups, vocab-parallel
+# pad+partition, column/row parallel linear shards, attention head + GQA KV
+# replication, get_pp_indices even/remainder + custom partition list). The
+# cross-rank collectives (all-reduce / all-gather / pipeline send-recv) require
+# a real multi-device backend and stay a host scope-cut.
+#
 # Partial (1): daemon graceful-shutdown — the loop already handles SIGTERM +
 # a stop-signal file (daemon.rs); SIGINT/full in-flight drain is still owned
 # by the cave-runtime host. Kept honest (not inflated to mapped).
@@ -74,13 +91,13 @@ note       = "PagedAttention block manager, continuous-batching scheduler, Sampl
 # (trait open for extension), embedding-recall RAG store (cave-hermes),
 # KV-cache eviction state machine (runtime-internal), JSON-mode response
 # validation, /api/version surface in extras.
-mapped_count          = 24  # 2026-05-30: +6 vLLM engine modules (PagedAttention, scheduler, sampling, quant, spec-decode, LoRA)
+mapped_count          = 27  # 2026-05-30 cont2: +3 vLLM modules (LLMEngine step+StopChecker, prefix cache, tensor/pipeline parallel)
 partial_count         = 1
 skipped_count         = 10
 unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
-total                 = 35  # 2026-05-30: +6 vLLM mapped modules (was 29)
-fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 35/35
-honest_ratio          = 0.9714  # (mapped + skipped) / total            = 34/35
+total                 = 38  # 2026-05-30 cont2: +3 vLLM mapped modules (was 35)
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 38/38
+honest_ratio          = 0.9737  # (mapped + skipped) / total            = 37/38
 adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
@@ -195,6 +212,22 @@ file          = "src/vllm_spec_decode.rs"
 upstream_name = "vllm.lora.worker_manager.LRUCacheWorkerLoRAManager"
 local_name    = "LoRAManager"
 file          = "src/vllm_lora.rs"
+
+# 2026-05-30 cont2 — three more vLLM control-plane modules (Apache-2.0).
+[[functions]]
+upstream_name = "vllm.engine.llm_engine.LLMEngine.step + output_processor.StopChecker"
+local_name    = "LLMEngine"
+file          = "src/vllm_engine.rs"
+
+[[functions]]
+upstream_name = "vllm.core.block.prefix_caching_block.PrefixCachingBlockAllocator"
+local_name    = "PrefixCachingAllocator"
+file          = "src/vllm_prefix_cache.rs"
+
+[[functions]]
+upstream_name = "vllm.distributed.utils + parallel-linear/VocabParallelEmbedding partition"
+local_name    = "ParallelConfig"
+file          = "src/vllm_parallel.rs"
 
 [[surfaces]]
 kind          = "http"

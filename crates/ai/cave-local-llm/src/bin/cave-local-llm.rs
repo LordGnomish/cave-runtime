@@ -14,7 +14,12 @@ use cave_local_llm::{
     manifest::{find_missing_functions, read_crate_manifest},
     metrics::DraftMetrics,
     ollama::{GenerateRequest, OllamaClient},
+    vllm_engine::{EngineConfig, FinishReason, LLMEngine, SeqView, StepModel},
     vllm_paged_attention::{AllocStatus, BlockSpaceManager},
+    vllm_parallel::{
+        attn_heads_per_rank, get_pp_indices, kv_heads_per_rank, vocab_partition, ParallelConfig,
+    },
+    vllm_prefix_cache::PrefixCachingAllocator,
     vllm_quant::{ActivationScheme, Fp8Format, QuantConfig},
     vllm_sampling::{OpenAiSampling, SamplingParams},
 };
@@ -117,6 +122,69 @@ enum VllmCmd {
         #[arg(long, default_value_t = 16)]
         max_tokens: usize,
     },
+    /// Run the continuous-batching LLMEngine over a constant-token stub model
+    Engine {
+        /// Prompt length in tokens
+        #[arg(long, default_value_t = 8)]
+        prompt_tokens: usize,
+        /// Max generated tokens
+        #[arg(long, default_value_t = 16)]
+        max_tokens: usize,
+        /// Total GPU KV blocks
+        #[arg(long, default_value_t = 256)]
+        gpu_blocks: usize,
+        /// Tokens per block
+        #[arg(long, default_value_t = 16)]
+        block_size: usize,
+    },
+    /// Report the automatic-prefix-cache hit rate for a repeated shared prefix
+    Prefix {
+        /// Total physical blocks
+        #[arg(long, default_value_t = 16)]
+        blocks: usize,
+        /// Tokens per block
+        #[arg(long, default_value_t = 2)]
+        block_size: usize,
+        /// Number of identical sequences sharing the prefix
+        #[arg(long, default_value_t = 4)]
+        sequences: usize,
+        /// Full blocks per sequence prefix
+        #[arg(long, default_value_t = 3)]
+        prefix_blocks: usize,
+    },
+    /// Print the tensor/pipeline-parallel sharding plan for one global rank
+    Parallel {
+        /// Tensor-parallel size
+        #[arg(long, default_value_t = 2)]
+        tp: usize,
+        /// Pipeline-parallel size
+        #[arg(long, default_value_t = 2)]
+        pp: usize,
+        /// Global rank to report
+        #[arg(long, default_value_t = 0)]
+        rank: usize,
+        /// Transformer layers
+        #[arg(long, default_value_t = 32)]
+        num_layers: usize,
+        /// Attention query heads
+        #[arg(long, default_value_t = 32)]
+        num_heads: usize,
+        /// Key/value heads (GQA)
+        #[arg(long, default_value_t = 8)]
+        num_kv_heads: usize,
+        /// Vocabulary size
+        #[arg(long, default_value_t = 32000)]
+        vocab: usize,
+    },
+}
+
+/// A deterministic stub model that emits a constant token id for every
+/// scheduled sequence — exercises the engine control flow without weights.
+struct ConstModel(u32);
+impl StepModel for ConstModel {
+    fn step(&mut self, batch: &[SeqView<'_>]) -> Vec<u32> {
+        vec![self.0; batch.len()]
+    }
 }
 
 #[tokio::main]
@@ -333,6 +401,114 @@ fn run_vllm(cmd: VllmCmd) -> Result<()> {
                 }
                 Err(e) => Err(anyhow::anyhow!("invalid sampling params: {e}")),
             }
+        }
+        VllmCmd::Engine {
+            prompt_tokens,
+            max_tokens,
+            gpu_blocks,
+            block_size,
+        } => {
+            let cfg = EngineConfig {
+                max_num_batched_tokens: 8192,
+                max_num_seqs: 256,
+                block_size,
+                num_gpu_blocks: gpu_blocks,
+                eos_token_id: 0,
+            };
+            let mut engine = LLMEngine::new(cfg, ConstModel(7));
+            let params = SamplingParams {
+                max_tokens: Some(max_tokens),
+                ..Default::default()
+            };
+            engine
+                .try_add_request(1, vec![1; prompt_tokens], params)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            let mut generated = 0usize;
+            let mut reason = None;
+            let mut steps = 0usize;
+            while engine.has_unfinished_requests() {
+                for o in engine.step() {
+                    generated += o.new_token_ids.len();
+                    if o.finished {
+                        reason = o.finish_reason;
+                    }
+                }
+                steps += 1;
+            }
+            let reason = match reason {
+                Some(FinishReason::Stop) => "stop",
+                Some(FinishReason::Length) => "length",
+                None => "—",
+            };
+            println!("LLMEngine continuous-batching run");
+            println!("  prompt:        {prompt_tokens} tokens");
+            println!("  generated:     {generated} tokens over {steps} steps");
+            println!("  finish reason: {reason}");
+            Ok(())
+        }
+        VllmCmd::Prefix {
+            blocks,
+            block_size,
+            sequences,
+            prefix_blocks,
+        } => {
+            let mut alloc = PrefixCachingAllocator::new(blocks, block_size);
+            for _ in 0..sequences {
+                let mut parent = None;
+                for b in 0..prefix_blocks {
+                    // Same token content across sequences ⇒ shared prefix.
+                    let toks: Vec<u32> = (0..block_size).map(|i| (b * block_size + i) as u32).collect();
+                    let a = alloc
+                        .allocate_immutable(parent, &toks)
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                    parent = Some(a.content_hash);
+                }
+            }
+            println!("Automatic prefix caching ({sequences} seqs × {prefix_blocks} blocks)");
+            println!("  pool:          {blocks} blocks × {block_size} tokens");
+            println!("  queries:       {}", alloc.cache_queries());
+            println!("  hits:          {}", alloc.cache_hits());
+            println!("  cached blocks: {}", alloc.num_cached_blocks());
+            println!("  hit rate:      {:.1}%", alloc.hit_rate() * 100.0);
+            Ok(())
+        }
+        VllmCmd::Parallel {
+            tp,
+            pp,
+            rank,
+            num_layers,
+            num_heads,
+            num_kv_heads,
+            vocab,
+        } => {
+            let cfg = ParallelConfig {
+                tensor_parallel_size: tp,
+                pipeline_parallel_size: pp,
+            };
+            if rank >= cfg.world_size() {
+                return Err(anyhow::anyhow!(
+                    "rank {rank} out of range for world_size {}",
+                    cfg.world_size()
+                ));
+            }
+            let (tp_rank, pp_rank) = (cfg.tp_rank(rank), cfg.pp_rank(rank));
+            let vs = vocab_partition(vocab, tp_rank, tp);
+            let (start_layer, end_layer) = get_pp_indices(num_layers, pp_rank, pp);
+            println!("Tensor/pipeline-parallel plan (tp={tp}, pp={pp}, rank={rank})");
+            println!("  world size:    {}", cfg.world_size());
+            println!("  tp_rank:       {tp_rank}  (group {:?})", cfg.tp_group(rank));
+            println!("  pp_rank:       {pp_rank}  (group {:?})", cfg.pp_group(rank));
+            println!(
+                "  q heads/rank:  {}",
+                attn_heads_per_rank(num_heads, tp).map_err(|e| anyhow::anyhow!("{e}"))?
+            );
+            println!("  kv heads/rank: {}", kv_heads_per_rank(num_kv_heads, tp));
+            println!(
+                "  vocab shard:   [{}, {}) of padded {} ({} rows)",
+                vs.start, vs.end, vs.padded_vocab, vs.num_embeddings_per_partition
+            );
+            println!("  layers:        [{start_layer}, {end_layer}) of {num_layers}");
+            Ok(())
         }
     }
 }
