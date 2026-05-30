@@ -38,13 +38,13 @@ url      = "https://github.com/twentyhq/twenty"
 # Counts (mapped + partial + skipped + unmapped) sum to `total`.
 # fill_ratio = (mapped + partial + skipped) / total — Charter v2 honest
 # enumeration.
-mapped_count   = 19
-partial_count  = 4
+mapped_count   = 23
+partial_count  = 0
 skipped_count  = 14
 unmapped_count = 0
 total          = 37
 fill_ratio     = 1.0000
-honest_ratio   = 0.5135
+honest_ratio   = 0.6216
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-30"
 infra_only     = false
@@ -141,27 +141,31 @@ upstream = "packages/twenty-server/src/engine/workspace-manager/workspace-migrat
 local    = "src/indexes.rs"
 notes    = "Workspace index seeds — 18 IndexSpec entries (BTree/Unique/Composite)."
 
-# ─── Partial (4) ─────────────────────────────────────────────────────────────
+# ─── 2026-05-30 honest-uplift: 4 [[partial]] → [[mapped]] ────────────────────
+# Strict-TDD ports closed the deferred runtime behind each partial. The
+# IMAP/Gmail *sync worker* remains a separate scope cut (see the
+# google-gmail-sync skip + messaging-sync scope_cut); these rows cover the
+# control-plane runtime + data models, which are now fully ported.
 
-[[partial]]
-upstream = "packages/twenty-server/src/engine/api/graphql/"
-local    = "src/graphql_schema.rs"
-notes    = "Schema SDL generation from ObjectMetadata + FieldMetadata. Resolver runtime deferred — see [[scope_cuts]] graphql-resolvers."
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/api/graphql/workspace-resolver-builder/"
+local    = "src/graphql_resolver.rs"
+notes    = "GraphQL findOne/findMany execution runtime — hand-rolled parser + executor (filter eq/neq/gt/gte/lt/lte/in/ilike, cascading ASC/DESC orderBy, first+cursor pagination, camelCase projection) wrapping findMany in the Relay Connection envelope {edges:[{node,cursor}],pageInfo,totalCount}. CrmStore::graphql_query bridge + POST /api/crm/{ws}/graphql. graphql_schema.rs generates the SDL this runtime serves. Closed 2026-05-30 (was partial)."
 
-[[partial]]
-upstream = "packages/twenty-server/src/modules/calendar/standard-objects/calendar-event-attendee.workspace-entity.ts"
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/calendar/common/standard-objects/calendar-event-participant.workspace-entity.ts"
 local    = "src/models/calendar_event.rs"
-notes    = "CalendarEventAttendee — model carried, RSVP-state side effects deferred."
+notes    = "CalendarEventAttendee RSVP state — canonical Rsvp enum (NEEDS_ACTION/DECLINED/TENTATIVE/ACCEPTED), respond() overwrite transitions, Google/Microsoft/CalDAV-PARTSTAT provider normalizers, AttendanceTally roll-up. Closed 2026-05-30 (was partial)."
 
-[[partial]]
-upstream = "packages/twenty-server/src/modules/message/standard-objects/message.workspace-entity.ts"
-local    = "src/models/activity.rs"
-notes    = "Thread+message model semantics absorbed into Activity, but IMAP/Gmail wire not implemented."
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/messaging/common/standard-objects/message.workspace-entity.ts"
+local    = "src/models/message.rs"
+notes    = "Messaging workspace-entities — Message/MessageThread/MessageChannel/MessageParticipant/MessageChannelMessageAssociation with exact enum casings (MessageDirection, MessageChannelType incl. EMAIL_GROUP, MessageParticipantRole FROM/TO/CC/BCC, MessageChannelSyncStatus, MessageChannelVisibility). Dedicated models replacing the Activity approximation. IMAP/Gmail sync worker stays scope-cut. Closed 2026-05-30 (was partial on src/models/activity.rs)."
 
-[[partial]]
+[[mapped]]
 upstream = "packages/twenty-server/src/modules/timeline/services/timeline-activity.service.ts"
-local    = "src/models/activity.rs"
-notes    = "ActivityTarget enables a polymorphic feed read; per-event timeline aggregation is deferred."
+local    = "src/timeline.rs"
+notes    = "Per-record timeline read path — timeline_for_target() walks noteTarget/taskTarget polymorphic links + folds TimelineActivity audit rows, newest-first; merge_recent() applies Twenty's 10-minute dedup window. CrmStore::timeline_for_target bridge + timeline_activities map. Closed 2026-05-30 (was partial)."
 
 # ─── Skipped — alt-language / browser-UI / vendor scaffold (12) ──────────────
 
@@ -250,9 +254,9 @@ deferred_to = "data-ray-2"
 reason = "Gmail/IMAP/Outlook sync requires OAuth + IMAP/JMAP wire ports — large parallel ray, deferred."
 
 [[scope_cuts]]
-area = "graphql-resolvers"
+area = "graphql-resolvers-write-path"
 deferred_to = "data-ray-2"
-reason = "Apollo-server runtime equivalent. The schema SDL is generated today (`src/graphql_schema.rs`); the resolver runtime + N+1 prevention is deferred."
+reason = "The read path (findOne/findMany + Connection envelope) shipped 2026-05-30 in `src/graphql_resolver.rs`. The mutation runtime (createOne/updateMany/destroy) + N+1 dataloader batching remain deferred."
 
 [[scope_cuts]]
 area = "webhook-bus"
@@ -271,4 +275,4 @@ status       = "partial"
 loc          = 144
 priority     = "P1"
 notes        = "Full CRM React app — cave-portal/src/admin/crm/* is a v0.2 scaffold"
-last_audit   = "2026-05-19"
+last_audit   = "2026-05-30"
