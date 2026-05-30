@@ -13,8 +13,13 @@
 //!   * `escalation_snapshot/utils.py::eta_for_escalation_step_notify_if_time`
 //!     — the time-window membership test (incl. overnight wrap).
 
-use cave_oncall::engine::{EscalationRun, MAX_TIMES_REPEAT};
+use cave_oncall::engine::{within_notify_window, EscalationRun, MAX_TIMES_REPEAT};
 use cave_oncall::models::{EscalationStep, EscalationStepType};
+
+/// Minutes-since-midnight helper for readable window tests.
+fn hm(h: u32, m: u32) -> u32 {
+    h * 60 + m
+}
 
 fn notify(order: u32) -> EscalationStep {
     EscalationStep {
@@ -90,4 +95,58 @@ fn repeat_is_capped_at_max_times_repeat_then_finishes() {
     assert_eq!(fired, 12);
     assert!(run.is_finished());
     assert_eq!(run.repeat_count(), MAX_TIMES_REPEAT);
+}
+
+// ---------------------------------------------------------------------------
+// Cycle 2 — STEP_NOTIFY_IF_TIME window membership (utils.py eta logic)
+// ---------------------------------------------------------------------------
+//
+// `eta_for_escalation_step_notify_if_time` returns None (escalation proceeds
+// immediately) exactly when "now" is inside the [from, to) window; otherwise it
+// schedules a future ETA (escalation pauses). `within_notify_window` is that
+// membership predicate, with all three upstream branches.
+
+#[test]
+fn notify_window_normal_daytime_window() {
+    // 09:00 <= now < 17:00 proceeds; the boundaries follow [from, to).
+    let (from, to) = (hm(9, 0), hm(17, 0));
+    assert!(!within_notify_window(from, to, hm(8, 59)));
+    assert!(within_notify_window(from, to, hm(9, 0))); // inclusive start
+    assert!(within_notify_window(from, to, hm(12, 30)));
+    assert!(within_notify_window(from, to, hm(16, 59)));
+    assert!(!within_notify_window(from, to, hm(17, 0))); // exclusive end
+    assert!(!within_notify_window(from, to, hm(23, 0)));
+}
+
+#[test]
+fn notify_window_overnight_wraps_past_midnight() {
+    // 22:00 -> 06:00 overnight window: in-window when now >= 22:00 OR now < 06:00.
+    let (from, to) = (hm(22, 0), hm(6, 0));
+    assert!(within_notify_window(from, to, hm(23, 30)));
+    assert!(within_notify_window(from, to, hm(22, 0))); // inclusive start
+    assert!(within_notify_window(from, to, hm(0, 0)));
+    assert!(within_notify_window(from, to, hm(5, 59)));
+    assert!(!within_notify_window(from, to, hm(6, 0))); // exclusive end
+    assert!(!within_notify_window(from, to, hm(12, 0))); // dead zone
+    assert!(!within_notify_window(from, to, hm(21, 59)));
+}
+
+#[test]
+fn notify_window_degenerate_equal_bounds_only_matches_the_instant() {
+    // from == to is a point window: proceeds only exactly at that minute.
+    let t = hm(10, 0);
+    assert!(within_notify_window(t, t, hm(10, 0)));
+    assert!(!within_notify_window(t, t, hm(9, 59)));
+    assert!(!within_notify_window(t, t, hm(10, 1)));
+}
+
+#[test]
+fn notify_if_time_step_type_round_trips() {
+    let step = EscalationStepType::NotifyIfTime {
+        from_minute: hm(9, 0),
+        to_minute: hm(17, 0),
+    };
+    let json = serde_json::to_string(&step).unwrap();
+    let back: EscalationStepType = serde_json::from_str(&json).unwrap();
+    assert_eq!(step, back);
 }
