@@ -11,7 +11,9 @@
 pub mod legacy;
 pub mod patch_transform;
 pub mod pipeline;
+pub mod revision_gc;
 pub mod step;
 pub mod store;
 
+pub use revision_gc::RevisionGarbageCollector;
 pub use store::CompositionStore;

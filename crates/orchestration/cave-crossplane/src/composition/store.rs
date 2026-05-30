@@ -2,15 +2,13 @@
 // Copyright 2026 Cave Runtime contributors
 //! Composition store with revision history (preserved from pre-port scaffold).
 
+use crate::composition::revision_gc::RevisionGarbageCollector;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{Composition, CompositionStatus, CreateCompositionRequest};
 use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::VecDeque;
 use uuid::Uuid;
-
-#[allow(dead_code)]
-const MAX_REVISIONS: usize = 10;
 
 pub struct CompositionStore {
     compositions: DashMap<String, Composition>,
@@ -124,16 +122,40 @@ impl CompositionStore {
             .ok_or_else(|| CrossplaneError::CompositionNotFound(name.to_owned()))
     }
 
-    /// Push a new revision snapshot, capped at MAX_REVISIONS.
+    /// Append a new revision snapshot. Retention is an explicit reconcile
+    /// concern handled by [`gc_revisions`](Self::gc_revisions) — mirroring
+    /// upstream, where CompositionRevisions are created on every spec change
+    /// and garbage-collected separately by `revisionHistoryLimit`.
     pub fn push_revision(&self, name: &str, composition: Composition) {
         if let Some(mut history) = self.revision_history.get_mut(name) {
             history.push_back(composition);
-            let len = history.len();
-            if len > MAX_REVISIONS {
-                let excess = len - MAX_REVISIONS;
-                history.drain(0..excess);
-            }
         }
+    }
+
+    /// Garbage-collect old revisions per `revisionHistoryLimit`, preserving the
+    /// current (highest-numbered) revision and the newest `limit` historical
+    /// revisions. Returns the number of revisions collected.
+    ///
+    /// `None` → default limit (1); `Some(0)` → keep all (GC disabled);
+    /// `Some(n)` → keep current + `n`. Upstream
+    /// `internal/controller/pkg/manager/reconciler.go` GC block.
+    pub fn gc_revisions(&self, name: &str, limit: Option<i64>) -> CrossplaneResult<usize> {
+        let mut history = self
+            .revision_history
+            .get_mut(name)
+            .ok_or_else(|| CrossplaneError::CompositionNotFound(name.to_owned()))?;
+        let revisions: Vec<u32> = history.iter().map(|c| c.revision).collect();
+        let current = revisions.iter().copied().max().unwrap_or(0);
+        let to_collect: std::collections::HashSet<u32> =
+            RevisionGarbageCollector::plan(&revisions, current, limit)
+                .into_iter()
+                .collect();
+        if to_collect.is_empty() {
+            return Ok(0);
+        }
+        let before = history.len();
+        history.retain(|c| !to_collect.contains(&c.revision));
+        Ok(before - history.len())
     }
 
     /// Number of compositions currently registered.
@@ -215,12 +237,33 @@ mod tests {
     }
 
     #[test]
-    fn push_revision_history_cap() {
+    fn push_revision_appends_unbounded() {
+        // Retention is now an explicit GC concern; push is append-only.
         let s = CompositionStore::new();
-        let c = s.create(req("c1")).unwrap();
-        for _ in 0..15 {
+        let mut c = s.create(req("c1")).unwrap();
+        for r in 2..=16u32 {
+            c.revision = r;
             s.push_revision("c1", c.clone());
         }
-        assert_eq!(s.get_revisions("c1").unwrap().len(), MAX_REVISIONS);
+        assert_eq!(s.get_revisions("c1").unwrap().len(), 16);
+    }
+
+    #[test]
+    fn gc_revisions_honours_history_limit() {
+        let s = CompositionStore::new();
+        let mut c = s.create(req("c1")).unwrap();
+        for r in 2..=12u32 {
+            c.revision = r;
+            s.push_revision("c1", c.clone());
+        }
+        let collected = s.gc_revisions("c1", Some(4)).unwrap();
+        assert_eq!(collected, 7); // 12 - (current + 4)
+        let nums: Vec<u32> = s
+            .get_revisions("c1")
+            .unwrap()
+            .iter()
+            .map(|r| r.revision)
+            .collect();
+        assert_eq!(nums, vec![8, 9, 10, 11, 12]);
     }
 }
