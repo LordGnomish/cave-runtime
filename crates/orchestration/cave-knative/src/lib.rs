@@ -22,6 +22,7 @@
 
 #![allow(non_snake_case)]
 
+pub mod activator;
 pub mod autoscaler;
 pub mod broker_controller;
 pub mod cert_bridge;
