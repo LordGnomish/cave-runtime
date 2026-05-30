@@ -26,3 +26,6 @@ pub mod tokenize;
 
 /// Dynamic token-budget batching (max batch size + max tokens per batch).
 pub mod batch;
+
+/// Pluggable embedding backend trait + deterministic reference HashEmbedder.
+pub mod backend;
