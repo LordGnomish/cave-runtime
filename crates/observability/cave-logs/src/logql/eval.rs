@@ -237,6 +237,47 @@ fn parse_unpack(line: &str, extra: &mut HashMap<String, String>) {
     }
 }
 
+/// Apply `label_replace` to a metric result, rewriting `dst_label` on each
+/// series from regex captures of `src_label`'s value. The regex is anchored
+/// to the whole source value (Prometheus semantics); non-matching series are
+/// returned unchanged, and an expansion that yields an empty string deletes
+/// `dst_label`.
+fn apply_label_replace(data: QueryData, lr: &LabelReplace) -> QueryData {
+    let re = match Regex::new(&format!("^(?:{})$", lr.regex)) {
+        Ok(r) => r,
+        // An invalid regex matches nothing → every series passes through.
+        Err(_) => return data,
+    };
+    let rewrite = |metric: &mut HashMap<String, String>| {
+        let src_val = metric.get(&lr.src_label).cloned().unwrap_or_default();
+        if let Some(caps) = re.captures(&src_val) {
+            let mut expanded = String::new();
+            caps.expand(&lr.replacement, &mut expanded);
+            if expanded.is_empty() {
+                metric.remove(&lr.dst_label);
+            } else {
+                metric.insert(lr.dst_label.clone(), expanded);
+            }
+        }
+    };
+    match data {
+        QueryData::Vector(mut v) => {
+            for r in &mut v {
+                rewrite(&mut r.metric);
+            }
+            QueryData::Vector(v)
+        }
+        QueryData::Matrix(mut m) => {
+            for r in &mut m {
+                rewrite(&mut r.metric);
+            }
+            QueryData::Matrix(m)
+        }
+        // label_replace is undefined over log streams — pass through.
+        other => other,
+    }
+}
+
 fn apply_label_filter(labels: &HashMap<String, String>, lf: &LabelFilter) -> bool {
     let actual = labels.get(&lf.label);
     match &lf.value {
@@ -455,6 +496,10 @@ impl Evaluator {
                 metric: HashMap::new(),
                 value: (start_ns as f64 / 1e9, n.to_string()),
             }]),
+            MetricQuery::LabelReplace(lr) => {
+                let inner = self.eval_metric_query(tenant, &lr.inner, start_ns, end_ns, step_ns);
+                apply_label_replace(inner, lr)
+            }
         }
     }
 

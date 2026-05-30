@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use super::ast::{
     self, BinOp, BinaryExpr, CompareOp, Decolorize, DropKeepLabel, DropLabels, Grouping,
-    KeepLabels, LabelFilter, LabelFilterValue, LabelFormat, LabelMatcher, LineFilter, LineFormat,
+    KeepLabels, LabelFilter, LabelFilterValue, LabelFormat, LabelMatcher, LabelReplace, LineFilter,
+    LineFormat,
     LogQuery, LogRangeAggregation, MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query,
     RangeAgg, StreamSelector, UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
 };
@@ -147,6 +148,10 @@ impl Parser {
             | Some(Token::Topk)
             | Some(Token::Bottomk)
             | Some(Token::Quantile) => Query::Metric(self.parse_metric_query()?),
+            // Function-style metric expressions invoked by identifier.
+            Some(Token::Ident(s)) if s == "label_replace" => {
+                Query::Metric(self.parse_metric_query()?)
+            }
             Some(Token::Number(_)) => {
                 let n = if let Some(Token::Number(n)) = self.advance() {
                     *n
@@ -483,6 +488,27 @@ impl Parser {
                 let inner = self.parse_metric_query()?;
                 self.expect(&Token::RParen)?;
                 Ok(inner)
+            }
+            Some(Token::Ident(s)) if s == "label_replace" => {
+                self.advance(); // label_replace
+                self.expect(&Token::LParen)?;
+                let inner = Box::new(self.parse_metric_query()?);
+                self.expect(&Token::Comma)?;
+                let dst_label = self.expect_str()?;
+                self.expect(&Token::Comma)?;
+                let replacement = self.expect_str()?;
+                self.expect(&Token::Comma)?;
+                let src_label = self.expect_str()?;
+                self.expect(&Token::Comma)?;
+                let regex = self.expect_str()?;
+                self.expect(&Token::RParen)?;
+                Ok(MetricQuery::LabelReplace(Box::new(LabelReplace {
+                    inner,
+                    dst_label,
+                    replacement,
+                    src_label,
+                    regex,
+                })))
             }
             Some(Token::Rate)
             | Some(Token::CountOverTime)

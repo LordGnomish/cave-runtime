@@ -294,6 +294,19 @@ pub enum MetricQuery {
     VectorAgg(VectorAggregation),
     BinaryExpr(BinaryExpr),
     Literal(f64),
+    LabelReplace(Box<LabelReplace>),
+}
+
+/// `label_replace(v, dst_label, replacement, src_label, regex)` — rewrites a
+/// destination label on each result series using regex captures of a source
+/// label's value (Prometheus/LogQL semantics).
+#[derive(Debug, Clone)]
+pub struct LabelReplace {
+    pub inner: Box<MetricQuery>,
+    pub dst_label: String,
+    pub replacement: String,
+    pub src_label: String,
+    pub regex: String,
 }
 
 /// Top-level query — either a log query or a metric query.
