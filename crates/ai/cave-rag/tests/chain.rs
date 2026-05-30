@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! RAG generation chain + citation tracking + answer attribution.
 
-use cave_rag::chain::{ExtractiveGenerator, Generator, LlmGenerator, RagPipeline};
+use cave_rag::chain::{ExtractiveGenerator, LlmGenerator, RagPipeline};
 use cave_rag::citation::{attribute_answer, build_citations};
 use cave_rag::document::Document;
 use cave_rag::embedding::HashingEmbedder;
@@ -32,8 +32,8 @@ fn store() -> (InMemoryVectorStore, HashingEmbedder) {
 fn extractive_generator_pulls_relevant_sentences() {
     let (store, e) = store();
     let r = SimilarityRetriever::new(&store, &e);
-    let gen = ExtractiveGenerator::new();
-    let pipeline = RagPipeline::new(&r, &gen).with_top_k(2);
+    let generator = ExtractiveGenerator::new();
+    let pipeline = RagPipeline::new(&r, &generator).with_top_k(2);
     let answer = pipeline.query("how does rust handle memory safety").unwrap();
     assert!(
         answer.answer.to_lowercase().contains("memory safety"),
@@ -62,8 +62,8 @@ fn llm_pipeline_with_reranker_produces_grounded_answer() {
     let r = SimilarityRetriever::new(&store, &e);
     let rr = LexicalCrossEncoder::new();
     let llm = ScriptedLlm;
-    let gen = LlmGenerator::new(&llm);
-    let pipeline = RagPipeline::new(&r, &gen).with_reranker(&rr).with_top_k(2);
+    let generator = LlmGenerator::new(&llm);
+    let pipeline = RagPipeline::new(&r, &generator).with_reranker(&rr).with_top_k(2);
     let answer = pipeline.query("memory safety in rust").unwrap();
     assert!(answer.answer.contains("memory safety"));
     // Attribution must flag the rust doc as the strongest support.

@@ -14,6 +14,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod chain;
+pub mod citation;
 pub mod document;
 pub mod embedding;
 pub mod error;
