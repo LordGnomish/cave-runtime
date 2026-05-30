@@ -2,9 +2,9 @@
 
 Pinned upstream:
 
-* **grafana/oncall @ v1.10.0** · `source_sha = d7c4a3b2e5f1c8a9b6e3d7c4a3b2e5f1c8a9b6e3`
+* **grafana/oncall @ v1.10.0** · `source_sha = 73a073d3d1467a39be228304eb5b809f29033965`
 
-Inventory hand-curated: 2026-05-19 · Charter v2 FINALIZE: 2026-05-19 · Wave-2 close-out: 2026-05-19
+Inventory hand-curated: 2026-05-19 · Charter v2 FINALIZE: 2026-05-19 · Wave-2 close-out: 2026-05-19 · Honest-uplift close-out: 2026-05-30
 
 This document is the honest companion to `parity.manifest.toml`. The manifest
 proves *coverage*; this report describes *fidelity* — which upstream apps
@@ -17,17 +17,31 @@ are wire-faithful, which are semantic-only, and what is explicitly deferred.
 | metric | value |
 |---|---|
 | upstream subsystems enumerated | 18 |
-| mapped | **12** (+3 vs pre-wave-2) |
-| partial | 2 |
+| mapped | **14** (+2 vs wave-2) |
+| partial | **0** (-2 — both closed) |
 | skipped (vendor-spec / browser-UI / test-harness) | 4 |
-| unmapped | **0** (-3 vs pre-wave-2) |
-| `fill_ratio` (mapped + partial + skipped) / total | **1.0** (measured, +0.1667) |
-| `honest_ratio` (mapped + skipped) / total | **0.8889** |
+| unmapped | **0** |
+| `fill_ratio` (mapped + partial + skipped) / total | **1.0** (measured) |
+| `honest_ratio` (mapped + skipped) / total | **1.0** (was 0.8889) |
 | `parity_ratio_source` | `"manifest"` |
-| cave-oncall `.rs` files | 7 (lib + models + engine + routes + slack + pagerduty_migrator + sms_voice; ~3300 LOC) |
-| SPDX AGPL-3.0-or-later coverage | **7/7 (100 %)** |
+| cave-oncall `.rs` files | 10 (lib + models + engine + routes + slack + pagerduty_migrator + sms_voice + integrations + rbac + invitations; ~3630 LOC) |
+| SPDX AGPL-3.0-or-later coverage | **10/10 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
-| new self-audit assertions (`tests/parity_self_audit.rs`) | **9** |
+| self-audit assertions (`tests/parity_self_audit.rs`) | **9** |
+
+## Honest-uplift close-out delta (2026-05-30)
+
+Both remaining `[[partial]]` subsystems were resolved via strict-TDD ports
+(RED test commit → GREEN impl commit), lifting `honest_ratio` 0.8889 → **1.0**.
+
+| Δ | upstream surface | provenance |
+|---|---|---|
+| → | `engine/config_integrations/` (alertmanager, grafana, grafana_alerting, formatted_webhook, webhook) | partial → mapped · `src/integrations.rs` — per-source `grouping_id` / `resolve_condition` / `source_link` / `web_title` normalization into `IncomingAlert`; `POST /api/oncall/integrations/{slug}` with dedupe + autoresolve. Tests: `tests/integration_parsers.rs` (10) |
+| → | `engine/apps/api/permissions.py` + `engine/apps/alerts/models/invitation.py` | partial → mapped · `src/rbac.rs` (LegacyAccessControlRole ladder + 32-entry permission catalog + `user_is_authorized`) and `src/invitations.rs` (Invitation lifecycle + backoff). Tests: `tests/rbac_invitations.rs` (13) |
+
+Also: `source_sha` corrected to the real `v1.10.0` tag commit; self-audit
+`workspace_root()` and member check repaired for the themed `crates/<theme>/`
+layout (the fixed pop-count and explicit-member assertion were stale).
 
 ---
 

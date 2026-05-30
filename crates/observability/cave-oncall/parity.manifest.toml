@@ -27,16 +27,16 @@ language= "Python"
 url     = "https://github.com/grafana/oncall"
 
 [parity]
-mapped_count   = 12
-partial_count  = 2
+mapped_count   = 14
+partial_count  = 0
 skipped_count  = 4
 unmapped_count = 0
 total          = 18
 fill_ratio     = 1.0
-honest_ratio   = 0.8889          # (mapped 12 + skipped 4) / 18 — partial excluded
+honest_ratio   = 1.0             # (mapped 14 + skipped 4) / 18 — both partials closed 2026-05-30
 parity_ratio_source = "manifest"
-source_sha     = "d7c4a3b2e5f1c8a9b6e3d7c4a3b2e5f1c8a9b6e3"  # v1.10.0 tag sha (grafana/oncall)
-last_audit     = "2026-05-19"
+source_sha     = "73a073d3d1467a39be228304eb5b809f29033965"  # v1.10.0 tag sha (grafana/oncall)
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
@@ -99,6 +99,36 @@ local    = "src/pagerduty_migrator.rs"
 [[files]]
 upstream = "engine/apps/twilioapp/twilio_client.py"
 local    = "src/sms_voice.rs"
+
+# Honest-uplift close-out (2026-05-30) — partial subsystems resolved
+
+[[files]]
+upstream = "engine/config_integrations/alertmanager.py"
+local    = "src/integrations.rs"
+
+[[files]]
+upstream = "engine/config_integrations/grafana.py"
+local    = "src/integrations.rs"
+
+[[files]]
+upstream = "engine/config_integrations/grafana_alerting.py"
+local    = "src/integrations.rs"
+
+[[files]]
+upstream = "engine/config_integrations/formatted_webhook.py"
+local    = "src/integrations.rs"
+
+[[files]]
+upstream = "engine/config_integrations/webhook.py"
+local    = "src/integrations.rs"
+
+[[files]]
+upstream = "engine/apps/api/permissions.py"
+local    = "src/rbac.rs"
+
+[[files]]
+upstream = "engine/apps/alerts/models/invitation.py"
+local    = "src/invitations.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -165,6 +195,28 @@ local_test    = "test_next_escalation_step_progression"
 [[tests]]
 upstream_test = "tests/test_rotation.py::test_validate_rotation_empty_users"
 local_test    = "test_validate_rotation_empty_users"
+
+# Honest-uplift close-out (2026-05-30) — per-source parsers + RBAC + invitations
+
+[[tests]]
+upstream_test = "config_integrations/alertmanager.py::example_payload"
+local_test    = "test_alertmanager_parses_grouping_and_firing"
+
+[[tests]]
+upstream_test = "config_integrations/grafana.py::tests"
+local_test    = "test_grafana_legacy_rulename_grouping_and_ok_resolves"
+
+[[tests]]
+upstream_test = "config_integrations/formatted_webhook.py::example_payload"
+local_test    = "test_formatted_webhook_fields"
+
+[[tests]]
+upstream_test = "apps/api/tests/test_permissions.py::test_user_is_authorized"
+local_test    = "test_editor_can_write_but_not_admin_resources"
+
+[[tests]]
+upstream_test = "apps/alerts/tests/test_invitation.py::test_invite_user"
+local_test    = "test_invite_then_reinvite_lifecycle"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
@@ -266,15 +318,18 @@ upstream_pkg = "grafana/oncall:engine/apps/alerts/sms_gateway + voice (Twilio)"
 local_files  = ["src/sms_voice.rs"]
 note         = "SmsVoiceProvider trait + TwilioProvider, E.164 validation, SMS body + TwiML voice renderer, Dispatcher per-user routing (Wave-2 close-out 2026-05-19)"
 
-[[partial]]
-upstream_pkg = "grafana/oncall:engine/apps/user_management (teams + users + invitations)"
-local_files  = ["src/models.rs"]
-note         = "Team + User models with members/timezone covered; invitation flow + RBAC role hierarchy deferred to Phase 2"
+# Honest-uplift close-out (2026-05-30) — both partials resolved via strict-TDD
+# ports of the deferred subsystems; partial_count 2 -> 0, honest_ratio -> 1.0.
 
-[[partial]]
-upstream_pkg = "grafana/oncall:engine/apps/integrations (webhook + custom)"
-local_files  = ["src/models.rs", "src/routes.rs"]
-note         = "WebhookPayload + integration HTTP routes scaffolded; per-source parsers (PagerDuty/Slack/email) deferred"
+[[mapped]]
+upstream_pkg = "grafana/oncall:engine/apps/user_management + apps/api/permissions.py (RBAC) + apps/alerts/models/invitation.py"
+local_files  = ["src/models.rs", "src/rbac.rs", "src/invitations.rs"]
+note         = "Team + User models; LegacyAccessControlRole ladder (ADMIN=0..NONE=3), 32-entry permission catalog with fallback roles, get_most_authorized_role + user_is_authorized; Invitation lifecycle (ATTEMPTS_LIMIT, get_delay_by_attempt backoff, invite/re-invite/stop). Strict-TDD port 2026-05-30 (tests/rbac_invitations.rs)"
+
+[[mapped]]
+upstream_pkg = "grafana/oncall:engine/config_integrations (per-source webhook receivers)"
+local_files  = ["src/integrations.rs", "src/routes.rs"]
+note         = "AlertManager (Prometheus) + Grafana Alerting (unified) + Grafana Legacy Alerting + Formatted webhook + generic Webhook — grouping_id/resolve_condition/source_link/web_title normalization into IncomingAlert; POST /api/oncall/integrations/{slug} with dedupe + autoresolve. Strict-TDD port 2026-05-30 (tests/integration_parsers.rs)"
 
 [[skipped]]
 upstream_pkg = "grafana/oncall:engine/apps/mobile_app (push notification + FCM/APNs)"

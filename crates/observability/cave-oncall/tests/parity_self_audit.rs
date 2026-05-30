@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.40;
 const CRATE_NAME: &str = "cave-oncall";
 
