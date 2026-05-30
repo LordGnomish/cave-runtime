@@ -46,7 +46,7 @@ total          = 37
 fill_ratio     = 1.0000
 honest_ratio   = 0.5135
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 [module]
