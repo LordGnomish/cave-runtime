@@ -277,3 +277,137 @@ fn through_persists_then_continues_downstream() {
     // ... and the stream continues through the rest of the topology.
     assert_eq!(rec_values(&app.drain_output("out")), vec![b"HI".to_vec()]);
 }
+
+// ─── Cycle 3: groupByKey/groupBy → count/reduce/aggregate → KTable ────────────
+
+#[test]
+fn count_maintains_a_per_key_tally() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .count("counts")
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"a", b"_", 0);
+    app.pipe_input("in", b"a", b"_", 0);
+    app.pipe_input("in", b"b", b"_", 0);
+
+    // Store holds the live tally per key (decimal-encoded Long).
+    assert_eq!(app.store_get("counts", b"a"), Some(b"2".to_vec()));
+    assert_eq!(app.store_get("counts", b"b"), Some(b"1".to_vec()));
+
+    // Changelog stream emits the updated count on every input.
+    let out = app.drain_output("out");
+    assert_eq!(rec_values(&out), vec![b"1".to_vec(), b"2".to_vec(), b"1".to_vec()]);
+    // The count changelog keeps the grouping key.
+    assert_eq!(out[1].key, b"a");
+}
+
+#[test]
+fn reduce_combines_values_per_key() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .reduce("reduced", |agg, next| {
+            let mut v = agg.to_vec();
+            v.push(b'+');
+            v.extend_from_slice(next);
+            v
+        })
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"a", 0);
+    app.pipe_input("in", b"k", b"b", 0);
+    app.pipe_input("in", b"k", b"c", 0);
+
+    // First value initializes; subsequent values fold via the reducer.
+    assert_eq!(app.store_get("reduced", b"k"), Some(b"a+b+c".to_vec()));
+    assert_eq!(
+        rec_values(&app.drain_output("out")),
+        vec![b"a".to_vec(), b"a+b".to_vec(), b"a+b+c".to_vec()]
+    );
+}
+
+#[test]
+fn aggregate_with_initializer_and_aggregator() {
+    let b = StreamsBuilder::new();
+    // Aggregate the running sum of value lengths, decimal-encoded.
+    b.stream("in")
+        .group_by_key()
+        .aggregate(
+            "sum",
+            || b"0".to_vec(),
+            |_k, value, current| {
+                let cur: i64 = String::from_utf8_lossy(current).parse().unwrap_or(0);
+                (cur + value.len() as i64).to_string().into_bytes()
+            },
+        )
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"xx", 0); // +2 -> 2
+    app.pipe_input("in", b"k", b"yyy", 0); // +3 -> 5
+    assert_eq!(app.store_get("sum", b"k"), Some(b"5".to_vec()));
+    assert_eq!(
+        rec_values(&app.drain_output("out")),
+        vec![b"2".to_vec(), b"5".to_vec()]
+    );
+}
+
+#[test]
+fn group_by_rekeys_before_grouping() {
+    let b = StreamsBuilder::new();
+    // Re-key by value's first byte, then count per new key.
+    b.stream("in")
+        .group_by(|r| vec![r.value[0]])
+        .count("byprefix")
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"orig1", b"apple", 0); // key -> "a"
+    app.pipe_input("in", b"orig2", b"avocado", 0); // key -> "a"
+    app.pipe_input("in", b"orig3", b"banana", 0); // key -> "b"
+
+    assert_eq!(app.store_get("byprefix", b"a"), Some(b"2".to_vec()));
+    assert_eq!(app.store_get("byprefix", b"b"), Some(b"1".to_vec()));
+}
+
+#[test]
+fn ktable_to_stream_then_filter() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .count("c")
+        .to_stream()
+        .filter(|r| r.value != b"1") // suppress the first observation per key
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"_", 0); // count 1 -> suppressed
+    app.pipe_input("in", b"k", b"_", 0); // count 2 -> emitted
+    assert_eq!(rec_values(&app.drain_output("out")), vec![b"2".to_vec()]);
+}
+
+#[test]
+fn ktable_map_values_transforms_changelog() {
+    let b = StreamsBuilder::new();
+    b.stream("in")
+        .group_by_key()
+        .count("c")
+        .map_values(|v| [b"count=".as_ref(), v].concat())
+        .to_stream()
+        .to("out");
+    let mut app = b.build();
+
+    app.pipe_input("in", b"k", b"_", 0);
+    assert_eq!(
+        rec_values(&app.drain_output("out")),
+        vec![b"count=1".to_vec()]
+    );
+}
