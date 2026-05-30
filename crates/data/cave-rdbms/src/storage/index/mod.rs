@@ -11,9 +11,11 @@
 use crate::types::SqlValue;
 use std::cmp::Ordering;
 
+pub mod brin;
 pub mod btree;
 pub mod hash;
 
+pub use brin::{BrinIndex, BrinRange};
 pub use btree::BTreeIndex;
 pub use hash::HashIndex;
 
