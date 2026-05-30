@@ -37,3 +37,6 @@ pub mod queue;
 
 /// Re-exports the scheduler module for enforcing guardrails and execution policies.
 pub mod scheduler;
+
+/// Pure-Rust GGUF header + metadata reader (no tensor data, no inference).
+pub mod gguf;
