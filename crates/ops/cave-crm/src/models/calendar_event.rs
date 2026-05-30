@@ -114,9 +114,79 @@ mod tests {
     }
 
     #[test]
-    fn attendee_defaults_invited() {
+    fn attendee_defaults_needs_action() {
+        // Twenty v2.6.0 CalendarEventParticipant.responseStatus defaults to
+        // NEEDS_ACTION (RFC 5545 PARTSTAT canonical).
         let a = CalendarEventAttendee::new(Uuid::nil(), Uuid::nil(), "a@b.c");
-        assert_eq!(a.response_status, "INVITED");
+        assert_eq!(a.response_status, "NEEDS_ACTION");
+        assert_eq!(a.rsvp(), Rsvp::NeedsAction);
         assert!(!a.is_organizer);
+    }
+
+    #[test]
+    fn rsvp_serializes_screaming_snake() {
+        assert_eq!(
+            serde_json::to_string(&Rsvp::NeedsAction).unwrap(),
+            "\"NEEDS_ACTION\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Rsvp::Accepted).unwrap(),
+            "\"ACCEPTED\""
+        );
+    }
+
+    #[test]
+    fn respond_transitions_status() {
+        let mut a = CalendarEventAttendee::new(Uuid::nil(), Uuid::nil(), "a@b.c");
+        let prev = a.respond(Rsvp::Accepted);
+        assert_eq!(prev, Rsvp::NeedsAction);
+        assert_eq!(a.rsvp(), Rsvp::Accepted);
+        assert_eq!(a.response_status, "ACCEPTED");
+        // Re-respond reflects the latest provider-driven state.
+        a.respond(Rsvp::Declined);
+        assert_eq!(a.rsvp(), Rsvp::Declined);
+    }
+
+    #[test]
+    fn rsvp_normalizes_google_response() {
+        assert_eq!(Rsvp::from_google("accepted"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_google("declined"), Rsvp::Declined);
+        assert_eq!(Rsvp::from_google("tentative"), Rsvp::Tentative);
+        assert_eq!(Rsvp::from_google("needsAction"), Rsvp::NeedsAction);
+        assert_eq!(Rsvp::from_google(""), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn rsvp_normalizes_microsoft_response() {
+        assert_eq!(Rsvp::from_microsoft("accepted"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_microsoft("tentativelyAccepted"), Rsvp::Tentative);
+        assert_eq!(Rsvp::from_microsoft("organizer"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_microsoft("none"), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn rsvp_normalizes_caldav_partstat() {
+        assert_eq!(Rsvp::from_caldav_partstat("ACCEPTED"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_caldav_partstat("NEEDS-ACTION"), Rsvp::NeedsAction);
+        assert_eq!(Rsvp::from_caldav_partstat("DELEGATED"), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn attendance_tally_counts_by_status() {
+        let ev = Uuid::new_v4();
+        let mut a = CalendarEventAttendee::new(Uuid::nil(), ev, "a@b.c");
+        a.respond(Rsvp::Accepted);
+        let mut b = CalendarEventAttendee::new(Uuid::nil(), ev, "b@b.c");
+        b.respond(Rsvp::Declined);
+        let mut c = CalendarEventAttendee::new(Uuid::nil(), ev, "c@b.c");
+        c.respond(Rsvp::Accepted);
+        let d = CalendarEventAttendee::new(Uuid::nil(), ev, "d@b.c"); // needs action
+
+        let tally = AttendanceTally::of(&[a, b, c, d]);
+        assert_eq!(tally.accepted, 2);
+        assert_eq!(tally.declined, 1);
+        assert_eq!(tally.tentative, 0);
+        assert_eq!(tally.needs_action, 1);
+        assert_eq!(tally.total(), 4);
     }
 }
