@@ -6,6 +6,10 @@
 //!
 //! Modules:
 //!   requirement   — complement-based Requirement set-algebra with bounds
+//!   requirements  — keyed Requirement collection + compatibility
+//!   hostport      — HostPort reservation/conflict tracking
+//!   taints        — taint/toleration matching + KnownEphemeralTaints
+//!   volumeusage   — per-node CSI volume-limit tracking (Volumes/VolumeUsage)
 
 pub mod hostport;
 pub mod requirement;
