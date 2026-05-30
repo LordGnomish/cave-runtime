@@ -7,6 +7,7 @@
 
 pub mod acme_client;
 pub mod cert_request;
+pub mod cr_approval_validation;
 pub mod crds;
 pub mod csr;
 pub mod engine;
