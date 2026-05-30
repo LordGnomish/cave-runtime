@@ -1006,6 +1006,15 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 2,
     },
     TrackedProject {
+        name: "Infinity (embeddings)",
+        github_repo: "michaelfeil/infinity",
+        cave_module: "cave-embed",
+        track_features: "OpenAI /v1/embeddings + reranker, model registry, dynamic batching, pooling, quantization",
+        check_frequency: "biweekly",
+        category: "ai",
+        phase: 2,
+    },
+    TrackedProject {
         name: "Grafana OnCall (engine)",
         github_repo: "grafana/oncall",
         cave_module: "cave-oncall",

@@ -39,6 +39,7 @@ uuid.workspace = true
 # In-process dispatchers (eksik-sweep 2026-05-24):
 cave-bench = { path = "../../security/cave-bench" }
 cave-falco = { path = "../../security/cave-falco" }
+cave-embed = { path = "../../ai/cave-embed" }
 
 [dev-dependencies]
 proptest = "1"

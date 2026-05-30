@@ -248,6 +248,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
     },
+    /// Embedding service (infinity-parity; /v1/embeddings + reranker)
+    Embed {
+        #[command(subcommand)]
+        cmd: EmbedCmd,
+    },
     /// Distributed key-value store (etcd v3 replacement; etcdctl parity)
     Etcd {
         #[command(subcommand)]
@@ -2654,6 +2659,36 @@ enum LocalLlmCmd {
 }
 
 #[derive(Subcommand)]
+enum EmbedCmd {
+    /// List the built-in embedding model registry
+    Models,
+    /// Embed text with a model and print the vector summary
+    Run {
+        /// Model id or alias (e.g. minilm, bge-base, e5-base-v2)
+        #[arg(long, default_value = "minilm")]
+        model: String,
+        /// Text to embed
+        #[arg(long)]
+        text: String,
+        /// Truncate output to N dimensions (Matryoshka)
+        #[arg(long)]
+        dimensions: Option<usize>,
+    },
+    /// Rerank documents against a query (cross-encoder)
+    Rerank {
+        /// Search query
+        #[arg(long)]
+        query: String,
+        /// Candidate documents (repeat --doc)
+        #[arg(long = "doc")]
+        docs: Vec<String>,
+        /// Keep at most N results
+        #[arg(long)]
+        top_n: Option<usize>,
+    },
+}
+
+#[derive(Subcommand)]
 enum DaemonSubCmd {
     /// Start the daemon in the foreground (runs cave-local-llm-daemon start)
     Start,
@@ -4292,6 +4327,70 @@ source_root = "src"
                     summary[status] = serde_json::json!(n);
                 }
                 println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+                Ok(())
+            }
+        },
+
+        // ── embed ─────────────────────────────────────────────────────────────
+        Commands::Embed { cmd } => match cmd {
+            EmbedCmd::Models => {
+                let reg = cave_embed::registry::ModelRegistry::with_builtins();
+                for id in reg.list_ids() {
+                    let c = reg.get(&id).expect("listed id resolves");
+                    println!(
+                        "{id}\tdims={}\tctx={}\tpooling={:?}\tnormalize={}",
+                        c.dimensions, c.max_seq_len, c.pooling, c.normalize
+                    );
+                }
+                Ok(())
+            }
+            EmbedCmd::Run {
+                model,
+                text,
+                dimensions,
+            } => {
+                use cave_embed::api::{EmbeddingData, EmbeddingRequest, Input};
+                let svc = cave_embed::service::EmbeddingService::with_builtins();
+                let req = EmbeddingRequest {
+                    model: model.clone(),
+                    input: Input::Single(text),
+                    encoding_format: None,
+                    dimensions,
+                    user: None,
+                };
+                let resp = svc
+                    .embed(&req)
+                    .map_err(|e| anyhow::anyhow!("embed: {e}"))?;
+                let dims = match &resp.data[0].embedding {
+                    EmbeddingData::Float(v) => v.len(),
+                    EmbeddingData::Base64(_) => 0,
+                };
+                let preview: Vec<f32> = match &resp.data[0].embedding {
+                    EmbeddingData::Float(v) => v.iter().take(8).copied().collect(),
+                    EmbeddingData::Base64(_) => Vec::new(),
+                };
+                println!("model:  {}", resp.model);
+                println!("dims:   {dims}");
+                println!("tokens: {}", resp.usage.total_tokens);
+                println!("head:   {preview:?}");
+                Ok(())
+            }
+            EmbedCmd::Rerank {
+                query,
+                docs,
+                top_n,
+            } => {
+                use cave_embed::rerank::{LexicalCrossEncoder, Reranker};
+                let rr = Reranker::new(Box::new(LexicalCrossEncoder::new()));
+                let results = rr.rerank(&query, &docs, top_n);
+                for r in results {
+                    println!(
+                        "{:.4}\t[{}] {}",
+                        r.relevance_score,
+                        r.index,
+                        docs.get(r.index).map(|s| s.as_str()).unwrap_or("")
+                    );
+                }
                 Ok(())
             }
         },
