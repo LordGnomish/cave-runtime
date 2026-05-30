@@ -31,6 +31,7 @@ pub mod portfolio;
 pub mod routes;
 pub mod sbom;
 pub mod search;
+pub mod tags;
 pub mod vuln_intel;
 
 use axum::Router;
