@@ -11,6 +11,108 @@
 //! Matching is family-sensitive: an IPv4 pattern never matches an IPv6
 //! address (mirrors Go's `net` semantics, which Loki relies on).
 
+use std::net::IpAddr;
+
+/// A compiled `ip("…")` pattern.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IpPattern {
+    /// A single exact address.
+    Single(IpAddr),
+    /// A CIDR block: every address sharing `prefix` leading bits with `net`.
+    Cidr { net: IpAddr, prefix: u8 },
+    /// An inclusive `start-end` range (same family, start ≤ end).
+    Range { start: IpAddr, end: IpAddr },
+}
+
+/// Maps an address onto a width-tagged 128-bit integer so v4 and v6 never
+/// alias: IPv4 keeps its 32-bit value, IPv6 its 128-bit value, and the
+/// `is_v6` flag is compared first by every operation here.
+fn to_bits(addr: IpAddr) -> (bool, u128) {
+    match addr {
+        IpAddr::V4(v4) => (false, u32::from(v4) as u128),
+        IpAddr::V6(v6) => (true, u128::from(v6)),
+    }
+}
+
+impl IpPattern {
+    /// Parse a Loki `ip()` argument. Returns `Err` for any malformed form.
+    pub fn parse(s: &str) -> Result<IpPattern, String> {
+        let s = s.trim();
+        // Range: `start-end`. A bare `-` (no end) or junk on either side errs.
+        if let Some((lhs, rhs)) = s.split_once('-') {
+            // Guard against IPv6 (which contains no '-') being misread; both
+            // sides must parse as addresses of the same family.
+            let start: IpAddr = lhs
+                .trim()
+                .parse()
+                .map_err(|_| format!("invalid range start: {lhs}"))?;
+            let end: IpAddr = rhs
+                .trim()
+                .parse()
+                .map_err(|_| format!("invalid range end: {rhs}"))?;
+            let (sv6, sbits) = to_bits(start);
+            let (ev6, ebits) = to_bits(end);
+            if sv6 != ev6 {
+                return Err("range endpoints differ in address family".into());
+            }
+            if sbits > ebits {
+                return Err("range start is greater than end".into());
+            }
+            return Ok(IpPattern::Range { start, end });
+        }
+        // CIDR: `net/prefix`.
+        if let Some((net_str, pfx_str)) = s.split_once('/') {
+            let net: IpAddr = net_str
+                .trim()
+                .parse()
+                .map_err(|_| format!("invalid CIDR network: {net_str}"))?;
+            let prefix: u8 = pfx_str
+                .trim()
+                .parse()
+                .map_err(|_| format!("invalid CIDR prefix: {pfx_str}"))?;
+            let max = if net.is_ipv6() { 128 } else { 32 };
+            if prefix > max {
+                return Err(format!("CIDR prefix /{prefix} exceeds /{max}"));
+            }
+            return Ok(IpPattern::Cidr { net, prefix });
+        }
+        // Single address.
+        let addr: IpAddr = s.parse().map_err(|_| format!("invalid address: {s}"))?;
+        Ok(IpPattern::Single(addr))
+    }
+
+    /// Does `addr` satisfy this pattern? Always `false` across families.
+    pub fn matches(&self, addr: IpAddr) -> bool {
+        let (av6, abits) = to_bits(addr);
+        match self {
+            IpPattern::Single(s) => to_bits(*s) == (av6, abits),
+            IpPattern::Cidr { net, prefix } => {
+                let (nv6, nbits) = to_bits(*net);
+                if nv6 != av6 {
+                    return false;
+                }
+                let width = if av6 { 128 } else { 32 };
+                if *prefix == 0 {
+                    return true;
+                }
+                // Mask off the host bits and compare the network portions.
+                let shift = width - *prefix as u32;
+                let mask = if shift >= 128 {
+                    0
+                } else {
+                    u128::MAX << shift
+                };
+                (nbits & mask) == (abits & mask)
+            }
+            IpPattern::Range { start, end } => {
+                let (sv6, sbits) = to_bits(*start);
+                let (_, ebits) = to_bits(*end);
+                sv6 == av6 && sbits <= abits && abits <= ebits
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
