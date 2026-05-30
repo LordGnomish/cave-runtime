@@ -19,6 +19,8 @@
 //!   * Braces are not special to the lexer; they only become their own tokens
 //!     when whitespace-separated.
 
+use std::collections::BTreeMap;
+
 /// A single lexed token plus the 1-based line on which it began.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
@@ -123,6 +125,236 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     }
 
     tokens
+}
+
+// ─── Parser (core/caddyfile/parse.go) ───────────────────────────────────────
+
+/// A parsed server block: the address keys preceding the opening brace plus
+/// the directive → token-slice map captured inside the block.
+///
+/// Faithful to upstream `caddyfile.ServerBlock`: each directive's slice begins
+/// with the directive name token itself, followed by every argument token on
+/// the directive's line (including the tokens of any nested `{ … }` block).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ServerBlock {
+    /// Address labels before the block (e.g. `example.com:53`).
+    pub keys: Vec<String>,
+    /// Directive name → captured tokens (directive token first).
+    pub tokens: BTreeMap<String, Vec<Token>>,
+}
+
+/// A Corefile parse failure with the 1-based source line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    /// 1-based source line where parsing failed.
+    pub line: usize,
+    /// Human-readable description.
+    pub message: String,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Corefile parse error (line {}): {}", self.line, self.message)
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// Parse Corefile/Caddyfile `input` into the list of [`ServerBlock`]s.
+///
+/// Port of `core/caddyfile/parse.go::parseAll` over the token stream produced
+/// by [`tokenize`]. Server blocks with no address keys are dropped (matching
+/// upstream, which only emits blocks where `len(Keys) > 0`).
+pub fn parse(input: &str) -> Result<Vec<ServerBlock>, ParseError> {
+    let mut parser = Parser::new(tokenize(input));
+    parser.parse_all()
+}
+
+/// Cursor-based recursive parser mirroring caddy's `Dispenser` + `parser`.
+struct Parser {
+    tokens: Vec<Token>,
+    cursor: isize,
+    block: ServerBlock,
+    eof: bool,
+}
+
+impl Parser {
+    fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, cursor: -1, block: ServerBlock::default(), eof: false }
+    }
+
+    // ── Dispenser primitives ────────────────────────────────────────────
+
+    /// Advance to the next token; `false` at end of stream.
+    fn next(&mut self) -> bool {
+        if self.cursor < self.tokens.len() as isize - 1 {
+            self.cursor += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn val(&self) -> &str {
+        self.tokens.get(self.cursor as usize).map_or("", |t| t.text.as_str())
+    }
+
+    fn cur(&self) -> Token {
+        self.tokens[self.cursor as usize].clone()
+    }
+
+    fn line(&self) -> usize {
+        self.tokens.get(self.cursor as usize).map_or(0, |t| t.line)
+    }
+
+    /// True when the current token starts a new source line relative to the
+    /// previous token (upstream `Dispenser.isNewLine`).
+    fn is_newline(&self) -> bool {
+        if self.cursor < 1 {
+            return true;
+        }
+        if self.cursor as usize > self.tokens.len() - 1 {
+            return false;
+        }
+        self.tokens[self.cursor as usize - 1].line < self.tokens[self.cursor as usize].line
+    }
+
+    // ── Grammar ──────────────────────────────────────────────────────────
+
+    fn parse_all(&mut self) -> Result<Vec<ServerBlock>, ParseError> {
+        let mut blocks = Vec::new();
+        while self.next() {
+            self.parse_one()?;
+            if !self.block.keys.is_empty() {
+                blocks.push(std::mem::take(&mut self.block));
+            }
+        }
+        Ok(blocks)
+    }
+
+    fn parse_one(&mut self) -> Result<(), ParseError> {
+        self.block = ServerBlock::default();
+        self.begin()
+    }
+
+    fn begin(&mut self) -> Result<(), ParseError> {
+        if self.tokens.is_empty() {
+            return Ok(());
+        }
+        self.addresses()?;
+        if self.eof {
+            return Ok(());
+        }
+        self.block_contents()
+    }
+
+    /// Read the address labels that precede a block. A trailing comma on a
+    /// token means another address follows (possibly on the next line).
+    fn addresses(&mut self) -> Result<(), ParseError> {
+        let mut expecting_another = false;
+        loop {
+            let mut tkn = self.val().to_string();
+
+            // An open brace ends the address list.
+            if tkn == "{" {
+                if expecting_another {
+                    return Err(ParseError {
+                        line: self.line(),
+                        message: "expected another address but found '{' — check for an extra comma".into(),
+                    });
+                }
+                break;
+            }
+
+            if !tkn.is_empty() {
+                if tkn.ends_with(',') {
+                    tkn.pop();
+                    expecting_another = true;
+                } else {
+                    expecting_another = false;
+                }
+                if !tkn.is_empty() {
+                    self.block.keys.push(tkn);
+                }
+            }
+
+            let has_next = self.next();
+            if expecting_another && !has_next {
+                return Err(ParseError {
+                    line: self.line(),
+                    message: "unexpected EOF while expecting another address".into(),
+                });
+            }
+            if !has_next {
+                self.eof = true;
+                break;
+            }
+            if !expecting_another && self.is_newline() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn block_contents(&mut self) -> Result<(), ParseError> {
+        // A single-server config may have no braces at all.
+        if self.val() != "{" {
+            self.cursor -= 1;
+            return Ok(());
+        }
+        self.directives()?;
+        // Consume the closing brace.
+        if !self.next() || self.val() != "}" {
+            return Err(ParseError {
+                line: self.line(),
+                message: "expected '}' to close server block".into(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Iterate the directives inside a `{ … }` block.
+    fn directives(&mut self) -> Result<(), ParseError> {
+        while self.next() {
+            if self.val() == "}" {
+                // Unget so block_contents can consume the closing brace.
+                self.cursor -= 1;
+                break;
+            }
+            self.directive()?;
+        }
+        Ok(())
+    }
+
+    /// Capture one directive and all of its argument tokens, honouring nested
+    /// `{ … }` braces, until the line ends at brace-nesting depth zero.
+    fn directive(&mut self) -> Result<(), ParseError> {
+        let dir = self.val().to_string();
+        let mut nesting = 0i32;
+        let tok = self.cur();
+        self.block.tokens.entry(dir.clone()).or_default().push(tok);
+
+        while self.next() {
+            let v = self.val().to_string();
+            if v == "{" {
+                nesting += 1;
+            } else if self.is_newline() && nesting == 0 {
+                // Read one token too far — give it back to directives().
+                self.cursor -= 1;
+                break;
+            } else if v == "}" && nesting > 0 {
+                nesting -= 1;
+            } else if v == "}" && nesting == 0 {
+                return Err(ParseError {
+                    line: self.line(),
+                    message: "unexpected '}'".into(),
+                });
+            }
+            let tok = self.cur();
+            self.block.tokens.entry(dir.clone()).or_default().push(tok);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
