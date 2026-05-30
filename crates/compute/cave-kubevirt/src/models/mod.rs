@@ -207,3 +207,71 @@ pub enum VmPhase {
     Terminating,
     Error,
 }
+
+#[cfg(test)]
+mod vmi_predicate_tests {
+    use super::*;
+
+    fn vmi_with(phase: &str) -> VirtualMachineInstance {
+        let mut v = VirtualMachineInstance::default();
+        v.status = Some(VirtualMachineInstanceStatus {
+            phase: phase.into(),
+            ..Default::default()
+        });
+        v
+    }
+
+    #[test]
+    fn unprocessed_covers_unset_and_pending() {
+        assert!(VirtualMachineInstance::default().is_unprocessed());
+        assert!(vmi_with("Pending").is_unprocessed());
+        assert!(!vmi_with("Scheduling").is_unprocessed());
+        assert!(!vmi_with("Running").is_unprocessed());
+    }
+
+    #[test]
+    fn scheduling_and_scheduled_are_distinct() {
+        assert!(vmi_with("Scheduling").is_scheduling());
+        assert!(!vmi_with("Scheduling").is_scheduled());
+        assert!(vmi_with("Scheduled").is_scheduled());
+        assert!(!vmi_with("Scheduled").is_scheduling());
+    }
+
+    #[test]
+    fn running_predicate() {
+        assert!(vmi_with("Running").is_running());
+        assert!(!vmi_with("Pending").is_running());
+    }
+
+    #[test]
+    fn final_covers_succeeded_and_failed_only() {
+        assert!(vmi_with("Succeeded").is_final());
+        assert!(vmi_with("Failed").is_final());
+        assert!(!vmi_with("Running").is_final());
+        assert!(!vmi_with("Unknown").is_final());
+    }
+
+    #[test]
+    fn marked_for_deletion_tracks_timestamp() {
+        let mut v = vmi_with("Running");
+        assert!(!v.is_marked_for_deletion());
+        v.deletion_timestamp = Some(1_780_000_000);
+        assert!(v.is_marked_for_deletion());
+    }
+
+    #[test]
+    fn paused_condition_detection() {
+        let mut v = vmi_with("Running");
+        assert!(!v.has_paused_condition());
+        v.status.as_mut().unwrap().conditions.push(Condition {
+            kind: "Paused".into(),
+            status: "True".into(),
+            reason: None,
+            message: None,
+        });
+        assert!(v.has_paused_condition());
+        assert!(v.has_condition("Paused", "True"));
+        // A Paused=False condition must NOT count as paused.
+        assert!(!v.has_condition("Paused", "False"));
+    }
+}
