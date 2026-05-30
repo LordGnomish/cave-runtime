@@ -103,6 +103,9 @@ pub fn apply_pipeline(
             PipelineStage::Unwrap(_) => {
                 // Unwrap is used in range aggregations; skip in log queries.
             }
+            PipelineStage::Drop(d) => {
+                apply_drop(&d.labels, &mut extra);
+            }
         }
     }
 
@@ -310,6 +313,28 @@ fn apply_line_format(template: &str, labels: &HashMap<String, String>) -> String
         out = out.replace(&format!("{{{{.{}}}}}", k), v);
     }
     out
+}
+
+/// Does the current value of a label satisfy a `drop`/`keep` value matcher?
+fn drop_keep_matcher_passes(value: &str, m: &LabelMatcher) -> bool {
+    match m.op {
+        MatchOp::Eq => value == m.value,
+        MatchOp::Neq => value != m.value,
+        MatchOp::Re => Regex::new(&m.value).map(|r| r.is_match(value)).unwrap_or(false),
+        MatchOp::NotRe => Regex::new(&m.value).map(|r| !r.is_match(value)).unwrap_or(false),
+    }
+}
+
+/// `| drop` — remove a label if any entry targets it (bare name always removes;
+/// a matcher removes only when the label's value passes the matcher).
+fn apply_drop(entries: &[DropKeepLabel], labels: &mut HashMap<String, String>) {
+    labels.retain(|name, value| {
+        let targeted = entries.iter().any(|e| match e {
+            DropKeepLabel::Name(n) => n == name,
+            DropKeepLabel::Matcher(m) => &m.name == name && drop_keep_matcher_passes(value, m),
+        });
+        !targeted
+    });
 }
 
 fn apply_label_format(mappings: &[(String, String)], labels: &mut HashMap<String, String>) {

@@ -6,10 +6,10 @@
 use std::time::Duration;
 
 use super::ast::{
-    self, BinOp, BinaryExpr, CompareOp, Decolorize, Grouping, LabelFilter, LabelFilterValue,
-    LabelFormat, LabelMatcher, LineFilter, LineFormat, LogQuery, LogRangeAggregation,
-    MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query, RangeAgg, StreamSelector,
-    UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
+    self, BinOp, BinaryExpr, CompareOp, Decolorize, DropKeepLabel, DropLabels, Grouping,
+    LabelFilter, LabelFilterValue, LabelFormat, LabelMatcher, LineFilter, LineFormat, LogQuery,
+    LogRangeAggregation, MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query, RangeAgg,
+    StreamSelector, UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
 };
 use super::lexer::{Lexer, Token};
 
@@ -289,6 +289,11 @@ impl Parser {
             Some(Token::Decolorize) => {
                 self.advance();
                 Ok(PipelineStage::Decolorize(Decolorize))
+            }
+            Some(Token::Drop) => {
+                self.advance();
+                let labels = self.parse_drop_keep_list()?;
+                Ok(PipelineStage::Drop(DropLabels { labels }))
             }
             // Label filter: `| label op value`
             Some(Token::Ident(_)) => {
@@ -656,6 +661,36 @@ impl Parser {
         }
     }
 
+    /// Parse a comma-separated `drop`/`keep` list. Each entry is a bare label
+    /// name or `name <op> value` (Loki only allows `=`/`!=`/`=~`/`!~` here).
+    fn parse_drop_keep_list(&mut self) -> Result<Vec<DropKeepLabel>, ParseError> {
+        let mut out = Vec::new();
+        loop {
+            let name = self.expect_ident()?;
+            let op = match self.peek() {
+                Some(Token::Eq) | Some(Token::EqEq) => Some(MatchOp::Eq),
+                Some(Token::Neq) => Some(MatchOp::Neq),
+                Some(Token::Re) => Some(MatchOp::Re),
+                Some(Token::NotRe) => Some(MatchOp::NotRe),
+                _ => None,
+            };
+            match op {
+                Some(op) => {
+                    self.advance();
+                    let value = self.expect_str()?;
+                    out.push(DropKeepLabel::Matcher(LabelMatcher { name, op, value }));
+                }
+                None => out.push(DropKeepLabel::Name(name)),
+            }
+            if let Some(Token::Comma) = self.peek() {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Ok(out)
+    }
+
     fn parse_label_list(&mut self) -> Result<Vec<String>, ParseError> {
         self.expect(&Token::LParen)?;
         let mut labels = Vec::new();
@@ -858,8 +893,8 @@ mod tests {
     fn parse_drop_labels_bare_names() {
         let q = Parser::parse_query(r#"{app="x"} | json | drop level, status"#).unwrap();
         if let Query::Log(lq) = q {
-            // |= json is two stages; drop is the third.
-            assert_eq!(lq.pipeline.len(), 2 + 1);
+            // json + drop = two stages.
+            assert_eq!(lq.pipeline.len(), 2);
             if let PipelineStage::Drop(d) = lq.pipeline.last().unwrap() {
                 assert_eq!(d.labels.len(), 2);
                 assert!(matches!(&d.labels[0], DropKeepLabel::Name(n) if n == "level"));

@@ -122,6 +122,22 @@ pub struct UnwrapExpr {
     pub converter: Option<String>,
 }
 
+/// One entry in a `| drop` or `| keep` list: either a bare label name or a
+/// label name guarded by a value matcher (`level="debug"`, `path=~"/api/.*"`).
+#[derive(Debug, Clone)]
+pub enum DropKeepLabel {
+    /// `drop foo` / `keep foo` — acts on the label unconditionally.
+    Name(String),
+    /// `drop foo="bar"` / `keep foo=~"re"` — acts only when the matcher passes.
+    Matcher(LabelMatcher),
+}
+
+/// Drop labels stage: `| drop level, status="500"` — removes matching labels.
+#[derive(Debug, Clone)]
+pub struct DropLabels {
+    pub labels: Vec<DropKeepLabel>,
+}
+
 /// A single stage in the log pipeline.
 #[derive(Debug, Clone)]
 pub enum PipelineStage {
@@ -132,6 +148,7 @@ pub enum PipelineStage {
     LabelFormat(LabelFormat),
     Decolorize(Decolorize),
     Unwrap(UnwrapExpr),
+    Drop(DropLabels),
 }
 
 // ── Log query ────────────────────────────────────────────────────────────────

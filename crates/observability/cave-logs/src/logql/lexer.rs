@@ -92,6 +92,7 @@ pub enum Token {
     LineFormat,
     LabelFormat,
     Decolorize,
+    Drop,
 
     // Literals
     Ident(String),
@@ -454,6 +455,7 @@ impl<'a> Lexer<'a> {
             "line_format" => Token::LineFormat,
             "label_format" => Token::LabelFormat,
             "decolorize" => Token::Decolorize,
+            "drop" => Token::Drop,
             _ => Token::Ident(word.to_owned()),
         };
         Ok(tok)
