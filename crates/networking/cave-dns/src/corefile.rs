@@ -129,9 +129,54 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 mod tests {
     use super::*;
 
+    fn texts(toks: &[Token]) -> Vec<&str> {
+        toks.iter().map(|t| t.text.as_str()).collect()
+    }
+
     #[test]
     fn trailing_unterminated_token_flushes_at_eof() {
         let toks = tokenize("errors");
         assert_eq!(toks, vec![Token { text: "errors".into(), line: 1 }]);
+    }
+
+    // ── Cycle 1: parse.go — server blocks + directives ─────────────────────
+
+    #[test]
+    fn parse_single_block_with_directives() {
+        let src = "example.com:53 {\n    whoami\n    forward . 1.1.1.1 8.8.8.8\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].keys, vec!["example.com:53".to_string()]);
+
+        // A bare directive carries only its own name token (caddy stores the
+        // directive token as the first element of its token slice).
+        assert_eq!(texts(&blocks[0].tokens["whoami"]), vec!["whoami"]);
+
+        // A directive with args carries name + every arg on the line.
+        assert_eq!(
+            texts(&blocks[0].tokens["forward"]),
+            vec!["forward", ".", "1.1.1.1", "8.8.8.8"]
+        );
+    }
+
+    #[test]
+    fn parse_directive_with_nested_block() {
+        // The nested `{ ... }` tokens belong to the enclosing directive.
+        let src = "example.com {\n    forward . 1.1.1.1 {\n        policy random\n        max_fails 3\n    }\n}\n";
+        let blocks = parse(src).expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            texts(&blocks[0].tokens["forward"]),
+            vec!["forward", ".", "1.1.1.1", "{", "policy", "random", "max_fails", "3", "}"]
+        );
+    }
+
+    #[test]
+    fn parse_one_line_server_block_without_braces() {
+        // A naked address line (no braces) is a valid single-server config.
+        let blocks = parse(".:53\n").expect("parse ok");
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].keys, vec![".:53".to_string()]);
+        assert!(blocks[0].tokens.is_empty());
     }
 }
