@@ -22,6 +22,7 @@ pub mod models;
 pub mod persistence;
 pub mod routes;
 pub mod store;
+pub mod sync;
 pub mod workflow_crd;
 
 use axum::Router;
