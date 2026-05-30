@@ -10,6 +10,189 @@
 //! [`super::backend::BackendRegistry`] selection can be metric-driven
 //! rather than static.
 
+use serde::{Deserialize, Serialize};
+
+use super::backend::Backend;
+
+/// One measured run of a backend against a task.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct EvalMetrics {
+    /// Energy spent, joules. Lower is better.
+    pub energy_joules: f64,
+    /// Wall-clock latency, milliseconds. Lower is better.
+    pub latency_ms: f64,
+    /// Marginal cost, USD (0.0 for a local run). Lower is better.
+    pub cost_usd: f64,
+    /// Task accuracy in `[0, 1]`. Higher is better.
+    pub accuracy: f64,
+}
+
+impl EvalMetrics {
+    pub fn new(energy_joules: f64, latency_ms: f64, cost_usd: f64, accuracy: f64) -> Self {
+        Self {
+            energy_joules,
+            latency_ms,
+            cost_usd,
+            accuracy,
+        }
+    }
+
+    /// True when every defined budget cap/floor is satisfied.
+    pub fn within_budget(&self, budget: &EvalBudget) -> bool {
+        if let Some(cap) = budget.max_energy_joules
+            && self.energy_joules > cap
+        {
+            return false;
+        }
+        if let Some(cap) = budget.max_latency_ms
+            && self.latency_ms > cap
+        {
+            return false;
+        }
+        if let Some(cap) = budget.max_cost_usd
+            && self.cost_usd > cap
+        {
+            return false;
+        }
+        if let Some(floor) = budget.min_accuracy
+            && self.accuracy < floor
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Weighted desirability — higher is better. Accuracy contributes
+    /// positively; energy/latency/cost contribute a diminishing penalty
+    /// (`w / (1 + value)`) so the score stays bounded and monotone in the
+    /// intuitive direction.
+    pub fn score(&self, w: &ScoreWeights) -> f64 {
+        w.accuracy * self.accuracy
+            + w.latency / (1.0 + self.latency_ms)
+            + w.energy / (1.0 + self.energy_joules)
+            + w.cost / (1.0 + self.cost_usd)
+    }
+}
+
+/// Per-dimension caps/floors. A `None` field is unconstrained.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct EvalBudget {
+    pub max_energy_joules: Option<f64>,
+    pub max_latency_ms: Option<f64>,
+    pub max_cost_usd: Option<f64>,
+    pub min_accuracy: Option<f64>,
+}
+
+impl EvalBudget {
+    pub fn unlimited() -> Self {
+        Self::default()
+    }
+
+    pub fn max_energy_joules(mut self, v: f64) -> Self {
+        self.max_energy_joules = Some(v);
+        self
+    }
+
+    pub fn max_latency_ms(mut self, v: f64) -> Self {
+        self.max_latency_ms = Some(v);
+        self
+    }
+
+    pub fn max_cost_usd(mut self, v: f64) -> Self {
+        self.max_cost_usd = Some(v);
+        self
+    }
+
+    pub fn min_accuracy(mut self, v: f64) -> Self {
+        self.min_accuracy = Some(v);
+        self
+    }
+}
+
+/// Relative importance of each dimension in [`EvalMetrics::score`].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ScoreWeights {
+    pub energy: f64,
+    pub latency: f64,
+    pub cost: f64,
+    pub accuracy: f64,
+}
+
+impl Default for ScoreWeights {
+    /// Local-first default: accuracy dominates, latency next, then energy,
+    /// then cost (cost is usually 0 on-device).
+    fn default() -> Self {
+        Self {
+            energy: 10.0,
+            latency: 100.0,
+            cost: 1.0,
+            accuracy: 1.0,
+        }
+    }
+}
+
+/// Accumulates [`EvalMetrics`] samples and aggregates them.
+#[derive(Debug, Default, Clone)]
+pub struct EvalHarness {
+    samples: Vec<EvalMetrics>,
+}
+
+impl EvalHarness {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, m: EvalMetrics) -> &mut Self {
+        self.samples.push(m);
+        self
+    }
+
+    pub fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.samples.is_empty()
+    }
+
+    /// Arithmetic mean across all recorded samples, or `None` if empty.
+    pub fn mean(&self) -> Option<EvalMetrics> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        let n = self.samples.len() as f64;
+        let mut acc = EvalMetrics::new(0.0, 0.0, 0.0, 0.0);
+        for s in &self.samples {
+            acc.energy_joules += s.energy_joules;
+            acc.latency_ms += s.latency_ms;
+            acc.cost_usd += s.cost_usd;
+            acc.accuracy += s.accuracy;
+        }
+        Some(EvalMetrics::new(
+            acc.energy_joules / n,
+            acc.latency_ms / n,
+            acc.cost_usd / n,
+            acc.accuracy / n,
+        ))
+    }
+}
+
+/// Rank candidate backends by score, dropping any whose metrics fall
+/// outside `budget`. Best-first.
+pub fn rank_backends(
+    entries: &[(Backend, EvalMetrics)],
+    budget: &EvalBudget,
+    weights: &ScoreWeights,
+) -> Vec<(Backend, f64)> {
+    let mut scored: Vec<(Backend, f64)> = entries
+        .iter()
+        .filter(|(_, m)| m.within_budget(budget))
+        .map(|(b, m)| (*b, m.score(weights)))
+        .collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
