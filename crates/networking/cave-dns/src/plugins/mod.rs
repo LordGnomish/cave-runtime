@@ -15,6 +15,7 @@ pub mod health;
 pub mod hosts;
 pub mod kubernetes;
 pub mod loadbalance;
+pub mod local;
 pub mod log;
 pub mod loop_detect;
 pub mod metrics;
