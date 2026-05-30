@@ -6,6 +6,7 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
+pub mod daemon;
 pub mod engine;
 pub mod executor;
 pub mod models;
