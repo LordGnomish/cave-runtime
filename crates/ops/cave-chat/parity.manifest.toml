@@ -1,7 +1,8 @@
 # parity.manifest.toml — cave-chat
 # Upstream: danny-avila/LibreChat  https://github.com/danny-avila/LibreChat
 # 2026-05-28 honest close — implemented real channel/message/presence/search/stats;
-# ADR-justified 11 sibling/out-of-scope cuts (UI, SSO, LLM routing, attachments, etc.)
+# 2026-05-30 strict-TDD: export-import skip -> mapped (conversation_export + conversation_tree);
+# ADR-justified 10 sibling/out-of-scope cuts (UI, SSO, LLM routing, attachments, etc.)
 
 [upstream]
 org        = "danny-avila"
@@ -15,18 +16,18 @@ source_sha = "v0.7.6"   # LibreChat v0.7.6 release tag (latest stable as of 2026
 
 [parity]
 # 2026-05-28 honest close — implemented real channel/message/presence/search/stats;
-# ADR-justified 11 sibling/out-of-scope cuts
+# ADR-justified 10 sibling/out-of-scope cuts
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.45
+honest_ratio        = 0.45   # 9 mapped / 20 total
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 8
+mapped_count        = 9
 partial_count       = 1
-skipped_count       = 11
+skipped_count       = 10
 unmapped_count      = 0
 total               = 20
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 # ── Mapped surfaces ───────────────────────────────────────────────────────────
@@ -140,15 +141,18 @@ area   = "openid-connect"
 what   = "OIDC login flow, JWT validation, session management"
 reason = "parallel-track cave-identity — OIDC/JWT sessions are owned by cave-identity"
 
-[[skipped]]
-area   = "export-import"
-what   = "Conversation export to JSON/markdown, import from ChatGPT/LibreChat formats"
-reason = "out-of-launch-scope — format conversion utilities are Phase 2; no serialisation-format dep available"
+[[mapped]]
+area    = "export-import"
+what    = "Conversation export to text/markdown + fork/import tree-path reconstruction"
+local   = "src/conversation_export.rs + src/conversation_tree.rs"
+notes   = "2026-05-30 strict-TDD line-port of LibreChat useExportConversation.ts (export_markdown/export_text/format_message_text) and import/fork.js pure tree algorithms (get_all_messages_up_to_parent INCLUDE_BRANCHES, get_messages_up_to_target_level TARGET_LEVEL, split_at_target_level). DB-bound getConvo/getMessages/saveBatch + browser download/CSV/screenshot left to persistence/UI layers."
 
 [module]
 name        = "cave-chat"
 description = "Team chat — LibreChat replacement"
 source_root = "src"
+rs_files    = 8
+rs_loc      = 1362
 
 [portal_ui]
 upstream_ui  = "LibreChat"
