@@ -264,6 +264,48 @@ pub fn printable_status(
     evaluate_printable_status(vm, vmi).as_str()
 }
 
+/// Upstream `defaultMaxCrashLoopBackoffDelaySeconds`.
+pub const DEFAULT_MAX_START_BACKOFF_SECONDS: i64 = 300;
+
+/// Deterministic core of upstream `calculateStartBackoffTime` (vm.go):
+/// `interval * failCount²`, capped at `max_delay`, where `interval` is
+/// `max(max_delay / 30, 10)`. The upstream random jitter term is intentionally
+/// omitted so the result is reproducible.
+pub fn calculate_start_backoff_time(fail_count: i64, max_delay: i64) -> i64 {
+    const MIN_INTERVAL: i64 = 10;
+    let fail_count = if fail_count <= 0 { 1 } else { fail_count };
+    let multiplier = fail_count * fail_count;
+    let interval = (max_delay / 30).max(MIN_INTERVAL);
+    (interval * multiplier).min(max_delay)
+}
+
+/// Seconds remaining before a start may be retried — `max(0, retry_after - now)`.
+/// Mirrors `startFailureBackoffTimeLeft`.
+pub fn start_failure_backoff_time_left(retry_after: Option<i64>, now: i64) -> i64 {
+    match retry_after {
+        Some(t) => (t - now).max(0),
+        None => 0,
+    }
+}
+
+/// Record one more consecutive start failure: bump the count, stamp the
+/// failing VMI's UID, and compute the next `retry_after` timestamp from the
+/// backoff schedule. Mirrors the StartFailure bookkeeping in `startVMI`.
+pub fn record_start_failure(
+    prev: Option<crate::models::StartFailure>,
+    vmi_uid: &str,
+    now: i64,
+    max_delay: i64,
+) -> crate::models::StartFailure {
+    let count = prev.map(|f| f.consecutive_fail_count).unwrap_or(0) + 1;
+    let delay = calculate_start_backoff_time(count as i64, max_delay);
+    crate::models::StartFailure {
+        consecutive_fail_count: count,
+        retry_after_timestamp: Some(now + delay),
+        last_failed_vmi_uid: Some(vmi_uid.to_string()),
+    }
+}
+
 /// Top-level driver: run one VM reconcile against the store, executing the
 /// resulting action in-memory.
 pub fn drive(store: &Arc<Store>, vm: &VirtualMachine) -> ReconcileAction {
