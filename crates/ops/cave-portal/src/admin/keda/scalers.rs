@@ -1180,6 +1180,11 @@ mod tests {
             "cron",
             "aws-sqs-queue",
             "azure-servicebus",
+            // Observability metric scalers also ported in cave-keda (with
+            // parseXMetadata constructors) must be browsable in the catalog.
+            "new-relic",
+            "splunk",
+            "dynatrace",
         ] {
             assert!(lookup(k).is_some(), "expected catalog entry for `{k}`");
         }
