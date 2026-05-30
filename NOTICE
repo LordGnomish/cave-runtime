@@ -96,6 +96,7 @@ Apache-2.0:
   - firecracker-microvm/firecracker (cave-sandbox; tertiary upstream)
   - goharbor/harbor          (cave-registry; v2.10)
   - google/gvisor            (cave-sandbox; primary upstream)
+  - grafana/beyla            (cave-ebpf-common; v1.6.0; userspace eBPF auto-instrumentation port)
   - istio/istio              (cave-mesh; 1.30.0, ambient-only)
   - jaegertracing/jaeger    (cave-trace; v1.52.0)
   - kata-containers/kata-containers (cave-sandbox; secondary upstream)

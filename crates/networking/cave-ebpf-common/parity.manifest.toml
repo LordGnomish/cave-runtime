@@ -1,115 +1,145 @@
 # parity.manifest.toml — cave-ebpf-common
 #
-# This crate is a shared types crate (BPF map definitions, syscall
-# event structs) used by both kernel-space eBPF programs and user-
-# space consumers. It is NOT a Cilium port — the actual Cilium
-# port lives in cave-net (see crates/cave-net/parity.manifest.toml,
-# upstream = cilium/cilium, fill_ratio = 0.9179 as of 2026-05-13).
+# Upstream: grafana/beyla  https://github.com/grafana/beyla  pinned v1.6.0
+# Apache-2.0 (eBPF auto-instrumentation). Companion data structures share
+# lineage with cilium/ebpf primitives (Apache-2.0).
 #
-# Previously this manifest mis-declared upstream = cilium/cilium,
-# which caused the /upstream tracker to display "Cilium 0%" (the
-# tracker mapped Cilium → cave-ebpf-common, whose skeleton manifest
-# computed overall=0.0). Marking infra_only = true so the dashboard
-# treats this as a Cave-internal crate and stops reporting a parity
-# axis that doesn't apply. The tracker now maps Cilium → cave-net
-# (see crates/cave-upstream/src/projects.rs).
+# ── Scope ─────────────────────────────────────────────────────────────────────
+# This crate began as a Cave-internal shared-types crate (SyscallEvent /
+# NetEvent / ResourceEvent — retained). It now also hosts a userspace port
+# of the grafana/beyla eBPF auto-instrumentation pipeline: the *userspace*
+# half of Beyla — the deterministic, kernel-independent logic that turns
+# captured connection bytes into OTLP spans.
+#
+#   src/loader.rs   — pkg/internal/ebpf/tracer.go  (CollectionSpec load path,
+#                     GPL-license verifier gate, map-ref resolution)
+#   src/map.rs      — cilium/ebpf map types (HASH / LRU_HASH / ARRAY) with
+#                     BPF_ANY/NOEXIST/EXIST + E2BIG/EEXIST/ENOENT semantics
+#   src/ringbuf.rs  — BPF_MAP_TYPE_RINGBUF reserve/commit/discard + in-order
+#                     consumer (busy-record blocking)
+#   src/probe.rs    — kprobe/uprobe/tracepoint attach registry (kallsyms gate,
+#                     uprobe symbol→offset resolution, link lifecycle)
+#   src/discover.rs — pkg/internal/ebpf/common + pkg/internal/request protocol
+#                     detection: HTTP/1.x, HTTP/2 preface, gRPC, SQL
+#                     (Postgres simple-query + MySQL COM_QUERY)
+#   src/process.rs  — pkg/internal/discover process discovery + exec/exit
+#                     watcher + service-name derivation
+#   src/otlp.rs     — pkg/internal/request Span + pkg/internal/export/otel
+#                     OTLP/JSON ResourceSpans rendering
+#
+# ── Userspace-approximation boundary (documented, per crate red-line) ─────────
+# The crate does NOT cross the kernel boundary: the actual bpf(2) syscall
+# (BPF_PROG_LOAD / BPF_MAP_CREATE) and perf_event_open(2) probe attach are
+# tracked honestly as `partial` subsystems — the userspace half is ported,
+# the syscall FFI (libbpf-rs / aya) is not. The eBPF C kernel programs
+# themselves (bpf2go .o objects) are `skipped` — they are compiled kernel
+# artifacts, not Rust-portable. Extra Beyla exporters (Prometheus, OTLP
+# metrics) and the Kubernetes metadata decorator are out of MVP scope.
+#
+# NB: the Cilium parity port still lives in cave-net (upstream=cilium/cilium);
+# the /upstream tracker maps Cilium → cave-net and Beyla → cave-ebpf-common
+# (see crates/ops/cave-upstream/src/projects.rs).
+
+[upstream]
+org         = "grafana"
+repo        = "beyla"
+version     = "v1.6.0"
+name        = "Grafana Beyla (eBPF auto-instrumentation)"
+license     = "Apache-2.0"
+language    = "Go"
+url         = "https://github.com/grafana/beyla"
+# Tag pin. This is a userspace-approximation port (kernel C programs and
+# bpf(2)/perf_event_open FFI deliberately not crossed — see scope notes),
+# so the pin is the release tag rather than a commit-level line-diff sha.
+source_sha  = "v1.6.0"
 
 [module]
 name        = "cave-ebpf-common"
-description = "Shared eBPF types — BPF map definitions, syscall event structs. Cave-internal types crate; the Cilium parity port lives in cave-net."
+description = "Shared eBPF event types + userspace port of the grafana/beyla eBPF auto-instrumentation pipeline (loader, BPF maps, ringbuf, probes, HTTP/gRPC/SQL discovery, process tracking, OTLP export)."
 source_root = "src"
 
 # ── File mappings ────────────────────────────────────────────────────────────
-# [[files]]
-# upstream = "path/in/upstream/repo.go"
-# local    = "src/local.rs"
+[[files]]
+upstream = "pkg/internal/ebpf/tracer.go"
+local    = "src/loader.rs"
 
-# ── Function mappings ────────────────────────────────────────────────────────
-# [[functions]]
-# upstream_name = "UpstreamFunc"
-# local_name    = "local_fn"
-# file          = "src/routes.rs"
+[[files]]
+upstream = "vendor/github.com/cilium/ebpf/map.go"
+local    = "src/map.rs"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
-# [[tests]]
-# upstream_test = "TestUpstreamFunc"
-# local_test    = "test_local_fn"
+[[files]]
+upstream = "pkg/internal/ebpf/common/ringbuf.go"
+local    = "src/ringbuf.rs"
+
+[[files]]
+upstream = "pkg/internal/ebpf/probes.go"
+local    = "src/probe.rs"
+
+[[files]]
+upstream = "pkg/internal/ebpf/common/protocol.go"
+local    = "src/discover.rs"
+
+[[files]]
+upstream = "pkg/internal/request/span.go"
+local    = "src/discover.rs"
+
+[[files]]
+upstream = "pkg/internal/discover/finder.go"
+local    = "src/process.rs"
+
+[[files]]
+upstream = "pkg/internal/discover/watcher.go"
+local    = "src/process.rs"
+
+[[files]]
+upstream = "pkg/internal/export/otel/traces.go"
+local    = "src/otlp.rs"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
-# [[surfaces]]
-# kind          = "http"
-# upstream_path = "/api/upstream"
-# local_path    = "/api/ebpf-common/endpoint"
+[[surfaces]]
+kind          = "http"
+upstream_path = "beyla /metrics + OTLP export"
+local_path    = "/admin/ebpf"
 
 [parity]
-infra_only = true
-# Cave-internal types crate — no upstream parity axis applies.
-# Previously declared upstream=cilium/cilium, which the /upstream
-# tracker page treated as a real Cilium port and reported "0%".
-# Marking infra_only=true keeps this crate out of the upstream
-# parity averages on the compliance dashboard.
-fill_ratio  = 0.0
-last_audit  = "2026-05-13"
+parity_ratio_source = "manifest"
+# Subsystem-count parity. honest_ratio is the headline metric for this
+# crate: of 17 Beyla auto-instrumentation subsystems, 13 are actually
+# represented in-crate (11 fully mapped userspace ports + 2 partial at the
+# kernel-FFI boundary). The remaining 4 are honestly absent (kernel C
+# programs + extra exporters + k8s decorator) — NOT ADR-justified, so they
+# count against both ratios rather than being credited as "filled".
+#
+#   fill_ratio   = (mapped + partial) / total = 13 / 17 = 0.7647
+#   honest_ratio = (mapped + partial) / total = 13 / 17 = 0.7647
+#
+# (Both equal because no scope-cut is ADR-credited — per the uplift
+#  red-line "ADR-justify mark YOK".)
+#
+# mapped (11):   program-loader-model, bpf-maps-abstraction, ringbuf-reader,
+#                probe-attach-registry, http-protocol-detect,
+#                grpc-protocol-detect, sql-protocol-detect, process-discovery,
+#                process-watcher, span-transform, otel-traces-export
+# partial (2):   bpf-syscall-ffi (loader userspace model only; real
+#                BPF_PROG_LOAD/BPF_MAP_CREATE not crossed),
+#                perf-event-attach (probe registry only; real
+#                perf_event_open(2) + PERF_EVENT_IOC_SET_BPF not crossed)
+# skipped (4):   ebpf-c-kernel-programs (bpf2go .o kernel artifacts),
+#                otel-metrics-export, prometheus-export, kube-metadata-decorator
+fill_ratio          = 0.7647
+honest_ratio        = 0.7647
+infra_only          = false
+mapped_count        = 11
+partial_count       = 2
+skipped_count       = 4
+unmapped_count      = 0
+total               = 17
+last_audit          = "2026-05-28"
 
-
-# Qwen-pump B-prime cycle 1778774770 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=1)
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_net_event_struct_exists"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_net_event_default_invariant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_resource_event_struct_exists"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_resource_event_type_safety"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_syscall_event_struct_exists"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_syscall_event_invariant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_net_event_empty_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_resource_event_long_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_syscall_event_special_chars_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_net_event_unicode_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_resource_event_numeric_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_syscall_event_whitespace_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_net_event_mixed_case_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_resource_event_hyphen_tenant"
-
-[[tests]]
-upstream_test = "qwen-scaffold pending review"
-local_test    = "test_syscall_event_underscore_tenant"
+# 2026-05-28 honest-uplift (strict-TDD, claude/cave-ebpf-common-honest-2026-05-28):
+#   Flipped infra_only true→false and established a real grafana/beyla
+#   parity axis. Previously the crate was infra_only=0.0 (the Cilium
+#   mis-mapping bug); Beyla is a distinct, previously-untracked upstream
+#   that maps cleanly here without disturbing the Cilium→cave-net mapping.
+#   7 strict RED→GREEN cycles ported the userspace pipeline (loader/map/
+#   ringbuf/probe/discover/process/otlp), +59 behavioral tests.

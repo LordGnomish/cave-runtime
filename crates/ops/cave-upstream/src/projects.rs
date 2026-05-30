@@ -21,7 +21,7 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All 66 upstream projects tracked by cave-runtime.
+/// All 67 upstream projects tracked by cave-runtime.
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // KUBERNETES CORE (reimplemented as cave-* crates)
@@ -243,6 +243,22 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         check_frequency: "monthly",
         category: "networking",
         phase: 1,
+    },
+    TrackedProject {
+        name: "Grafana Beyla",
+        github_repo: "grafana/beyla",
+        // Beyla is a *distinct* upstream from Cilium and maps cleanly to
+        // cave-ebpf-common's userspace auto-instrumentation port (loader /
+        // BPF maps / ringbuf / probes / HTTP-gRPC-SQL discovery / process
+        // tracking / OTLP export). This does NOT disturb the Cilium →
+        // cave-net mapping above — see the parity manifest at
+        // crates/networking/cave-ebpf-common/parity.manifest.toml
+        // (honest_ratio = 0.7647, userspace-approximation boundary noted).
+        cave_module: "cave-ebpf-common",
+        track_features: "eBPF auto-instrumentation, HTTP/gRPC/SQL protocol discovery, process tracking, kprobe/uprobe/tracepoint attach, ringbuf transport, OTLP span export",
+        check_frequency: "biweekly",
+        category: "observability",
+        phase: 2,
     },
     TrackedProject {
         name: "CoreDNS",
