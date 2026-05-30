@@ -35,6 +35,11 @@ pub use company::Company;
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
 pub use lead::{Lead, LeadStatus};
+pub use message::{
+    Message, MessageChannel, MessageChannelMessageAssociation, MessageChannelSyncStatus,
+    MessageChannelType, MessageChannelVisibility, MessageDirection, MessageParticipant,
+    MessageParticipantRole, MessageThread,
+};
 pub use opportunity::{Opportunity, OpportunityStatus};
 pub use person::Person;
 pub use pipeline_step::PipelineStep;
