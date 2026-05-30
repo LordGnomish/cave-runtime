@@ -26,3 +26,6 @@ pub mod array;
 
 /// Eager array operations — elementwise, broadcast, reductions, matmul.
 pub mod ops;
+
+/// Reverse-mode automatic differentiation (`Tape` / `Var`).
+pub mod autograd;
