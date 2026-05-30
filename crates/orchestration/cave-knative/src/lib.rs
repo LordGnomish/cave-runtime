@@ -19,6 +19,8 @@
 //!   broker_controller — Broker reconciler state machine (Phase 2)
 //!   webhook           — Admission validation + defaulting (Phase 2)
 //!   cert_bridge       — cert-manager Certificate CR projection (Phase 2)
+//!   queue_proxy       — sidecar Breaker + Semaphore + RequestStats (Phase 3 data-plane)
+//!   activator         — cold-start hold, capacity partitioning, p2c LB, retry (Phase 3 data-plane)
 
 #![allow(non_snake_case)]
 
@@ -41,6 +43,10 @@ pub mod sources_container;
 pub mod sources_ping;
 pub mod webhook;
 
+pub use activator::{
+    InfiniteBreaker, RetryPolicy, RevisionThrottler, REVISION_MAX_CONCURRENCY, assign_slice,
+    min_one_or_value, pick_indices, pick_p2c,
+};
 pub use autoscaler::{
     Autoscaler, AutoscalerConfig, AutoscalerMetric, AutoscalerMode, ScaleDecision,
 };
@@ -63,6 +69,9 @@ pub use meta::{
     ANNOTATION_MAX_SCALE, ANNOTATION_METRIC, ANNOTATION_MIN_SCALE, ANNOTATION_TARGET, Container,
     EnvVar, ObjectMeta, PodSpec, RevisionTemplateSpec, TrafficTarget, validate_template,
     validate_traffic,
+};
+pub use queue_proxy::{
+    Breaker, BreakerError, BreakerParams, RequestStats, Semaphore, StatReport,
 };
 pub use revision::{Revision, RevisionSpec, RevisionStatus};
 pub use route::{Route, RouteSpec, RouteStatus};

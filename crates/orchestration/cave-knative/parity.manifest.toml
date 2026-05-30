@@ -44,14 +44,30 @@ source_sha  = "knative-v1.22.0"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.8667
-last_audit          = "2026-05-24"
+honest_ratio        = 0.9333
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 26
+mapped_count        = 28
 partial_count       = 0
-skipped_count       = 4
+skipped_count       = 2
 unmapped_count      = 0
 total               = 30
+
+# 2026-05-30 Phase 3 data-plane close — queue-proxy + activator ports:
+#   * Moved 2 from [[skipped]] → [[mapped]] now that real pure-Rust ports
+#     exist (strict-TDD, 33 new lib tests):
+#       - queue-proxy  → src/queue_proxy.rs (Breaker + Semaphore u64 packing
+#         + ErrRequestQueueFull rejection + UpdateConcurrency + RequestStats
+#         time-weighted concurrency reporting). Maps pkg/queue/breaker.go.
+#       - activator    → src/activator.rs (calculateCapacity pod-direct vs
+#         ClusterIP partitioning + minOneOrValue + revisionMaxConcurrency
+#         clamp + InfiniteBreaker + pickIndices/assignSlice remnant
+#         distribution + randomChoice2 power-of-two-choices LB + cold-start
+#         RetryPolicy backoff). Maps pkg/activator/net/{throttler,lb_policy}.go.
+#   * Counts: 26→28 mapped, 4→2 skipped. fill_ratio stays 1.0
+#     ((28 + 0 + 2) / 30). honest_ratio = (mapped + partial) / total
+#     = 28 / 30 = 0.9333. Remaining [[skipped]] (2): domain-mapping (needs
+#     cave-dns + cave-certs), build-deprecated (removed upstream).
 
 # 2026-05-28 Argo Events module moved OUT to cave-workflows:
 #   * Argo Events (argoproj/argo-events v1.9.10) was mismapped into
@@ -189,6 +205,16 @@ local    = "src/hpa_bridge.rs"
 [[files]]
 upstream = "pkg/reconciler/channel/in_memory"
 local    = "src/in_memory_channel.rs"
+
+# Phase 3 data-plane close-out (2026-05-30) — 2 skipped → mapped
+
+[[files]]
+upstream = "pkg/queue/breaker.go"
+local    = "src/queue_proxy.rs"
+
+[[files]]
+upstream = "pkg/activator/net/throttler.go + lb_policy.go"
+local    = "src/activator.rs"
 
 # ── Function mappings ───────────────────────────────────────────────────────
 
@@ -353,17 +379,19 @@ name = "eventing-in-memory-channel-impl"
 upstream = "pkg/reconciler/channel/in_memory"
 note = "IMC dispatcher — per-subscriber queue + retry with linear/exponential backoff + dead-letter accumulator + addressable URI. Wave-2 close-out 2026-05-19 via src/in_memory_channel.rs."
 
-# ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
+# Phase 3 data-plane close-out (2026-05-30) — 2 [[skipped]] → [[mapped]]
 
-[[skipped]]
+[[mapped]]
 name = "queue-proxy"
-upstream = "cmd/queueproxy + pkg/queue"
-reason = "Sidecar pod for request enqueue + concurrency reporting — runtime data-plane component (Phase 3 — cave-runtime sidecar mesh)."
+upstream = "pkg/queue/breaker.go"
+note = "Sidecar concurrency enforcement — Breaker (total_slots = queue_depth+max_concurrency, ErrRequestQueueFull rejection, two-phase pending→active admit) over a lock-free Semaphore packing capacity|in_flight into one AtomicU64, dynamic UpdateConcurrency, plus RequestStats time-weighted average concurrency for autoscaler reporting. src/queue_proxy.rs."
 
-[[skipped]]
+[[mapped]]
 name = "activator"
-upstream = "cmd/activator + pkg/activator"
-reason = "Cold-start request hold + retry — runtime data-plane component (Phase 3 — cave-runtime activator)."
+upstream = "pkg/activator/net/throttler.go + lb_policy.go"
+note = "Cold-start hold + capacity partitioning — calculateCapacity (pod-direct cc*numTrackers vs ClusterIP cc*backend/activators floored at 1), minOneOrValue, revisionMaxConcurrency clamp, InfiniteBreaker (cc==0 gate), pickIndices/assignSlice remnant-to-low-index distribution, randomChoice2 power-of-two-choices LB, and RetryPolicy exponential backoff retrying only 503 cold-start responses. src/activator.rs."
+
+# ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
 [[skipped]]
 name = "domain-mapping"

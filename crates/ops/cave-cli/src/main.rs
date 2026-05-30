@@ -709,6 +709,10 @@ enum KnativeServiceCmd {
     Services,
     Revisions,
     Routes,
+    /// activator data-plane status (cold-start holds, capacity partitioning)
+    Activator,
+    /// queue-proxy data-plane status (breaker, concurrency reporting)
+    QueueProxy,
 }
 
 #[derive(Subcommand)]
@@ -4808,6 +4812,8 @@ source_root = "src"
             KnativeServiceCmd::Services => c.get("/api/knative/services").await,
             KnativeServiceCmd::Revisions => c.get("/api/knative/revisions").await,
             KnativeServiceCmd::Routes => c.get("/api/knative/routes").await,
+            KnativeServiceCmd::Activator => c.get("/api/knative/activator").await,
+            KnativeServiceCmd::QueueProxy => c.get("/api/knative/queue-proxy").await,
         },
         Commands::LlmGateway { cmd } => match cmd {
             LlmGwCmd::Routes => c.get("/api/llm-gateway/routes").await,
