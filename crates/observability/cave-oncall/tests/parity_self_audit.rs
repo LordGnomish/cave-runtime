@@ -20,10 +20,28 @@ const FLOOR_FILL_RATIO: f64 = 0.40;
 const CRATE_NAME: &str = "cave-oncall";
 
 fn workspace_root() -> PathBuf {
-    let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
-    p.pop();
-    p.pop();
-    p
+    let start: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+    // Walk up until we find the workspace root Cargo.toml (the one declaring
+    // `[workspace]`). After the theme reorg the crate lives at
+    // `crates/<theme>/cave-oncall`, so a fixed pop-count is brittle — search.
+    let mut p = start.clone();
+    loop {
+        let candidate = p.join("Cargo.toml");
+        if fs::read_to_string(&candidate)
+            .map(|s| s.contains("[workspace]"))
+            .unwrap_or(false)
+        {
+            return p;
+        }
+        if !p.pop() {
+            break;
+        }
+    }
+    // Fallback: original two-level pop (flat pre-reorg layout).
+    let mut q = start;
+    q.pop();
+    q.pop();
+    q
 }
 
 fn manifest_text() -> String {
@@ -111,10 +129,23 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_crate_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // After the theme reorg the workspace uses a glob (`crates/*/*`) instead of
+    // an explicit per-crate listing. Accept either form, then confirm the
+    // themed crate directory actually exists on disk.
+    let crate_dir_rel = "crates/observability/cave-oncall";
+    let listed = cargo.contains(&format!("\"crates/{}\"", CRATE_NAME))
+        || cargo.contains(&format!("\"{}\"", crate_dir_rel))
+        || cargo.contains("\"crates/*/*\"")
+        || cargo.contains("\"crates/*\"");
     assert!(
-        cargo.contains(&format!("\"crates/{}\"", CRATE_NAME)),
-        "root Cargo.toml [workspace.members] must list \"crates/{}\"",
+        listed,
+        "root Cargo.toml [workspace.members] must include {} (explicit or glob)",
         CRATE_NAME
+    );
+    assert!(
+        root.join(crate_dir_rel).join("Cargo.toml").exists(),
+        "themed crate dir {} must exist under workspace root",
+        crate_dir_rel
     );
 }
 
