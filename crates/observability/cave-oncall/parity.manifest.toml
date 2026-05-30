@@ -162,6 +162,23 @@ upstream_name = "Rotation.clean"
 local_name    = "validate_rotation"
 file          = "src/engine.rs"
 
+# Depth ports (2026-05-30, cont2) — escalation-snapshot execution semantics.
+
+[[functions]]
+upstream_name = "EscalationPolicy.MAX_TIMES_REPEAT / STEP_REPEAT_ESCALATION_N_TIMES"
+local_name    = "EscalationRun::next_step"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "eta_for_escalation_step_notify_if_time"
+local_name    = "within_notify_window"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "EscalationPolicySnapshot.STEP_NOTIFY_IF_NUM_ALERTS_IN_TIME_WINDOW"
+local_name    = "num_alerts_in_window / num_alerts_condition_met"
+file          = "src/engine.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -217,6 +234,20 @@ local_test    = "test_editor_can_write_but_not_admin_resources"
 [[tests]]
 upstream_test = "apps/alerts/tests/test_invitation.py::test_invite_user"
 local_test    = "test_invite_then_reinvite_lifecycle"
+
+# Depth ports (2026-05-30, cont2) — escalation execution (tests/escalation_depth.rs)
+
+[[tests]]
+upstream_test = "test_escalation_snapshot.py::test_escalation_repeat_max_times"
+local_test    = "repeat_is_capped_at_max_times_repeat_then_finishes"
+
+[[tests]]
+upstream_test = "test_escalation_snapshot.py::test_notify_if_time_window"
+local_test    = "notify_window_overnight_wraps_past_midnight"
+
+[[tests]]
+upstream_test = "test_escalation_snapshot.py::test_notify_if_num_alerts_in_window"
+local_test    = "num_alerts_condition_proceeds_only_when_strictly_greater"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
@@ -279,9 +310,9 @@ local_files  = ["src/engine.rs"]
 note         = "current_oncall + rotation_assignment_at + upcoming_shifts (Daily/Weekly/Custom rotation types, override precedence)"
 
 [[mapped]]
-upstream_pkg = "grafana/oncall:engine/apps/alerts/escalation_engine.py"
+upstream_pkg = "grafana/oncall:engine/apps/alerts/escalation_engine.py + escalation_snapshot/"
 local_files  = ["src/engine.rs"]
-note         = "next_escalation_step — cumulative-timeout progression with current_escalation_step tracking"
+note         = "next_escalation_step — cumulative-timeout progression with current_escalation_step tracking. Depth (cont2 2026-05-30): EscalationRun executor (RepeatFromStart bounded by MAX_TIMES_REPEAT=5), within_notify_window (STEP_NOTIFY_IF_TIME incl. overnight wrap), num_alerts_in_window/num_alerts_condition_met (STEP_NOTIFY_IF_NUM_ALERTS_IN_TIME_WINDOW)"
 
 [[mapped]]
 upstream_pkg = "grafana/oncall:engine/apps/alerts/dedupe.py"
