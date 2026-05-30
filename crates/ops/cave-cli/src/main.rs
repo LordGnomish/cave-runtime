@@ -751,6 +751,22 @@ enum RolloutsCmd {
     Status,
     Promote,
     Abort,
+    /// Preview the manifest patch a traffic-router provider would apply
+    TrafficPreview {
+        /// Provider kind: istio|smi|nginx|alb|apisix|plugin|traefik|ambassador|app-mesh
+        provider: String,
+        /// Canary weight 0-100
+        weight: u8,
+        /// Resource name (VirtualService / TrafficSplit / Ingress / Mapping / VirtualRouter)
+        name: String,
+        /// Namespace
+        #[arg(long, default_value = "default")]
+        namespace: String,
+        #[arg(long, default_value = "stable")]
+        stable_service: String,
+        #[arg(long, default_value = "canary")]
+        canary_service: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4838,6 +4854,41 @@ source_root = "src"
             RolloutsCmd::Status => c.get("/api/rollouts/status").await,
             RolloutsCmd::Promote => c.post("/api/rollouts/promote", json!({})).await,
             RolloutsCmd::Abort => c.post("/api/rollouts/abort", json!({})).await,
+            RolloutsCmd::TrafficPreview {
+                provider,
+                weight,
+                name,
+                namespace,
+                stable_service,
+                canary_service,
+            } => {
+                // Map (provider, name) onto the provider-specific TrafficProvider shape.
+                let provider_json = match provider.as_str() {
+                    "istio" => json!({"kind": "istio", "virtual_service": name, "namespace": namespace}),
+                    "smi" => json!({"kind": "smi", "trafficsplit_name": name, "namespace": namespace}),
+                    "nginx" => json!({"kind": "nginx", "stable_ingress": name, "namespace": namespace}),
+                    "alb" => json!({"kind": "alb", "ingress": name, "annotation_prefix": "alb.ingress.kubernetes.io"}),
+                    "apisix" => json!({"kind": "apisix", "route": name, "namespace": namespace}),
+                    "plugin" => json!({"kind": "plugin", "plugin_name": name, "config": {}}),
+                    "traefik" => json!({"kind": "traefik", "traefik_service": name, "namespace": namespace}),
+                    "ambassador" => json!({"kind": "ambassador", "mapping": name, "namespace": namespace}),
+                    "app-mesh" | "appmesh" => json!({"kind": "app-mesh", "virtual_router": name, "namespace": namespace}),
+                    other => {
+                        eprintln!("unknown provider '{other}' (istio|smi|nginx|alb|apisix|plugin|traefik|ambassador|app-mesh)");
+                        return Ok(());
+                    }
+                };
+                c.post(
+                    "/api/rollouts/traffic/preview",
+                    json!({
+                        "provider": provider_json,
+                        "canary_weight": weight,
+                        "stable_service": stable_service,
+                        "canary_service": canary_service,
+                    }),
+                )
+                .await
+            }
         },
         Commands::Security { cmd } => match cmd {
             SecurityCmd::Events => c.get("/api/security/events").await,
