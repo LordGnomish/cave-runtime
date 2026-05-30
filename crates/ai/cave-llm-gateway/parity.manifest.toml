@@ -23,16 +23,16 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5652   # (mapped + partial) / total = 26/46
+honest_ratio         = 0.5870   # (mapped + partial) / total = 27/46
 adr_justified_ratio  = 1.00     # every [[partial]] + [[skipped]] cites one of the 8 standard scope-cut labels from the umbrella ADR
 adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153"
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-24"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 23
+mapped_count         = 24
 partial_count        = 3
-skipped_count        = 20
+skipped_count        = 19
 unmapped_count       = 0
 total                = 46
 
@@ -131,6 +131,10 @@ local    = "src/providers/mlx.rs"
 [[files]]
 upstream = "litellm/llms/mistral.py"
 local    = "src/providers/mistral.rs"
+
+[[files]]
+upstream = "litellm/llms/cohere/chat/transformation.py"
+local    = "src/providers/cohere.rs"
 
 [[files]]
 upstream = "litellm/secret_managers/main.py"
@@ -307,6 +311,9 @@ name = "provider-mlx"
 name = "provider-mistral"
 
 [[mapped]]
+name = "provider-cohere"
+
+[[mapped]]
 name = "provider-local-openai-compat"
 
 [[mapped]]
@@ -389,11 +396,6 @@ cut_to = "cave-llm-gateway-phase-2"
 [[skipped]]
 name   = "provider-vertex-google"
 reason = "GCP Vertex/Gemini — provider matrix Phase 2"
-cut_to = "cave-llm-gateway-phase-2"
-
-[[skipped]]
-name   = "provider-cohere"
-reason = "Cohere — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
 
 [[skipped]]
@@ -481,7 +483,7 @@ cut_to = "cave-portal-api"
 [[scope_cuts]]
 group   = "cloud-saas-matrix"
 members = ["provider-bedrock", "provider-azure-openai", "provider-vertex-google",
-           "provider-cohere", "provider-together-fireworks",
+           "provider-together-fireworks",
            "provider-replicate-huggingface", "provider-groq-deepseek"]
 reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plus all three local backends"
 
