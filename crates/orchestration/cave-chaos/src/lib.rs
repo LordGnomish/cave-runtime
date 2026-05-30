@@ -14,6 +14,7 @@ pub mod reconcile;
 pub mod routes;
 pub mod selector;
 pub mod store;
+pub mod webhook;
 pub mod workflow;
 pub mod schedule;
 
