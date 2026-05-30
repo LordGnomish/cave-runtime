@@ -25,6 +25,19 @@ pub struct Pos {
     pub column: usize,
 }
 
+impl Pos {
+    /// Returns a position advanced by `n` bytes on the same line. Mirrors
+    /// `token.Pos.Add`; used for computing end positions of single-line tokens
+    /// (identifiers, literals) which never contain newlines.
+    pub fn advance(self, n: usize) -> Pos {
+        Pos {
+            offset: self.offset + n,
+            line: self.line,
+            column: self.column + n,
+        }
+    }
+}
+
 /// A lexical error encountered while scanning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScanError {
