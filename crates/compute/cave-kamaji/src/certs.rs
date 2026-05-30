@@ -198,4 +198,63 @@ mod tests {
             }
         }
     }
+
+    // ── Cycle 2: apiserver SANs ─────────────────────────────────────────────
+
+    #[test]
+    fn apiserver_sans_include_the_standard_kubernetes_dns_names() {
+        let san = apiserver_cert_sans("cluster.local", "10.96.0.1", None, &[]);
+        assert_eq!(
+            san.dns_names,
+            vec![
+                "kubernetes",
+                "kubernetes.default",
+                "kubernetes.default.svc",
+                "kubernetes.default.svc.cluster.local",
+            ]
+        );
+    }
+
+    #[test]
+    fn apiserver_sans_include_service_ip_and_loopback() {
+        let san = apiserver_cert_sans("cluster.local", "10.96.0.1", None, &[]);
+        assert_eq!(san.ip_addresses, vec!["10.96.0.1", "127.0.0.1"]);
+    }
+
+    #[test]
+    fn apiserver_sans_route_endpoint_by_dns_vs_ip() {
+        // A DNS control-plane endpoint lands in dns_names.
+        let dns = apiserver_cert_sans("cluster.local", "10.96.0.1", Some("cp.example.com"), &[]);
+        assert!(dns.dns_names.contains(&"cp.example.com".to_string()));
+        assert!(!dns.ip_addresses.contains(&"cp.example.com".to_string()));
+
+        // An IP control-plane endpoint lands in ip_addresses.
+        let ip = apiserver_cert_sans("cluster.local", "10.96.0.1", Some("203.0.113.7"), &[]);
+        assert!(ip.ip_addresses.contains(&"203.0.113.7".to_string()));
+        assert!(!ip.dns_names.contains(&"203.0.113.7".to_string()));
+    }
+
+    #[test]
+    fn apiserver_sans_append_extra_certsans_split_and_deduped() {
+        let extra = vec![
+            "tenant.internal".to_string(),
+            "192.168.1.10".to_string(),
+            // duplicates of standard entries must not appear twice
+            "kubernetes".to_string(),
+            "127.0.0.1".to_string(),
+        ];
+        let san = apiserver_cert_sans("cluster.local", "10.96.0.1", None, &extra);
+        // "kubernetes" appears exactly once.
+        assert_eq!(
+            san.dns_names.iter().filter(|n| *n == "kubernetes").count(),
+            1
+        );
+        assert_eq!(
+            san.ip_addresses.iter().filter(|n| *n == "127.0.0.1").count(),
+            1
+        );
+        // extra DNS + IP entries are present.
+        assert!(san.dns_names.contains(&"tenant.internal".to_string()));
+        assert!(san.ip_addresses.contains(&"192.168.1.10".to_string()));
+    }
 }
