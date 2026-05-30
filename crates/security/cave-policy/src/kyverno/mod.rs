@@ -5,6 +5,7 @@
 //! Implements: ClusterPolicy/Policy, validate/mutate/generate/verifyImages rules,
 //! JMESPath variable substitution, PolicyReports, CleanupPolicies, PolicyExceptions.
 
+pub mod exception;
 pub mod generate;
 pub mod image_verify;
 pub mod jmespath;
@@ -97,7 +98,8 @@ impl KyvernoEngine {
                 }
 
                 // Check if there's an exception for this resource/rule
-                if self.has_exception(policy_name, &rule.name, resource) {
+                if self.has_exception(policy_name, &rule.name, resource, namespace, operation, &context)
+                {
                     tracing::debug!(
                         target: "kyverno",
                         policy = policy_name,
@@ -226,33 +228,27 @@ impl KyvernoEngine {
         policy_name: &str,
         rule_name: &str,
         resource: &serde_json::Value,
+        namespace: Option<&str>,
+        operation: &str,
+        context: &serde_json::Value,
     ) -> bool {
         let res_namespace = resource
             .get("metadata")
             .and_then(|m| m.get("namespace"))
-            .and_then(|v| v.as_str());
-        for exc in self.exceptions.values() {
-            let policy_matches = exc.spec.exceptions.iter().any(|entry| {
-                entry.policy_name == policy_name
-                    && entry.rule_names.contains(&rule_name.to_string())
-            });
-            if !policy_matches {
-                continue;
-            }
-            // Only apply the exception when the resource is in scope of the
-            // exception's match_resources block. Without this check every
-            // resource targeted by the rule would inherit the exception.
-            if !matches_resources(
-                &exc.spec.match_resources,
+            .and_then(|v| v.as_str())
+            .or(namespace);
+        self.exceptions.values().any(|exc| {
+            exception::exception_applies(
+                exc,
+                policy_name,
+                rule_name,
                 resource,
                 res_namespace,
-                "CREATE",
-            ) {
-                continue;
-            }
-            return true;
-        }
-        false
+                operation,
+                context,
+                matches_resources,
+            )
+        })
     }
 
     /// Generate a PolicyReport for a namespace.

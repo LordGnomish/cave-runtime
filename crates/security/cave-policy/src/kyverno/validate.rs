@@ -372,8 +372,15 @@ fn eval_condition_value(
         Value::String(s) => {
             let trimmed = s.trim();
             if trimmed.starts_with("{{") && trimmed.ends_with("}}") {
-                let expr = &trimmed[2..trimmed.len() - 2].trim().to_string();
-                evaluate(expr, resource)
+                let expr = trimmed[2..trimmed.len() - 2].trim();
+                // Kyverno condition keys are JMESPath over the full evaluation
+                // context (`request.object`, `request.operation`, …). Resolve
+                // against `context`; fall back to the bare resource so that
+                // resource-relative keys (`metadata.labels.x`) keep working.
+                match evaluate(expr, context) {
+                    Ok(Value::Null) => evaluate(expr, resource),
+                    other => other,
+                }
             } else {
                 Ok(Value::String(s.clone()))
             }
