@@ -24,6 +24,7 @@
 //! each pod, with one container directory under that.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 /// Pod QoS tier — drives the slice naming.
@@ -162,18 +163,99 @@ fn control_file(v: &CgroupValue) -> &'static str {
     }
 }
 
+/// Reject values that cgroup v2 would reject at write time, before any
+/// state is mutated or any control file is touched. Shared by every
+/// backend so the in-memory and on-disk paths enforce the same contract.
+fn validate_value(value: &CgroupValue) -> Result<(), CgroupError> {
+    if let CgroupValue::CpuMax { quota: Some(q), .. } = value {
+        if *q == 0 {
+            return Err(CgroupError::Invalid("cpu quota must not be zero".into()));
+        }
+    }
+    if let CgroupValue::CpusetCpus(s) = value {
+        if s.is_empty() {
+            return Err(CgroupError::Invalid("cpuset.cpus must not be empty".into()));
+        }
+    }
+    Ok(())
+}
+
+/// Render a `CgroupValue` to its `(control-file, on-disk content)` pair
+/// using the cgroup v2 unified-hierarchy wire format — matching
+/// `libcontainer/cgroups/fs2` writers:
+///
+/// * `memory.max` / `pids.max` — a decimal byte/count, or the literal
+///   `max` for "unlimited".
+/// * `cpu.max` — `"$QUOTA $PERIOD"`, with `$QUOTA` the literal `max`
+///   when there is no quota.
+/// * `cpuset.cpus` — the CSV/range list verbatim.
+pub fn serialize_value(value: &CgroupValue) -> (&'static str, String) {
+    match value {
+        CgroupValue::MemoryMax(MemoryLimit::Unlimited) => ("memory.max", "max".to_string()),
+        CgroupValue::MemoryMax(MemoryLimit::Bytes(b)) => ("memory.max", b.to_string()),
+        CgroupValue::CpuMax { quota, period_us } => {
+            let q = quota.map(|q| q.to_string()).unwrap_or_else(|| "max".to_string());
+            ("cpu.max", format!("{q} {period_us}"))
+        }
+        CgroupValue::CpusetCpus(s) => ("cpuset.cpus", s.clone()),
+        CgroupValue::PidsMax(None) => ("pids.max", "max".to_string()),
+        CgroupValue::PidsMax(Some(n)) => ("pids.max", n.to_string()),
+    }
+}
+
+/// Parse the on-disk content of a v2 control file back into a
+/// `CgroupValue`. Inverse of [`serialize_value`]; tolerates the trailing
+/// newline the kernel appends on read.
+pub fn parse_value(control: &str, content: &str) -> Result<CgroupValue, CgroupError> {
+    let c = content.trim();
+    match control {
+        "memory.max" => Ok(CgroupValue::MemoryMax(if c == "max" {
+            MemoryLimit::Unlimited
+        } else {
+            MemoryLimit::Bytes(
+                c.parse()
+                    .map_err(|_| CgroupError::Invalid(format!("memory.max: {c:?}")))?,
+            )
+        })),
+        "cpu.max" => {
+            let mut it = c.split_whitespace();
+            let raw_quota = it
+                .next()
+                .ok_or_else(|| CgroupError::Invalid("cpu.max: empty".into()))?;
+            let period_us = it
+                .next()
+                .ok_or_else(|| CgroupError::Invalid("cpu.max: missing period".into()))?
+                .parse()
+                .map_err(|_| CgroupError::Invalid(format!("cpu.max period: {c:?}")))?;
+            let quota = if raw_quota == "max" {
+                None
+            } else {
+                Some(
+                    raw_quota
+                        .parse()
+                        .map_err(|_| CgroupError::Invalid(format!("cpu.max quota: {c:?}")))?,
+                )
+            };
+            Ok(CgroupValue::CpuMax { quota, period_us })
+        }
+        "cpuset.cpus" => Ok(CgroupValue::CpusetCpus(c.to_string())),
+        "pids.max" => Ok(CgroupValue::PidsMax(if c == "max" {
+            None
+        } else {
+            Some(
+                c.parse()
+                    .map_err(|_| CgroupError::Invalid(format!("pids.max: {c:?}")))?,
+            )
+        })),
+        other => Err(CgroupError::Invalid(format!(
+            "unsupported control file: {other}"
+        ))),
+    }
+}
+
 impl CgroupBackend for InMemoryCgroups {
     fn write(&self, path: &CgroupPath, value: CgroupValue) -> Result<(), CgroupError> {
-        if let CgroupValue::CpuMax { quota: Some(q), .. } = &value {
-            if *q == 0 {
-                return Err(CgroupError::Invalid("cpu quota must not be zero".into()));
-            }
-        }
-        if let CgroupValue::CpusetCpus(s) = &value {
-            if s.is_empty() {
-                return Err(CgroupError::Invalid("cpuset.cpus must not be empty".into()));
-            }
-        }
+        validate_value(&value)?;
         let cf = control_file(&value).to_string();
         let mut g = self.inner.write().expect("poisoned");
         g.insert((path.0.clone(), cf), value);
@@ -189,6 +271,72 @@ impl CgroupBackend for InMemoryCgroups {
         let mut g = self.inner.write().expect("poisoned");
         g.retain(|(p, _), _| p != &path.0);
         Ok(())
+    }
+}
+
+/// Production backend — writes control files into the cgroup v2 unified
+/// hierarchy mounted at `root` (`/sys/fs/cgroup` on a live node). A
+/// [`CgroupPath`] like `/kubepods.slice/.../pod<uid>.slice` maps to the
+/// directory `root/kubepods.slice/.../pod<uid>.slice`; each control value
+/// is written to its named file inside that directory.
+///
+/// Parameterising the mount root keeps the writer testable against a temp
+/// directory without a real cgroup mount, while production simply passes
+/// `/sys/fs/cgroup`.
+pub struct Cgroupv2FsBackend {
+    root: PathBuf,
+}
+
+impl Cgroupv2FsBackend {
+    /// Create a backend rooted at a cgroup v2 mount point.
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    /// The mount root this backend writes under.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Absolute directory for a cgroup path (the leading `/` of the
+    /// logical path is stripped so it joins under `root`).
+    fn abs_dir(&self, path: &CgroupPath) -> PathBuf {
+        self.root.join(path.0.trim_start_matches('/'))
+    }
+}
+
+impl CgroupBackend for Cgroupv2FsBackend {
+    fn write(&self, path: &CgroupPath, value: CgroupValue) -> Result<(), CgroupError> {
+        // Validate before any directory is materialised so a rejected
+        // write leaves no partial slice on disk.
+        validate_value(&value)?;
+        let (cf, content) = serialize_value(&value);
+        let dir = self.abs_dir(path);
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| CgroupError::Io(format!("create {}: {e}", dir.display())))?;
+        let file = dir.join(cf);
+        std::fs::write(&file, content)
+            .map_err(|e| CgroupError::Io(format!("write {}: {e}", file.display())))?;
+        Ok(())
+    }
+
+    fn read(&self, path: &CgroupPath, control: &str) -> Result<Option<CgroupValue>, CgroupError> {
+        let file = self.abs_dir(path).join(control);
+        match std::fs::read_to_string(&file) {
+            Ok(s) => Ok(Some(parse_value(control, &s)?)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(CgroupError::Io(format!("read {}: {e}", file.display()))),
+        }
+    }
+
+    fn remove(&self, path: &CgroupPath) -> Result<(), CgroupError> {
+        let dir = self.abs_dir(path);
+        match std::fs::remove_dir_all(&dir) {
+            Ok(()) => Ok(()),
+            // Removing an absent cgroup is a no-op (idempotent teardown).
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(CgroupError::Io(format!("remove {}: {e}", dir.display()))),
+        }
     }
 }
 
