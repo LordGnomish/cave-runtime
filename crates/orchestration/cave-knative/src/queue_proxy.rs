@@ -235,6 +235,90 @@ impl Breaker {
     }
 }
 
+/// A single reporting snapshot from [`RequestStats::report`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StatReport {
+    /// Time-weighted mean concurrency over the elapsed window.
+    pub average_concurrency: f64,
+    /// Requests that arrived during the window (`proxiedRequestCount` peer).
+    pub request_count: f64,
+}
+
+/// Time-weighted concurrency accountant for the queue-proxy.
+///
+/// Mirrors the queue-proxy's per-window stat aggregation: between events it
+/// accrues `concurrency * dt` into a weighted area, and [`report`] divides
+/// that area by the window length to yield the average concurrency the
+/// autoscaler scrapes.
+///
+/// [`report`]: RequestStats::report
+#[derive(Debug, Clone)]
+pub struct RequestStats {
+    concurrency: f64,
+    last_change: f64,
+    window_start: f64,
+    weighted_area: f64,
+    request_count: f64,
+}
+
+impl RequestStats {
+    /// Start accounting at time `now` (seconds, monotonic).
+    pub fn new(now: f64) -> Self {
+        Self {
+            concurrency: 0.0,
+            last_change: now,
+            window_start: now,
+            weighted_area: 0.0,
+            request_count: 0.0,
+        }
+    }
+
+    /// Accrue `concurrency * (t - last_change)` into the weighted area.
+    fn accumulate(&mut self, t: f64) {
+        let dt = t - self.last_change;
+        if dt > 0.0 {
+            self.weighted_area += self.concurrency * dt;
+        }
+        self.last_change = t;
+    }
+
+    /// A request entered the proxy at time `t`.
+    pub fn request_in(&mut self, t: f64) {
+        self.accumulate(t);
+        self.concurrency += 1.0;
+        self.request_count += 1.0;
+    }
+
+    /// A request left the proxy at time `t`.
+    pub fn request_out(&mut self, t: f64) {
+        self.accumulate(t);
+        if self.concurrency > 0.0 {
+            self.concurrency -= 1.0;
+        }
+    }
+
+    /// Close the window at `now`, returning the time-weighted average
+    /// concurrency and the request count, then roll the window forward.
+    pub fn report(&mut self, now: f64) -> StatReport {
+        self.accumulate(now);
+        let window = now - self.window_start;
+        let average_concurrency = if window > 0.0 {
+            self.weighted_area / window
+        } else {
+            0.0
+        };
+        let report = StatReport {
+            average_concurrency,
+            request_count: self.request_count,
+        };
+        // Roll forward: keep current in-flight concurrency, reset accumulators.
+        self.weighted_area = 0.0;
+        self.window_start = now;
+        self.request_count = 0.0;
+        report
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
