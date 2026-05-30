@@ -26,3 +26,6 @@ pub mod token;
 
 /// Lexical scanner / lexer (`syntax/scanner`).
 pub mod scanner;
+
+/// Abstract syntax tree (`syntax/ast`).
+pub mod ast;
