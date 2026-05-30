@@ -246,6 +246,221 @@ pub fn span_id_string(id: u64) -> String {
     format!("{:016x}", id)
 }
 
+// ─── Index-mapping generator (plugin/storage/es/mappings/mapping.go) ─────────
+
+/// Render-time parameters for the Jaeger Elasticsearch index templates,
+/// mirroring `mappings.MappingBuilder` driven by `cmd/esmapping-generator`.
+///
+/// The generator substitutes these into a version-specific skeleton: ES ≥ 8
+/// produces a *composable* index template (`priority` + a `template` wrapper
+/// around `settings`/`mappings`), ES 7 produces the *legacy* `_template`
+/// shape (top-level `settings`/`mappings`/`aliases` + `order`). When
+/// [`use_ilm`](Self::use_ilm) is set, the rollover ILM settings are emitted.
+#[derive(Debug, Clone)]
+pub struct MappingBuilder {
+    /// Elasticsearch major version (7 or 8).
+    pub es_version: u32,
+    pub shards: i64,
+    pub replicas: i64,
+    /// Optional index prefix (joined with `-`).
+    pub index_prefix: Option<String>,
+    pub use_ilm: bool,
+    pub ilm_policy_name: String,
+    pub priority_span_template: i64,
+    pub priority_service_template: i64,
+    pub priority_dependencies_template: i64,
+}
+
+impl Default for MappingBuilder {
+    fn default() -> Self {
+        MappingBuilder {
+            es_version: 8,
+            shards: 5,
+            replicas: 1,
+            index_prefix: None,
+            use_ilm: false,
+            ilm_policy_name: "jaeger-ilm-policy".into(),
+            priority_span_template: 0,
+            priority_service_template: 0,
+            priority_dependencies_template: 0,
+        }
+    }
+}
+
+impl MappingBuilder {
+    /// `[prefix-]base` (no date — index templates match the dated indices via
+    /// the `*` pattern).
+    fn prefixed(&self, base: &str) -> String {
+        match &self.index_prefix {
+            Some(p) if !p.is_empty() => format!("{}-{}", p, base),
+            _ => base.to_owned(),
+        }
+    }
+
+    /// Settings block (shared across span/service/dependencies). `write_alias`
+    /// is the rollover target used when ILM is enabled.
+    fn settings(&self, write_alias: &str) -> Value {
+        let mut s = serde_json::Map::new();
+        s.insert("number_of_shards".into(), Value::from(self.shards));
+        s.insert("number_of_replicas".into(), Value::from(self.replicas));
+        s.insert("index.requests.cache.enable".into(), Value::Bool(true));
+        s.insert("index.mapping.nested_fields.limit".into(), Value::from(50));
+        if self.use_ilm {
+            s.insert(
+                "index.lifecycle.name".into(),
+                Value::String(self.ilm_policy_name.clone()),
+            );
+            s.insert(
+                "index.lifecycle.rollover_alias".into(),
+                Value::String(write_alias.to_owned()),
+            );
+        }
+        Value::Object(s)
+    }
+
+    /// Wrap settings+mappings into the version-appropriate template envelope.
+    fn envelope(&self, base: &str, priority: i64, mappings: Value) -> Value {
+        let pattern = format!("{}-*", self.prefixed(base));
+        let write_alias = format!("{}-write", self.prefixed(base));
+        let settings = self.settings(&write_alias);
+        if self.es_version >= 8 {
+            serde_json::json!({
+                "index_patterns": [pattern],
+                "priority": priority,
+                "template": {
+                    "settings": settings,
+                    "mappings": mappings,
+                },
+            })
+        } else {
+            serde_json::json!({
+                "index_patterns": [pattern],
+                "order": priority,
+                "settings": settings,
+                "mappings": mappings,
+                "aliases": {},
+            })
+        }
+    }
+
+    /// Render the `jaeger-span` index template.
+    pub fn span_mapping(&self) -> Value {
+        self.envelope("jaeger-span", self.priority_span_template, span_doc_mappings())
+    }
+
+    /// Render the `jaeger-service` index template.
+    pub fn service_mapping(&self) -> Value {
+        self.envelope(
+            "jaeger-service",
+            self.priority_service_template,
+            service_doc_mappings(),
+        )
+    }
+
+    /// Render the `jaeger-dependencies` index template.
+    pub fn dependencies_mapping(&self) -> Value {
+        self.envelope(
+            "jaeger-dependencies",
+            self.priority_dependencies_template,
+            dependencies_doc_mappings(),
+        )
+    }
+}
+
+/// `tags` / `process.tags` nested key/value/type field shape.
+fn nested_tags_mapping() -> Value {
+    serde_json::json!({
+        "type": "nested",
+        "dynamic": false,
+        "properties": {
+            "key": { "type": "keyword", "ignore_above": 256 },
+            "type": { "type": "keyword", "ignore_above": 256 },
+            "value": { "type": "keyword", "ignore_above": 256 }
+        }
+    })
+}
+
+/// jaeger-span document mappings (model.go ES dbmodel Span).
+fn span_doc_mappings() -> Value {
+    serde_json::json!({
+        "dynamic_templates": [
+            { "span_tags_map": {
+                "path_match": "tag.*",
+                "mapping": { "type": "keyword", "ignore_above": 256 }
+            }},
+            { "process_tags_map": {
+                "path_match": "process.tag.*",
+                "mapping": { "type": "keyword", "ignore_above": 256 }
+            }}
+        ],
+        "date_detection": false,
+        "properties": {
+            "traceID": { "type": "keyword", "ignore_above": 256 },
+            "spanID": { "type": "keyword", "ignore_above": 256 },
+            "parentSpanID": { "type": "keyword", "ignore_above": 256 },
+            "operationName": { "type": "keyword", "ignore_above": 256 },
+            "flags": { "type": "integer" },
+            "startTime": { "type": "long" },
+            "startTimeMillis": { "type": "date", "format": "epoch_millis" },
+            "duration": { "type": "long" },
+            "tags": nested_tags_mapping(),
+            "logs": {
+                "type": "nested",
+                "dynamic": false,
+                "properties": {
+                    "timestamp": { "type": "long" },
+                    "fields": nested_tags_mapping()
+                }
+            },
+            "references": {
+                "type": "nested",
+                "dynamic": false,
+                "properties": {
+                    "refType": { "type": "keyword", "ignore_above": 256 },
+                    "traceID": { "type": "keyword", "ignore_above": 256 },
+                    "spanID": { "type": "keyword", "ignore_above": 256 }
+                }
+            },
+            "process": {
+                "properties": {
+                    "serviceName": { "type": "keyword", "ignore_above": 256 },
+                    "tags": nested_tags_mapping()
+                }
+            }
+        }
+    })
+}
+
+/// jaeger-service document mappings.
+fn service_doc_mappings() -> Value {
+    serde_json::json!({
+        "date_detection": false,
+        "properties": {
+            "serviceName": { "type": "keyword", "ignore_above": 256 },
+            "operationName": { "type": "keyword", "ignore_above": 256 }
+        }
+    })
+}
+
+/// jaeger-dependencies document mappings.
+fn dependencies_doc_mappings() -> Value {
+    serde_json::json!({
+        "date_detection": false,
+        "properties": {
+            "timestamp": { "type": "date", "format": "epoch_millis" },
+            "dependencies": {
+                "type": "nested",
+                "dynamic": false,
+                "properties": {
+                    "parent": { "type": "keyword", "ignore_above": 256 },
+                    "child": { "type": "keyword", "ignore_above": 256 },
+                    "callCount": { "type": "long" }
+                }
+            }
+        }
+    })
+}
+
 // ─── Date-rotated index naming (spanstore writer) ───────────────────────────
 
 /// Build a date-rotated index name: `[prefix-]base + YYYY-MM-DD` in UTC from
