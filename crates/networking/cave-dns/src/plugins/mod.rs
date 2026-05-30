@@ -6,6 +6,7 @@ pub mod auto;
 pub mod bufsize;
 pub mod cache;
 pub mod chaos;
+pub mod dns64;
 pub mod errors;
 pub mod etcd;
 pub mod file;
