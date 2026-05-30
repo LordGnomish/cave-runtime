@@ -899,6 +899,57 @@ mod tests {
     }
 
     #[test]
+    fn parse_ip_line_filter_match() {
+        let q = Parser::parse_query(r#"{app="x"} |= ip("192.168.0.0/16")"#).unwrap();
+        if let Query::Log(lq) = q {
+            assert_eq!(lq.pipeline.len(), 1);
+            match &lq.pipeline[0] {
+                PipelineStage::LineFilter(LineFilter::IpMatch(p)) => {
+                    assert_eq!(
+                        *p,
+                        super::super::ip::IpPattern::parse("192.168.0.0/16").unwrap()
+                    );
+                }
+                other => panic!("expected ip line filter, got {other:?}"),
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
+    fn parse_ip_line_filter_not_match() {
+        let q = Parser::parse_query(r#"{app="x"} != ip("10.0.0.1")"#).unwrap();
+        if let Query::Log(lq) = q {
+            assert!(matches!(
+                lq.pipeline[0],
+                PipelineStage::LineFilter(LineFilter::IpNotMatch(_))
+            ));
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
+    fn parse_ip_bad_pattern_errs() {
+        assert!(Parser::parse_query(r#"{app="x"} |= ip("nonsense")"#).is_err());
+    }
+
+    #[test]
+    fn parse_plain_eq_filter_still_works() {
+        // `ip` detection must not break ordinary `|= "text"` filters.
+        let q = Parser::parse_query(r#"{app="x"} |= "ip something""#).unwrap();
+        if let Query::Log(lq) = q {
+            assert!(matches!(
+                lq.pipeline[0],
+                PipelineStage::LineFilter(LineFilter::Contains(_))
+            ));
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
     fn parse_line_format() {
         let q =
             Parser::parse_query(r#"{app="x"} | line_format "{{.method}} {{.status}}""#).unwrap();

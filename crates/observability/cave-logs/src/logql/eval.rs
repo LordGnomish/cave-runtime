@@ -1010,4 +1010,47 @@ mod tests {
             panic!("expected streams");
         }
     }
+
+    #[test]
+    fn ip_line_filter_keeps_only_matching_lines() {
+        use super::super::parser::Parser;
+        let store = LogStore::new();
+        let t = 1_000_000_000i64;
+        store
+            .push(
+                "tenant",
+                make_labels(&[("app", "gw")]),
+                vec![
+                    LogEntry::new(t, "req from 192.168.4.5 ok"),
+                    LogEntry::new(t + 1, "req from 10.0.0.9 ok"),
+                    LogEntry::new(t + 2, "req from 192.168.250.1 ok"),
+                ],
+            )
+            .unwrap();
+        let eval = Evaluator::new(store);
+
+        // `|= ip("192.168.0.0/16")` keeps the two 192.168.x lines.
+        let q = match Parser::parse_query(r#"{app="gw"} |= ip("192.168.0.0/16")"#).unwrap() {
+            Query::Log(lq) => lq,
+            _ => panic!("expected log query"),
+        };
+        let data = eval.eval_log_query("tenant", &q, 0, t + 10, 100, Direction::Forward);
+        let QueryData::Streams(streams) = data else {
+            panic!("expected streams");
+        };
+        assert_eq!(streams[0].values.len(), 2);
+        assert!(streams[0].values.iter().all(|(_, l)| l.contains("192.168")));
+
+        // `!= ip(...)` is the complement: only the 10.0.0.9 line survives.
+        let qn = match Parser::parse_query(r#"{app="gw"} != ip("192.168.0.0/16")"#).unwrap() {
+            Query::Log(lq) => lq,
+            _ => panic!("expected log query"),
+        };
+        let data = eval.eval_log_query("tenant", &qn, 0, t + 10, 100, Direction::Forward);
+        let QueryData::Streams(streams) = data else {
+            panic!("expected streams");
+        };
+        assert_eq!(streams[0].values.len(), 1);
+        assert!(streams[0].values[0].1.contains("10.0.0.9"));
+    }
 }
