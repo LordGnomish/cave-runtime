@@ -46,3 +46,6 @@ pub mod quant;
 
 /// vLLM PagedAttention block manager — KV-block alloc, ref-counted CoW, swap.
 pub mod vllm_paged_attention;
+
+/// vLLM continuous-batching scheduler — budget, prefill/decode, preemption.
+pub mod vllm_scheduler;
