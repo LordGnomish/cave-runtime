@@ -2,6 +2,9 @@
 # Upstream: gravitational/teleport  https://github.com/gravitational/teleport
 # 2026-05-28 honest close — implemented real PAM core (7 modules, ~1650 LOC);
 # ADR-justified 8 sibling/out-of-scope cuts.
+# 2026-05-30 strict-TDD: ported Teleport session lifecycle state machine
+# (lib/srv/sess.go setState) → closed the "connect/hangup state machine" gap;
+# "Session models and engine" promoted partial → mapped.
 
 [upstream]
 org        = "gravitational"
@@ -14,18 +17,20 @@ language   = "Go"
 url        = "https://github.com/gravitational/teleport"
 
 [parity]
-# 2026-05-28 honest close — implemented real PAM core; ADR-justified 8 cuts
+# 2026-05-30 honest TDD — partial "Session models and engine" → mapped
+# (session lifecycle state machine line-ported). honest_ratio convention is
+# (mapped+partial)/total: (8+3)/16 = 0.6875 (unchanged; partial→mapped shift).
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
 honest_ratio        = 0.6875
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 7
-partial_count       = 4
+mapped_count        = 8
+partial_count       = 3
 skipped_count       = 5
 unmapped_count      = 0
 total               = 16
-last_audit          = "2026-05-28"
+last_audit          = "2026-05-30"
 infra_only          = false
 
 # ── Mapped (real implementation) ─────────────────────────────────────────────
@@ -72,14 +77,13 @@ description = "Track lifecycle of reverse-tunnel connections: active, closed, er
 local_file  = "src/proxy_tunnel.rs"
 notes       = "TunnelRegistry; byte counters; tunnels_for_user/node; close/error"
 
-# ── Partial ───────────────────────────────────────────────────────────────────
+[[mapped]]
+area        = "Session lifecycle state machine"
+description = "Connect/hangup state machine: Pending→Running→Terminating→Terminated with legal-transition guard"
+local_file  = "src/session_lifecycle.rs"
+notes       = "Line-port of Teleport lib/srv/sess.go setState; monotonic forward-only, Terminated sink, history audit trail. TDD 2026-05-30 (13 tests). Promoted from partial 'Session models and engine'."
 
-[[partial]]
-area        = "Session models and engine"
-description = "PamSession, AccessRequest, SessionStatus lifecycle helpers"
-local_file  = "src/models.rs + src/engine.rs"
-gap         = "Full session lifecycle management deferred (connect/hangup state machine)"
-notes       = "Basic models + is_active/is_recorded/pending_sessions helpers present"
+# ── Partial ───────────────────────────────────────────────────────────────────
 
 [[partial]]
 area        = "Trusted cluster federation"
