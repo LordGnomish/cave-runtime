@@ -85,3 +85,26 @@ cavectl secrets {store, external, push, generator, sealed, seal, unseal, rotate}
 ```
 
 To be wired in `crates/cave-cli/src/main.rs` post-merge.
+
+## 2026-05-30 depth continuation (count-neutral)
+
+Strict-TDD depth on the already-mapped **transit** engine — no
+reclassification, `honest_ratio` held honest at **0.5625** rather than
+inflated (the 21 skips remain genuine Go-bootstrap / cloud-SDK /
+k8s-controller-runtime / Enterprise-licensing scope-cuts).
+
+| Surface | Behavior | Upstream cite |
+|---|---|---|
+| Derived-key encryption | per-context HKDF-SHA256 key derivation; a derived key now **requires** a `context`, same context reproduces the key, wrong context fails AEAD auth | `keysutil.Policy.DeriveKey` (`Kdf_hkdf_sha256`), `GetKey` |
+| Convergent encryption v3 | deterministic `HMAC-SHA256(hmac_key, plaintext)[:12]` nonce → identical plaintext+context yields byte-identical ciphertext (equality search) | `keysutil.Policy.SymmetricEncryptRaw` (`convergentVersion == 3`), `EncryptWithFactory` |
+
+Previously the transit `context` field and the `derived` /
+`convergent_encryption` key flags were accepted but ignored. They now
+flow end-to-end through the existing (already-mounted) `transit::router`
+encrypt/decrypt/create-key handlers and the generic
+`vault write transit/keys/<name> derived=true convergent_encryption=true`
+CLI passthrough — no new routes or commands required.
+
++10 lib tests (195 → 205). Also un-staled the 5 wave-3 self-audit gates
+in `tests/parity_self_audit.rs` that lagged the wave-4 v2.5.3 → v2.5.4
+manifest bump (now 9/9 GREEN).

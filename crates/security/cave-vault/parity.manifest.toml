@@ -41,6 +41,15 @@ role          = "GitOps-safe encrypted-Secret CRD with RSA-OAEP+AES-GCM hybrid e
 #   * +4 skipped: ESO continuous-reconciler informer + helm-chart-bootstrap +
 #     kubeseal CLI + sealed-secrets prom exporter (k8s-controller-runtime &
 #     CLI ownership).
+# 2026-05-30 depth continuation (count-neutral — strengthens the already-mapped
+# transit engine, no reclassification):
+#   * transit derived-key encryption — per-context HKDF-SHA256 key derivation
+#     with context-required enforcement (keysutil DeriveKey, Kdf_hkdf_sha256).
+#   * transit convergent encryption v3 — deterministic HMAC-SHA256 nonce for
+#     equality-searchable ciphertext (keysutil SymmetricEncryptRaw v3).
+#   The 21 skips remain genuine architectural scope-cuts (Go bootstrap, cloud
+#   SDKs, k8s controller-runtime, Enterprise licensing); honest_ratio is held
+#   honest at 0.5625 rather than inflated.
 mapped_count   = 27
 partial_count  = 0
 skipped_count  = 21
@@ -48,7 +57,7 @@ unmapped_count = 0
 total          = 48
 fill_ratio     = 1.0000
 honest_ratio   = 0.5625
-last_audit     = "2026-05-23"
+last_audit     = "2026-05-30"
 parity_ratio_source = "manifest"
 infra_only     = false
 
@@ -215,6 +224,22 @@ file          = "src/engines/pki.rs"
 upstream_name = "pathFetchCRL"
 local_name    = "get_crl_pem"
 file          = "src/engines/pki.rs"
+
+# transit derived + convergent encryption (2026-05-30 depth continuation)
+[[functions]]
+upstream_name = "Policy.DeriveKey"          # keysutil, Kdf_hkdf_sha256
+local_name    = "hkdf_sha256_derive"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "Policy.GetKey"             # derived per-context enc/hmac material
+local_name    = "transit_key_material"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "Policy.SymmetricEncryptRaw" # convergentVersion 3 deterministic nonce
+local_name    = "convergent_nonce"
+file          = "src/engines/transit.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 # Each entry maps an upstream openbao test (Go source) to an actual `fn`
