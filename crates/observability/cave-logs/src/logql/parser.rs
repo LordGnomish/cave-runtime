@@ -889,6 +889,38 @@ mod tests {
     }
 
     #[test]
+    fn parse_range_with_offset() {
+        let q = Parser::parse_query(r#"rate({app="x"}[5m] offset 1h)"#).unwrap();
+        if let Query::Metric(MetricQuery::RangeAgg(ra)) = q {
+            assert_eq!(ra.range, Duration::from_secs(5 * 60));
+            assert_eq!(ra.offset, Some(Duration::from_secs(3600)));
+        } else {
+            panic!("expected range agg");
+        }
+    }
+
+    #[test]
+    fn parse_range_without_offset_is_none() {
+        let q = Parser::parse_query(r#"count_over_time({app="x"}[5m])"#).unwrap();
+        if let Query::Metric(MetricQuery::RangeAgg(ra)) = q {
+            assert_eq!(ra.offset, None);
+        } else {
+            panic!("expected range agg");
+        }
+    }
+
+    #[test]
+    fn parse_quantile_over_time_with_offset() {
+        let q =
+            Parser::parse_query(r#"quantile_over_time(0.9, {a="b"}[5m] offset 30m)"#).unwrap();
+        if let Query::Metric(MetricQuery::RangeAgg(ra)) = q {
+            assert_eq!(ra.offset, Some(Duration::from_secs(1800)));
+        } else {
+            panic!("expected range agg");
+        }
+    }
+
+    #[test]
     fn parse_binary_expr() {
         let q = Parser::parse_query(r#"rate({a="b"}[1m]) + rate({a="c"}[1m])"#).unwrap();
         assert!(matches!(q, Query::Metric(MetricQuery::BinaryExpr(_))));

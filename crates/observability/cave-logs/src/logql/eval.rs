@@ -711,6 +711,7 @@ fn extract_values(data: &QueryData) -> Vec<f64> {
 mod tests {
     use super::*;
     use crate::models::{Labels, LogEntry};
+    use std::time::Duration;
     use std::collections::HashMap;
 
     fn make_labels(pairs: &[(&str, &str)]) -> Labels {
@@ -905,6 +906,65 @@ mod tests {
         let r2 = apply_pipeline(&LogEntry::new(0, "x"), &miss, std::slice::from_ref(&keep)).unwrap();
         assert!(!r2.labels.contains_key("status")); // matcher failed → dropped
         assert_eq!(r2.labels.get("level").map(|s| s.as_str()), Some("info"));
+    }
+
+    #[test]
+    fn range_agg_offset_shifts_window_back() {
+        let store = LogStore::new();
+        let hour = 3_600_000_000_000i64; // 1h in ns
+        let base = 100 * hour;
+        // Two entries live at `base`; the evaluation window sits 1h LATER.
+        store
+            .push(
+                "t",
+                make_labels(&[("app", "a")]),
+                vec![LogEntry::new(base, "hit"), LogEntry::new(base + 1, "hit2")],
+            )
+            .unwrap();
+        let eval = Evaluator::new(store);
+
+        let selector = StreamSelector {
+            matchers: vec![LabelMatcher {
+                name: "app".into(),
+                op: MatchOp::Eq,
+                value: "a".into(),
+            }],
+        };
+        let mk = |offset: Option<Duration>| {
+            MetricQuery::RangeAgg(LogRangeAggregation {
+                agg: RangeAgg::CountOverTime,
+                query: LogQuery {
+                    selector: selector.clone(),
+                    pipeline: vec![],
+                },
+                range: Duration::from_nanos(hour as u64),
+                grouping: None,
+                offset,
+            })
+        };
+        let (start, end, step) = (base + hour, base + 2 * hour, hour);
+
+        // Without offset, the window is empty (data is 1h in the past).
+        let no_off = eval.eval_metric_query("t", &mk(None), start, end, step);
+        let sum_no = matrix_sum(&no_off);
+        assert_eq!(sum_no, 0.0, "window 1h after data must be empty without offset");
+
+        // `offset 1h` pulls the window back onto the data → both entries counted.
+        let with_off =
+            eval.eval_metric_query("t", &mk(Some(Duration::from_nanos(hour as u64))), start, end, step);
+        let sum_off = matrix_sum(&with_off);
+        assert_eq!(sum_off, 2.0, "offset 1h must capture both entries");
+    }
+
+    fn matrix_sum(d: &QueryData) -> f64 {
+        if let QueryData::Matrix(m) = d {
+            m.iter()
+                .flat_map(|s| s.values.iter())
+                .map(|(_, v)| v.parse::<f64>().unwrap_or(0.0))
+                .sum()
+        } else {
+            panic!("expected matrix, got {:?}", d);
+        }
     }
 
     #[test]
