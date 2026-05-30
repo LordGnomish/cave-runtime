@@ -13,6 +13,7 @@ pub mod grouping;
 pub mod models;
 pub mod oncall;
 pub mod routes;
+pub mod silence;
 pub mod store;
 
 use axum::Router;
