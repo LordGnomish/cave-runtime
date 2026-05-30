@@ -39,6 +39,15 @@ pub enum HermesError {
     #[error("recall index error: {0}")]
     Recall(String),
 
+    #[error("backend orchestration error: {0}")]
+    Backend(String),
+
+    #[error("agent state error: {0}")]
+    AgentState(String),
+
+    #[error("self-improvement error: {0}")]
+    SelfImprove(String),
+
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 
