@@ -1651,6 +1651,13 @@ enum KubeProxyCmd {
     SyncStats,
     /// Show recent error events
     Errors,
+    /// Show the configured dual-stack ClusterCIDR (v4 + v6)
+    ClusterCidrs,
+    /// Check whether an endpoint IP is node-local per DetectLocalByCIDR
+    DetectLocal {
+        /// Endpoint IP (v4 or v6) to test against this node's ClusterCIDR
+        ip: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4678,6 +4685,10 @@ source_root = "src"
             KubeProxyCmd::Services => c.get("/api/kube-proxy/services").await,
             KubeProxyCmd::SyncStats => c.get("/api/kube-proxy/sync-stats").await,
             KubeProxyCmd::Errors => c.get("/api/kube-proxy/errors").await,
+            KubeProxyCmd::ClusterCidrs => c.get("/api/kube-proxy/cluster-cidrs").await,
+            KubeProxyCmd::DetectLocal { ip } => {
+                c.get(&format!("/api/kube-proxy/detect-local?ip={ip}")).await
+            }
         },
 
         // ── Tracing ───────────────────────────────────────────────────────────
