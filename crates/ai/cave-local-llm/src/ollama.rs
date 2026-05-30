@@ -380,4 +380,66 @@ mod tests {
         assert_eq!(tags.models.len(), 1);
         assert_eq!(tags.models[0].name, "qwen2.5-coder:32b");
     }
+
+    // ── Multimodal (image input) — cite api/types.go GenerateRequest.Images,
+    //    Message.Images []ImageData (base64-encoded over the wire). ────────────
+    #[test]
+    fn test_encode_image_base64() {
+        // 0x89 'P' 'N' 'G' -> standard base64
+        assert_eq!(encode_image(b"\x89PNG"), "iVBORw==");
+    }
+
+    #[test]
+    fn test_generate_request_serializes_images_when_set() {
+        let req = GenerateRequest {
+            model: "llava".into(),
+            prompt: "describe this".into(),
+            stream: Some(false),
+            options: None,
+            keep_alive: None,
+            images: Some(vec![encode_image(b"\x89PNG")]),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(
+            json.contains("\"images\":[\"iVBORw==\"]"),
+            "expected base64 image array, got {json}"
+        );
+    }
+
+    #[test]
+    fn test_generate_request_omits_images_when_none() {
+        let req = GenerateRequest {
+            model: "m".into(),
+            prompt: "p".into(),
+            stream: None,
+            options: None,
+            keep_alive: None,
+            images: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("images"), "images must be omitted, got {json}");
+    }
+
+    #[test]
+    fn test_chat_message_with_images_serializes() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: "what is in this picture".into(),
+            images: Some(vec!["YWJj".into()]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"images\":[\"YWJj\"]"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_message_without_images_omits_field() {
+        let m = ChatMessage {
+            role: "assistant".into(),
+            content: "ok".into(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("images"), "got {json}");
+    }
 }
