@@ -10,6 +10,7 @@ pub mod baseline;
 pub mod custom_rules;
 pub mod decoders;
 pub mod detector;
+pub mod giturl;
 pub mod models;
 pub mod precommit;
 pub mod routes;
