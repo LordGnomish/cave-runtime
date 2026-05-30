@@ -35,3 +35,6 @@ pub mod optim;
 
 /// Neural-network modules — `Linear` + `Activation`.
 pub mod nn;
+
+/// Group-wise affine quantization — `mx.quantize` / `mx.dequantize` analog.
+pub mod quant;
