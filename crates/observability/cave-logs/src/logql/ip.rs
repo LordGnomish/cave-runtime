@@ -111,6 +111,56 @@ impl IpPattern {
             }
         }
     }
+
+    /// Address family this pattern targets (`true` = IPv6).
+    fn is_v6(&self) -> bool {
+        match self {
+            IpPattern::Single(a) => a.is_ipv6(),
+            IpPattern::Cidr { net, .. } => net.is_ipv6(),
+            IpPattern::Range { start, .. } => start.is_ipv6(),
+        }
+    }
+
+    /// Scan a raw log line for any embedded address matching this pattern.
+    /// The candidate alphabet is family-scoped so a v4 pattern won't snag on
+    /// hex-letter runs and a "1.2.3" version string can't parse as an address.
+    pub fn line_matches(&self, line: &str) -> bool {
+        let v6 = self.is_v6();
+        let is_cand = |c: char| {
+            if v6 {
+                c.is_ascii_hexdigit() || c == ':' || c == '.'
+            } else {
+                c.is_ascii_digit() || c == '.'
+            }
+        };
+        let mut run = String::new();
+        for ch in line.chars() {
+            if is_cand(ch) {
+                run.push(ch);
+            } else if !run.is_empty() {
+                if self.run_matches(&run) {
+                    return true;
+                }
+                run.clear();
+            }
+        }
+        !run.is_empty() && self.run_matches(&run)
+    }
+
+    /// Try to parse one candidate run as an address and test it, tolerating a
+    /// single trailing separator left by adjacent punctuation (`"…4.5."`).
+    fn run_matches(&self, run: &str) -> bool {
+        if let Ok(addr) = run.parse::<IpAddr>() {
+            return self.matches(addr);
+        }
+        let trimmed = run.trim_end_matches(['.', ':']);
+        if trimmed.len() != run.len() {
+            if let Ok(addr) = trimmed.parse::<IpAddr>() {
+                return self.matches(addr);
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]
