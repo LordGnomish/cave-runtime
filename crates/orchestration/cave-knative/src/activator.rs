@@ -108,6 +108,95 @@ impl InfiniteBreaker {
     }
 }
 
+/// Compute the `[begin, end)` tracker slice owned by activator `self_index`
+/// plus the count of `remnants` trailing trackers shared with low-index
+/// activators. Mirrors upstream `pickIndices`.
+pub fn pick_indices(num_trackers: i64, self_index: i64, num_activators: i64) -> (i64, i64, i64) {
+    if num_activators > num_trackers {
+        let begin = self_index % num_trackers;
+        return (begin, begin + 1, 0);
+    }
+    let slice_size = num_trackers / num_activators;
+    let begin = self_index * slice_size;
+    let end = begin + slice_size;
+    let remnants = num_trackers % num_activators;
+    (begin, end, remnants)
+}
+
+/// Partition `trackers` for activator `self_index`, mirroring upstream
+/// `assignSlice`: each activator gets its contiguous `[begin, end)` slice,
+/// and the `remnants` trailing trackers are handed one-each to the lowest-
+/// index activators.
+pub fn assign_slice<T: Clone>(trackers: &[T], self_index: i64, num_activators: i64) -> Vec<T> {
+    let lt = trackers.len() as i64;
+    if self_index == -1 || lt <= 1 || num_activators == 1 {
+        return trackers.to_vec();
+    }
+    let (bi, ei, remnants) = pick_indices(lt, self_index, num_activators);
+    let mut x: Vec<T> = trackers[bi as usize..ei as usize].to_vec();
+    if remnants > 0 {
+        let tail = &trackers[trackers.len() - remnants as usize..];
+        if (tail.len() as i64) > self_index {
+            x.push(tail[self_index as usize].clone());
+        }
+    }
+    x
+}
+
+/// Power-of-two-choices load balancer (`randomChoice2Policy`).
+///
+/// `weights` is the per-tracker in-flight count; `r1` / `r2` are caller-
+/// supplied random draws (`r1 ∈ [0, len)`, `r2 ∈ [0, len-1)`) so the policy
+/// stays deterministic and testable. Picks two distinct trackers and returns
+/// the index of the one with fewer in-flight requests; `coin` breaks ties.
+pub fn pick_p2c(weights: &[u64], r1: usize, r2: usize, coin: bool) -> Option<usize> {
+    let l = weights.len();
+    if l == 0 {
+        return None;
+    }
+    if l == 1 {
+        return Some(0);
+    }
+    let i1 = r1 % l;
+    // Shift the second draw out of [0, l-1) up past i1 so the picks differ.
+    let mut i2 = r2 % (l - 1);
+    if i2 >= i1 {
+        i2 += 1;
+    }
+    let mut pick = i1;
+    if weights[i1] > weights[i2] {
+        pick = i2;
+    } else if weights[i1] == weights[i2] && coin {
+        pick = i2;
+    }
+    Some(pick)
+}
+
+/// Cold-start retry policy for the activator's request proxy.
+///
+/// While a revision scales up from zero its pods answer `503`; the activator
+/// holds and retries the request with exponential backoff until the revision
+/// is ready or attempts are exhausted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryPolicy {
+    /// Maximum retry attempts before giving up.
+    pub max_retries: u32,
+    /// Base backoff in milliseconds (doubled each attempt).
+    pub base_backoff_ms: u64,
+}
+
+impl RetryPolicy {
+    /// Backoff (ms) to wait before retry `attempt` (0-indexed), or `None` if
+    /// the response is not retryable or attempts are exhausted. Only `503`
+    /// (revision not yet ready) is retried.
+    pub fn should_retry(&self, status: u16, attempt: u32) -> Option<u64> {
+        if status != 503 || attempt >= self.max_retries {
+            return None;
+        }
+        Some(self.base_backoff_ms * (1u64 << attempt))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,7 +299,7 @@ mod tests {
     fn assign_slice_one_or_zero_trackers_returns_all() {
         let trackers = vec![10u32];
         assert_eq!(assign_slice(&trackers, 0, 3), trackers);
-        assert_eq!(assign_slice(&[], 0, 3), Vec::<u32>::new());
+        assert_eq!(assign_slice::<u32>(&[], 0, 3), Vec::<u32>::new());
     }
 
     #[test]
@@ -239,8 +328,9 @@ mod tests {
 
     #[test]
     fn p2c_picks_lower_weight_of_two() {
-        // weights: idx0=5, idx1=2, idx2=9. r1=0, r2=1 -> compare 5 vs 2 -> pick idx1
-        assert_eq!(pick_p2c(&[5, 2, 9], 0, 1, false), Some(1));
+        // weights: idx0=5, idx1=2, idx2=9. r1=0, r2=0 -> i2 shifts 0->1 (>=i1),
+        // compare idx0=5 vs idx1=2 -> pick the lighter idx1.
+        assert_eq!(pick_p2c(&[5, 2, 9], 0, 0, false), Some(1));
     }
 
     #[test]
