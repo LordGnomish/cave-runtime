@@ -64,23 +64,23 @@ source_sha = "vendored-by-coredns-v1.14.3"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.7917
+honest_ratio        = 0.7736   # = (mapped 39 + partial 2) / total 53 — count-based real coverage; raised by 5 line-by-line plugin ports + TSIG partial->mapped. NOT 1.00: external cgo plugin-loader, live AWS/Azure/GCP SDKs and the upstream-removed federation plugin remain un-mappable (docs/audit/cave-dns/2026-05-28-gap-analysis.md).
 adr_justified_ratio = 1.0   # 12 skipped scope_cut: 10 to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 3 partial (DoQ 0-RTT, Caddyfile lexer, TSIG HMAC) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-28"
 infra_only          = false
-mapped_count        = 33
-partial_count       = 3
+mapped_count        = 39
+partial_count       = 2
 skipped_count       = 12
 unmapped_count      = 0
-total               = 48
+total               = 53
 
 [module]
 name        = "cave-dns"
 description = "CoreDNS-compatible authoritative and recursive DNS server — plugin chain + DNSSEC + UDP/TCP/DoH/DoT/DoQ + zone-transfer + Kubernetes + REST API"
 source_root = "src"
 
-# ─── Mapped subsystems (33) ─────────────────────────────────────────────────
+# ─── Mapped subsystems (39) ─────────────────────────────────────────────────
 
 [[mapped]]
 name = "plugin-chain-framework"
@@ -280,7 +280,43 @@ upstream = "plugin/dnssec/dnssec.go + vendor/miekg/dns/dnssec.go"
 local_files = ["src/protocol/dnssec.rs", "src/dnssec/validator.rs", "src/dnssec/nsec.rs", "src/dnssec/nsec3.rs", "src/dnssec/dnskey.rs", "src/dnssec/rrsig.rs"]
 note = "NSEC + NSEC3 denial-of-existence + DNSKEY trust-anchor + RRSIG validator + offline signer."
 
-# ─── Partial subsystems (3) ─────────────────────────────────────────────────
+[[mapped]]
+name = "plugin-bufsize"
+upstream = "plugin/bufsize/bufsize.go + plugin/bufsize/setup.go"
+local_files = ["src/plugins/bufsize.rs"]
+note = "EDNS0 UDP buffer-size clamp (RFC 6891 range 512..=4096, dnsflagday.net 2020 default 1232)."
+
+[[mapped]]
+name = "plugin-minimal"
+upstream = "plugin/minimal/minimal.go"
+local_files = ["src/plugins/minimal.rs"]
+note = "Strip authority+additional sections from positive NOERROR responses; denial/error/delegation pass through."
+
+[[mapped]]
+name = "plugin-header"
+upstream = "plugin/header/header.go + plugin/header/handler.go"
+local_files = ["src/plugins/header.rs"]
+note = "Set/clear aa/ra/rd header flags on query and response with set|clear + flag validation."
+
+[[mapped]]
+name = "plugin-local"
+upstream = "plugin/local/local.go"
+local_files = ["src/plugins/local.rs"]
+note = "Canned replies for localhost. (+subdomains) and the loopback reverse zones 0/127/255.in-addr.arpa."
+
+[[mapped]]
+name = "plugin-dns64"
+upstream = "plugin/dns64/dns64.go"
+local_files = ["src/plugins/dns64.rs"]
+note = "AAAA synthesis from A via RFC 6052 to6 embedding (default 64:ff9b::/96) + RFC 6147 intercept/translate predicates."
+
+[[mapped]]
+name = "tsig-hmac-zone-transfer"
+upstream = "vendor/miekg/dns/tsig.go"
+local_files = ["src/zone/tsig.rs", "src/zone/transfer.rs"]
+note = "TSIG transaction signatures (RFC 8945): TsigKey HMAC-SHA256 sign/verify (validated against RFC 4231 vector) wired into zone::transfer sign_transfer_message/verify_transfer_message."
+
+# ─── Partial subsystems (2) ─────────────────────────────────────────────────
 
 [[partial]]
 name = "doq-quic-listener"
@@ -295,13 +331,6 @@ upstream = "core/caddyfile/parse.go"
 local_files = ["src/config.rs"]
 note = "We accept the runtime config as serde JSON/TOML; the Caddyfile lexer is a Phase 2 work item that ships behind a cave-dns-corefile sub-crate."
 gap_reason = "Caddyfile tokeniser deferred to dedicated cave-dns-corefile parser; serde JSON shim is functional for cave-runtime use"
-
-[[partial]]
-name = "tsig-hmac-zone-transfer"
-upstream = "vendor/miekg/dns/tsig.go"
-local_files = ["src/zone/transfer.rs"]
-note = "We parse the TSIG key name on zone-transfer requests but do not yet HMAC-sign the response. Phase 2 routes through cave-vault for the keyring."
-gap_reason = "HMAC signing deferred until cave-vault provides the zone-transfer keyring API"
 
 # ─── Skipped subsystems (10 — formalised Phase 2 cuts) ──────────────────────
 
