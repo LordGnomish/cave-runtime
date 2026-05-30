@@ -16,10 +16,24 @@ const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 
 fn workspace_root() -> PathBuf {
+    // Walk up from the crate dir until we find the Cargo.toml that declares
+    // `[workspace]`. Robust to both the flat (`crates/cave-iceberg`) and the
+    // themed (`crates/data/cave-iceberg`) layouts.
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
-    p.pop();
-    p.pop();
-    p
+    while p.pop() {
+        let cargo = p.join("Cargo.toml");
+        if fs::read_to_string(&cargo)
+            .map(|s| s.contains("[workspace]"))
+            .unwrap_or(false)
+        {
+            return p;
+        }
+    }
+    // Fallback to the historical two-pop behaviour.
+    let mut q: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+    q.pop();
+    q.pop();
+    q
 }
 
 fn manifest_text() -> String {
@@ -101,9 +115,16 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_cave_iceberg_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // Accept either the explicit member listing (flat layout) or the themed
+    // glob membership (`crates/*/*`), under which cave-iceberg lives at
+    // `crates/data/cave-iceberg`.
+    let listed = cargo.contains("\"crates/cave-iceberg\"")
+        || cargo.contains("\"crates/data/cave-iceberg\"")
+        || cargo.contains("\"crates/*/*\"")
+        || cargo.contains("\"crates/*\"");
     assert!(
-        cargo.contains("\"crates/cave-iceberg\""),
-        "root Cargo.toml [workspace.members] must list \"crates/cave-iceberg\""
+        listed,
+        "root Cargo.toml [workspace.members] must include cave-iceberg (literal or via crates/*/* glob)"
     );
 }
 
