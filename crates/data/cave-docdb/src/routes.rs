@@ -364,3 +364,80 @@ async fn server_port(State(state): State<Arc<DocDbState>>) -> ApiResult<Value> {
     let port = state.wire_port.load(Ordering::SeqCst);
     Ok(Json(serde_json::json!({ "port": port })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn seed(state: &Arc<DocDbState>, db: &str, col: &str, docs: Vec<Document>) {
+        let database = state.engine.get_or_create_database(db).await;
+        let collection = database.get_or_create_collection(col).await;
+        collection.insert_many(docs).await.unwrap();
+    }
+
+    fn doc(json: Value) -> Document {
+        json.as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn aggregate_route_applies_unwind_pipeline() {
+        let state = Arc::new(DocDbState::default());
+        seed(
+            &state,
+            "rdb",
+            "items",
+            vec![doc(serde_json::json!({"_id": 1, "tags": ["a", "b", "c"]}))],
+        )
+        .await;
+
+        let Json(results) = aggregate(
+            State(state.clone()),
+            Path(("rdb".to_string(), "items".to_string())),
+            Json(AggregateRequest {
+                pipeline: vec![serde_json::json!({"$unwind": "$tags"})],
+            }),
+        )
+        .await
+        .unwrap();
+
+        // The route must run the pipeline: one array of 3 tags -> 3 documents.
+        assert_eq!(results.len(), 3);
+        let tags: Vec<&str> = results
+            .iter()
+            .filter_map(|d| d.get("tags").and_then(|v| v.as_str()))
+            .collect();
+        assert_eq!(tags, vec!["a", "b", "c"]);
+    }
+
+    #[tokio::test]
+    async fn aggregate_route_applies_match_pipeline() {
+        let state = Arc::new(DocDbState::default());
+        seed(
+            &state,
+            "rdb2",
+            "scores",
+            vec![
+                doc(serde_json::json!({"v": 10})),
+                doc(serde_json::json!({"v": 50})),
+                doc(serde_json::json!({"v": 90})),
+            ],
+        )
+        .await;
+
+        let Json(results) = aggregate(
+            State(state.clone()),
+            Path(("rdb2".to_string(), "scores".to_string())),
+            Json(AggregateRequest {
+                pipeline: vec![serde_json::json!({"$match": {"v": {"$gte": 50}}})],
+            }),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(results.len(), 2);
+    }
+}
