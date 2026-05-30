@@ -108,6 +108,35 @@ local    = "src/models/mod.rs"
 upstream = "pkg/controllers/provisioning/scheduling/scheduler.go"
 local    = "src/scheduler.rs"
 
+# ── pkg/scheduling package (v1.12.1 deep-port, continuation rays 2026-05-30) ──
+# Descriptive mappings only — the headline counts above stay pinned to the
+# v1.4.0 subsystem baseline (re-baselining to v1.12.1's ~200-file surface
+# would inflate the count-based ratio). True progress is tracked as the LOC
+# honest_ratio in docs/audit/cave-karpenter/2026-05-28-cont2-progress.md.
+[[files]]
+upstream = "pkg/scheduling/requirement.go"
+local    = "src/scheduling/requirement.rs"
+
+[[files]]
+upstream = "pkg/scheduling/requirements.go"
+local    = "src/scheduling/requirements.rs"
+
+[[files]]
+upstream = "pkg/scheduling/hostportusage.go"
+local    = "src/scheduling/hostport.rs"
+
+[[files]]
+upstream = "pkg/scheduling/taints.go"
+local    = "src/scheduling/taints.rs"
+
+[[files]]
+upstream = "pkg/scheduling/volumeusage.go"
+local    = "src/scheduling/volumeusage.rs"
+
+[[files]]
+upstream = "pkg/utils/resources/resources.go"
+local    = "src/resources/mod.rs"
+
 [[files]]
 upstream = "pkg/controllers/provisioning/batcher/batcher.go"
 local    = "src/batcher.rs"
