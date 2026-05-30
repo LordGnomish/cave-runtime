@@ -234,6 +234,83 @@ pub fn next_escalation_step<'a>(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Escalation execution — repeat semantics
+// ---------------------------------------------------------------------------
+
+/// Upstream `EscalationPolicy.MAX_TIMES_REPEAT` (engine/apps/alerts/models/
+/// escalation_policy.py): a `RepeatFromStart` step rewinds escalation to the
+/// first step at most this many times before the chain finishes.
+pub const MAX_TIMES_REPEAT: u32 = 5;
+
+/// Stateful walk over an escalation chain's steps, mirroring the upstream
+/// escalation-snapshot executor.
+///
+/// `next_escalation_step` answers "which step is due at elapsed T" statelessly
+/// and has no notion of looping. The real executor advances a cursor: it emits
+/// each concrete step in order, and when it reaches a [`RepeatFromStart`] step
+/// it transparently rewinds the cursor to the first step — but only while the
+/// repeat budget ([`MAX_TIMES_REPEAT`]) is unspent. Once the budget is gone the
+/// chain finishes.
+///
+/// [`RepeatFromStart`]: crate::models::EscalationStepType::RepeatFromStart
+#[derive(Debug, Clone, Default)]
+pub struct EscalationRun {
+    next_index: usize,
+    repeat_count: u32,
+    finished: bool,
+}
+
+impl EscalationRun {
+    /// A fresh run positioned before the first step.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// How many times the chain has rewound via `RepeatFromStart` so far.
+    pub fn repeat_count(&self) -> u32 {
+        self.repeat_count
+    }
+
+    /// Whether the chain has run to completion (steps exhausted, or the repeat
+    /// budget spent at a `RepeatFromStart`).
+    pub fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    /// Emit the index of the next concrete step to fire, advancing internal
+    /// state. `RepeatFromStart` steps are never emitted: they rewind the cursor
+    /// (incrementing [`repeat_count`](Self::repeat_count)) up to
+    /// [`MAX_TIMES_REPEAT`], after which the run finishes and `None` is
+    /// returned for all subsequent calls.
+    pub fn next_step(&mut self, steps: &[EscalationStep]) -> Option<usize> {
+        loop {
+            if self.finished || self.next_index >= steps.len() {
+                self.finished = true;
+                return None;
+            }
+
+            let idx = self.next_index;
+            match steps[idx].step_type {
+                crate::models::EscalationStepType::RepeatFromStart => {
+                    if self.repeat_count < MAX_TIMES_REPEAT {
+                        self.repeat_count += 1;
+                        self.next_index = 0;
+                        // Loop again to emit the (rewound) first step.
+                        continue;
+                    }
+                    self.finished = true;
+                    return None;
+                }
+                _ => {
+                    self.next_index = idx + 1;
+                    return Some(idx);
+                }
+            }
+        }
+    }
+}
+
 /// Validate a rotation configuration for basic sanity.
 pub fn validate_rotation(rot: &Rotation) -> Result<(), OnCallError> {
     if rot.users.is_empty() {
