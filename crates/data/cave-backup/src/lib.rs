@@ -17,6 +17,8 @@ pub mod restore_order;
 pub mod routes;
 pub mod schedule;
 pub mod storage;
+pub mod types;
+pub mod volume;
 
 use axum::Router;
 use models::{BackupStorageLocation, BslAccessMode, BslPhase, StorageProvider};
