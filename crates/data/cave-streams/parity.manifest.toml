@@ -50,18 +50,18 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 #     (kafka/pulsar/connect/tiered) + cavectl streams sub-commands +
 #     observability cave-streams alerts & dashboard — all green
 #     pre-close.
-mapped_count   = 27
+mapped_count   = 29
 partial_count  = 0
-skipped_count  = 18
+skipped_count  = 16
 unmapped_count = 0
 total          = 45
 fill_ratio     = 1.0
-honest_ratio   = 0.9556
-adr_justified_ratio = 1.0      # 18 skipped (16 original: go-bootstrap + stdlib-analog + test-harness + CLI / +2 formalized 2026-05-28: KIP-932 share groups preview-feature + Pulsar transactions both deferred to streaming-ray-2) + 2 scope_cuts (pulsar-transactions + kafka-share-groups, same items) all justified by streaming-consolidation ADR — Kafka EOS is canonical, Pulsar TC is parallel-track for ring 2.
+honest_ratio   = 1.0
+adr_justified_ratio = 1.0      # 16 skipped (go-bootstrap + stdlib-analog + test-harness + CLI). 2026-05-30 streaming honest-ratio uplift: the 2 previously scope-cut items (KIP-932 share groups + Pulsar transactions) are now REAL strict-TDD ports → promoted skipped→mapped (src/kafka_share_groups.rs + src/pulsar_transactions.rs), honest_ratio 0.9556→1.0. No deferrals remain.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STREAMING-CONSOLIDATION-001"
 parity_ratio_source = "manifest"
 source_sha     = { kafka = "9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2", pulsar = "1940aebc6ade10050399cd65f870353eedf80008" }
-last_audit     = "2026-05-28"
+last_audit     = "2026-05-30"
 infra_only     = false
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
@@ -604,6 +604,18 @@ upstream_pkg = "apache/kafka:streams/processor-api"
 local_files  = ["src/kafka_streams_processor.rs"]
 note         = "Low-level Streams Processor API — Topology(add_source/add_processor/add_sink/add_state_store) with parent validation; Processor trait + StateStore (put/get/delete/keys); ProcessorContext.forward/commit/schedule; ScheduledPunctuator wall-clock + stream-time with last_fired interval check; BFS routing source→processor→sink with explicit forward override."
 
+# ─── 2026-05-30 honest-ratio uplift — final 2 scope_cuts resolved ──────────
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/group-coordinator/share/ + share-coordinator/"
+local_files  = ["src/kafka_share_groups.rs"]
+note         = "KIP-932 queue-style share groups (strict-TDD port, 32 tests). RecordState (Available=0/Acquired=1/Acknowledged=2/Archived=4, id 3 skipped) + AcknowledgeType (Accept/Release/Reject/Renew) id+transition machines; SharePartition two-sweep acquire (re-acquire Available batches whole, never split, then one fresh batch at next_fetch_offset) + acknowledge (Accept→Acknowledged, Release→Available with auto-archive on delivery-cap, Reject→Archived, Renew lock-extend) + sweep_expired_locks (inclusive deadline) + move_start_offset (drop fully-stale, bump state_epoch) + ShareGroupOffset/PersisterStateBatch durable snapshot; thread-safe SharePartitionManager + tick_sweep; ShareGroup join/leave (group_epoch) + stabilise + per-member session_epoch; ShareSession epoch-validated advance; ShareGroupConfig KIP-932 defaults (30s lock / 5 deliveries / 45s session)."
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-transaction/ + pulsar-broker/.../transaction/"
+local_files  = ["src/pulsar_transactions.rs"]
+note         = "Pulsar transaction coordinator (strict-TDD port, 27 tests). TxnId(most/least bits) + TxnStatus can_transition_to (Open→{Open,Committing,Aborting}; Committing→{Committing,Committed}; Aborting→{Aborting,Aborted}; terminals self-loop) ; TxnMeta OPEN-gated produced/acked partition sets + compare-and-set update_txn_status; TransactionMetadataStore monotonic least-bits ids + TransactionStats {created,committed,aborted,timed_out}; TransactionCoordinator begin/commit/abort + process_timeouts (only-Open abort, timed_out bumped at the Aborting step, kept distinct from aborted); TransactionTimeoutTracker min-heap via reverse Ord with strict < expiry; TxnBuffer/TransactionBuffer sequence-ordered entries (OPEN-gate, tail-map read) + AbortedTxnProcessor filter_aborted; PendingAckHandle individual_ack dedup by (ledger,entry) + commit/abort release. Kafka EOS (src/transactions.rs) stays the canonical mapped EOS path; this is the Pulsar parallel track."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -691,15 +703,10 @@ note         = "BC crypto provider — Rust uses ring"
 # connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
 
-[[skipped]]
-upstream_pkg = "apache/kafka:server/group-coordinator/share/"
-scope_cut_to = "streaming-ray-2"
-reason       = "KIP-932 queue-style share groups (Kafka 4.x preview feature, not yet stable). Formalized as scope_cut deferral 2026-05-28 — see matching [[scope_cuts]] entry below."
-
-[[skipped]]
-upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
-scope_cut_to = "streaming-ray-2"
-reason       = "Pulsar transactional producer + TC. Kafka EOS (idempotent producer + transaction coordinator) is the canonical mapped path per ADR-RUNTIME-STREAMING-CONSOLIDATION-001; Pulsar TC is parallel-track. Formalized as scope_cut deferral 2026-05-28 — see matching [[scope_cuts]] entry below."
+# 2026-05-30 streaming honest-ratio uplift — the 2 formerly scope-cut
+# items below are now REAL strict-TDD ports, promoted skipped → mapped:
+#   apache/kafka:server/group-coordinator/share/ → src/kafka_share_groups.rs
+#   apache/pulsar:pulsar-broker/.../transactions/ → src/pulsar_transactions.rs
 
 # Phase 2 promotions (2026-05-19) — moved from [[unmapped]] to [[mapped]]:
 #   apache/kafka:streams/processor-api          → src/kafka_streams_processor.rs
@@ -713,17 +720,11 @@ reason       = "Pulsar transactional producer + TC. Kafka EOS (idempotent produc
 # commits. `fill_ratio` is the honest measure post-scope-cut: mapped /
 # (mapped + partial + skipped + unmapped) ≡ (45 − 6) / 45 = 0.8667.
 
-[[scope_cuts]]
-name      = "pulsar-transactions"
-upstream  = "apache/pulsar:pulsar-broker/.../transactions/"
-reason    = "Kafka EOS (idempotent producer + transaction coordinator) is mapped; Pulsar's transaction buffer + TC is a separate subsystem deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
-name      = "kafka-share-groups"
-upstream  = "apache/kafka:server/group-coordinator/share/"
-reason    = "KIP-932 queue-style share groups (Kafka 4.x preview feature). Deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
+# No open scope_cuts remain. The 2026-05-19 close-out's two deferrals
+# (pulsar-transactions + kafka-share-groups) were resolved by the
+# 2026-05-30 honest-ratio uplift ray — both are now strict-TDD ports
+# (see the [[mapped]] entries `src/pulsar_transactions.rs` and
+# `src/kafka_share_groups.rs`). honest_ratio 0.9556 → 1.0.
 
 # Resolved scope_cuts (2026-05-19 Phase 2 deep-port):
 #   * pulsar-geographic-replication → mapped (src/pulsar_geo_replication.rs)

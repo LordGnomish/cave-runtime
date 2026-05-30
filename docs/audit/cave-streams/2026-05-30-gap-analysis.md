@@ -103,6 +103,23 @@ Each lands as a **RED commit** (failing tests) then a **GREEN commit** (impl + l
 On close, both promote `[[skipped]]`/`[[scope_cuts]]` → `[[mapped]]`:
 `mapped 27→29`, `skipped 18→16`, `honest_ratio 0.9556→1.0`, `fill_ratio` stays 1.0.
 
+### Result (achieved 2026-05-30)
+
+| | before | after |
+| --- | --- | --- |
+| **honest_ratio** (manifest, authored) | 0.9556 | **1.0** |
+| mapped_count | 27 | 29 |
+| skipped_count | 18 | 16 |
+| open scope_cuts | 2 | 0 |
+| cave-streams tests | 747 | **806** (+59: 32 share-groups + 27 pulsar-txn) |
+| src LOC | 31,412 | ~32,400 (+~990: kafka_share_groups.rs + pulsar_transactions.rs) |
+
+Strict-TDD commit chain (each RED then GREEN, never combined):
+`534064bd` docs(Phase 1) → `504a2403` test[RED] share groups → `0c281312`
+feat[GREEN] share groups → `c8a64c03` test[RED] pulsar txn → `bb78311c`
+feat[GREEN] pulsar txn → Phase 4 manifest + regenerated parity-index
+(via `scripts/build-parity-index.py`, **not** hand-edited).
+
 ---
 
 ## 5. Honest findings NOT closed this ray (documented, not hidden)
