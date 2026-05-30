@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v2.2.3";
 const FLOOR_FILL_RATIO: f64 = 0.95;
-const FLOOR_MAPPED: usize = 21;
+const FLOOR_MAPPED: usize = 22;
 const FLOOR_RS_FILES: usize = 42;
 
 fn manifest_text() -> String {
