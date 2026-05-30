@@ -578,6 +578,34 @@ pub fn combine_conditions(b1: bool, b2: bool, op: ConditionOperator) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{DataFrame, DataFrameData, DataFrameSchema, FieldSchema};
+    use std::collections::HashMap;
+
+    /// Build a Grafana-shaped time-series DataFrame: a `time` field + a
+    /// `number` field with the given values.
+    fn test_series_frame(ref_id: &str, times: &[i64], vals: &[Option<f64>]) -> DataFrame {
+        let time_col: Vec<serde_json::Value> =
+            times.iter().map(|t| serde_json::json!(t)).collect();
+        let val_col: Vec<serde_json::Value> = vals
+            .iter()
+            .map(|v| match v {
+                Some(f) => serde_json::json!(f),
+                None => serde_json::Value::Null,
+            })
+            .collect();
+        DataFrame {
+            schema: DataFrameSchema {
+                ref_id: ref_id.to_string(),
+                name: ref_id.to_string(),
+                fields: vec![
+                    FieldSchema { name: "time".into(), field_type: "time".into(), type_info: None, labels: None, config: None },
+                    FieldSchema { name: "value".into(), field_type: "number".into(), type_info: None, labels: None, config: None },
+                ],
+                meta: None,
+            },
+            data: DataFrameData { values: vec![time_col, val_col], entities: None },
+        }
+    }
 
     // ── mathexp reducers (pkg/expr/mathexp/reduce.go) ───────────────────────
 
@@ -891,5 +919,187 @@ mod tests {
         assert!(combine_conditions(true, false, ConditionOperator::Or));
         assert!(combine_conditions(false, true, ConditionOperator::LogicOr));
         assert!(combine_conditions(true, true, ConditionOperator::And));
+    }
+
+    // ── math binary operators (pkg/expr/mathexp/exp.go binaryOp) ────────────
+
+    #[test]
+    fn test_math_binop_arithmetic() {
+        assert_eq!(math_binop_scalar("+", 2.0, 3.0).unwrap(), 5.0);
+        assert_eq!(math_binop_scalar("-", 5.0, 3.0).unwrap(), 2.0);
+        assert_eq!(math_binop_scalar("*", 2.0, 3.0).unwrap(), 6.0);
+        assert_eq!(math_binop_scalar("/", 6.0, 2.0).unwrap(), 3.0);
+        assert_eq!(math_binop_scalar("%", 7.0, 3.0).unwrap(), 1.0);
+        assert_eq!(math_binop_scalar("**", 2.0, 3.0).unwrap(), 8.0);
+    }
+
+    #[test]
+    fn test_math_binop_comparisons_return_one_or_zero() {
+        assert_eq!(math_binop_scalar("==", 2.0, 2.0).unwrap(), 1.0);
+        assert_eq!(math_binop_scalar("==", 2.0, 3.0).unwrap(), 0.0);
+        assert_eq!(math_binop_scalar(">", 3.0, 2.0).unwrap(), 1.0);
+        assert_eq!(math_binop_scalar("<=", 2.0, 2.0).unwrap(), 1.0);
+        assert_eq!(math_binop_scalar("!=", 2.0, 3.0).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_math_binop_logical_short_circuit() {
+        // && short circuits to 0 when a == 0, even if b is NaN.
+        assert_eq!(math_binop_scalar("&&", 0.0, f64::NAN).unwrap(), 0.0);
+        // || short circuits to 1 when a != 0, even if b is NaN.
+        assert_eq!(math_binop_scalar("||", 1.0, f64::NAN).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_math_binop_nan_propagates() {
+        assert!(math_binop_scalar("+", f64::NAN, 3.0).unwrap().is_nan());
+    }
+
+    #[test]
+    fn test_math_binop_unknown_op_errors() {
+        assert!(math_binop_scalar("???", 1.0, 2.0).is_err());
+    }
+
+    #[test]
+    fn test_math_binop_option_nil_propagates() {
+        // Number <op> Number where either is nil → nil.
+        assert_eq!(math_binop("+", None, Some(3.0)).unwrap(), None);
+        assert_eq!(math_binop("+", Some(2.0), Some(3.0)).unwrap(), Some(5.0));
+    }
+
+    // ── DataFrame integration ───────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_number_series() {
+        let frame = test_series_frame("A", &[0, 5, 10], &[Some(1.0), None, Some(3.0)]);
+        let (times, vals) = extract_number_series(&frame);
+        assert_eq!(times, vec![0, 5, 10]);
+        assert_eq!(vals, vec![Some(1.0), None, Some(3.0)]);
+    }
+
+    #[test]
+    fn test_number_frame_roundtrip() {
+        let f = number_frame("A", Some(3.0));
+        // a Number frame has a single number field with one row
+        match value_of_number_frame(&f) {
+            Some(v) => assert_eq!(v, 3.0),
+            None => panic!("expected a value"),
+        }
+        assert_eq!(value_of_number_frame(&number_frame("B", None)), None);
+    }
+
+    // ── high-level cross-refId expression pipeline ──────────────────────────
+
+    #[test]
+    fn test_evaluate_reduce_over_series() {
+        let mut vars = HashMap::new();
+        vars.insert(
+            "A".to_string(),
+            ExprValue::Series { times: vec![0, 1, 2], vals: vec![Some(1.0), Some(2.0), Some(3.0)] },
+        );
+        let cmd = ExprCommand::Reduce {
+            input: "A".into(),
+            reducer: ReducerId::Mean,
+            mapper: None,
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, Some(2.0)),
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_math_two_refs() {
+        // The defining mixed-datasource case: combine results A and B by refId.
+        let mut vars = HashMap::new();
+        vars.insert("A".to_string(), ExprValue::Number(Some(10.0)));
+        vars.insert("B".to_string(), ExprValue::Number(Some(4.0)));
+        let cmd = ExprCommand::MathBinary {
+            left: Operand::Ref("A".into()),
+            op: "-".into(),
+            right: Operand::Ref("B".into()),
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, Some(6.0)),
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_math_ref_and_literal_with_nil() {
+        let mut vars = HashMap::new();
+        vars.insert("A".to_string(), ExprValue::Number(None));
+        let cmd = ExprCommand::MathBinary {
+            left: Operand::Ref("A".into()),
+            op: "+".into(),
+            right: Operand::Lit(5.0),
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, None),
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_threshold() {
+        let mut vars = HashMap::new();
+        vars.insert("A".to_string(), ExprValue::Number(Some(12.0)));
+        let cmd = ExprCommand::Threshold {
+            input: "A".into(),
+            evaluator: Evaluator::Threshold { typ: "gt".into(), threshold: 10.0 },
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, Some(1.0)),
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_classic_condition_firing() {
+        let mut vars = HashMap::new();
+        vars.insert(
+            "A".to_string(),
+            ExprValue::Series { times: vec![0, 1, 2], vals: vec![Some(5.0), Some(5.0), Some(5.0)] },
+        );
+        let cmd = ExprCommand::ClassicCondition {
+            conditions: vec![ClassicCond {
+                input: "A".into(),
+                reducer: ClassicReducer::Avg,
+                evaluator: Evaluator::Threshold { typ: "gt".into(), threshold: 4.0 },
+                operator: ConditionOperator::And,
+            }],
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, Some(1.0)),
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_classic_condition_nodata() {
+        let mut vars = HashMap::new();
+        vars.insert(
+            "A".to_string(),
+            ExprValue::Series { times: vec![0], vals: vec![None] },
+        );
+        let cmd = ExprCommand::ClassicCondition {
+            conditions: vec![ClassicCond {
+                input: "A".into(),
+                reducer: ClassicReducer::Avg,
+                evaluator: Evaluator::Threshold { typ: "gt".into(), threshold: 4.0 },
+                operator: ConditionOperator::And,
+            }],
+        };
+        match evaluate(&cmd, &vars).unwrap() {
+            ExprValue::Number(v) => assert_eq!(v, None), // no data → nil
+            _ => panic!("expected number"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_missing_ref_errors() {
+        let vars = HashMap::new();
+        let cmd = ExprCommand::Reduce { input: "Z".into(), reducer: ReducerId::Sum, mapper: None };
+        assert!(evaluate(&cmd, &vars).is_err());
     }
 }
