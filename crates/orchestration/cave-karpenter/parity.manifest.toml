@@ -137,6 +137,10 @@ local    = "src/scheduling/volumeusage.rs"
 upstream = "pkg/utils/resources/resources.go"
 local    = "src/resources/mod.rs"
 
+[[files]]
+upstream = "pkg/utils/pretty/pretty.go"
+local    = "src/pretty.rs"
+
 # ── apis/v1 portable helpers (v1.12.1 deep-port, cont2 2026-05-30) ────────────
 [[files]]
 upstream = "pkg/apis/v1/nodepool.go"
