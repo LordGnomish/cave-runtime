@@ -291,6 +291,52 @@ mod tests {
         assert!(verify_signature(&doc, "!not!base64!", &pubk).is_err());
     }
 
+    // ── Cycle 3: built-in exc-c14n as a first-class
+    // SignedDocument mode (no external plug required). ─────────
+
+    #[test]
+    fn builtin_c14n_round_trips_byte_variant_forms() {
+        let key = test_keypair_pkcs8_der();
+        let pubk = test_public_key_der();
+        // Two byte-different but c14n-equivalent encodings of the
+        // same element: attribute order + self-closing form.
+        let form_a = br#"<saml:R xmlns:saml="urn:s" b="2" a="1"><saml:I/></saml:R>"#;
+        let form_b = br#"<saml:R xmlns:saml="urn:s" a="1" b="2"><saml:I></saml:I></saml:R>"#;
+        let sig = sign_rsa_sha256(&SignedDocument::with_builtin_c14n(form_a), &key).unwrap();
+        // Built-in c14n collapses both forms — verification of the
+        // *other* encoding against the same signature succeeds.
+        verify_signature(&SignedDocument::with_builtin_c14n(form_b), &sig, &pubk).unwrap();
+    }
+
+    #[test]
+    fn builtin_c14n_inclusive_retains_unused_prefix() {
+        let key = test_keypair_pkcs8_der();
+        let pubk = test_public_key_der();
+        // `ext:` is declared but unused. Plain built-in c14n
+        // drops it; the inclusive variant (PrefixList=["ext"])
+        // keeps it, so the two produce *different* signatures and
+        // a cross-verify must fail.
+        let xml = br#"<saml:R xmlns:saml="urn:s" xmlns:ext="urn:e"><saml:I/></saml:R>"#;
+        let sig_incl = sign_rsa_sha256(
+            &SignedDocument::with_builtin_c14n_inclusive(xml, &["ext"]),
+            &key,
+        )
+        .unwrap();
+        // Same prefix list verifies.
+        verify_signature(
+            &SignedDocument::with_builtin_c14n_inclusive(xml, &["ext"]),
+            &sig_incl,
+            &pubk,
+        )
+        .unwrap();
+        // Plain built-in c14n (dropping ext:) must NOT verify
+        // against the inclusive signature.
+        assert!(
+            verify_signature(&SignedDocument::with_builtin_c14n(xml), &sig_incl, &pubk).is_err(),
+            "inclusive and plain c14n should differ"
+        );
+    }
+
     #[test]
     fn canonicalize_fn_is_applied() {
         let key = test_keypair_pkcs8_der();

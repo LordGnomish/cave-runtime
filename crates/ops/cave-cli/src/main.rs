@@ -5693,9 +5693,30 @@ mod batch4_parse_tests {
         assert!(matches!(
             cli.command,
             Commands::Auth {
-                cmd: AuthCmd::SamlC14n
+                cmd: AuthCmd::SamlC14n {
+                    inclusive_prefixes: None
+                }
             }
         ));
+    }
+
+    #[test]
+    fn auth_saml_c14n_parses_inclusive_prefixes() {
+        // `--inclusive-prefixes ds,saml` selects the built-in
+        // exc-c14n InclusiveNamespaces PrefixList mode.
+        let cli = parse(&[
+            "cavectl",
+            "auth",
+            "saml-c14n",
+            "--inclusive-prefixes",
+            "ds,saml",
+        ]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::SamlC14n { inclusive_prefixes },
+            } => assert_eq!(inclusive_prefixes.as_deref(), Some("ds,saml")),
+            _ => panic!("unexpected command variant"),
+        }
     }
 
     // ── LDAP federation + Kerberos/SPNEGO sub-commands ───────────────────────
