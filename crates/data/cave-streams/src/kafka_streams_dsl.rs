@@ -73,7 +73,46 @@ enum NodeKind {
     /// Stateful reduce: the first value per key initializes the store; later
     /// values fold via `reducer(current, value)`.  Emits a changelog record.
     Reduce { store: String, reducer: Reducer },
+    /// Windowed aggregation.  A record at timestamp `t` is assigned to every
+    /// window `[start, start+size)` containing `t` (one for tumbling, several
+    /// for overlapping hopping windows).  Per `(key, window_start)` the store
+    /// holds `agg(key, value, store.get_or(init))`; each window emits a
+    /// changelog record.
+    WindowedAggregate {
+        store: String,
+        size_ms: i64,
+        advance_ms: i64,
+        init: Initializer,
+        agg: Aggregator,
+    },
     Sink { topic: String },
+}
+
+/// Composite state-store key for a windowed aggregate: `key` bytes, a NUL
+/// separator, then the window start as big-endian `i64`.
+fn window_store_key(key: &[u8], window_start: i64) -> Vec<u8> {
+    let mut k = Vec::with_capacity(key.len() + 9);
+    k.extend_from_slice(key);
+    k.push(0);
+    k.extend_from_slice(&window_start.to_be_bytes());
+    k
+}
+
+/// Window starts whose `[start, start+size)` interval contains `ts`, ascending.
+/// A start is valid iff `start <= ts < start + size` and `start` is a multiple
+/// of `advance`.
+fn windows_for(ts: i64, size_ms: i64, advance_ms: i64) -> Vec<i64> {
+    let mut starts = Vec::new();
+    if size_ms <= 0 || advance_ms <= 0 || ts < 0 {
+        return starts;
+    }
+    let mut start = (ts / advance_ms) * advance_ms; // largest multiple <= ts
+    while start + size_ms > ts && start >= 0 {
+        starts.push(start);
+        start -= advance_ms;
+    }
+    starts.reverse(); // ascending window-start order
+    starts
 }
 
 struct Node {
@@ -335,6 +374,95 @@ impl KGroupedStream {
             agg: Box::new(agg),
         })
     }
+
+    /// Window the grouped stream by event time (`KGroupedStream.windowedBy`).
+    pub fn windowed_by(&self, windows: TimeWindows) -> TimeWindowedKStream {
+        TimeWindowedKStream {
+            inner: self.inner.clone(),
+            node: self.node,
+            windows,
+        }
+    }
+}
+
+/// A fixed-size, fixed-advance time window definition.  Mirrors
+/// `org.apache.kafka.streams.kstream.TimeWindows`.  `advance == size` gives
+/// tumbling windows; `advance < size` gives overlapping hopping windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeWindows {
+    size_ms: i64,
+    advance_ms: i64,
+}
+
+impl TimeWindows {
+    /// A tumbling window of `size_ms` (`TimeWindows.ofSizeWithNoGrace`).
+    pub fn of_size_ms(size_ms: i64) -> Self {
+        Self {
+            size_ms,
+            advance_ms: size_ms,
+        }
+    }
+
+    /// Make the window hop by `advance_ms` (`TimeWindows.advanceBy`).
+    pub fn advance_by_ms(mut self, advance_ms: i64) -> Self {
+        self.advance_ms = advance_ms;
+        self
+    }
+
+    pub fn size_ms(&self) -> i64 {
+        self.size_ms
+    }
+
+    pub fn advance_ms(&self) -> i64 {
+        self.advance_ms
+    }
+}
+
+/// A grouped stream windowed by time, awaiting a windowed aggregation.
+/// Mirrors `org.apache.kafka.streams.kstream.TimeWindowedKStream`.
+pub struct TimeWindowedKStream {
+    inner: Rc<RefCell<BuildState>>,
+    node: usize,
+    windows: TimeWindows,
+}
+
+impl TimeWindowedKStream {
+    fn chain(&self, kind: NodeKind) -> KTable {
+        let node = self.inner.borrow_mut().push(kind, Some(self.node));
+        KTable {
+            inner: self.inner.clone(),
+            node,
+        }
+    }
+
+    /// Count records per `(key, window)` (`TimeWindowedKStream.count`).
+    pub fn count(&self, store: &str) -> KTable {
+        self.chain(NodeKind::WindowedAggregate {
+            store: store.to_string(),
+            size_ms: self.windows.size_ms,
+            advance_ms: self.windows.advance_ms,
+            init: Box::new(|| b"0".to_vec()),
+            agg: Box::new(|_k, _v, current| {
+                let cur: i64 = String::from_utf8_lossy(current).parse().unwrap_or(0);
+                (cur + 1).to_string().into_bytes()
+            }),
+        })
+    }
+
+    /// Aggregate per `(key, window)` (`TimeWindowedKStream.aggregate`).
+    pub fn aggregate<I, A>(&self, store: &str, init: I, agg: A) -> KTable
+    where
+        I: Fn() -> Vec<u8> + 'static,
+        A: Fn(&[u8], &[u8], &[u8]) -> Vec<u8> + 'static,
+    {
+        self.chain(NodeKind::WindowedAggregate {
+            store: store.to_string(),
+            size_ms: self.windows.size_ms,
+            advance_ms: self.windows.advance_ms,
+            init: Box::new(init),
+            agg: Box::new(agg),
+        })
+    }
 }
 
 /// A changelog-backed table.  Mirrors `org.apache.kafka.streams.kstream.KTable`.
@@ -409,6 +537,11 @@ enum Step {
         store: String,
         key: Vec<u8>,
         changelog: Record,
+    },
+    /// One store write + changelog forward per matched window.
+    WindowUpdates {
+        store: String,
+        updates: Vec<(Vec<u8>, Record)>,
     },
 }
 
@@ -502,6 +635,32 @@ impl StreamsApp {
                         changelog,
                     }
                 }
+                NodeKind::WindowedAggregate {
+                    store,
+                    size_ms,
+                    advance_ms,
+                    init,
+                    agg,
+                } => {
+                    let mut updates = Vec::new();
+                    for start in windows_for(rec.timestamp_ms, *size_ms, *advance_ms) {
+                        let composite = window_store_key(&rec.key, start);
+                        let cur = self
+                            .stores
+                            .get(store)
+                            .and_then(|s| s.get(&composite))
+                            .cloned()
+                            .unwrap_or_else(|| init());
+                        let newv = agg(&rec.key, &rec.value, &cur);
+                        // Changelog record is keyed by the windowed key.
+                        let changelog = Record::new(&composite, &newv, rec.timestamp_ms);
+                        updates.push((composite, changelog));
+                    }
+                    Step::WindowUpdates {
+                        store: store.clone(),
+                        updates,
+                    }
+                }
                 NodeKind::Sink { topic } => Step::Sink {
                     topic: topic.clone(),
                     rec,
@@ -543,6 +702,17 @@ impl StreamsApp {
                     self.run(c, changelog.clone());
                 }
             }
+            Step::WindowUpdates { store, updates } => {
+                for (composite, changelog) in updates {
+                    self.stores
+                        .entry(store.clone())
+                        .or_default()
+                        .insert(composite, changelog.value.clone());
+                    for &c in &children {
+                        self.run(c, changelog.clone());
+                    }
+                }
+            }
             Step::Sink { topic, rec } => {
                 self.output.entry(topic).or_default().push(rec);
             }
@@ -557,6 +727,17 @@ impl StreamsApp {
     /// Query a materialized state store by key.
     pub fn store_get(&self, store: &str, key: &[u8]) -> Option<Vec<u8>> {
         self.stores.get(store).and_then(|s| s.get(key).cloned())
+    }
+
+    /// Query a windowed state store by `(key, window_start)`.
+    pub fn windowed_store_get(
+        &self,
+        store: &str,
+        key: &[u8],
+        window_start_ms: i64,
+    ) -> Option<Vec<u8>> {
+        let composite = window_store_key(key, window_start_ms);
+        self.stores.get(store).and_then(|s| s.get(&composite).cloned())
     }
 }
 
