@@ -32,6 +32,19 @@ pub fn add_to_node_addresses(addresses: &mut Vec<NodeAddress>, add_addresses: &[
     }
 }
 
+/// `GetNodeAddressesFromNodeIP` — given the operator-provided node IP(s) and
+/// the cloud-reported addresses, return the enforced address set: every cloud
+/// address whose IP equals a provided node IP comes first (and pins its type),
+/// then every remaining cloud address whose type was *not* pinned. Errors if a
+/// provided IP matches none of the cloud addresses. Mirrors address.go.
+pub fn get_node_addresses_from_node_ip(
+    provided_node_ip: &str,
+    cloud_node_addresses: &[NodeAddress],
+) -> Result<Vec<NodeAddress>, String> {
+    let _ = (provided_node_ip, cloud_node_addresses);
+    unimplemented!("RED: get_node_addresses_from_node_ip")
+}
+
 // ─── component-helpers node/util/ips.go ──────────────────────────────────────
 
 /// `ParseIPSloppy` — tolerant IP parse matching `k8s.io/utils/net`: IPv4
@@ -204,5 +217,87 @@ mod tests {
             parse_ip_sloppy("010.000.000.001"),
             Some("10.0.0.1".parse::<IpAddr>().unwrap())
         );
+    }
+
+    // ── get_node_addresses_from_node_ip ──
+
+    #[test]
+    fn enforce_node_ip_matched_first_then_other_types() {
+        let cloud = vec![
+            ip(NodeAddressType::InternalIP, "10.0.0.1"),
+            ip(NodeAddressType::ExternalIP, "1.2.3.4"),
+            ip(NodeAddressType::Hostname, "node-a"),
+        ];
+        let r = get_node_addresses_from_node_ip("10.0.0.1", &cloud).unwrap();
+        assert_eq!(
+            r,
+            vec![
+                ip(NodeAddressType::InternalIP, "10.0.0.1"),
+                ip(NodeAddressType::ExternalIP, "1.2.3.4"),
+                ip(NodeAddressType::Hostname, "node-a"),
+            ]
+        );
+    }
+
+    #[test]
+    fn enforce_node_ip_pins_type_dropping_same_type_siblings() {
+        // Matching one ExternalIP pins the ExternalIP type, so the *other*
+        // ExternalIP is dropped (its type is already enforced).
+        let cloud = vec![
+            ip(NodeAddressType::InternalIP, "10.0.0.1"),
+            ip(NodeAddressType::ExternalIP, "1.2.3.4"),
+            ip(NodeAddressType::ExternalIP, "5.6.7.8"),
+        ];
+        let r = get_node_addresses_from_node_ip("5.6.7.8", &cloud).unwrap();
+        assert_eq!(
+            r,
+            vec![
+                ip(NodeAddressType::ExternalIP, "5.6.7.8"),
+                ip(NodeAddressType::InternalIP, "10.0.0.1"),
+            ]
+        );
+    }
+
+    #[test]
+    fn enforce_node_ip_no_match_errors() {
+        let cloud = vec![ip(NodeAddressType::InternalIP, "10.0.0.1")];
+        let e = get_node_addresses_from_node_ip("192.168.0.9", &cloud).unwrap_err();
+        assert_eq!(
+            e,
+            "failed to get node address from cloud provider that matches ip: 192.168.0.9"
+        );
+    }
+
+    #[test]
+    fn enforce_node_ip_sloppy_address_equality() {
+        // Cloud reports a leading-zero address; provided IP is canonical.
+        let cloud = vec![ip(NodeAddressType::InternalIP, "010.000.000.001")];
+        let r = get_node_addresses_from_node_ip("10.0.0.1", &cloud).unwrap();
+        assert_eq!(r, vec![ip(NodeAddressType::InternalIP, "010.000.000.001")]);
+    }
+
+    #[test]
+    fn enforce_node_ip_dual_stack_both_pinned() {
+        let cloud = vec![
+            ip(NodeAddressType::InternalIP, "10.0.0.1"),
+            ip(NodeAddressType::InternalIP, "2001:db8::1"),
+            ip(NodeAddressType::Hostname, "node-a"),
+        ];
+        let r = get_node_addresses_from_node_ip("10.0.0.1,2001:db8::1", &cloud).unwrap();
+        assert_eq!(
+            r,
+            vec![
+                ip(NodeAddressType::InternalIP, "10.0.0.1"),
+                ip(NodeAddressType::InternalIP, "2001:db8::1"),
+                ip(NodeAddressType::Hostname, "node-a"),
+            ]
+        );
+    }
+
+    #[test]
+    fn enforce_node_ip_parse_error_propagates() {
+        let cloud = vec![ip(NodeAddressType::InternalIP, "10.0.0.1")];
+        let e = get_node_addresses_from_node_ip("garbage", &cloud).unwrap_err();
+        assert_eq!(e, "failed to parse node IP \"garbage\": could not parse \"garbage\"");
     }
 }
