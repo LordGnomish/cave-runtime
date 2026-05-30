@@ -278,8 +278,46 @@ mod tests {
     #[test]
     fn help_mentions_all_subcommands() {
         let h = help();
-        for sub in ["query", "zone", "plugin", "cache", "reload"] {
+        for sub in ["query", "zone", "plugin", "cache", "reload", "corefile"] {
             assert!(h.contains(sub), "help missing subcommand {sub}");
         }
+    }
+
+    // ── Cycle 6: corefile subcommand ───────────────────────────────────────
+
+    #[test]
+    fn parse_corefile_validate_with_path() {
+        let cmd = parse(&["corefile", "validate", "/etc/cave/Corefile"]).unwrap();
+        assert_eq!(
+            cmd,
+            DnsCommand::Corefile {
+                action: CorefileAction::Validate,
+                path: "/etc/cave/Corefile".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_corefile_show_with_path() {
+        let cmd = parse(&["corefile", "show", "Corefile"]).unwrap();
+        assert_eq!(
+            cmd,
+            DnsCommand::Corefile {
+                action: CorefileAction::Show,
+                path: "Corefile".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_corefile_requires_path() {
+        let err = parse(&["corefile", "validate"]).unwrap_err();
+        assert_eq!(err, CliError::MissingArgument("corefile validate|show", "<path>"));
+    }
+
+    #[test]
+    fn parse_corefile_unknown_action_errors() {
+        let err = parse(&["corefile", "lint", "Corefile"]).unwrap_err();
+        assert_eq!(err, CliError::UnknownAction("corefile", "lint".into()));
     }
 }
