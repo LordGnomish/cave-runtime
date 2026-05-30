@@ -27,7 +27,9 @@ pub mod workspace;
 
 pub use activity::{Activity, ActivityKind, ActivityTarget, ActivityTargetKind, Note};
 pub use api_key::ApiKey;
-pub use calendar_event::{CalendarEvent, CalendarEventAttendee, CalendarEventVisibility};
+pub use calendar_event::{
+    AttendanceTally, CalendarEvent, CalendarEventAttendee, CalendarEventVisibility, Rsvp,
+};
 pub use company::Company;
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
