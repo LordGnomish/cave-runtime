@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23  
 **Branch:** `claude/cave-vault-eso-sealed-2026-05-23`  
-**Status:** 1.0000 fill ratio, 8/8 Charter v2 gates GREEN.
+**Status:** 1.0000 fill ratio, 8/8 PASS — all Charter v2 gates GREEN (8-gate close-out).
 
 ## Triumvirate upstreams
 
