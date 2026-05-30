@@ -1,0 +1,134 @@
+# parity.manifest.toml — cave-embed
+# Upstream reference: michaelfeil/infinity  https://github.com/michaelfeil/infinity
+
+[upstream]
+org        = "michaelfeil"
+repo       = "infinity"
+version    = "0.0.75"
+license    = "MIT"
+source_sha = "0.0.75"   # michaelfeil/infinity release tag (embedding/reranker server reference)
+
+[parity]
+# 2026-05-30 fresh strict-TDD port (8 RED->GREEN cycles). cave-embed ports the
+# serving surface of michaelfeil/infinity — a high-throughput embedding +
+# reranker server — to dependency-free pure Rust: an OpenAI /v1/embeddings API,
+# a sentence-transformers / BGE / E5 / Mistral / nomic / jina / CLIP model
+# registry, dynamic token-budget batching, the standard pooling strategies,
+# embedding quantization (fp16 + int8), an LRU result cache, and a cross-encoder
+# reranker (/v1/rerank). A deterministic reference backend (signed feature-hash
+# bag-of-words) makes the whole pipeline exercisable without bundling model
+# weights; concrete ONNX/candle/burn weight-loaders plug in through the
+# EmbeddingBackend trait.
+#
+# Mapped (10): pooling.rs (mean/CLS/max/last-token + L2 + cosine), registry.rs
+# (11-card catalogue across 7 families + asymmetric query/passage prefixes +
+# alias index), tokenize.rs (word tokenizer + token count + context truncate),
+# batch.rs (descending-length token-budget packer), backend.rs (EmbeddingBackend
+# trait + HashEmbedder reference + BackendRegistry), api.rs (OpenAI
+# /v1/embeddings request/response, untagged string|array input, float|base64
+# EmbeddingData), service.rs (EmbeddingService — resolve card, ctx-window
+# truncate, batch, Matryoshka dims truncate+renormalize, token usage, cache
+# memoization), cache.rs (LRU result cache, hit/miss stats), quant.rs (IEEE-754
+# binary16 pack/unpack + per-vector int8 scalar quantization), rerank.rs
+# (CrossEncoder trait + LexicalCrossEncoder reference + Reranker + /v1/rerank).
+#
+# Partial (1): multimodal CLIP — the registry exposes a CLIP card and the shared
+# text/image Modality, and the text path embeds through it, but the image
+# feature-extraction tower (vision preprocessing + weights) is not implemented
+# in-crate. Kept honest (not inflated to mapped).
+#
+# Skipped (6): concrete ONNX-Runtime / candle / burn weight-loading backend
+# (trait open; reference embedder ships) — no bundled model weights; GPU/CUDA
+# execution provider — hardware out-of-scope; HTTP server hosting of /v1/*
+# (cave-portal-api + cave-llm-gateway own request serving) — parallel-track;
+# CLIP/image vision tower preprocessing — out-of-scope-subsystem (no vision
+# weights); native HF-tokenizers / sentencepiece subword tokenizer (word
+# tokenizer ships for accounting + truncation) — vendor-adapter; model
+# download / HF-hub fetch — out-of-scope (cave-llm-tracker owns discovery).
+mapped_count          = 10
+partial_count         = 1
+skipped_count         = 6
+unmapped_count        = 0
+total                 = 17
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 17/17
+honest_ratio          = 0.9412  # (mapped + skipped) / total            = 16/17
+adr_justified_ratio   = 1.00    # the partial + every [[skipped]] cites a standard scope-cut label from ADR-RUNTIME-PARITY-100-PCT-001
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-30"
+infra_only            = false
+
+# adr_justified_ratio breakdown (2026-05-30):
+#   * multimodal CLIP partial            → out-of-scope-subsystem: text path mapped; image vision tower needs bundled weights (deferred)
+#   * concrete ONNX/candle/burn backend  → vendor-adapter: EmbeddingBackend trait open; reference HashEmbedder ships
+#   * GPU/CUDA execution provider        → out-of-scope-subsystem (hardware)
+#   * HTTP /v1/* hosting                 → parallel-track (cave-portal-api + cave-llm-gateway)
+#   * CLIP image vision tower            → out-of-scope-subsystem (no vision weights)
+#   * native subword tokenizer           → vendor-adapter (word tokenizer ships for accounting/truncation)
+#   * HF-hub model download              → out-of-scope-subsystem (cave-llm-tracker owns discovery)
+
+# 2026-05-30 scope_cuts — delegated to higher layers / hardware / weights.
+[[scope_cuts]]
+upstream_pkg = "infinity_emb/transformer/* concrete ONNX/torch backends"
+reason       = "delegated"
+note         = "cave-embed ships the EmbeddingBackend trait + a deterministic reference embedder; concrete weight-loaders (ONNX Runtime / candle / burn) plug in downstream. No model weights are bundled in the sovereign build."
+
+[[scope_cuts]]
+upstream_pkg = "infinity_emb/fastapi_schemas + server entrypoint (/v1 hosting)"
+reason       = "delegated"
+note         = "cave-portal-api + cave-llm-gateway own HTTP request serving; cave-embed provides the wire types + serving core they call."
+
+[module]
+name        = "cave-embed"
+description = "Cave embedding service — OpenAI /v1/embeddings + reranker, model registry, dynamic batching, pooling, quantization, result cache"
+source_root = "src"
+
+[[functions]]
+upstream_name = "Pooling (sentence-transformers)"
+local_name    = "pool"
+file          = "src/pooling.rs"
+
+[[functions]]
+upstream_name = "select_model / ModelCapabilities"
+local_name    = "ModelRegistry::get"
+file          = "src/registry.rs"
+
+[[functions]]
+upstream_name = "tokenize / count_tokens"
+local_name    = "tokenize"
+file          = "src/tokenize.rs"
+
+[[functions]]
+upstream_name = "BatchHandler dynamic batching"
+local_name    = "plan_batches"
+file          = "src/batch.rs"
+
+[[functions]]
+upstream_name = "InferenceEngine.encode"
+local_name    = "EmbeddingBackend::embed"
+file          = "src/backend.rs"
+
+[[functions]]
+upstream_name = "OpenAIEmbeddingInput / OpenAIEmbeddingResult"
+local_name    = "EmbeddingRequest / EmbeddingResponse"
+file          = "src/api.rs"
+
+[[functions]]
+upstream_name = "_embed (engine orchestration) + usage"
+local_name    = "EmbeddingService::embed"
+file          = "src/service.rs"
+
+[[functions]]
+upstream_name = "result cache (lru)"
+local_name    = "EmbeddingCache"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "quantization (fp16 / int8)"
+local_name    = "Int8Vector / f32_to_f16"
+file          = "src/quant.rs"
+
+[[functions]]
+upstream_name = "rerank / CrossEncoder"
+local_name    = "Reranker::serve"
+file          = "src/rerank.rs"
