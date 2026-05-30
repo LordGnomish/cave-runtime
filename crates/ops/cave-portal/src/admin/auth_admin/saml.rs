@@ -21,6 +21,12 @@ pub struct SamlBrokerConfig {
     pub principal_attribute: String,
     pub name_id_format: NameIdFormat,
     pub signature_algorithm: String,
+    /// `InclusiveNamespaces` prefix list (xml-exc-c14n §2.2) used
+    /// by cave's built-in exclusive canonicalizer when matching a
+    /// strict IdP's signed octet stream. Comma-separated prefixes
+    /// (`#default` for the default namespace); empty for plain
+    /// exclusive c14n.
+    pub inclusive_namespaces: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +73,7 @@ pub fn default_config() -> SamlBrokerConfig {
         principal_attribute: "NameID".into(),
         name_id_format: NameIdFormat::Persistent,
         signature_algorithm: "RSA_SHA256".into(),
+        inclusive_namespaces: String::new(),
     }
 }
 
@@ -134,6 +141,15 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
       <span class="block text-sm font-medium">Principal attribute</span>
       <input class="mt-1 block w-full rounded border-gray-300 dark:bg-zinc-800" name="principalAttribute" value="{pa}">
     </label>
+    <label class="block">
+      <span class="block text-sm font-medium">InclusiveNamespaces PrefixList</span>
+      <input class="mt-1 block w-full rounded border-gray-300 dark:bg-zinc-800" name="inclusiveNamespaces" value="{ins}" placeholder="e.g. ds,saml,#default">
+      <span class="block text-xs text-gray-500 dark:text-zinc-500 mt-1">
+        Built-in exclusive c14n (xml-exc-c14n) prefix list — leave
+        empty for plain exclusive canonicalization. Match a strict
+        IdP's <code>&lt;ec:InclusiveNamespaces&gt;</code> transform.
+      </span>
+    </label>
     <div class="flex gap-2 pt-2">
       <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white">Save</button>
       <a href="/admin/auth/saml/metadata.xml" class="px-4 py-2 rounded bg-zinc-200 dark:bg-zinc-700">Download SP metadata</a>
@@ -145,6 +161,7 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         sso = escape(&c.sso_url),
         slo = escape(&c.slo_url),
         pa = escape(&c.principal_attribute),
+        ins = escape(&c.inclusive_namespaces),
         sr = if c.sign_request { "checked" } else { "" },
         was = if c.want_assertions_signed {
             "checked"

@@ -51,16 +51,29 @@ pub const ALG_SHA256: &str = "http://www.w3.org/2001/04/xmlenc#sha256";
 pub const ALG_EXC_C14N: &str = "http://www.w3.org/2001/10/xml-exc-c14n#";
 
 /// A SAML document the broker is preparing to sign, paired with
-/// a canonicalization function. Default canonicalization is the
-/// identity function — the bytes are treated as-is. Production
-/// integrations that need c14n compatibility with strict IdPs
-/// set `canonicalize_fn` to an `xmlsec1`-compatible
-/// implementation.
+/// a canonicalization step. Default canonicalization is the
+/// identity function — the bytes are treated as-is.
+///
+/// cave ships a first-class strict-mode canonicalizer: build with
+/// [`SignedDocument::with_builtin_c14n`] to apply the in-tree
+/// exclusive XML canonicalization (Canonical XML 1.0 escaping +
+/// the visibly-utilised namespace rule), or
+/// [`SignedDocument::with_builtin_c14n_inclusive`] to add an
+/// `InclusiveNamespaces` prefix list for IdPs (ADFS, Shibboleth)
+/// that sign with one. The `canonicalize_fn` escape hatch remains
+/// for callers that still want to delegate to an external
+/// `xmlsec1`-compatible implementation.
 pub struct SignedDocument<'a> {
     /// Bytes of the SAML element to sign / verify.
     pub xml: &'a [u8],
-    /// Optional canonicalization step. Identity if `None`.
+    /// Optional canonicalization step. Identity if `None`. When
+    /// `inclusive_prefixes` is non-empty it takes precedence and
+    /// the built-in exc-c14n is used instead.
     pub canonicalize_fn: Option<fn(&[u8]) -> Result<Vec<u8>, SamlError>>,
+    /// `InclusiveNamespaces` prefix list. When non-empty the
+    /// built-in exc-c14n runs with these prefixes retained
+    /// (xml-exc-c14n §2.2), overriding `canonicalize_fn`.
+    pub inclusive_prefixes: Vec<String>,
 }
 
 impl<'a> SignedDocument<'a> {
@@ -68,10 +81,36 @@ impl<'a> SignedDocument<'a> {
         Self {
             xml,
             canonicalize_fn: None,
+            inclusive_prefixes: Vec::new(),
+        }
+    }
+
+    /// Sign / verify over the built-in exclusive-c14n form of
+    /// `xml` — no external canonicalizer needed.
+    pub fn with_builtin_c14n(xml: &'a [u8]) -> Self {
+        Self {
+            xml,
+            canonicalize_fn: Some(super::canonicalization::exc_c14n),
+            inclusive_prefixes: Vec::new(),
+        }
+    }
+
+    /// Like [`with_builtin_c14n`](Self::with_builtin_c14n) but
+    /// with an `InclusiveNamespaces` prefix list (use `"#default"`
+    /// for the default namespace).
+    pub fn with_builtin_c14n_inclusive(xml: &'a [u8], prefixes: &[&str]) -> Self {
+        Self {
+            xml,
+            canonicalize_fn: None,
+            inclusive_prefixes: prefixes.iter().map(|p| (*p).to_string()).collect(),
         }
     }
 
     fn canonical_bytes(&self) -> Result<Vec<u8>, SamlError> {
+        if !self.inclusive_prefixes.is_empty() {
+            let refs: Vec<&str> = self.inclusive_prefixes.iter().map(String::as_str).collect();
+            return super::canonicalization::exc_c14n_with_prefixes(self.xml, &refs);
+        }
         match self.canonicalize_fn {
             Some(f) => f(self.xml),
             None => Ok(self.xml.to_vec()),
@@ -347,6 +386,7 @@ mod tests {
         let doc = SignedDocument {
             xml: b"hello",
             canonicalize_fn: Some(upper),
+            inclusive_prefixes: Vec::new(),
         };
         let sig = sign_rsa_sha256(&doc, &key).unwrap();
         // Signature was made over "HELLO" — verifying without
@@ -357,6 +397,7 @@ mod tests {
         let doc_canon = SignedDocument {
             xml: b"hello",
             canonicalize_fn: Some(upper),
+            inclusive_prefixes: Vec::new(),
         };
         verify_signature(&doc_canon, &sig, &pubk).unwrap();
     }

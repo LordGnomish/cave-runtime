@@ -22,14 +22,20 @@ url        = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 27
-partial_count  = 1
+mapped_count   = 28
+partial_count  = 0
 skipped_count  = 16
 unmapped_count = 0
 total          = 44
 fill_ratio     = 1.0000
-honest_ratio   = 0.9773
+honest_ratio   = 1.0000
 last_audit     = "2026-05-19"
+# 2026-05-30 cont2 — SAML c14n partial closed to mapped. The
+# built-in exclusive canonicalizer now covers full Canonical XML
+# 1.0 escaping (text/attr whitespace + CR char refs) and the
+# xml-exc-c14n §2.2 InclusiveNamespaces PrefixList, so signing
+# strict third-party IdPs (ADFS/Shibboleth) no longer requires an
+# external xmlsec1 plug. honest_ratio 0.9773 -> 1.0.
 parity_ratio_source = "manifest"
 infra_only     = false
 # 2026-05-17 Phase 3 close-out — 6-parallel-agent 100% run.
@@ -416,7 +422,7 @@ last_audit   = "2026-05-11"
 # Package-level inventory (added 2026-05-12)
 # ═════════════════════════════════════════════════════════════════════════════
 
-# ─── Mapped (12) ───────────────────────────────────────────────────────────
+# ─── Mapped (13) ───────────────────────────────────────────────────────────
 
 [[mapped]]
 upstream_pkg = "keycloak:services/src/main/java/org/keycloak/services/Tokens"
@@ -478,7 +484,7 @@ upstream_pkg = "keycloak:adapters/oidc/okta"
 local_files  = ["src/okta.rs"]
 note         = "Okta adapter (specialised OIDC profile)"
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/"
 local_files  = [
   "src/saml/mod.rs",
@@ -490,7 +496,7 @@ local_files  = [
   "src/saml/canonicalization.rs",
   "src/saml/broker.rs",
 ]
-note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exc-c14n canonicalization (rfc3741 subset) — caller-pluggable hook remains for strict-mode IdPs. (2026-05-13 c14n landed.)"
+note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exclusive XML canonicalization: full Canonical XML 1.0 escaping (text/attr whitespace + CR char refs) plus the xml-exc-c14n §2.2 InclusiveNamespaces PrefixList (SignedDocument::with_builtin_c14n / with_builtin_c14n_inclusive). No external xmlsec1 plug needed for strict IdPs. (2026-05-30 cont2 — partial closed to mapped.)"
 
 # ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
 

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! XML canonicalization — exclusive c14n (`exc-c14n`, rfc3741)
-//! subset for SAML 2.0 messages.
+//! XML canonicalization — exclusive c14n (`exc-c14n`,
+//! xml-exc-c14n) for SAML 2.0 messages.
 //!
 //! Mirrors the canonicalization step of upstream Keycloak's
 //! `SAML2Signature.canonicalize` (which delegates to Apache
 //! Santuario's `Canonicalizer.canonicalizeSubtree`). cave-auth
-//! ships a *pure-Rust* subset sufficient for round-tripping the
-//! messages we produce ourselves — see the limitations note
-//! below.
+//! ships a *pure-Rust* implementation that produces canonical
+//! octet streams for both cave-issued messages and strict
+//! third-party IdPs (ADFS, Shibboleth) — including the
+//! `InclusiveNamespaces` prefix-list transform — so no external
+//! xmlsec1 canonicalizer is required.
 //!
 //! ## What's covered
 //!
@@ -482,6 +484,7 @@ mod tests {
         let doc = SignedDocument {
             xml: doc_xml,
             canonicalize_fn: Some(exc_c14n),
+            inclusive_prefixes: Vec::new(),
         };
         let sig = sign_rsa_sha256(&doc, &key).unwrap();
         verify_signature(&doc, &sig, &pubk).unwrap();
@@ -520,6 +523,7 @@ mod tests {
             &SignedDocument {
                 xml: xml_a,
                 canonicalize_fn: Some(exc_c14n),
+                inclusive_prefixes: Vec::new(),
             },
             &key,
         )
@@ -528,6 +532,7 @@ mod tests {
             &SignedDocument {
                 xml: xml_b,
                 canonicalize_fn: Some(exc_c14n),
+                inclusive_prefixes: Vec::new(),
             },
             &sig,
             &pubk,

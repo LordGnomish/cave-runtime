@@ -542,7 +542,14 @@ enum AuthCmd {
     /// Verify an inbound SAML AuthnRequest by its `ID`.
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
-    SamlC14n,
+    /// Pass `--inclusive-prefixes ds,saml` to canonicalize with
+    /// the built-in exc-c14n `InclusiveNamespaces` prefix list.
+    SamlC14n {
+        /// Comma-separated `InclusiveNamespaces` prefix list
+        /// (use `#default` for the default namespace).
+        #[arg(long)]
+        inclusive_prefixes: Option<String>,
+    },
     // ── LDAP federation (Keycloak federation/ldap parity) ────────────────────
     /// Bind against the LDAP federation provider and report resultCode.
     LdapTestConnection,
@@ -4700,7 +4707,15 @@ source_root = "src"
             AuthCmd::Events            => c.get("/api/auth/events").await,
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
-            AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::SamlC14n { inclusive_prefixes } => {
+                // Prefix-list tokens are XML NCNames (plus the
+                // literal `#default`) — URL-safe, so pass raw.
+                let path = match inclusive_prefixes {
+                    Some(p) => format!("/api/auth/saml/c14n?inclusive_prefixes={p}"),
+                    None => "/api/auth/saml/c14n".to_string(),
+                };
+                c.get(&path).await
+            }
             // LDAP federation
             AuthCmd::LdapTestConnection => c.get(cavectl::auth::ldap::PATH_TEST_CONNECTION).await,
             AuthCmd::LdapSyncUsers      => c.get(cavectl::auth::ldap::PATH_SYNC_USERS).await,
