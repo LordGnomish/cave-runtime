@@ -118,6 +118,62 @@ impl DynatraceScaler {
         )
     }
 
+    /// Port of `parseDynatraceMetadata`.
+    ///
+    /// Mirrors the typed-config struct tags: `host` (triggerMetadata;authParams)
+    /// and `metricSelector` (triggerMetadata) and `token` (authParams) and
+    /// `threshold` (float) are required; `from` defaults to `now-2h`;
+    /// `activationThreshold` is an optional float defaulting to `0`.
+    pub fn from_metadata(meta: &std::collections::HashMap<String, String>) -> Result<Self, String> {
+        let host = meta
+            .get("host")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "host is required".to_string())?
+            .clone();
+        let metric_selector = meta
+            .get("metricSelector")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "metricSelector is required".to_string())?
+            .clone();
+        let token = meta
+            .get("token")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "token is required".to_string())?
+            .clone();
+        let threshold = meta
+            .get("threshold")
+            .ok_or_else(|| "threshold is required".to_string())?
+            .parse::<f64>()
+            .map_err(|_| "threshold must be a float".to_string())?;
+
+        let from_timestamp = meta
+            .get("from")
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_else(|| "now-2h".to_string());
+        let activation_threshold = match meta.get("activationThreshold") {
+            Some(v) => v
+                .parse::<f64>()
+                .map_err(|_| "activationThreshold must be a float".to_string())?,
+            None => 0.0,
+        };
+
+        Ok(Self {
+            host,
+            metric_selector,
+            token,
+            from_timestamp,
+            threshold,
+            activation_threshold,
+            current_value: 0.0,
+        })
+    }
+
+    /// Port of the scaler metric name: `scalerName = "dynatrace"`, normalized.
+    pub fn metric_name(&self) -> String {
+        "dynatrace".to_string()
+    }
+
     /// Record a freshly-fetched metric value.
     pub fn observe(&mut self, value: f64) {
         self.current_value = if value.is_nan() { 0.0 } else { value };
