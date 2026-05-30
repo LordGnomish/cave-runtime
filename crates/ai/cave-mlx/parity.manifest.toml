@@ -13,17 +13,21 @@ source_sha = "v0.31.2"   # 68cf2fddd8de5edd8ab3d926391772b2e2cedad8 (latest stab
 # core* of ml-explore/mlx onto a dependency-light, pure-Rust CPU backend.
 # Evaluation is eager (no lazy graph, no Metal/GPU). Every mapped item below
 # was built test-first (RED commit → GREEN commit) with analytic-gradient and
-# numeric checks; 46 crate tests pass.
+# numeric checks; 71 crate tests pass.
 #
-# Mapped (16): array.rs (N-dim f32 Array — shape/strides/reshape(-1)/arange/
+# Mapped (17): array.rs (N-dim f32 Array — shape/strides/reshape(-1)/arange/
 # zeros/ones/full/from_scalar/get/item); ops.rs broadcasting elementwise
 # (add/sub/mul/div), unary math (exp/log/sqrt/neg), activations
 # (relu/sigmoid/tanh), matmul, transpose, axis/full reductions (sum/mean/max),
 # numerically-stable softmax; autograd.rs reverse-mode Tape/Var (grad /
 # value_and_grad analog) with broadcast-aware gradient reduction;
-# nn.rs Linear + Activation modules; optim.rs Sgd (momentum + coupled decay),
-# Adam, AdamW (decoupled decay); quant.rs group-wise affine quantize/dequantize
-# (4/8-bit); cave-mlx CLI (version/info/demo).
+# conv.rs channel-last conv1d / conv2d (NLC/NHWC, weight (C_out,K..,C_in),
+# stride + implicit zero-padding, dilation 1) + max_pool2d / avg_pool2d;
+# nn.rs Linear + Conv2d (forward-only inference layer) + Activation modules;
+# optim.rs Sgd (momentum + coupled decay), Adam, AdamW (decoupled decay);
+# quant.rs group-wise affine quantize/dequantize (4/8-bit); cave-mlx CLI
+# (version/info/demo). [2026-05-30 cont2: conv.rs + nn.Conv2d closed the
+# previously-unmapped convolution gap via 2 strict RED→GREEN cycles.]
 #
 # Partial (1): mx.random — only a seeded Kaiming-uniform initializer (StdRng)
 # is present (used by nn.Linear::new); the full distribution suite
@@ -43,23 +47,24 @@ source_sha = "v0.31.2"   # 68cf2fddd8de5edd8ab3d926391772b2e2cedad8 (latest stab
 #                                                  src/gguf.rs already owns GGUF
 #                                                  header/metadata reading)
 #
-# Unmapped (1): convolution (conv1d / conv2d / pooling) — an honestly-tracked
-# in-scope gap deferred to a follow-up slice. NOT dressed as a justified
-# scope-cut; it lowers fill_ratio and honest_ratio on purpose.
-mapped_count          = 16
+# Unmapped (0): the convolution gap (conv1d / conv2d / pooling) that previously
+# sat here was closed on 2026-05-30 (cont2) — it is now mapped (conv.rs +
+# nn.Conv2d). No in-scope item is left unmapped.
+mapped_count          = 17
 partial_count         = 1
 skipped_count         = 8
-unmapped_count        = 1
+unmapped_count        = 0
 total                 = 26
-fill_ratio            = 0.9615  # (mapped + partial + skipped) / total = 25/26
-honest_ratio          = 0.9231  # (mapped + skipped) / total            = 24/26
+fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 26/26
+honest_ratio          = 0.9615  # (mapped + skipped) / total            = 25/26
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-30"
 infra_only            = false
 # NOTE: adr_justified_ratio is intentionally omitted. The skipped items above
 # are described by plain engineering rationale (architectural cuts + one
-# parallel-track delegation); no item is marked ADR-justified, and the single
-# unmapped item (convolution) is an acknowledged gap, not a justified cut.
+# parallel-track delegation); no item is marked ADR-justified. honest_ratio
+# (0.9615) stays below fill_ratio (1.0) because mx.random is still partial
+# (only the seeded Kaiming initializer is ported) — kept honest, not inflated.
 
 [module]
 name        = "cave-mlx"
@@ -102,8 +107,23 @@ local_name    = "Tape / Var::backward"
 file          = "src/autograd.rs"
 
 [[functions]]
+upstream_name = "mx.conv1d / mx.conv2d (channel-last)"
+local_name    = "conv::conv1d / conv::conv2d"
+file          = "src/conv.rs"
+
+[[functions]]
+upstream_name = "mlx.nn.{MaxPool2d,AvgPool2d}"
+local_name    = "conv::max_pool2d / conv::avg_pool2d"
+file          = "src/conv.rs"
+
+[[functions]]
 upstream_name = "mlx.nn.Linear"
 local_name    = "nn::Linear"
+file          = "src/nn.rs"
+
+[[functions]]
+upstream_name = "mlx.nn.Conv2d"
+local_name    = "nn::Conv2d"
 file          = "src/nn.rs"
 
 [[functions]]

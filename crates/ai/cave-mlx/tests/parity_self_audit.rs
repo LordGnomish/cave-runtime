@@ -14,8 +14,10 @@
 //   8. PARITY_REPORT.md exists and summarises the gate result
 //   9. Charter v2 composite — all of the above re-asserted
 //
-// honest_ratio (0.9231) is deliberately below fill_ratio: convolution is an
-// acknowledged unmapped gap and mx.random is partial. No item is ADR-justified.
+// honest_ratio (0.9615) is deliberately below fill_ratio (1.0): mx.random is
+// partial (only the seeded Kaiming initializer is ported). Convolution, once an
+// unmapped gap, was closed on 2026-05-30 (conv.rs + nn.Conv2d). No item is
+// ADR-justified.
 
 use std::fs;
 use std::path::{Path, PathBuf};
