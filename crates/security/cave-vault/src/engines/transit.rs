@@ -161,6 +161,26 @@ fn aes256_gcm_encrypt(key: &[u8], plaintext: &[u8]) -> VaultResult<Vec<u8>> {
     Ok(result)
 }
 
+/// AES-256-GCM seal with a caller-supplied 12-byte nonce (convergent path).
+/// Mirrors `aes256_gcm_encrypt` but prepends the given nonce instead of a
+/// random one, so the ciphertext is byte-for-byte reproducible.
+fn aes256_gcm_encrypt_with_nonce(
+    key: &[u8],
+    plaintext: &[u8],
+    nonce_bytes: [u8; 12],
+) -> VaultResult<Vec<u8>> {
+    let unbound_key = aead::UnboundKey::new(&aead::AES_256_GCM, key)
+        .map_err(|_| VaultError::Crypto("key creation failed".into()))?;
+    let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
+    let key = aead::LessSafeKey::new(unbound_key);
+    let mut in_out = plaintext.to_vec();
+    key.seal_in_place_append_tag(nonce, aead::Aad::empty(), &mut in_out)
+        .map_err(|_| VaultError::Crypto("encryption failed".into()))?;
+    let mut result = nonce_bytes.to_vec();
+    result.extend_from_slice(&in_out);
+    Ok(result)
+}
+
 fn aes256_gcm_decrypt(key: &[u8], ciphertext: &[u8]) -> VaultResult<Vec<u8>> {
     if ciphertext.len() < 12 {
         return Err(VaultError::Crypto("ciphertext too short".into()));
@@ -185,6 +205,24 @@ fn chacha20_encrypt(key_bytes: &[u8], plaintext: &[u8]) -> VaultResult<Vec<u8>> 
     let mut nonce_bytes = [0u8; 12];
     rng.fill(&mut nonce_bytes)
         .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
+    let key = aead::LessSafeKey::new(unbound_key);
+    let mut in_out = plaintext.to_vec();
+    key.seal_in_place_append_tag(nonce, aead::Aad::empty(), &mut in_out)
+        .map_err(|_| VaultError::Crypto("encryption failed".into()))?;
+    let mut result = nonce_bytes.to_vec();
+    result.extend_from_slice(&in_out);
+    Ok(result)
+}
+
+/// ChaCha20-Poly1305 seal with a caller-supplied 12-byte nonce (convergent).
+fn chacha20_encrypt_with_nonce(
+    key_bytes: &[u8],
+    plaintext: &[u8],
+    nonce_bytes: [u8; 12],
+) -> VaultResult<Vec<u8>> {
+    let unbound_key = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, key_bytes)
+        .map_err(|_| VaultError::Crypto("key creation failed".into()))?;
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let key = aead::LessSafeKey::new(unbound_key);
     let mut in_out = plaintext.to_vec();
@@ -239,37 +277,66 @@ fn hkdf_sha256_derive(secret: &[u8], context: &[u8], out_len: usize) -> VaultRes
     Ok(out)
 }
 
-/// Resolve the effective AEAD encryption key for a transit key version.
-/// For a derived key a non-empty `context` is required and the key is derived
-/// per-request via HKDF-SHA256; otherwise the stored key is used verbatim.
-/// Cite: openbao keysutil `GetKey`/`DeriveKey`.
-fn derived_enc_key(
+/// Deterministic convergent nonce (convergent encryption version 3):
+/// `HMAC-SHA256(hmac_key, plaintext)` truncated to the 12-byte AEAD nonce.
+/// Cite: openbao keysutil SymmetricEncryptRaw, `convergentVersion == 3`.
+fn convergent_nonce(hmac_key: &[u8], plaintext: &[u8]) -> [u8; 12] {
+    let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, hmac_key);
+    let tag = ring::hmac::sign(&key, plaintext);
+    let mut nonce = [0u8; 12];
+    nonce.copy_from_slice(&tag.as_ref()[..12]);
+    nonce
+}
+
+/// Resolve the AEAD encryption material for a transit key version. Returns
+/// `(enc_key, hmac_key)` where `hmac_key` is present only for convergent keys
+/// (used to derive the deterministic nonce). For a derived key a non-empty
+/// `context` is required and material is derived per-request via HKDF-SHA256
+/// — 32 bytes normally, or 64 bytes (enc||hmac) for convergent. Because
+/// HKDF-Expand is a prefix-consistent stream, the first 32 bytes are identical
+/// for both, so decrypt can always derive the 32-byte enc key. Cite: openbao
+/// keysutil `EncryptWithFactory` (`encBytes + hmacBytes`), `GetKey`.
+fn transit_key_material(
     key: &TransitKey,
     kv: &KeyVersion,
     context: Option<&[u8]>,
-) -> VaultResult<Vec<u8>> {
+) -> VaultResult<(Vec<u8>, Option<Vec<u8>>)> {
     if key.derived {
         let ctx = context
             .filter(|c| !c.is_empty())
             .ok_or_else(|| VaultError::InvalidRequest(MISSING_CONTEXT_ERR.into()))?;
-        hkdf_sha256_derive(&kv.key_bytes, ctx, 32)
+        if key.convergent_encryption {
+            let material = hkdf_sha256_derive(&kv.key_bytes, ctx, 64)?;
+            Ok((material[..32].to_vec(), Some(material[32..].to_vec())))
+        } else {
+            Ok((hkdf_sha256_derive(&kv.key_bytes, ctx, 32)?, None))
+        }
     } else {
-        Ok(kv.key_bytes.clone())
+        Ok((kv.key_bytes.clone(), None))
     }
 }
 
-/// Seal a plaintext under a transit key version, honoring derived keys.
-/// Returns nonce-prefixed AEAD ciphertext (before the `vault:vN:` framing).
+/// Seal a plaintext under a transit key version, honoring derived +
+/// convergent keys. Returns nonce-prefixed AEAD ciphertext (before the
+/// `vault:vN:` framing). Convergent keys derive the nonce deterministically
+/// from the plaintext so identical plaintext+context yields identical
+/// ciphertext (equality search); others use a random nonce.
 fn transit_seal(
     key: &TransitKey,
     kv: &KeyVersion,
     context: Option<&[u8]>,
     plaintext: &[u8],
 ) -> VaultResult<Vec<u8>> {
-    let enc_key = derived_enc_key(key, kv, context)?;
-    match key.key_type {
-        KeyType::Aes256Gcm96 => aes256_gcm_encrypt(&enc_key, plaintext),
-        KeyType::Chacha20Poly1305 => chacha20_encrypt(&enc_key, plaintext),
+    let (enc_key, hmac_key) = transit_key_material(key, kv, context)?;
+    match (&key.key_type, hmac_key) {
+        (KeyType::Aes256Gcm96, Some(hk)) => {
+            aes256_gcm_encrypt_with_nonce(&enc_key, plaintext, convergent_nonce(&hk, plaintext))
+        }
+        (KeyType::Aes256Gcm96, None) => aes256_gcm_encrypt(&enc_key, plaintext),
+        (KeyType::Chacha20Poly1305, Some(hk)) => {
+            chacha20_encrypt_with_nonce(&enc_key, plaintext, convergent_nonce(&hk, plaintext))
+        }
+        (KeyType::Chacha20Poly1305, None) => chacha20_encrypt(&enc_key, plaintext),
         _ => Err(VaultError::InvalidRequest(
             "encryption not supported for this key type".into(),
         )),
@@ -283,7 +350,7 @@ fn transit_open(
     context: Option<&[u8]>,
     ciphertext: &[u8],
 ) -> VaultResult<Vec<u8>> {
-    let enc_key = derived_enc_key(key, kv, context)?;
+    let (enc_key, _) = transit_key_material(key, kv, context)?;
     match key.key_type {
         KeyType::Aes256Gcm96 => aes256_gcm_decrypt(&enc_key, ciphertext),
         KeyType::Chacha20Poly1305 => chacha20_decrypt(&enc_key, ciphertext),
