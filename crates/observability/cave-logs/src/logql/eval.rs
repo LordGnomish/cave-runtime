@@ -792,6 +792,42 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_drop_bare_names() {
+        let entry = LogEntry::new(0, "ignored");
+        let labels = make_labels(&[("app", "api"), ("level", "info"), ("status", "200")]);
+        let pipeline = vec![PipelineStage::Drop(DropLabels {
+            labels: vec![
+                DropKeepLabel::Name("level".into()),
+                DropKeepLabel::Name("status".into()),
+            ],
+        })];
+        let r = apply_pipeline(&entry, &labels, &pipeline).unwrap();
+        assert_eq!(r.labels.get("app").map(|s| s.as_str()), Some("api"));
+        assert!(!r.labels.contains_key("level"));
+        assert!(!r.labels.contains_key("status"));
+    }
+
+    #[test]
+    fn pipeline_drop_conditional_matcher() {
+        // `| drop level="debug"` removes `level` ONLY when its value is "debug".
+        let drop = PipelineStage::Drop(DropLabels {
+            labels: vec![DropKeepLabel::Matcher(LabelMatcher {
+                name: "level".into(),
+                op: MatchOp::Eq,
+                value: "debug".into(),
+            })],
+        });
+
+        let debug = make_labels(&[("level", "debug"), ("app", "api")]);
+        let r1 = apply_pipeline(&LogEntry::new(0, "x"), &debug, std::slice::from_ref(&drop)).unwrap();
+        assert!(!r1.labels.contains_key("level"));
+
+        let info = make_labels(&[("level", "info"), ("app", "api")]);
+        let r2 = apply_pipeline(&LogEntry::new(0, "x"), &info, std::slice::from_ref(&drop)).unwrap();
+        assert_eq!(r2.labels.get("level").map(|s| s.as_str()), Some("info"));
+    }
+
+    #[test]
     fn evaluator_log_query() {
         let store = LogStore::new();
         let t = 1_000_000_000i64;

@@ -853,4 +853,45 @@ mod tests {
         let q = Parser::parse_query(r#"rate({a="b"}[1m]) + rate({a="c"}[1m])"#).unwrap();
         assert!(matches!(q, Query::Metric(MetricQuery::BinaryExpr(_))));
     }
+
+    #[test]
+    fn parse_drop_labels_bare_names() {
+        let q = Parser::parse_query(r#"{app="x"} | json | drop level, status"#).unwrap();
+        if let Query::Log(lq) = q {
+            // |= json is two stages; drop is the third.
+            assert_eq!(lq.pipeline.len(), 2 + 1);
+            if let PipelineStage::Drop(d) = lq.pipeline.last().unwrap() {
+                assert_eq!(d.labels.len(), 2);
+                assert!(matches!(&d.labels[0], DropKeepLabel::Name(n) if n == "level"));
+                assert!(matches!(&d.labels[1], DropKeepLabel::Name(n) if n == "status"));
+            } else {
+                panic!("expected Drop stage, got {:?}", lq.pipeline.last());
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
+
+    #[test]
+    fn parse_drop_labels_with_matcher() {
+        let q = Parser::parse_query(r#"{app="x"} | drop level="debug", trace_id"#).unwrap();
+        if let Query::Log(lq) = q {
+            if let PipelineStage::Drop(d) = &lq.pipeline[0] {
+                assert_eq!(d.labels.len(), 2);
+                match &d.labels[0] {
+                    DropKeepLabel::Matcher(m) => {
+                        assert_eq!(m.name, "level");
+                        assert_eq!(m.op, MatchOp::Eq);
+                        assert_eq!(m.value, "debug");
+                    }
+                    other => panic!("expected matcher, got {:?}", other),
+                }
+                assert!(matches!(&d.labels[1], DropKeepLabel::Name(n) if n == "trace_id"));
+            } else {
+                panic!("expected Drop stage");
+            }
+        } else {
+            panic!("expected log query");
+        }
+    }
 }
