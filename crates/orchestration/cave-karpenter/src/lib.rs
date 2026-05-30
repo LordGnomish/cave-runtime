@@ -34,6 +34,7 @@ pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod provider;
 pub mod scheduler;
+pub mod scheduling;
 pub mod store;
 
 pub use models::{
