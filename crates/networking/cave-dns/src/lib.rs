@@ -33,3 +33,4 @@ pub const MODULE_NAME: &str = "dns";
 pub fn router(zones: Arc<zone::ZoneManager>) -> Router {
     routes::create_router(zones)
 }
+pub mod bufsize;
