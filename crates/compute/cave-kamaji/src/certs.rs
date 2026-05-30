@@ -424,4 +424,43 @@ mod tests {
         let soon = now + Duration::hours(12);
         assert_eq!(requeue_after(soon, now), None);
     }
+
+    // ── Cycle 4: reconcile skip + status ────────────────────────────────────
+
+    #[test]
+    fn unchanged_and_valid_certificate_skips_regeneration() {
+        // checksum matches a non-empty prior + CA verifies + key-pair valid → skip.
+        assert!(!should_regenerate(Some("abc123"), "abc123", true, true));
+    }
+
+    #[test]
+    fn changed_checksum_forces_regeneration() {
+        assert!(should_regenerate(Some("old"), "new", true, true));
+    }
+
+    #[test]
+    fn first_reconcile_with_no_prior_regenerates() {
+        // No prior checksum recorded yet.
+        assert!(should_regenerate(None, "abc123", true, true));
+        // Empty current checksum is never treated as a match.
+        assert!(should_regenerate(Some(""), "", true, true));
+    }
+
+    #[test]
+    fn invalid_ca_or_keypair_forces_regeneration_even_when_unchanged() {
+        // CA rotated underneath us → leaf must be re-signed.
+        assert!(should_regenerate(Some("abc"), "abc", false, true));
+        // Cert/key-pair mismatch → regenerate.
+        assert!(should_regenerate(Some("abc"), "abc", true, false));
+    }
+
+    #[test]
+    fn certificate_status_records_secret_checksum_and_update_time() {
+        let now = Utc.with_ymd_and_hms(2026, 5, 30, 1, 2, 3).unwrap();
+        let mut st = CertificateStatus::default();
+        st.record("tcp-apiserver-certificate", "sha256:deadbeef", now);
+        assert_eq!(st.secret_name, "tcp-apiserver-certificate");
+        assert_eq!(st.checksum, "sha256:deadbeef");
+        assert_eq!(st.last_update, Some(now));
+    }
 }
