@@ -572,4 +572,104 @@ mod tests {
         let total: usize = assignments.values().map(|v| v.len()).sum();
         assert_eq!(total, 6);
     }
+
+    // ── KIP-345: static consumer-group membership ──────────────────────────
+
+    fn join_static(
+        c: &GroupCoordinator,
+        group: &str,
+        instance_id: &str,
+        client: &str,
+    ) -> JoinGroupResult {
+        c.join_group_static(
+            group.into(),
+            Some(instance_id.into()),
+            None,
+            client.into(),
+            "127.0.0.1".into(),
+            30000,
+            60000,
+            "consumer".into(),
+            HashMap::new(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn static_first_join_assigns_member_and_records_instance_id() {
+        let c = coordinator();
+        let r = join_static(&c, "g", "instance-A", "c1");
+        assert_eq!(r.error_code, 0);
+        assert!(!r.member_id.is_empty());
+        assert_eq!(r.generation_id, 1);
+        let desc = c.describe_group("g").unwrap();
+        assert_eq!(desc.members.len(), 1);
+    }
+
+    #[test]
+    fn static_rejoin_reuses_member_id_without_rebalance() {
+        let c = coordinator();
+        let first = join_static(&c, "g", "instance-A", "c1");
+        // Drive the group to Stable so we can observe that a static
+        // rejoin does NOT trip a new rebalance.
+        c.sync_group("g", first.generation_id, &first.member_id, HashMap::new())
+            .unwrap();
+
+        // Same group.instance.id rejoins (e.g. a rolling bounce).
+        let second = join_static(&c, "g", "instance-A", "c1");
+        // KIP-345: the static member keeps its member id and the
+        // generation does NOT advance — no rebalance is triggered.
+        assert_eq!(second.member_id, first.member_id);
+        assert_eq!(second.generation_id, first.generation_id);
+        let desc = c.describe_group("g").unwrap();
+        assert_eq!(desc.members.len(), 1, "no duplicate member created");
+    }
+
+    #[test]
+    fn distinct_instance_ids_are_separate_members_and_rebalance() {
+        let c = coordinator();
+        let a = join_static(&c, "g", "instance-A", "c1");
+        c.sync_group("g", a.generation_id, &a.member_id, HashMap::new())
+            .unwrap();
+        let b = join_static(&c, "g", "instance-B", "c2");
+        // A genuinely new member must advance the generation.
+        assert!(b.generation_id > a.generation_id);
+        assert_ne!(b.member_id, a.member_id);
+        let desc = c.describe_group("g").unwrap();
+        assert_eq!(desc.members.len(), 2);
+    }
+
+    #[test]
+    fn static_member_survives_expire_stale_members() {
+        let c = coordinator();
+        let r = join_static(&c, "g", "instance-A", "c1");
+        c.sync_group("g", r.generation_id, &r.member_id, HashMap::new())
+            .unwrap();
+        // Static members are NOT removed by the dynamic session-timeout
+        // sweep — that's the whole point of KIP-345 (survive transient
+        // restarts within session.timeout without leaving the group).
+        c.expire_stale_members();
+        let desc = c.describe_group("g").unwrap();
+        assert_eq!(desc.members.len(), 1, "static member must not be expired");
+    }
+
+    #[test]
+    fn dynamic_join_still_works_alongside_static() {
+        let c = coordinator();
+        // The legacy dynamic path is untouched.
+        let r = c
+            .join_group(
+                "g".into(),
+                None,
+                "c1".into(),
+                "127.0.0.1".into(),
+                30000,
+                60000,
+                "consumer".into(),
+                HashMap::new(),
+            )
+            .unwrap();
+        assert_eq!(r.error_code, 0);
+        assert_eq!(r.generation_id, 1);
+    }
 }
