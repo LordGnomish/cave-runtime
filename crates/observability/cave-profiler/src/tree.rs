@@ -558,4 +558,23 @@ mod tests {
         let round = Tree::from_collapsed(&t.collapsed());
         assert_eq!(round, t);
     }
+
+    #[test]
+    fn node_serde_round_trip() {
+        let mut t = Tree::new();
+        t.insert_stack(5, &["a", "b"]);
+        let json = serde_json::to_string(&t.root).unwrap();
+        let back: Vec<Node> = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, t.root);
+    }
+
+    #[test]
+    fn diff_node_serde_round_trip() {
+        let mut l = Tree::new();
+        l.insert_stack(1, &["x", "y"]);
+        let d = Tree::diff(&l, &Tree::new());
+        let json = serde_json::to_string(&d).unwrap();
+        let back: Vec<DiffNode> = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, d);
+    }
 }
