@@ -121,12 +121,13 @@ fn line_comment_is_skipped_but_keeps_terminator() {
 
 #[test]
 fn realistic_alloy_block() {
+    // LCurly does NOT set insertTerm (only RCURLY/RPAREN/RBRACK do), so the
+    // newline after `{` is plain whitespace and no terminator follows it.
     let t = toks("prometheus.scrape \"default\" {\n  targets = []\n}\n");
     assert_eq!(
         t,
         vec![
             Token::Ident, Token::Dot, Token::Ident, Token::String, Token::LCurly,
-            Token::Terminator,
             Token::Ident, Token::Assign, Token::LBrack, Token::RBrack, Token::Terminator,
             Token::RCurly, Token::Terminator,
             Token::Eof,

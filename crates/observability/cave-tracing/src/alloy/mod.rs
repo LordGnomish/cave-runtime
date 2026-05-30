@@ -23,3 +23,6 @@
 
 /// Lexical tokens of the Alloy configuration syntax (`syntax/token`).
 pub mod token;
+
+/// Lexical scanner / lexer (`syntax/scanner`).
+pub mod scanner;
