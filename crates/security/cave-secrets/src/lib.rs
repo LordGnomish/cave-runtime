@@ -12,6 +12,7 @@ pub mod decoders;
 pub mod detector;
 pub mod giturl;
 pub mod models;
+pub mod output;
 pub mod precommit;
 pub mod routes;
 pub mod sanitizer;
