@@ -3112,6 +3112,37 @@ enum NetCmd {
         #[arg(long)]
         port: u16,
     },
+    /// Probe the EDT bandwidth scheduler (Cilium bpf/lib/edt.h): given a
+    /// per-aggregate byte-rate and watermark, report whether a packet is
+    /// paced (pass) or dropped past the FQ horizon, and its departure tstamp.
+    Bandwidth {
+        /// Rate limit in bytes/sec (annotation bits/sec ÷ 8).
+        #[arg(long)]
+        bps: u64,
+        /// Current earliest-departure watermark (ns).
+        #[arg(long, default_value_t = 0)]
+        t_last: u64,
+        /// Packet length in bytes.
+        #[arg(long)]
+        len: u64,
+        /// Monotonic clock now (ns).
+        #[arg(long)]
+        now: u64,
+        /// The packet's current departure timestamp (ns).
+        #[arg(long)]
+        tstamp: u64,
+    },
+    /// Translate an IPv4 to its NAT46/64 IPv6 embedding (Cilium
+    /// bpf/lib/nat_46x64.h) and recover it, in `mapped` (::ffff:) or
+    /// `rfc6052` (64:ff9b::/96) form.
+    Nat64 {
+        /// IPv4 address (dotted-quad).
+        #[arg(long)]
+        v4: String,
+        /// Embedding: `mapped` or `rfc6052`.
+        #[arg(long, default_value = "mapped")]
+        encoding: String,
+    },
     /// Liveness probe (/api/net/health)
     Health,
 }
@@ -4557,6 +4588,27 @@ source_root = "src"
                     "/api/net/check",
                     json!({ "src": src, "dst": dst, "port": port }),
                 )
+                .await
+            }
+            NetCmd::Bandwidth { bps, t_last, len, now, tstamp } => {
+                c.post(
+                    "/api/net/bandwidth/schedule",
+                    json!({
+                        "bps": bps,
+                        "t_last": t_last,
+                        "packet_len": len,
+                        "now_ns": now,
+                        "tstamp_ns": tstamp,
+                    }),
+                )
+                .await
+            }
+            NetCmd::Nat64 { v4, encoding } => {
+                c.get(&format!(
+                    "/api/net/nat64/translate?v4={}&encoding={}",
+                    urlencode(&v4),
+                    urlencode(&encoding)
+                ))
                 .await
             }
             NetCmd::Health => c.get("/api/net/health").await,

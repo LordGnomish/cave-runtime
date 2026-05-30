@@ -6,7 +6,11 @@ use crate::dataplane::NetState;
 use crate::ebpf_sim::bpf_host_sim::{Direction, HostVerdict};
 use crate::ebpf_sim::policy_lpm::RangePolicyMap;
 use crate::ebpf_sim::port_range::port_range_to_masked_ports;
-use crate::ebpf_sim::program::L4Proto;
+use crate::ebpf_sim::program::{Ipv4, L4Proto};
+use crate::ebpf_sim::{
+    build_v4_in_v6, build_v4_in_v6_rfc6052, edt_sched_departure, get_v4_from_v6, EdtInfo,
+    EdtVerdict, V6Addr,
+};
 use crate::models::*;
 use axum::{
     extract::{Path, Query, State},
@@ -34,7 +38,162 @@ pub fn create_router(state: Arc<NetState>) -> Router {
         .route("/api/net/check", post(check_policy))
         .route("/api/net/policy/port-range", get(port_range_decompose))
         .route("/api/net/policy/port-range/check", post(port_range_check))
+        .route("/api/net/bandwidth/schedule", post(bandwidth_schedule))
+        .route("/api/net/nat64/translate", get(nat64_translate))
         .with_state(state)
+}
+
+/// Render an IPv6 address as RFC 5952 hextet notation (lower-case, the
+/// longest run of >=2 zero groups collapsed to `::`). We format hextets
+/// rather than deferring to `std::net::Ipv6Addr`'s Display, which
+/// special-cases IPv4-mapped addresses into mixed `::ffff:a.b.c.d`
+/// notation — here we want the raw embedding visible.
+fn format_v6_hextets(addr: &V6Addr) -> String {
+    let groups: [u16; 8] = std::array::from_fn(|i| {
+        u16::from_be_bytes([addr.0[i * 2], addr.0[i * 2 + 1]])
+    });
+    // Find the longest run of consecutive zero groups (length >= 2).
+    let (mut best_start, mut best_len) = (usize::MAX, 0usize);
+    let (mut cur_start, mut cur_len) = (0usize, 0usize);
+    for (i, &g) in groups.iter().enumerate() {
+        if g == 0 {
+            if cur_len == 0 {
+                cur_start = i;
+            }
+            cur_len += 1;
+            if cur_len > best_len {
+                best_len = cur_len;
+                best_start = cur_start;
+            }
+        } else {
+            cur_len = 0;
+        }
+    }
+    if best_len < 2 {
+        return groups
+            .iter()
+            .map(|g| format!("{g:x}"))
+            .collect::<Vec<_>>()
+            .join(":");
+    }
+    let head: Vec<String> = groups[..best_start].iter().map(|g| format!("{g:x}")).collect();
+    let tail: Vec<String> = groups[best_start + best_len..]
+        .iter()
+        .map(|g| format!("{g:x}"))
+        .collect();
+    format!("{}::{}", head.join(":"), tail.join(":"))
+}
+
+/// Parse a dotted-quad IPv4 string into [`Ipv4`], rejecting malformed input.
+fn parse_v4(s: &str) -> Option<Ipv4> {
+    let o: Vec<u8> = s.split('.').filter_map(|p| p.parse::<u8>().ok()).collect();
+    if o.len() == 4 && s.split('.').count() == 4 {
+        Some(Ipv4::from_octets(o[0], o[1], o[2], o[3]))
+    } else {
+        None
+    }
+}
+
+/// Build the JSON verdict for scheduling a packet against an EDT
+/// aggregate. Mirrors Cilium's `edt_sched_departure` (`bpf/lib/edt.h`):
+/// reports the pacing `verdict` (`pass`/`drop`), the stamped departure
+/// `tstamp`, and the computed transmission `delay_ns`.
+pub fn edt_schedule_json(
+    bps: u64,
+    t_last: u64,
+    t_horizon_drop: u64,
+    packet_len: u64,
+    now_ns: u64,
+    tstamp_ns: u64,
+) -> serde_json::Value {
+    let mut info = EdtInfo::with_t_last(bps, t_horizon_drop, t_last);
+    let (verdict, tstamp) = edt_sched_departure(&mut info, packet_len, now_ns, tstamp_ns);
+    let delay_ns = if bps == 0 {
+        0
+    } else {
+        packet_len * crate::ebpf_sim::NSEC_PER_SEC / bps
+    };
+    let verdict_str = match verdict {
+        EdtVerdict::Pass => "pass",
+        EdtVerdict::Drop => "drop",
+    };
+    serde_json::json!({
+        "verdict": verdict_str,
+        "tstamp": tstamp,
+        "delay_ns": delay_ns,
+        "bps": bps,
+        "t_last": info.t_last,
+        "t_horizon_drop": t_horizon_drop,
+    })
+}
+
+/// Build the JSON view of a NAT46/64 address translation. Encodes the
+/// IPv4 in either the `mapped` (`::ffff:`) or `rfc6052` (`64:ff9b::/96`)
+/// form and recovers it back, mirroring `bpf/lib/nat_46x64.h`. A
+/// malformed IPv4 reports an `error` and fails closed.
+pub fn nat64_translate_json(v4: &str, encoding: &str) -> serde_json::Value {
+    let ip = match parse_v4(v4) {
+        Some(ip) => ip,
+        None => return serde_json::json!({"error": "invalid IPv4 address"}),
+    };
+    let v6 = if encoding.eq_ignore_ascii_case("rfc6052") {
+        build_v4_in_v6_rfc6052(ip)
+    } else {
+        build_v4_in_v6(ip)
+    };
+    let encoding_str = if encoding.eq_ignore_ascii_case("rfc6052") {
+        "rfc6052"
+    } else {
+        "mapped"
+    };
+    let recovered = get_v4_from_v6(&v6).map(|r| r.to_string());
+    serde_json::json!({
+        "v4": ip.to_string(),
+        "encoding": encoding_str,
+        "v6": format_v6_hextets(&v6),
+        "recovered_v4": recovered,
+    })
+}
+
+#[derive(Deserialize)]
+struct BandwidthScheduleReq {
+    bps: u64,
+    t_last: u64,
+    #[serde(default = "default_horizon")]
+    t_horizon_drop: u64,
+    packet_len: u64,
+    now_ns: u64,
+    tstamp_ns: u64,
+}
+
+fn default_horizon() -> u64 {
+    crate::ebpf_sim::DEFAULT_DROP_HORIZON_NS
+}
+
+async fn bandwidth_schedule(Json(req): Json<BandwidthScheduleReq>) -> Json<serde_json::Value> {
+    Json(edt_schedule_json(
+        req.bps,
+        req.t_last,
+        req.t_horizon_drop,
+        req.packet_len,
+        req.now_ns,
+        req.tstamp_ns,
+    ))
+}
+
+#[derive(Deserialize)]
+struct Nat64Query {
+    v4: String,
+    #[serde(default = "default_encoding")]
+    encoding: String,
+}
+
+fn default_encoding() -> String {
+    "mapped".to_string()
+}
+
+async fn nat64_translate(Query(q): Query<Nat64Query>) -> Json<serde_json::Value> {
+    Json(nat64_translate_json(&q.v4, &q.encoding))
 }
 
 /// Parse a protocol name (case-insensitive) into an [`L4Proto`].
