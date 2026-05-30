@@ -9,6 +9,7 @@
 pub mod build;
 pub mod catalog;
 pub mod engine;
+pub mod entrypoint;
 pub mod executor;
 pub mod github;
 pub mod jenkins;
