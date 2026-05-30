@@ -254,6 +254,27 @@ mod tests {
     }
 
     #[test]
+    fn traefik_patch_weights_weighted_services() {
+        // argo-rollouts v1.9.0 rollout/trafficrouting/traefik: TraefikService CRD,
+        // weights live at spec.weighted.services[{name, weight}]; canary = desired,
+        // stable = 100 - desired.
+        let p = TrafficProvider::Traefik {
+            traefik_service: "rollouts-demo".into(),
+            namespace: "argo".into(),
+        };
+        let patch = render_patch(&p, &WeightSplit::new(30), "stable-svc", "canary-svc");
+        assert_eq!(patch["apiVersion"], "traefik.io/v1alpha1");
+        assert_eq!(patch["kind"], "TraefikService");
+        assert_eq!(patch["metadata"]["name"], "rollouts-demo");
+        assert_eq!(patch["metadata"]["namespace"], "argo");
+        let svcs = &patch["spec"]["weighted"]["services"];
+        assert_eq!(svcs[0]["name"], "stable-svc");
+        assert_eq!(svcs[0]["weight"], 70);
+        assert_eq!(svcs[1]["name"], "canary-svc");
+        assert_eq!(svcs[1]["weight"], 30);
+    }
+
+    #[test]
     fn weight_split_serde_roundtrip() {
         let s = WeightSplit::new(37);
         let j = serde_json::to_string(&s).unwrap();
