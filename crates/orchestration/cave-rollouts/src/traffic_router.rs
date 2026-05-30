@@ -295,6 +295,24 @@ mod tests {
     }
 
     #[test]
+    fn ambassador_patch_builds_canary_mapping() {
+        // argo-rollouts v1.9.0 rollout/trafficrouting/ambassador: clones the base
+        // Mapping into "<name>-canary", repoints spec.service to the canary service
+        // and sets spec.weight = desired (int).
+        let p = TrafficProvider::Ambassador {
+            mapping: "demo-mapping".into(),
+            namespace: "argo".into(),
+        };
+        let patch = render_patch(&p, &WeightSplit::new(25), "stable-svc", "canary-svc");
+        assert_eq!(patch["apiVersion"], "getambassador.io/v2");
+        assert_eq!(patch["kind"], "Mapping");
+        assert_eq!(patch["metadata"]["name"], "demo-mapping-canary");
+        assert_eq!(patch["metadata"]["namespace"], "argo");
+        assert_eq!(patch["spec"]["service"], "canary-svc");
+        assert_eq!(patch["spec"]["weight"], 25);
+    }
+
+    #[test]
     fn weight_split_serde_roundtrip() {
         let s = WeightSplit::new(37);
         let j = serde_json::to_string(&s).unwrap();
