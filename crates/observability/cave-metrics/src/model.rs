@@ -212,21 +212,33 @@ impl LabelMatcher {
     }
 
     pub fn matches(&self, labels: &Labels) -> bool {
-        let label_val = labels.get(&self.name).unwrap_or("");
+        self.matches_value(labels.get(&self.name).unwrap_or(""))
+    }
+
+    /// Evaluate the matcher against a single raw label value (an absent label is
+    /// passed as `""`). This is the primitive the TSDB inverted index uses when
+    /// resolving postings per Prometheus `PostingsForMatchers`.
+    pub fn matches_value(&self, value: &str) -> bool {
         match self.op {
-            MatchOp::Equal => label_val == self.value,
-            MatchOp::NotEqual => label_val != self.value,
+            MatchOp::Equal => value == self.value,
+            MatchOp::NotEqual => value != self.value,
             MatchOp::RegexMatch => self
                 .regex
                 .as_ref()
-                .map(|r| r.is_match(label_val))
+                .map(|r| r.is_match(value))
                 .unwrap_or(false),
             MatchOp::RegexNotMatch => !self
                 .regex
                 .as_ref()
-                .map(|r| r.is_match(label_val))
+                .map(|r| r.is_match(value))
                 .unwrap_or(false),
         }
+    }
+
+    /// Whether this matcher matches the empty string. Per Prometheus, such a
+    /// matcher also selects every series that does not carry the label at all.
+    pub fn matches_empty(&self) -> bool {
+        self.matches_value("")
     }
 }
 

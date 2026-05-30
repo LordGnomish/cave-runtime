@@ -114,75 +114,68 @@ impl InvertedIndex {
         vals
     }
 
-    /// Return fingerprints matching all matchers (intersection).
-    fn matching(&self, matchers: &[LabelMatcher]) -> HashSet<u64> {
-        if matchers.is_empty() {
-            // Return all fps
-            let mut all = HashSet::new();
-            for vals in self.index.values() {
-                for fps in vals.values() {
-                    all.extend(fps);
+    /// Every fingerprint known to the index (the `AllPostings` set).
+    fn all_fps(&self) -> HashSet<u64> {
+        let mut all = HashSet::new();
+        for vals in self.index.values() {
+            for fps in vals.values() {
+                all.extend(fps);
+            }
+        }
+        all
+    }
+
+    /// Resolve a single matcher to its fingerprint set, faithfully reproducing
+    /// Prometheus `PostingsForMatchers` semantics (tsdb/querier.go).
+    ///
+    /// A matcher that matches the empty string also selects series lacking the
+    /// label (prometheus/prometheus#3575): such a matcher resolves to
+    /// `all_fps − {fps whose value does NOT match}`, so absent-label series —
+    /// which carry no entry in this label's posting lists — are retained.
+    /// Otherwise the matcher resolves to the union of posting lists whose value
+    /// matches, and absent-label series are excluded.
+    fn matching_one(&self, m: &LabelMatcher) -> HashSet<u64> {
+        let vals = self.index.get(&m.name);
+        if m.matches_empty() {
+            let mut excluded = HashSet::new();
+            if let Some(vals) = vals {
+                for (val, fps) in vals {
+                    if !m.matches_value(val) {
+                        excluded.extend(fps);
+                    }
                 }
             }
-            return all;
+            self.all_fps().difference(&excluded).copied().collect()
+        } else {
+            let mut matched = HashSet::new();
+            if let Some(vals) = vals {
+                for (val, fps) in vals {
+                    if m.matches_value(val) {
+                        matched.extend(fps);
+                    }
+                }
+            }
+            matched
+        }
+    }
+
+    /// Return fingerprints matching all matchers (intersection of per-matcher sets).
+    fn matching(&self, matchers: &[LabelMatcher]) -> HashSet<u64> {
+        if matchers.is_empty() {
+            return self.all_fps();
         }
 
         let mut result: Option<HashSet<u64>> = None;
-
         for matcher in matchers {
-            use crate::model::MatchOp;
-            let candidates: HashSet<u64> = match &matcher.op {
-                MatchOp::Equal => self
-                    .index
-                    .get(&matcher.name)
-                    .and_then(|vals| vals.get(&matcher.value))
-                    .cloned()
-                    .unwrap_or_default(),
-                MatchOp::NotEqual => {
-                    // All fps that do NOT have this exact label value
-                    let exclude: HashSet<u64> = self
-                        .index
-                        .get(&matcher.name)
-                        .and_then(|vals| vals.get(&matcher.value))
-                        .cloned()
-                        .unwrap_or_default();
-                    let mut all = HashSet::new();
-                    for vals in self.index.values() {
-                        for fps in vals.values() {
-                            all.extend(fps);
-                        }
-                    }
-                    all.difference(&exclude).cloned().collect()
-                }
-                MatchOp::RegexMatch | MatchOp::RegexNotMatch => {
-                    // Enumerate all values for the label name
-                    let mut matched_fps = HashSet::new();
-                    if let Some(vals) = self.index.get(&matcher.name) {
-                        for (val, fps) in vals {
-                            let lbl = Labels::from_pairs([(&matcher.name, val.as_str())]);
-                            if matcher.matches(&lbl) {
-                                matched_fps.extend(fps);
-                            }
-                        }
-                    }
-                    if matcher.op == MatchOp::RegexNotMatch {
-                        let mut all = HashSet::new();
-                        for vals in self.index.values() {
-                            for fps in vals.values() {
-                                all.extend(fps);
-                            }
-                        }
-                        all.difference(&matched_fps).cloned().collect()
-                    } else {
-                        matched_fps
-                    }
-                }
-            };
-
+            let candidates = self.matching_one(matcher);
             result = Some(match result {
                 None => candidates,
-                Some(r) => r.intersection(&candidates).cloned().collect(),
+                Some(r) => r.intersection(&candidates).copied().collect(),
             });
+            // Short-circuit: an empty intersection cannot grow.
+            if result.as_ref().map(|r| r.is_empty()).unwrap_or(false) {
+                return HashSet::new();
+            }
         }
 
         result.unwrap_or_default()
