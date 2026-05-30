@@ -33,6 +33,7 @@ pub mod error;
 pub mod gateway;
 pub mod llm_gateway_adapter;
 pub mod memory;
+pub mod openjarvis;
 pub mod planner;
 pub mod prompt;
 pub mod provider_tools;
