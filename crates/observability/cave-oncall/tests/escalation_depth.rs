@@ -13,8 +13,12 @@
 //!   * `escalation_snapshot/utils.py::eta_for_escalation_step_notify_if_time`
 //!     — the time-window membership test (incl. overnight wrap).
 
-use cave_oncall::engine::{within_notify_window, EscalationRun, MAX_TIMES_REPEAT};
+use cave_oncall::engine::{
+    num_alerts_condition_met, num_alerts_in_window, within_notify_window, EscalationRun,
+    MAX_TIMES_REPEAT,
+};
 use cave_oncall::models::{EscalationStep, EscalationStepType};
+use chrono::{Duration, TimeZone, Utc};
 
 /// Minutes-since-midnight helper for readable window tests.
 fn hm(h: u32, m: u32) -> u32 {
@@ -145,6 +149,72 @@ fn notify_if_time_step_type_round_trips() {
     let step = EscalationStepType::NotifyIfTime {
         from_minute: hm(9, 0),
         to_minute: hm(17, 0),
+    };
+    let json = serde_json::to_string(&step).unwrap();
+    let back: EscalationStepType = serde_json::from_str(&json).unwrap();
+    assert_eq!(step, back);
+}
+
+// ---------------------------------------------------------------------------
+// Cycle 3 — STEP_NOTIFY_IF_NUM_ALERTS_IN_TIME_WINDOW
+// ---------------------------------------------------------------------------
+//
+// escalation_policy_snapshot.py counts the alert group's alerts whose
+// created_at >= last_alert.created_at - num_minutes_in_window, then:
+//     if num_alerts_in_window <= self.num_alerts_in_window: pause
+// i.e. escalation proceeds only when the trailing-window count is STRICTLY
+// greater than the configured threshold. The window is anchored on the most
+// recent alert, not on wall-clock now.
+
+#[test]
+fn num_alerts_in_window_counts_from_latest_alert() {
+    let base = Utc.with_ymd_and_hms(2026, 5, 30, 12, 0, 0).unwrap();
+    // Alerts at t-30, t-9, t-5, t-1, t (minutes relative to the latest).
+    let times = vec![
+        base - Duration::minutes(30),
+        base - Duration::minutes(9),
+        base - Duration::minutes(5),
+        base - Duration::minutes(1),
+        base,
+    ];
+    // 10-minute trailing window anchored on `base`: includes t-9,t-5,t-1,t = 4.
+    assert_eq!(num_alerts_in_window(&times, 10), 4);
+    // 60-minute window catches all five.
+    assert_eq!(num_alerts_in_window(&times, 60), 5);
+    // Empty input has no alerts in any window.
+    assert_eq!(num_alerts_in_window(&[], 10), 0);
+}
+
+#[test]
+fn num_alerts_window_boundary_is_inclusive() {
+    let base = Utc.with_ymd_and_hms(2026, 5, 30, 12, 0, 0).unwrap();
+    // An alert exactly at the window edge (t-10 for a 10-min window) is counted
+    // because upstream uses `created_at >= last - delta` (>=, inclusive).
+    let times = vec![base - Duration::minutes(10), base];
+    assert_eq!(num_alerts_in_window(&times, 10), 2);
+    // Just outside the edge (t-11) is excluded.
+    let times = vec![base - Duration::minutes(11), base];
+    assert_eq!(num_alerts_in_window(&times, 10), 1);
+}
+
+#[test]
+fn num_alerts_condition_proceeds_only_when_strictly_greater() {
+    let base = Utc.with_ymd_and_hms(2026, 5, 30, 12, 0, 0).unwrap();
+    let times: Vec<_> = (0..5).map(|i| base - Duration::minutes(i)).collect(); // 5 alerts, all within 10m
+
+    // count(5) > threshold(3) => proceed.
+    assert!(num_alerts_condition_met(&times, 10, 3));
+    // count(5) == threshold(5) => `<=` pauses, so NOT met.
+    assert!(!num_alerts_condition_met(&times, 10, 5));
+    // count(5) < threshold(6) => not met.
+    assert!(!num_alerts_condition_met(&times, 10, 6));
+}
+
+#[test]
+fn notify_if_num_alerts_step_type_round_trips() {
+    let step = EscalationStepType::NotifyIfNumAlertsInWindow {
+        num_alerts: 3,
+        window_minutes: 10,
     };
     let json = serde_json::to_string(&step).unwrap();
     let back: EscalationStepType = serde_json::from_str(&json).unwrap();
