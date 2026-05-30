@@ -165,10 +165,54 @@ pub struct DiffNode {
 impl Tree {
     /// Diff two trees, aligning frames by name at each level into a combined
     /// tree carrying the left and right `total` per frame.
-    pub fn diff(_left: &Tree, _right: &Tree) -> Vec<DiffNode> {
-        // RED placeholder
-        Vec::new()
+    pub fn diff(left: &Tree, right: &Tree) -> Vec<DiffNode> {
+        diff_level(&left.root, &right.root)
     }
+}
+
+/// Sorted merge-join of two name-sorted child lists into diff nodes.
+fn diff_level(l: &[Node], r: &[Node]) -> Vec<DiffNode> {
+    let mut out: Vec<DiffNode> = Vec::new();
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < l.len() || j < r.len() {
+        let take_left = j >= r.len() || (i < l.len() && l[i].name <= r[j].name);
+        let take_right = i >= l.len() || (j < r.len() && r[j].name <= l[i].name);
+        match (take_left, take_right) {
+            // same name on both sides
+            (true, true) => {
+                out.push(DiffNode {
+                    name: l[i].name.clone(),
+                    left: l[i].total,
+                    right: r[j].total,
+                    children: diff_level(&l[i].children, &r[j].children),
+                });
+                i += 1;
+                j += 1;
+            }
+            // present only on the left
+            (true, false) => {
+                out.push(DiffNode {
+                    name: l[i].name.clone(),
+                    left: l[i].total,
+                    right: 0,
+                    children: diff_level(&l[i].children, &[]),
+                });
+                i += 1;
+            }
+            // present only on the right
+            (false, true) => {
+                out.push(DiffNode {
+                    name: r[j].name.clone(),
+                    left: 0,
+                    right: r[j].total,
+                    children: diff_level(&[], &r[j].children),
+                });
+                j += 1;
+            }
+            (false, false) => unreachable!(),
+        }
+    }
+    out
 }
 
 /// Merge `src` nodes into the sorted `dst` child list, recursing into
