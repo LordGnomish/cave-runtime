@@ -39,6 +39,7 @@ pub mod routes;
 pub mod sampling;
 pub mod spm;
 pub mod storage;
+pub mod storage_badger;
 pub mod storage_cassandra;
 pub mod storage_es;
 pub mod traceql;
