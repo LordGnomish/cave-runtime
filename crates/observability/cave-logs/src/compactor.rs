@@ -20,7 +20,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::chunk::{ChunkError, decode_chunk, encode_chunk};
+use crate::chunk::{decode_chunk, encode_chunk};
 use crate::models::{Chunk, Codec, LogEntry, TimestampNs};
 
 /// Disable retention by passing this as the cutoff to [`compact`].
@@ -37,34 +37,29 @@ pub struct CompactionStats {
     pub entries_in: usize,
     /// Total entries written to the output chunks.
     pub entries_out: usize,
-    /// Identical `(timestamp_ns, line)` pairs removed.
+    /// Identical `(ts, line)` pairs removed.
     pub entries_deduped: usize,
     /// Entries dropped because they aged past the retention cutoff.
     pub entries_expired: usize,
 }
 
-/// Sort entries by `(timestamp_ns, line)` and collapse exact `(timestamp_ns,
-/// line)` duplicates. Distinct lines that share a timestamp are preserved.
-/// Returns the number of duplicates removed.
+/// Sort entries by `(ts, line)` and collapse exact `(ts, line)` duplicates.
+/// Distinct lines that share a timestamp are preserved. Returns the number of
+/// duplicates removed. Mirrors [`crate::store::LogStore::dedup_entries`].
 fn sort_and_dedupe(entries: &mut Vec<LogEntry>) -> usize {
     let before = entries.len();
-    entries.sort_by(|a, b| {
-        a.timestamp_ns
-            .cmp(&b.timestamp_ns)
-            .then_with(|| a.line.cmp(&b.line))
-    });
-    // Keep `metadata` of the first occurrence; collapse on (ts, line) identity
-    // — this mirrors Loki's de-dupe key, which is timestamp + line.
-    entries.dedup_by(|a, b| a.timestamp_ns == b.timestamp_ns && a.line == b.line);
+    entries.sort_by(|a, b| a.ts.cmp(&b.ts).then_with(|| a.line.cmp(&b.line)));
+    // De-dupe on the (ts, line) key — Loki's de-dupe identity.
+    entries.dedup_by(|a, b| a.ts == b.ts && a.line == b.line);
     before - entries.len()
 }
 
 /// Compact a set of chunks.
 ///
 /// Chunks are grouped by `(tenant, stream_fp)`; each group is merged into a
-/// single re-encoded chunk. Entries with `timestamp_ns < retention_cutoff_ns`
-/// are dropped (pass [`NO_RETENTION`] to disable). The output chunk for each
-/// group is encoded with `out_codec`. Output chunks are returned ordered by
+/// single re-encoded chunk. Entries with `ts < retention_cutoff_ns` are dropped
+/// (pass [`NO_RETENTION`] to disable). The output chunk for each group is
+/// encoded with `out_codec`. Output chunks are returned ordered by
 /// `(tenant, stream_fp)`, so re-running [`compact`] on its own output is a
 /// no-op (idempotent).
 ///
@@ -73,7 +68,7 @@ pub fn compact(
     chunks: &[Chunk],
     retention_cutoff_ns: TimestampNs,
     out_codec: Codec,
-) -> Result<(Vec<Chunk>, CompactionStats), ChunkError> {
+) -> anyhow::Result<(Vec<Chunk>, CompactionStats)> {
     let mut stats = CompactionStats {
         input_chunks: chunks.len(),
         ..Default::default()
@@ -96,7 +91,7 @@ pub fn compact(
 
         // Retention: drop entries older than the cutoff.
         let before_retention = entries.len();
-        entries.retain(|e| e.timestamp_ns >= retention_cutoff_ns);
+        entries.retain(|e| e.ts >= retention_cutoff_ns);
         stats.entries_expired += before_retention - entries.len();
 
         // Sort + dedupe the merged entry set.
@@ -108,9 +103,9 @@ pub fn compact(
         }
 
         // Entries are sorted by (ts, line), so first/last give the ts range.
-        let min_ts = entries.first().map(|e| e.timestamp_ns).unwrap_or(0);
-        let max_ts = entries.last().map(|e| e.timestamp_ns).unwrap_or(0);
-        let uncompressed_size: usize = entries.iter().map(|e| e.estimated_size()).sum();
+        let min_ts = entries.first().map(|e| e.ts).unwrap_or(0);
+        let max_ts = entries.last().map(|e| e.ts).unwrap_or(0);
+        let uncompressed_size: u64 = entries.iter().map(|e| e.size_bytes() as u64).sum();
         let num_entries = entries.len() as u64;
         let data = encode_chunk(&entries, out_codec)?;
 
@@ -140,12 +135,12 @@ mod tests {
         Chunk {
             stream_fp: fp,
             tenant: tenant.to_string(),
-            min_ts: e.iter().map(|x| x.timestamp_ns).min().unwrap_or(0),
-            max_ts: e.iter().map(|x| x.timestamp_ns).max().unwrap_or(0),
+            min_ts: e.iter().map(|x| x.ts).min().unwrap_or(0),
+            max_ts: e.iter().map(|x| x.ts).max().unwrap_or(0),
             num_entries: e.len() as u64,
             codec,
             data: encode_chunk(e, codec).unwrap(),
-            uncompressed_size: e.iter().map(|x| x.estimated_size()).sum(),
+            uncompressed_size: e.iter().map(|x| x.size_bytes() as u64).sum(),
         }
     }
 
