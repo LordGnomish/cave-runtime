@@ -40,9 +40,9 @@ fn test_redact_empty_and_exact_boundary() {
     assert_eq!(redact(""), "");
     // len 4 is the `<= 4` branch boundary: every char masked, no kept chars.
     assert_eq!(redact("abcd"), "****");
-    // len 5 is the first "long" case: keep first ("a") + last ("e"),
-    // mask the middle len-4 = 1 char.
-    assert_eq!(redact("abcde"), "a*e");
+    // len 5 is the first "long" case: keep=2 (first "ab" + last "de"),
+    // mask the middle len - keep*2 = 1 char.
+    assert_eq!(redact("abcde"), "ab*de");
 }
 
 #[test]
