@@ -23,6 +23,16 @@ pub enum DnsCommand {
     Cache { action: CacheAction },
     /// `cavectl dns reload`
     Reload,
+    /// `cavectl dns corefile {validate|show} <path>`
+    Corefile { action: CorefileAction, path: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CorefileAction {
+    /// Parse the Corefile and report errors (exit non-zero on failure).
+    Validate,
+    /// Parse the Corefile and print the resolved server blocks.
+    Show,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,7 +56,7 @@ pub enum CacheAction {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CliError {
-    #[error("dns: missing subcommand (one of: query, zone, plugin, cache, reload)")]
+    #[error("dns: missing subcommand (one of: query, zone, plugin, cache, reload, corefile)")]
     MissingSubcommand,
     #[error("dns: unknown subcommand: {0}")]
     UnknownSubcommand(String),
@@ -134,6 +144,24 @@ pub fn parse(argv: &[&str]) -> Result<DnsCommand, CliError> {
             }
             Ok(DnsCommand::Reload)
         }
+        "corefile" => {
+            let action_str = iter
+                .next()
+                .ok_or(CliError::MissingArgument("corefile", "<action>"))?;
+            let action = match action_str {
+                "validate" => CorefileAction::Validate,
+                "show" => CorefileAction::Show,
+                other => return Err(CliError::UnknownAction("corefile", other.to_string())),
+            };
+            let path = iter
+                .next()
+                .ok_or(CliError::MissingArgument("corefile validate|show", "<path>"))?
+                .to_string();
+            if let Some(extra) = iter.next() {
+                return Err(CliError::UnexpectedArgument(extra.to_string()));
+            }
+            Ok(DnsCommand::Corefile { action, path })
+        }
         other => Err(CliError::UnknownSubcommand(other.to_string())),
     }
 }
@@ -147,7 +175,8 @@ pub fn help() -> &'static str {
      \tzone    list|show|reload [zone]  inspect / reload zones\n\
      \tplugin  list|describe [name]     list plugins / describe one\n\
      \tcache   stats|flush              cache introspection\n\
-     \treload                           reload the running config\n"
+     \treload                           reload the running config\n\
+     \tcorefile validate|show <path>   parse / validate a Corefile\n"
 }
 
 #[cfg(test)]
