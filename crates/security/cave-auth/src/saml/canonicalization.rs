@@ -541,4 +541,62 @@ mod tests {
         let s = std::str::from_utf8(&out).unwrap();
         assert_eq!(s, "<a x=\"p&#x9;q&#xA;r&#xD;s\"></a>", "got: {s}");
     }
+
+    // ── Cycle 2: exc-c14n InclusiveNamespaces PrefixList
+    // (xml-exc-c14n §2.2 / the `<ec:InclusiveNamespaces
+    // PrefixList="…">` transform parameter). Prefixes in the
+    // list are processed as in inclusive c14n: their in-scope
+    // declarations are retained at the apex even when not
+    // visibly utilised. ───────────────────────────────────────
+
+    #[test]
+    fn prefix_list_retains_otherwise_unused_namespace() {
+        // `other:` is declared but never used. Plain exc-c14n
+        // drops it; with it in the PrefixList it must survive.
+        let xml = br#"<samlp:Req xmlns:samlp="urn:p" xmlns:other="urn:o"/>"#;
+        let dropped = exc_c14n(xml).unwrap();
+        let s_dropped = std::str::from_utf8(&dropped).unwrap();
+        assert!(!s_dropped.contains("xmlns:other"), "plain: {s_dropped}");
+
+        let kept = exc_c14n_with_prefixes(xml, &["other"]).unwrap();
+        let s = std::str::from_utf8(&kept).unwrap();
+        assert!(s.contains(r#"xmlns:other="urn:o""#), "got: {s}");
+        // The visibly-utilised samlp: declaration is still there.
+        assert!(s.contains(r#"xmlns:samlp="urn:p""#), "got: {s}");
+    }
+
+    #[test]
+    fn prefix_list_default_namespace_via_empty_token() {
+        // The default-namespace token in a PrefixList is the
+        // literal "#default" (xml-exc-c14n §2.2). It keeps an
+        // otherwise-unused default xmlns declaration.
+        let xml = br#"<p:R xmlns:p="urn:p" xmlns="urn:def"/>"#;
+        let dropped = exc_c14n(xml).unwrap();
+        assert!(
+            !std::str::from_utf8(&dropped).unwrap().contains("xmlns=\""),
+            "default ns should drop without prefix list"
+        );
+        let kept = exc_c14n_with_prefixes(xml, &["#default"]).unwrap();
+        let s = std::str::from_utf8(&kept).unwrap();
+        assert!(s.contains(r#"xmlns="urn:def""#), "got: {s}");
+    }
+
+    #[test]
+    fn prefix_list_only_affects_listed_prefixes() {
+        // Two unused prefixes; only the listed one survives.
+        let xml = br#"<p:R xmlns:p="urn:p" xmlns:a="urn:a" xmlns:b="urn:b"/>"#;
+        let kept = exc_c14n_with_prefixes(xml, &["a"]).unwrap();
+        let s = std::str::from_utf8(&kept).unwrap();
+        assert!(s.contains(r#"xmlns:a="urn:a""#), "got: {s}");
+        assert!(!s.contains("xmlns:b"), "b should drop: {s}");
+    }
+
+    #[test]
+    fn prefix_list_empty_equals_plain_exc_c14n() {
+        let xml = br#"<samlp:Req xmlns:samlp="urn:p" xmlns:other="urn:o"/>"#;
+        assert_eq!(
+            exc_c14n_with_prefixes(xml, &[]).unwrap(),
+            exc_c14n(xml).unwrap()
+        );
+    }
 }
