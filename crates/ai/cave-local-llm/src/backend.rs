@@ -142,6 +142,7 @@ impl InferenceBackend for OllamaBackend {
                     .map(|m| ChatMessage {
                         role: m.role,
                         content: m.content,
+                        ..Default::default()
                     })
                     .collect(),
                 stream: Some(false),

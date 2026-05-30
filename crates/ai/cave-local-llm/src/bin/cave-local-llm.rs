@@ -135,6 +135,7 @@ async fn run(cli: Cli) -> Result<()> {
                 stream: Some(false),
                 options: None,
                 keep_alive: None,
+                images: None,
             };
 
             let response = ollama.generate(req).await.map_err(|e| {

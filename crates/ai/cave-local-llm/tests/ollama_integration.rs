@@ -91,6 +91,7 @@ async fn test_generate_returns_response() {
         stream: Some(false),
         options: None,
         keep_alive: None,
+        images: None,
     };
 
     let resp = client.generate(req).await.expect("generate should succeed");
@@ -127,6 +128,7 @@ async fn test_generate_stream_collects_all_chunks() {
         stream: Some(true),
         options: None,
         keep_alive: None,
+        images: None,
     };
 
     let mut stream = client
@@ -172,6 +174,7 @@ async fn test_generate_stream_skips_empty_lines() {
             stream: Some(true),
             options: None,
             keep_alive: None,
+            images: None,
         })
         .await
         .unwrap();
@@ -202,6 +205,7 @@ async fn test_chat_returns_response() {
         messages: vec![ChatMessage {
             role: "user".into(),
             content: "hi".into(),
+            ..Default::default()
         }],
         stream: Some(false),
         options: None,
@@ -238,6 +242,7 @@ async fn test_chat_stream_collects_chunks() {
         messages: vec![ChatMessage {
             role: "user".into(),
             content: "hey".into(),
+            ..Default::default()
         }],
         stream: Some(true),
         options: None,

@@ -6,6 +6,7 @@
 /// Overridden at runtime by OLLAMA_MODEL env var or CLI --model flag.
 pub const DEFAULT_MODEL: &str = "qwen3-coder-next:Q4_K_M";
 
+use base64::Engine as _;
 use futures::{Stream, StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,14 @@ pub type OllamaResult<T> = Result<T, OllamaError>;
 
 /// Boxed, pinned stream of `T` items from an Ollama streaming endpoint.
 pub type OllamaStream<T> = Pin<Box<dyn Stream<Item = OllamaResult<T>> + Send>>;
+
+/// Base64-encode raw image bytes for the `images` field of a generate/chat
+/// request. Cite api/types.go `ImageData []byte` — Ollama serialises raw image
+/// bytes as standard base64 strings on the wire for multimodal models (llava,
+/// llama3.2-vision, …).
+pub fn encode_image(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
 
 // ── Request / response types ──────────────────────────────────────────────────
 
@@ -60,6 +69,11 @@ pub struct GenerateRequest {
     /// duration strings ("5m", "1h", "24h") or "-1" for indefinite.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_alive: Option<String>,
+    /// Base64-encoded images for multimodal models. Cite api/types.go
+    /// `GenerateRequest.Images []ImageData`. Use [`encode_image`] to build
+    /// entries from raw bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,10 +103,14 @@ pub struct GenerateChunk {
     pub total_duration: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    /// Base64-encoded images for multimodal chat. Cite api/types.go
+    /// `Message.Images []ImageData`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -350,6 +368,7 @@ mod tests {
             stream: Some(false),
             options: None,
             keep_alive: None,
+            images: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"stream\":false"));
