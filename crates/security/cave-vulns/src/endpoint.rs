@@ -66,25 +66,154 @@ pub struct Endpoint {
 impl Endpoint {
     /// Parse a URI string into its components, applying DefectDojo's
     /// `clean()` normalization. Mirrors `Endpoint.from_uri`.
-    pub fn from_uri(_uri: &str) -> Result<Self, EndpointError> {
-        Err(EndpointError::MissingHost) // stub — implemented in GREEN commit
+    ///
+    /// Decomposition order matches RFC-3986: fragment (`#`) and query
+    /// (`?`) are peeled off the tail first, then the scheme (`://` or a
+    /// leading `//`), then `userinfo@`, then `host[:port]`, then the
+    /// root-less path. A `:port` equal to the scheme default collapses
+    /// to `None` (upstream stores null in that case).
+    pub fn from_uri(uri: &str) -> Result<Self, EndpointError> {
+        let mut rest = uri;
+
+        // 1. fragment — everything after the first '#'.
+        let fragment = split_off(&mut rest, '#');
+        // 2. query — everything after the first '?'.
+        let query = split_off(&mut rest, '?');
+
+        // 3. scheme + authority/path.
+        let (protocol, authority_path) = if let Some(idx) = rest.find("://") {
+            (Some(rest[..idx].to_ascii_lowercase()), &rest[idx + 3..])
+        } else if let Some(stripped) = rest.strip_prefix("//") {
+            (None, stripped)
+        } else {
+            // Scheme-less / authority-only — treat the whole thing as the
+            // authority + path (importers prepend "//" for this shape).
+            (None, rest)
+        };
+
+        // 4. split authority from path at the first '/'.
+        let (authority, raw_path) = match authority_path.find('/') {
+            Some(i) => (&authority_path[..i], Some(&authority_path[i..])),
+            None => (authority_path, None),
+        };
+
+        // 5. userinfo@ — split on the last '@' in the authority.
+        let (userinfo, hostport) = match authority.rfind('@') {
+            Some(i) => (Some(authority[..i].to_string()), &authority[i + 1..]),
+            None => (None, authority),
+        };
+
+        // 6. host[:port], handling bracketed IPv6 literals.
+        let (host_raw, port_raw) = split_host_port(hostport)?;
+        if host_raw.is_empty() {
+            return Err(EndpointError::MissingHost);
+        }
+        let host = host_raw.to_string();
+
+        // 7. port → u16, then collapse scheme-default ports to None.
+        let mut port = match port_raw {
+            Some(p) if !p.is_empty() => Some(
+                p.parse::<u16>()
+                    .map_err(|_| EndpointError::InvalidPort(p.to_string()))?,
+            ),
+            _ => None,
+        };
+        if let (Some(proto), Some(p)) = (&protocol, port) {
+            if scheme_default_port(proto) == Some(p) {
+                port = None;
+            }
+        }
+
+        // 8. path — strip all leading slashes (root-less); empty → None.
+        let path = raw_path
+            .map(|p| p.trim_start_matches('/').to_string())
+            .filter(|p| !p.is_empty());
+
+        Ok(Self {
+            protocol,
+            userinfo,
+            host,
+            port,
+            path,
+            query,
+            fragment,
+            product_id: None,
+        })
     }
 
     /// The port that actually applies: the explicit port if stored,
     /// otherwise the scheme default. Mirrors upstream port inference.
     pub fn effective_port(&self) -> Option<u16> {
-        None // stub
+        self.port
+            .or_else(|| self.protocol.as_deref().and_then(scheme_default_port))
     }
 
     /// `True` when the endpoint can never resolve (no host).
     pub fn is_broken(&self) -> bool {
-        true // stub
+        self.host.is_empty()
     }
 }
 
 impl std::fmt::Display for Endpoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.host) // stub
+        if let Some(p) = &self.protocol {
+            write!(f, "{p}://")?;
+        }
+        if let Some(u) = &self.userinfo {
+            write!(f, "{u}@")?;
+        }
+        // Bracket IPv6 literals (host containing ':' and not already bracketed).
+        if self.host.contains(':') && !self.host.starts_with('[') {
+            write!(f, "[{}]", self.host)?;
+        } else {
+            write!(f, "{}", self.host)?;
+        }
+        if let Some(port) = self.port {
+            write!(f, ":{port}")?;
+        }
+        if let Some(path) = &self.path {
+            write!(f, "/{path}")?;
+        }
+        if let Some(q) = &self.query {
+            write!(f, "?{q}")?;
+        }
+        if let Some(fr) = &self.fragment {
+            write!(f, "#{fr}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Split `s` at the first occurrence of `sep`, returning the suffix (if any)
+/// and truncating `s` in place to the prefix. Empty suffix → `None`.
+fn split_off(s: &mut &str, sep: char) -> Option<String> {
+    match s.find(sep) {
+        Some(i) => {
+            let tail = s[i + sep.len_utf8()..].to_string();
+            *s = &s[..i];
+            if tail.is_empty() { None } else { Some(tail) }
+        }
+        None => None,
+    }
+}
+
+/// Split a `host[:port]` authority chunk, honoring `[ipv6]:port` literals.
+/// Returns `(host_without_brackets, Some(port_str))`.
+fn split_host_port(hostport: &str) -> Result<(&str, Option<&str>), EndpointError> {
+    if let Some(rest) = hostport.strip_prefix('[') {
+        // Bracketed IPv6: host is up to ']', optional ':port' follows.
+        let close = rest
+            .find(']')
+            .ok_or_else(|| EndpointError::InvalidPort(hostport.to_string()))?;
+        let host = &rest[..close];
+        let after = &rest[close + 1..];
+        let port = after.strip_prefix(':');
+        Ok((host, port))
+    } else {
+        match hostport.rfind(':') {
+            Some(i) => Ok((&hostport[..i], Some(&hostport[i + 1..]))),
+            None => Ok((hostport, None)),
+        }
     }
 }
 
@@ -104,13 +233,13 @@ pub struct EndpointStatus {
 }
 
 impl EndpointStatus {
-    pub fn new(_endpoint_id: Uuid, _finding_id: Uuid) -> Self {
-        // stub — implemented in GREEN commit
+    pub fn new(endpoint_id: Uuid, finding_id: Uuid) -> Self {
+        let now = Utc::now();
         Self {
-            endpoint_id: Uuid::nil(),
-            finding_id: Uuid::nil(),
-            date: Utc::now(),
-            last_modified: Utc::now(),
+            endpoint_id,
+            finding_id,
+            date: now,
+            last_modified: now,
             mitigated: false,
             mitigated_time: None,
             mitigated_by: None,
@@ -121,8 +250,13 @@ impl EndpointStatus {
     }
 
     /// Mark mitigated by `actor`, stamping `mitigated_time`/`last_modified`.
-    pub fn mitigate(&mut self, _actor: &str) {
-        // stub
+    /// Mirrors `Endpoint_Status.save` setting `mitigated_time` on transition.
+    pub fn mitigate(&mut self, actor: &str) {
+        let now = Utc::now();
+        self.mitigated = true;
+        self.mitigated_time = Some(now);
+        self.mitigated_by = Some(actor.to_string());
+        self.last_modified = now;
     }
 }
 
