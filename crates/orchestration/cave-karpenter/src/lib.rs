@@ -28,6 +28,7 @@
 
 pub mod batcher;
 pub mod binpack;
+pub mod budgets;
 pub mod disruption;
 pub mod drain;
 pub mod models;
