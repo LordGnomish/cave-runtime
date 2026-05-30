@@ -1,0 +1,28 @@
+[package]
+name = "cave-rag"
+description = "Cave RAG — retrieval-augmented generation framework (loaders, splitters, embeddings, retrievers, rerankers, GraphRAG, agentic RAG)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-rag"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["rag", "retrieval", "llm", "embeddings", "graphrag"]
+categories = ["text-processing", "science", "api-bindings"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+regex = { workspace = true }
+sha2 = { workspace = true }
+pulldown-cmark = { workspace = true }
+flate2 = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+proptest = "1"
+tempfile = "3"
