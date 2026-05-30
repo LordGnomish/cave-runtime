@@ -481,7 +481,14 @@ impl RaftCore {
     /// joint-aware `VoteResult` primitive so a future joint reconfiguration is
     /// handled correctly.
     pub fn election_vote_result(&self) -> cave_etcd::raft_tracker::VoteResult {
-        unimplemented!()
+        let mut tracker = cave_etcd::raft_tracker::ProgressTracker::new(1);
+        for &m in &self.members {
+            tracker.add_voter(m);
+        }
+        for &granted in &self.votes_received {
+            tracker.record_vote(granted, true);
+        }
+        tracker.vote_result()
     }
 
     // ── Inbound RPC handlers ───────────────────────────────────────────────
@@ -647,7 +654,9 @@ impl RaftCore {
         }
         if reply.vote_granted {
             self.votes_received.insert(from);
-            if self.votes_received.len() >= self.majority() {
+            // Promote through the ported etcd VoteResult tally (joint-aware);
+            // for a single config this is identical to the strict-majority test.
+            if self.election_vote_result() == cave_etcd::raft_tracker::VoteResult::Won {
                 self.become_leader(now);
             }
         }
