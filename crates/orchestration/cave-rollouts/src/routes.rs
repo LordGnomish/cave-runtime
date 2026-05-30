@@ -20,6 +20,7 @@ use crate::{
     RolloutsState,
     engine::{advance_canary, apply_canary_action, initial_status},
     models::*,
+    traffic_router::{TrafficProvider, WeightSplit, render_patch},
 };
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -36,6 +37,8 @@ pub fn create_router(state: Arc<RolloutsState>) -> Router {
         )
         .route("/api/rollouts/{rollout_id}/status", get(rollout_status))
         .route("/api/rollouts/{rollout_id}/action", post(rollout_action))
+        // Traffic-router patch preview (Istio/SMI/NGINX/ALB/Apisix/Plugin/Traefik/Ambassador/AppMesh)
+        .route("/api/rollouts/traffic/preview", post(traffic_preview))
         // Analysis templates
         .route(
             "/api/rollouts/analysis/templates",
@@ -148,6 +151,30 @@ async fn rollout_action(
     // TODO: load rollout from DB, call apply_canary_action / blue_green equivalent
     let _ = req;
     StatusCode::ACCEPTED
+}
+
+// ── Traffic router preview ─────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct TrafficPreviewRequest {
+    provider: TrafficProvider,
+    canary_weight: u8,
+    stable_service: String,
+    canary_service: String,
+}
+
+/// POST /api/rollouts/traffic/preview — render the provider-specific manifest
+/// patch a controller would apply for the given canary weight. Pure function;
+/// no cluster access.
+async fn traffic_preview(Json(req): Json<TrafficPreviewRequest>) -> impl IntoResponse {
+    let split = WeightSplit::new(req.canary_weight);
+    let patch = render_patch(
+        &req.provider,
+        &split,
+        &req.stable_service,
+        &req.canary_service,
+    );
+    (StatusCode::OK, Json(patch))
 }
 
 // ── Analysis Templates ────────────────────────────────────────────────────────
