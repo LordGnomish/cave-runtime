@@ -155,6 +155,20 @@ local    = "src/logql/eval.rs"
 upstream = "pkg/logql/log/keep_labels.go"
 local    = "src/logql/eval.rs"
 
+# `ip()` matcher ported 2026-05-30 (cont2, strict-TDD): single / CIDR /
+# inclusive-range patterns (v4+v6), used by both line filters (`|= ip("…")`,
+# `!= ip("…")`) and label filters (`| addr = ip("…")`). Family-sensitive.
+[[files]]
+upstream = "pkg/logql/log/ip.go"
+local    = "src/logql/ip.rs"
+
+# `label_replace(v, dst, repl, src, regex)` ported 2026-05-30 (cont2,
+# strict-TDD): Prometheus-semantics label rewrite over vector/matrix results
+# — regex anchored to whole src value, $-capture expansion, empty→delete.
+[[files]]
+upstream = "pkg/logql/syntax/ast.go (LabelReplaceExpr)"
+local    = "src/logql/eval.rs"
+
 [[files]]
 upstream = "pkg/logql/logql.go"
 local    = "src/logql/mod.rs"
