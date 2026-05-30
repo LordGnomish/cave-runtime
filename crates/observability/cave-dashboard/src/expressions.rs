@@ -8,6 +8,221 @@
 //! reduce / resample / math / classic-condition operations entirely
 //! server-side, exactly like Grafana's `__expr__` datasource.
 
+// ── mathexp reducers — pkg/expr/mathexp/reduce.go ───────────────────────────
+
+/// The reduction function applied to a series to produce a single number.
+/// Mirrors `mathexp.ReducerID`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReducerId {
+    Sum,
+    Mean,
+    Min,
+    Max,
+    Count,
+    Last,
+    Median,
+}
+
+impl ReducerId {
+    /// Parse a reducer name (case-insensitive), matching
+    /// `mathexp.ReducerID(strings.ToLower(redString))`.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "sum" => Some(ReducerId::Sum),
+            "mean" => Some(ReducerId::Mean),
+            "min" => Some(ReducerId::Min),
+            "max" => Some(ReducerId::Max),
+            "count" => Some(ReducerId::Count),
+            "last" => Some(ReducerId::Last),
+            "median" => Some(ReducerId::Median),
+            _ => None,
+        }
+    }
+
+    /// Supported reducer ids — `GetSupportedReduceFuncs()`.
+    pub fn supported() -> &'static [ReducerId] {
+        &[
+            ReducerId::Sum,
+            ReducerId::Mean,
+            ReducerId::Min,
+            ReducerId::Max,
+            ReducerId::Count,
+            ReducerId::Last,
+            ReducerId::Median,
+        ]
+    }
+}
+
+#[inline]
+fn is_nil_or_nan(v: Option<f64>) -> bool {
+    match v {
+        None => true,
+        Some(f) => f.is_nan(),
+    }
+}
+
+/// Sum — any nil/NaN element forces the whole reduction to NaN (Go `Sum`).
+fn r_sum(vals: &[Option<f64>]) -> f64 {
+    let mut sum = 0.0;
+    for &v in vals {
+        match v {
+            Some(f) if !f.is_nan() => sum += f,
+            _ => return f64::NAN,
+        }
+    }
+    sum
+}
+
+/// Mean = Sum / Len (Go `Avg`). Len counts every point.
+fn r_avg(vals: &[Option<f64>]) -> f64 {
+    let sum = r_sum(vals);
+    sum / vals.len() as f64
+}
+
+fn r_min(vals: &[Option<f64>]) -> f64 {
+    if vals.is_empty() {
+        return f64::NAN;
+    }
+    let mut f = 0.0;
+    for (i, &v) in vals.iter().enumerate() {
+        match v {
+            Some(x) if !x.is_nan() => {
+                if i == 0 || x < f {
+                    f = x;
+                }
+            }
+            _ => return f64::NAN,
+        }
+    }
+    f
+}
+
+fn r_max(vals: &[Option<f64>]) -> f64 {
+    if vals.is_empty() {
+        return f64::NAN;
+    }
+    let mut f = 0.0;
+    for (i, &v) in vals.iter().enumerate() {
+        match v {
+            Some(x) if !x.is_nan() => {
+                if i == 0 || x > f {
+                    f = x;
+                }
+            }
+            _ => return f64::NAN,
+        }
+    }
+    f
+}
+
+/// Count = number of points, including nils (Go `Count`).
+fn r_count(vals: &[Option<f64>]) -> f64 {
+    vals.len() as f64
+}
+
+fn r_last(vals: &[Option<f64>]) -> f64 {
+    match vals.last() {
+        None => f64::NAN,
+        Some(None) => f64::NAN,
+        Some(Some(f)) => *f,
+    }
+}
+
+fn r_median(vals: &[Option<f64>]) -> f64 {
+    let mut values: Vec<f64> = Vec::with_capacity(vals.len());
+    for &v in vals {
+        match v {
+            Some(f) if !f.is_nan() => values.push(f),
+            _ => return f64::NAN,
+        }
+    }
+    if values.is_empty() {
+        return f64::NAN;
+    }
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mid = values.len() / 2;
+    if values.len() % 2 == 0 {
+        (values[mid - 1] + values[mid]) / 2.0
+    } else {
+        values[mid]
+    }
+}
+
+/// Reduce a series of optional values to a single `Number`, where `None`
+/// represents a null result and `Some(NaN)` a NaN result — matching
+/// Grafana's `Series.Reduce`. The reducer never returns a Go-nil here, so the
+/// result is always `Some`.
+pub fn reduce_series(reducer: ReducerId, vals: &[Option<f64>]) -> Option<f64> {
+    let f = match reducer {
+        ReducerId::Sum => r_sum(vals),
+        ReducerId::Mean => r_avg(vals),
+        ReducerId::Min => r_min(vals),
+        ReducerId::Max => r_max(vals),
+        ReducerId::Count => r_count(vals),
+        ReducerId::Last => r_last(vals),
+        ReducerId::Median => r_median(vals),
+    };
+    Some(f)
+}
+
+// ── ReduceMapper — pkg/expr/mathexp/reduce.go ───────────────────────────────
+
+/// Maps points before/after reduction. Mirrors the `ReduceMapper` interface
+/// implementations `DropNonNumber` and `ReplaceNonNumberWithValue`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ReduceMapper {
+    /// Drop nil / NaN / Inf points entirely.
+    DropNonNumber,
+    /// Replace nil / NaN / Inf points with a fixed value.
+    ReplaceNonNumber(f64),
+}
+
+impl ReduceMapper {
+    /// `MapInput` — applied to each point of the source series.
+    pub fn map_input(&self, v: Option<f64>) -> Option<f64> {
+        match self {
+            ReduceMapper::DropNonNumber => match v {
+                Some(f) if !f.is_nan() && !f.is_infinite() => Some(f),
+                _ => None,
+            },
+            ReduceMapper::ReplaceNonNumber(value) => match v {
+                Some(f) if !f.is_nan() && !f.is_infinite() => Some(f),
+                _ => Some(*value),
+            },
+        }
+    }
+
+    /// `MapOutput` — applied to the reduced result.
+    pub fn map_output(&self, v: Option<f64>) -> Option<f64> {
+        match self {
+            ReduceMapper::DropNonNumber => match v {
+                Some(f) if f.is_nan() => None,
+                other => other,
+            },
+            ReduceMapper::ReplaceNonNumber(value) => match v {
+                Some(f) if f.is_nan() => Some(*value),
+                other => other,
+            },
+        }
+    }
+}
+
+/// Reduce with a mapper — the source series is mapped (dropping `None`
+/// results) before reduction, then the output is mapped, matching
+/// `Series.Reduce` with a non-nil `mapper`.
+pub fn reduce_series_mapped(
+    reducer: ReducerId,
+    vals: &[Option<f64>],
+    mapper: &ReduceMapper,
+) -> Option<f64> {
+    let mapped: Vec<Option<f64>> = vals
+        .iter()
+        .filter_map(|&v| mapper.map_input(v).map(Some))
+        .collect();
+    let reduced = reduce_series(reducer, &mapped);
+    mapper.map_output(reduced)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
