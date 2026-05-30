@@ -176,4 +176,106 @@ mod tests {
         assert!(!b.has_capacity(), "scaled back to zero closes it");
         assert_eq!(b.capacity(), 0);
     }
+
+    // ── Cycle 4: pick_indices + assign_slice + pick_p2c + retry ─────────────
+
+    #[test]
+    fn pick_indices_more_activators_than_trackers_is_round_robin() {
+        // numActivators(5) > numTrackers(3): selfIndex % numTrackers, width 1
+        assert_eq!(pick_indices(3, 0, 5), (0, 1, 0));
+        assert_eq!(pick_indices(3, 4, 5), (1, 2, 0)); // 4 % 3 == 1
+    }
+
+    #[test]
+    fn pick_indices_even_split_no_remnants() {
+        // 6 trackers / 3 activators = slice 2, no remnant
+        assert_eq!(pick_indices(6, 0, 3), (0, 2, 0));
+        assert_eq!(pick_indices(6, 2, 3), (4, 6, 0));
+    }
+
+    #[test]
+    fn pick_indices_uneven_split_has_remnants() {
+        // 7 trackers / 3 activators = slice 2, remnant 1
+        assert_eq!(pick_indices(7, 0, 3), (0, 2, 1));
+        assert_eq!(pick_indices(7, 2, 3), (4, 6, 1));
+    }
+
+    #[test]
+    fn assign_slice_single_activator_takes_all() {
+        let trackers = vec![10u32, 11, 12, 13];
+        assert_eq!(assign_slice(&trackers, 0, 1), trackers);
+    }
+
+    #[test]
+    fn assign_slice_one_or_zero_trackers_returns_all() {
+        let trackers = vec![10u32];
+        assert_eq!(assign_slice(&trackers, 0, 3), trackers);
+        assert_eq!(assign_slice(&[], 0, 3), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn assign_slice_even_split_partitions() {
+        let trackers = vec![10u32, 11, 12, 13, 14, 15];
+        assert_eq!(assign_slice(&trackers, 0, 3), vec![10, 11]);
+        assert_eq!(assign_slice(&trackers, 1, 3), vec![12, 13]);
+        assert_eq!(assign_slice(&trackers, 2, 3), vec![14, 15]);
+    }
+
+    #[test]
+    fn assign_slice_remnant_goes_to_low_index_activators() {
+        // 7 trackers, 3 activators: slice 2, remnant 1 (the last tracker, id 16).
+        let trackers = vec![10u32, 11, 12, 13, 14, 15, 16];
+        // tail = [16]; only selfIndex 0 (< len(tail)=1) gets the remnant.
+        assert_eq!(assign_slice(&trackers, 0, 3), vec![10, 11, 16]);
+        assert_eq!(assign_slice(&trackers, 1, 3), vec![12, 13]);
+        assert_eq!(assign_slice(&trackers, 2, 3), vec![14, 15]);
+    }
+
+    #[test]
+    fn p2c_empty_is_none_single_is_zero() {
+        assert_eq!(pick_p2c(&[], 0, 0, false), None);
+        assert_eq!(pick_p2c(&[7], 0, 0, false), Some(0));
+    }
+
+    #[test]
+    fn p2c_picks_lower_weight_of_two() {
+        // weights: idx0=5, idx1=2, idx2=9. r1=0, r2=1 -> compare 5 vs 2 -> pick idx1
+        assert_eq!(pick_p2c(&[5, 2, 9], 0, 1, false), Some(1));
+    }
+
+    #[test]
+    fn p2c_shifts_second_index_to_avoid_collision() {
+        // r1=1, r2=1 -> r2 >= r1 so r2 becomes 2; compare idx1=2 vs idx2=9 -> idx1
+        assert_eq!(pick_p2c(&[5, 2, 9], 1, 1, false), Some(1));
+    }
+
+    #[test]
+    fn p2c_tie_uses_coin() {
+        // equal weights at idx0 and idx1; coin=false keeps pick(r1), coin=true takes alt
+        assert_eq!(pick_p2c(&[4, 4], 0, 0, false), Some(0));
+        assert_eq!(pick_p2c(&[4, 4], 0, 0, true), Some(1));
+    }
+
+    #[test]
+    fn retry_policy_retries_503_with_exponential_backoff() {
+        let p = RetryPolicy {
+            max_retries: 3,
+            base_backoff_ms: 100,
+        };
+        assert_eq!(p.should_retry(503, 0), Some(100)); // 100 * 2^0
+        assert_eq!(p.should_retry(503, 1), Some(200)); // 100 * 2^1
+        assert_eq!(p.should_retry(503, 2), Some(400)); // 100 * 2^2
+        assert_eq!(p.should_retry(503, 3), None); // exhausted
+    }
+
+    #[test]
+    fn retry_policy_does_not_retry_success_or_4xx() {
+        let p = RetryPolicy {
+            max_retries: 5,
+            base_backoff_ms: 50,
+        };
+        assert_eq!(p.should_retry(200, 0), None);
+        assert_eq!(p.should_retry(404, 0), None);
+        assert_eq!(p.should_retry(500, 0), None, "only 503 (cold-start) retries");
+    }
 }
