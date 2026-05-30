@@ -15,27 +15,40 @@ url     = "https://github.com/vmware-tanzu/velero"
 # 2026-05-29 Charter v2 close — fill_ratio 0.0 → 1.0
 #   Upstream surface enumerated at top-level package / subsystem granularity
 #   (vmware-tanzu/velero).  11 internal/ packages fully mapped in [[files]].
-#   13 upstream subsystems scope-cut per ADR-RUNTIME-PARITY-100-PCT-001 §5:
-#     cli-replaced(1) + plugin-framework-only(4) + parallel-track(2) +
+#   Upstream subsystems scope-cut per ADR-RUNTIME-PARITY-100-PCT-001 §5
+#   (as of 2026-05-30, after wave-2 reclassified pkg/backup/ + pkg/restore/ to mapped):
+#     cli-replaced(1) + plugin-framework-only(2) + parallel-track(2) +
 #     sovereign-cloud(1) + runtime-bootstrap-owned(1) +
 #     persistence-consolidation(2) + architecturally-superseded(1) +
-#     portal-api-owned(1).
-#   honest_ratio = 11/24 preserved — real baseline, not inflated.
+#     portal-api-owned(1) = 11 skipped.
+#   honest_ratio computed from real mapped line-ports — not inflated.
 # 2026-05-29 fresh-impl: ported Velero schedule_controller.go getNextRunTime via strict-TDD
 #   (test 8b6364a8 RED → impl 8382e416 GREEN) — src/schedule.rs::next_run (hand-rolled 5-field cron
 #   parser, no external dep). Distinct now-implemented piece of the otherwise-skipped controller pkg.
 #   mapped 11→12, total 24→25. fill_ratio stays 1.0.
-mapped_count          = 12
+# 2026-05-30 wave-2 honest uplift: ported two pure engine pieces out of the previously
+#   over-broad plugin-framework-only skips, via strict-TDD (two RED→GREEN cycles):
+#     - pkg/util/collections/includes_excludes.go (IncludesExcludes.ShouldInclude /
+#       IncludeEverything + ValidateIncludesExcludes + in-crate glob matcher) →
+#       src/includes_excludes.rs. The pkg/backup/ skip was reclassified: its *action plugin*
+#       SDK stays Rust-trait-dispatched, but the resource/namespace selection engine it
+#       relied on is now genuinely line-ported (20 mirror tests).
+#     - pkg/types/priority.go (Priorities parse/String) + pkg/restore/restore.go
+#       getOrderedResources → src/restore_order.rs. The pkg/restore/ skip was reclassified:
+#       its *RestoreItemAction* SDK stays trait-dispatched, but the deterministic restore
+#       resource-ordering engine is now genuinely line-ported (11 mirror tests).
+#   mapped 12→14, skipped 13→11, total stays 25. honest_ratio 0.48 → 0.56. fill_ratio stays 1.0.
+mapped_count          = 14
 partial_count         = 0
-skipped_count         = 13
+skipped_count         = 11
 unmapped_count        = 0
 total                 = 25
 fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 25/25
-honest_ratio          = 0.48    # mapped / total = 12/25 — preserved honestly
-adr_justified_ratio   = 1.0     # all 13 skipped entries architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5
+honest_ratio          = 0.56    # mapped / total = 14/25 — raised honestly via 2 TDD line-ports
+adr_justified_ratio   = 1.0     # all 11 skipped entries architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-29"
+last_audit            = "2026-05-30"
 infra_only            = false
 
 # ── Scope cuts (reclassified 2026-05-29) ─────────────────────────────────────
@@ -78,16 +91,6 @@ note         = "Restic/Kopia repository management consolidated into cave-artifa
 upstream_pkg = "pkg/apis/"
 reason       = "architecturally-superseded"
 note         = "Generated CRD API types superseded by cave-k8s CRD generation layer; ADR-RUNTIME-PARITY-100-PCT-001 §5.architecturally-superseded"
-
-[[skipped]]
-upstream_pkg = "pkg/restore/"
-reason       = "plugin-framework-only"
-note         = "Restore item action plugin framework; extensibility handled via Rust trait objects; ADR-RUNTIME-PARITY-100-PCT-001 §5.plugin-framework-only"
-
-[[skipped]]
-upstream_pkg = "pkg/backup/"
-reason       = "plugin-framework-only"
-note         = "Backup item action plugin framework; extensibility handled via Rust trait objects; ADR-RUNTIME-PARITY-100-PCT-001 §5.plugin-framework-only"
 
 [[skipped]]
 upstream_pkg = "pkg/uploader/"
@@ -145,6 +148,14 @@ local    = "src/schedule.rs"
 [[files]]
 upstream = "pkg/controller/schedule_controller.go (getNextRunTime)"
 local    = "src/schedule.rs"  # next_run() — 5-field cron next-run computation (2026-05-29 fresh-impl)
+
+[[files]]
+upstream = "pkg/util/collections/includes_excludes.go"
+local    = "src/includes_excludes.rs"  # IncludesExcludes selection engine + ValidateIncludesExcludes + in-crate glob (2026-05-30 wave-2 TDD; reclassified from pkg/backup/ skip)
+
+[[files]]
+upstream = "pkg/types/priority.go + pkg/restore/restore.go (getOrderedResources)"
+local    = "src/restore_order.rs"  # Priorities parse/String + restore resource-ordering engine (2026-05-30 wave-2 TDD; reclassified from pkg/restore/ skip)
 
 [[files]]
 upstream = "internal/storage.go"
