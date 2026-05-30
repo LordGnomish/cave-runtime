@@ -23,6 +23,9 @@ pub enum BenchSubcommand {
     Schedules,
     /// `cavectl bench observability` — print dashboards + alerts.
     Observability,
+    /// `cavectl bench validate-custom --file <framework.json>` — parse +
+    /// validate an operator-authored custom benchmark framework.
+    ValidateCustom { framework_json: String },
 }
 
 /// Dispatch a CLI subcommand. Returns the textual output to print.
@@ -62,6 +65,11 @@ pub fn dispatch(cmd: BenchSubcommand) -> Result<String> {
                         out.push_str(&format!("{:<12} {:<25} {}\n", t.id, t.tactic.as_str(), t.check.title));
                     }
                 }
+                "security" => {
+                    for c in crate::kubescape_security::security_controls() {
+                        out.push_str(&format!("{:<10} {:<10} {}\n", c.check.id, c.check.severity.as_str(), c.check.title));
+                    }
+                }
                 _ => return Err(crate::error::BenchError::Internal(format!("unknown framework '{framework}'"))),
             }
             Ok(out)
@@ -76,6 +84,17 @@ pub fn dispatch(cmd: BenchSubcommand) -> Result<String> {
             out.push_str("\n# Alert rules\n");
             out.push_str(&crate::observability::alert_rules_yaml());
             Ok(out)
+        }
+        BenchSubcommand::ValidateCustom { framework_json } => {
+            let spec = crate::custom::CustomFrameworkSpec::from_json(&framework_json)?;
+            spec.validate()?;
+            Ok(format!(
+                "custom framework '{}' ({}) OK — {} control(s): {}\n",
+                spec.id,
+                if spec.version.is_empty() { "unversioned" } else { &spec.version },
+                spec.controls.len(),
+                spec.control_ids().join(", ")
+            ))
         }
     }
 }
@@ -136,5 +155,28 @@ mod tests {
     fn test_dispatch_schedules_returns_message() {
         let out = dispatch(BenchSubcommand::Schedules).unwrap();
         assert!(out.contains("stateless"));
+    }
+
+    #[test]
+    fn test_dispatch_checks_security() {
+        let out = dispatch(BenchSubcommand::Checks { framework: "security".into() }).unwrap();
+        assert!(out.contains("C-0260"));
+        assert!(out.contains("C-0292"));
+    }
+
+    #[test]
+    fn test_dispatch_validate_custom_ok() {
+        let json = r#"{"id":"acme","name":"Acme","version":"1.0","controls":[
+            {"control_id":"A-1","name":"manual","severity":"low","node_type":"policies","rule":{"items":[],"logic":"And","manual":true}}
+        ]}"#;
+        let out = dispatch(BenchSubcommand::ValidateCustom { framework_json: json.into() }).unwrap();
+        assert!(out.contains("custom framework 'acme'"));
+        assert!(out.contains("A-1"));
+    }
+
+    #[test]
+    fn test_dispatch_validate_custom_rejects_empty() {
+        let json = r#"{"id":"empty","name":"Empty","controls":[]}"#;
+        assert!(dispatch(BenchSubcommand::ValidateCustom { framework_json: json.into() }).is_err());
     }
 }

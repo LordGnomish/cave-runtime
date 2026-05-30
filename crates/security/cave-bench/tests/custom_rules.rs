@@ -87,7 +87,7 @@ fn test_valid_spec_passes_validation() {
 
 #[test]
 fn test_builder_fluent_authoring() {
-    let mut item = TestItem {
+    let item = TestItem {
         source: ValueSource::Flag("--anonymous-auth".into()),
         op: BinOp::Eq,
         value: "false".into(),
@@ -97,7 +97,7 @@ fn test_builder_fluent_authoring() {
         .version("2.1")
         .control("ORG-1", "Anon auth off", Severity::Critical, "master", "Disable anon auth.", {
             let mut r = cave_bench::custom::CustomRule::default();
-            r.items.push(std::mem::take(&mut item));
+            r.items.push(item);
             r
         })
         .build();

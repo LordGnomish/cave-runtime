@@ -54,6 +54,8 @@ pub enum Framework {
     SecurityBaseline,
     /// SOC2 / ISO Common Criteria style controls — derived.
     SocControls,
+    /// Operator-authored custom benchmark framework.
+    Custom,
 }
 
 impl Framework {
@@ -64,6 +66,7 @@ impl Framework {
             Framework::MitreAttack => "mitre-attack",
             Framework::SecurityBaseline => "security",
             Framework::SocControls => "soc-controls",
+            Framework::Custom => "custom",
         }
     }
 }
