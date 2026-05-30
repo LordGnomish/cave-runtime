@@ -28,6 +28,7 @@ pub mod indexes;
 pub mod models;
 pub mod routes;
 pub mod store;
+pub mod timeline;
 pub mod webhook;
 pub mod workflow;
 
