@@ -37,6 +37,7 @@ pub mod labels;
 pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod nodepool_validation;
+pub mod pod;
 pub mod pretty;
 pub mod provider;
 pub mod resources;
