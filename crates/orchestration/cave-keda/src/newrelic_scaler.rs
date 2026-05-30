@@ -14,6 +14,7 @@
 //! by the runtime transport layer.
 
 use crate::scaler::ScalerTrait;
+use std::collections::HashMap;
 use std::time::Duration;
 
 /// One cell of an NRDB result row. NRDB returns `map[string]interface{}`; we
@@ -94,6 +95,65 @@ impl NewRelicScaler {
             return Err("query return no results".to_string());
         }
         Ok(0.0)
+    }
+
+    /// Port of `parseNewRelicMetadata`.
+    ///
+    /// Mirrors the typed-config struct tags: `account` (int) and `nrql` come
+    /// from triggerMetadata/authParams and are required; `threshold` (float) is
+    /// required for a scaling trigger; `region` defaults to `"US"`;
+    /// `activationThreshold` defaults to `0`; `noDataError` is an optional bool.
+    /// `queryKey` lives in authParams and is resolved by the transport layer, so
+    /// it is not part of the pure-decision metadata here.
+    pub fn from_metadata(meta: &HashMap<String, String>) -> Result<Self, String> {
+        let account = meta
+            .get("account")
+            .ok_or_else(|| "account is required".to_string())?
+            .parse::<i64>()
+            .map_err(|_| "account must be an integer".to_string())?;
+        let nrql = meta
+            .get("nrql")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "nrql is required".to_string())?
+            .clone();
+        let threshold = meta
+            .get("threshold")
+            .ok_or_else(|| "threshold is required".to_string())?
+            .parse::<f64>()
+            .map_err(|_| "threshold must be a float".to_string())?;
+
+        let region = meta
+            .get("region")
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_else(|| "US".to_string());
+        let activation_threshold = match meta.get("activationThreshold") {
+            Some(v) => v
+                .parse::<f64>()
+                .map_err(|_| "activationThreshold must be a float".to_string())?,
+            None => 0.0,
+        };
+        let no_data_error = match meta.get("noDataError") {
+            Some(v) => v
+                .parse::<bool>()
+                .map_err(|_| "noDataError must be a bool".to_string())?,
+            None => false,
+        };
+
+        Ok(Self {
+            account,
+            nrql,
+            region,
+            no_data_error,
+            threshold,
+            activation_threshold,
+            current_value: 0.0,
+        })
+    }
+
+    /// Port of the scaler metric name: `scalerName = "new-relic"`, normalized.
+    pub fn metric_name(&self) -> String {
+        "new-relic".to_string()
     }
 
     /// Record a freshly-fetched query value.
