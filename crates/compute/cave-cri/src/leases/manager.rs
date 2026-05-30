@@ -4,7 +4,9 @@
 
 use super::resource::{Resource, ResourceKind};
 use crate::content::store::LocalStore;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,9 +16,11 @@ pub enum LeaseError {
     NotFound(String),
     #[error("lease {0} already exists")]
     AlreadyExists(String),
+    #[error("lease store io: {0}")]
+    Io(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Lease {
     pub id: String,
     pub created_at_unix: i64,
@@ -43,6 +47,10 @@ impl Lease {
 pub struct LeaseManager {
     leases: Arc<RwLock<HashMap<String, Lease>>>,
     store: Option<Arc<LocalStore>>,
+    /// When set, every mutation is flushed to `<persist_path>` so the
+    /// table survives a daemon restart (containerd's bolt `leases`
+    /// bucket analog — see [`LeaseManager::open`]).
+    persist_path: Option<PathBuf>,
 }
 
 impl LeaseManager {
@@ -50,6 +58,7 @@ impl LeaseManager {
         Self {
             leases: Arc::new(RwLock::new(HashMap::new())),
             store: None,
+            persist_path: None,
         }
     }
 
@@ -59,7 +68,69 @@ impl LeaseManager {
         Self {
             leases: Arc::new(RwLock::new(HashMap::new())),
             store: Some(store),
+            persist_path: None,
         }
+    }
+
+    /// Open a persistent lease table rooted at `root`. Leases are stored
+    /// in `<root>/leases.json`; an absent file starts empty. Mirrors
+    /// containerd's `core/metadata` lease bucket: every create / add /
+    /// remove / delete / reap is durable across reopen.
+    pub fn open(root: &Path) -> Result<Self, LeaseError> {
+        Self::open_inner(root, None)
+    }
+
+    /// Like [`LeaseManager::open`] but also wires a content store and
+    /// rehydrates the in-use interlock for every persisted
+    /// content-kind resource, so a blob held by a lease before restart
+    /// still cannot be reaped after it.
+    pub fn open_with_store(root: &Path, store: Arc<LocalStore>) -> Result<Self, LeaseError> {
+        Self::open_inner(root, Some(store))
+    }
+
+    fn open_inner(root: &Path, store: Option<Arc<LocalStore>>) -> Result<Self, LeaseError> {
+        std::fs::create_dir_all(root).map_err(|e| LeaseError::Io(e.to_string()))?;
+        let path = root.join("leases.json");
+        let table: HashMap<String, Lease> = match std::fs::read(&path) {
+            Ok(bytes) if !bytes.is_empty() => {
+                serde_json::from_slice(&bytes).map_err(|e| LeaseError::Io(e.to_string()))?
+            }
+            Ok(_) => HashMap::new(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+            Err(e) => return Err(LeaseError::Io(e.to_string())),
+        };
+        // Rehydrate the GC interlock for content resources.
+        if let Some(store) = &store {
+            for lease in table.values() {
+                for r in &lease.resources {
+                    if r.kind == ResourceKind::Content {
+                        if let Some(digest) = r.content_digest() {
+                            store.mark_in_use(&digest, lease.id.clone());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(Self {
+            leases: Arc::new(RwLock::new(table)),
+            store,
+            persist_path: Some(path),
+        })
+    }
+
+    /// Flush the current table to disk if persistence is enabled.
+    /// Called while *not* holding the lease lock.
+    fn persist(&self) -> Result<(), LeaseError> {
+        let Some(path) = &self.persist_path else {
+            return Ok(());
+        };
+        let table = self.leases.read().unwrap();
+        let bytes = serde_json::to_vec_pretty(&*table).map_err(|e| LeaseError::Io(e.to_string()))?;
+        // Atomic-ish replace: write a temp sibling then rename.
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &bytes).map_err(|e| LeaseError::Io(e.to_string()))?;
+        std::fs::rename(&tmp, path).map_err(|e| LeaseError::Io(e.to_string()))?;
+        Ok(())
     }
 
     pub fn create(
@@ -69,18 +140,22 @@ impl LeaseManager {
         labels: HashMap<String, String>,
     ) -> Result<Lease, LeaseError> {
         let id = id.into();
-        let mut leases = self.leases.write().unwrap();
-        if leases.contains_key(&id) {
-            return Err(LeaseError::AlreadyExists(id));
-        }
-        let lease = Lease {
-            id: id.clone(),
-            created_at_unix: now_unix(),
-            ttl_seconds,
-            labels,
-            resources: HashSet::new(),
+        let lease = {
+            let mut leases = self.leases.write().unwrap();
+            if leases.contains_key(&id) {
+                return Err(LeaseError::AlreadyExists(id));
+            }
+            let lease = Lease {
+                id: id.clone(),
+                created_at_unix: now_unix(),
+                ttl_seconds,
+                labels,
+                resources: HashSet::new(),
+            };
+            leases.insert(id, lease.clone());
+            lease
         };
-        leases.insert(id, lease.clone());
+        self.persist()?;
         Ok(lease)
     }
 
@@ -100,16 +175,19 @@ impl LeaseManager {
     /// Add a resource to a lease. For content resources, also marks
     /// the digest in-use on the wired store (if any).
     pub fn add_resource(&self, lease_id: &str, resource: Resource) -> Result<(), LeaseError> {
-        let mut leases = self.leases.write().unwrap();
-        let lease = leases
-            .get_mut(lease_id)
-            .ok_or_else(|| LeaseError::NotFound(lease_id.into()))?;
-        if resource.kind == ResourceKind::Content {
-            if let (Some(store), Some(digest)) = (&self.store, resource.content_digest()) {
-                store.mark_in_use(&digest, lease_id.to_string());
+        {
+            let mut leases = self.leases.write().unwrap();
+            let lease = leases
+                .get_mut(lease_id)
+                .ok_or_else(|| LeaseError::NotFound(lease_id.into()))?;
+            if resource.kind == ResourceKind::Content {
+                if let (Some(store), Some(digest)) = (&self.store, resource.content_digest()) {
+                    store.mark_in_use(&digest, lease_id.to_string());
+                }
             }
+            lease.resources.insert(resource);
         }
-        lease.resources.insert(resource);
+        self.persist()?;
         Ok(())
     }
 
@@ -117,11 +195,14 @@ impl LeaseManager {
     /// store's in-use mapping; on a multi-resource lease that mapping
     /// reflects the lease itself, not the individual resource.
     pub fn remove_resource(&self, lease_id: &str, resource: &Resource) -> Result<(), LeaseError> {
-        let mut leases = self.leases.write().unwrap();
-        let lease = leases
-            .get_mut(lease_id)
-            .ok_or_else(|| LeaseError::NotFound(lease_id.into()))?;
-        lease.resources.remove(resource);
+        {
+            let mut leases = self.leases.write().unwrap();
+            let lease = leases
+                .get_mut(lease_id)
+                .ok_or_else(|| LeaseError::NotFound(lease_id.into()))?;
+            lease.resources.remove(resource);
+        }
+        self.persist()?;
         Ok(())
     }
 
@@ -134,6 +215,7 @@ impl LeaseManager {
         if let Some(store) = &self.store {
             store.release_lease(lease_id);
         }
+        self.persist()?;
         Ok(())
     }
 

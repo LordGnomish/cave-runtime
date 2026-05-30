@@ -15,9 +15,15 @@
 //! * [`resource::Resource`] — typed reference to a content digest or
 //!   a snapshot id.
 //!
-//! Out of scope (documented in the manifest):
-//! * Boltdb persistence — leases live in memory; on restart the
-//!   cluster controller is expected to re-register active leases.
+//! Persistence: [`manager::LeaseManager::open`] /
+//! [`manager::LeaseManager::open_with_store`] back the table with a
+//! JSON file under `<root>/leases.json` — the single-process analog of
+//! containerd's bolt `leases` bucket (`core/metadata/leases.go`). Every
+//! create / add / remove / delete / reap is flushed atomically, and
+//! `open_with_store` rehydrates the content GC interlock on restart so
+//! a blob held before a restart still can't be reaped after it. The
+//! in-memory [`manager::LeaseManager::new`] path is kept for callers
+//! that don't need durability (tests, ephemeral pulls).
 
 pub mod manager;
 pub mod resource;

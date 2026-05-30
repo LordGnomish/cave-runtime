@@ -3,8 +3,9 @@
 //! Typed reference held by a lease.
 
 use crate::content::digest::Digest;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ResourceKind {
     Content,
     Snapshot,
@@ -21,7 +22,7 @@ impl ResourceKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Resource {
     pub kind: ResourceKind,
     /// String identifier — digest wire-form for content, snapshot id
