@@ -13,6 +13,7 @@ pub mod gc;
 pub mod hooks;
 pub mod includes_excludes;
 pub mod models;
+pub mod restore_order;
 pub mod routes;
 pub mod schedule;
 pub mod storage;
