@@ -28,6 +28,7 @@
 pub mod agent_state;
 pub mod backend;
 pub mod eval;
+pub mod plan_execute;
 
 /// Upstream pin for the OpenJarvis primitive set. Tracked alongside the
 /// Hermes upstream pin in [`crate::UPSTREAM_VERSION`]; cave-hermes is a
