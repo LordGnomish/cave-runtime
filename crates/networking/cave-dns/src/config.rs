@@ -53,6 +53,69 @@ impl Default for DnsConfig {
     }
 }
 
+impl DnsConfig {
+    /// Build a [`DnsConfig`] from a native Corefile, bridging the
+    /// [`crate::corefile`] parser into the live config type.
+    ///
+    /// The first server block's address key supplies the listen port (the
+    /// `:port` suffix, defaulting to 53), and its directives are mapped onto
+    /// the [`PluginConfig`] chain. `{$VAR}` references in address keys are
+    /// resolved via the process environment by [`crate::corefile::parse`].
+    /// Directives without a config mapping yet are ignored (Phase 2).
+    pub fn from_corefile(input: &str) -> Result<Self, crate::corefile::ParseError> {
+        let blocks = crate::corefile::parse(input)?;
+        let mut cfg = DnsConfig::default();
+
+        if let Some(block) = blocks.first() {
+            // Port from the first key's ":port" suffix (default 53).
+            let port = block
+                .keys
+                .first()
+                .and_then(|k| k.rsplit_once(':'))
+                .and_then(|(_, p)| p.parse::<u16>().ok())
+                .unwrap_or(53);
+            let listen = format!("0.0.0.0:{port}");
+            cfg.listen_udp = vec![listen.clone()];
+            cfg.listen_tcp = vec![listen];
+
+            // Map directives onto the plugin chain.
+            cfg.plugins = block
+                .tokens
+                .values()
+                .filter_map(|toks| plugin_from_tokens(toks))
+                .collect();
+        }
+        Ok(cfg)
+    }
+}
+
+/// Translate one directive's token slice (directive name first) into a
+/// [`PluginConfig`]. Returns `None` for directives without a mapping yet.
+fn plugin_from_tokens(toks: &[crate::corefile::Token]) -> Option<PluginConfig> {
+    let name = toks.first()?.text.as_str();
+    let args: Vec<&str> = toks[1..].iter().map(|t| t.text.as_str()).collect();
+    Some(match name {
+        "whoami" => PluginConfig::Whoami,
+        "forward" => {
+            // forward FROM TO...  — drop the FROM zone, keep upstreams.
+            let upstreams = args.iter().skip(1).map(|s| s.to_string()).collect();
+            PluginConfig::Forward(ForwardConfig { upstreams, ..Default::default() })
+        }
+        "cache" => PluginConfig::Cache(CacheConfig::default()),
+        "errors" => PluginConfig::Errors(ErrorsConfig::default()),
+        "log" => PluginConfig::Log(LogConfig::default()),
+        "health" => PluginConfig::Health(HealthConfig::default()),
+        "ready" => PluginConfig::Ready(ReadyConfig::default()),
+        "metrics" | "prometheus" => PluginConfig::Metrics(MetricsConfig::default()),
+        "loadbalance" => PluginConfig::Loadbalance(LoadbalanceConfig::default()),
+        "loop" => PluginConfig::Loop(LoopConfig::default()),
+        "reload" => PluginConfig::Reload(ReloadConfig::default()),
+        "chaos" => PluginConfig::Chaos(ChaosConfig::default()),
+        "any" => PluginConfig::Any(AnyConfig::default()),
+        _ => return None,
+    })
+}
+
 // ─── Zone config ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -665,14 +728,19 @@ mod corefile_config_tests {
             ".:53 {\n    whoami\n    forward . 1.1.1.1 8.8.8.8\n}\n",
         )
         .expect("ok");
-        assert!(matches!(cfg.plugins[0], PluginConfig::Whoami));
-        match &cfg.plugins[1] {
-            PluginConfig::Forward(f) => {
-                // The FROM zone (".") is dropped; the rest are upstreams.
-                assert_eq!(f.upstreams, vec!["1.1.1.1".to_string(), "8.8.8.8".to_string()]);
-            }
-            other => panic!("expected forward, got {other:?}"),
-        }
+        // Plugin chain order is registration-defined upstream, not Corefile
+        // order, so assert by presence rather than index.
+        assert!(cfg.plugins.iter().any(|p| matches!(p, PluginConfig::Whoami)));
+        let fwd = cfg
+            .plugins
+            .iter()
+            .find_map(|p| match p {
+                PluginConfig::Forward(f) => Some(f),
+                _ => None,
+            })
+            .expect("forward plugin present");
+        // The FROM zone (".") is dropped; the rest are upstreams.
+        assert_eq!(fwd.upstreams, vec!["1.1.1.1".to_string(), "8.8.8.8".to_string()]);
     }
 
     #[test]
