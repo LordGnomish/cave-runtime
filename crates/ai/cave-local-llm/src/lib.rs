@@ -58,3 +58,6 @@ pub mod vllm_quant;
 
 /// vLLM speculative-decode rejection sampler — accept/recovery/bonus + stats.
 pub mod vllm_spec_decode;
+
+/// vLLM multi-LoRA manager — request scaling, slot pool + LRU, forward delta.
+pub mod vllm_lora;
