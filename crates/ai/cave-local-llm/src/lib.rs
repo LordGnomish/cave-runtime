@@ -55,3 +55,6 @@ pub mod vllm_sampling;
 
 /// vLLM weight-quant configs — AWQ/GPTQ/FP8 layout, pack factor, ratios.
 pub mod vllm_quant;
+
+/// vLLM speculative-decode rejection sampler — accept/recovery/bonus + stats.
+pub mod vllm_spec_decode;
