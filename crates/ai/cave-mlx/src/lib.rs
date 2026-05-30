@@ -21,4 +21,5 @@
 
 #![forbid(unsafe_code)]
 
-// Modules are added one strict-TDD cycle at a time, lowest layer first.
+/// N-dimensional dense array (`Array`) — the MLX `mx.array` analog.
+pub mod array;
