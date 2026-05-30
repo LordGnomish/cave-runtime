@@ -32,3 +32,6 @@ pub mod autograd;
 
 /// First-order optimizers — `Sgd` / `Adam` / `AdamW`.
 pub mod optim;
+
+/// Neural-network modules — `Linear` + `Activation`.
+pub mod nn;

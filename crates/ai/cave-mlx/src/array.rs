@@ -155,11 +155,6 @@ impl Array {
         &self.data
     }
 
-    /// Mutable view of the underlying buffer (internal use by ops/autograd).
-    pub(crate) fn data_mut(&mut self) -> &mut [f32] {
-        &mut self.data
-    }
-
     /// Read a single element addressed by a full multi-index.
     ///
     /// Panics if the index rank differs from the array rank — callers in this
