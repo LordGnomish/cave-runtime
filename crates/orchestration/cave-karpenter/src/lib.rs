@@ -33,6 +33,7 @@ pub mod drain;
 pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod provider;
+pub mod resources;
 pub mod scheduler;
 pub mod scheduling;
 pub mod store;
