@@ -8,5 +8,7 @@
 //!   requirement   — complement-based Requirement set-algebra with bounds
 
 pub mod requirement;
+pub mod requirements;
 
 pub use requirement::{NodeSelectorRequirement, Operator, Requirement};
+pub use requirements::Requirements;

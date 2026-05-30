@@ -187,6 +187,29 @@ impl Requirement {
         }
     }
 
+    /// Serialized form, expanding a both-bounds requirement into the two
+    /// distinct `Gte` + `Lte` entries (`BoundedNodeSelectorRequirements` +
+    /// the single-return `NodeSelectorRequirement` collapsed into one call).
+    pub fn bounded_node_selector_requirements(&self) -> Vec<NodeSelectorRequirement> {
+        if let (Some(g), Some(l)) = (self.gte, self.lte) {
+            return vec![
+                NodeSelectorRequirement {
+                    key: self.key.clone(),
+                    operator: Operator::Gte,
+                    values: vec![g.to_string()],
+                    min_values: self.min_values,
+                },
+                NodeSelectorRequirement {
+                    key: self.key.clone(),
+                    operator: Operator::Lte,
+                    values: vec![l.to_string()],
+                    min_values: self.min_values,
+                },
+            ];
+        }
+        vec![self.node_selector_requirement()]
+    }
+
     /// Constrain `self` by `other`, returning the intersection requirement.
     pub fn intersection(&self, other: &Requirement) -> Requirement {
         let complement = self.complement && other.complement;
