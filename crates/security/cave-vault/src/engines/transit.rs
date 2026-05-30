@@ -1028,6 +1028,62 @@ mod tests {
         assert_eq!(a1.len(), 32);
     }
 
+    // ── Convergent encryption v3 (deterministic HMAC-SHA256 nonce) ───────────
+
+    fn convergent_key() -> TransitKey {
+        let mut key = create_transit_key("c", KeyType::Aes256Gcm96).unwrap();
+        key.derived = true;
+        key.convergent_encryption = true;
+        key
+    }
+
+    #[test]
+    fn convergent_same_plaintext_and_context_is_deterministic() {
+        let key = convergent_key();
+        let kv = key.versions.get(&1).unwrap().clone();
+        let a = transit_seal(&key, &kv, Some(b"tenant=acme"), b"4111-1111-1111-1111").unwrap();
+        let b = transit_seal(&key, &kv, Some(b"tenant=acme"), b"4111-1111-1111-1111").unwrap();
+        assert_eq!(a, b, "convergent encryption must be deterministic");
+    }
+
+    #[test]
+    fn convergent_distinct_plaintext_yields_distinct_ciphertext() {
+        let key = convergent_key();
+        let kv = key.versions.get(&1).unwrap().clone();
+        let a = transit_seal(&key, &kv, Some(b"t"), b"card-A").unwrap();
+        let b = transit_seal(&key, &kv, Some(b"t"), b"card-B").unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn convergent_round_trips() {
+        let key = convergent_key();
+        let kv = key.versions.get(&1).unwrap().clone();
+        let pt = b"convergent payload";
+        let ct = transit_seal(&key, &kv, Some(b"ctx"), pt).unwrap();
+        assert_eq!(transit_open(&key, &kv, Some(b"ctx"), &ct).unwrap(), pt);
+    }
+
+    #[test]
+    fn derived_non_convergent_is_randomized() {
+        let mut key = create_transit_key("d", KeyType::Aes256Gcm96).unwrap();
+        key.derived = true; // not convergent
+        let kv = key.versions.get(&1).unwrap().clone();
+        let a = transit_seal(&key, &kv, Some(b"ctx"), b"same").unwrap();
+        let b = transit_seal(&key, &kv, Some(b"ctx"), b"same").unwrap();
+        assert_ne!(a, b, "non-convergent derived keys use a random nonce");
+    }
+
+    #[test]
+    fn convergent_nonce_is_a_deterministic_12_byte_hmac() {
+        let n1 = convergent_nonce(&[9u8; 32], b"abc");
+        let n2 = convergent_nonce(&[9u8; 32], b"abc");
+        let n3 = convergent_nonce(&[9u8; 32], b"abd");
+        assert_eq!(n1, n2);
+        assert_ne!(n1, n3);
+        assert_eq!(n1.len(), 12);
+    }
+
     #[test]
     fn test_ed25519_key_sign_verify() {
         use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
