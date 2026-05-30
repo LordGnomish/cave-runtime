@@ -12,8 +12,9 @@
 //! to consume per-sync.
 
 use crate::error::{KubeProxyError, KubeProxyResult};
-use crate::service::Cidr;
+use crate::service::{Cidr, IpCidr};
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 
 /// Cite: `pkg/proxy/apis/config/types.go:55` (ProxyMode) — the family
 /// the sync loop should target. The userspace mode is intentionally
@@ -69,9 +70,10 @@ pub enum DetectLocal {
 pub struct ProxyConfig {
     pub mode: ProxyMode,
     pub cluster_cidr: Option<Cidr>,
-    /// Cite: `pkg/proxy/apis/config/types.go:107`
-    /// (ClusterCIDR — IPv6 family, future hook).
-    pub cluster_cidr_v6: Option<String>,
+    /// Cite: `pkg/proxy/apis/config/types.go:107` (ClusterCIDR — IPv6 family).
+    /// A live, parsed CIDR (was previously a dead `Option<String>` hook);
+    /// consumed by [`ProxyConfig::detect_local_by_cidr`] for v6 endpoints.
+    pub cluster_cidr_v6: Option<IpCidr>,
     pub detect_local: DetectLocal,
     /// Cite: `pkg/proxy/apis/config/types.go:103` (NodePortAddresses) —
     /// when set, NodePort/LoadBalancer rules only bind to interfaces
@@ -140,6 +142,51 @@ impl ProxyConfig {
             return true;
         }
         self.node_port_addresses.iter().any(|c| c.contains(addr))
+    }
+
+    /// Populate the v4 + v6 ClusterCIDR fields from the upstream
+    /// comma-separated dual-stack `ClusterCIDR` string (e.g.
+    /// `"10.244.0.0/16,fd00:10:244::/56"`). The last CIDR of each family
+    /// wins, mirroring `GetClusterIPByFamily` which keys purely on family.
+    ///
+    /// Cite: `pkg/proxy/apis/config/types.go:107` (ClusterCIDR),
+    /// `k8s.io/utils/net.ParseCIDRs`.
+    pub fn with_cluster_cidrs(mut self, spec: &str) -> KubeProxyResult<Self> {
+        for cidr in IpCidr::parse_list(spec)? {
+            if cidr.is_ipv6() {
+                self.cluster_cidr_v6 = Some(cidr);
+            } else {
+                // Preserve the IPv4 `Cidr` representation other call sites
+                // already consume (e.g. NodePort bind checks).
+                self.cluster_cidr = Some(Cidr::parse(&cidr.to_string_canonical())?);
+            }
+        }
+        Ok(self)
+    }
+
+    /// Return the configured ClusterCIDR for the requested IP family, or
+    /// `None` if this proxier has no CIDR for that family.
+    ///
+    /// Cite: `pkg/proxy/util/utils.go` `GetClusterIPByFamily`.
+    pub fn cluster_cidr_for_family(&self, want_v6: bool) -> Option<IpCidr> {
+        if want_v6 {
+            self.cluster_cidr_v6
+        } else {
+            self.cluster_cidr
+                .map(|c| IpCidr::parse(&c.to_string_canonical()).expect("v4 Cidr is valid IpCidr"))
+        }
+    }
+
+    /// Upstream `DetectLocalByCIDR`: an endpoint IP is "local" when it falls
+    /// inside this node's ClusterCIDR for the endpoint's own IP family. A v4
+    /// endpoint is never matched against the v6 CIDR and vice-versa.
+    ///
+    /// Cite: `pkg/proxy/topology.go` `DetectLocalByCIDR`.
+    pub fn detect_local_by_cidr(&self, ip: IpAddr) -> bool {
+        match self.cluster_cidr_for_family(ip.is_ipv6()) {
+            Some(cidr) => cidr.contains(ip),
+            None => false,
+        }
     }
 }
 
