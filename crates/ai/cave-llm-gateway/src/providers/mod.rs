@@ -8,8 +8,10 @@
 
 pub mod cohere;
 pub mod google;
+pub mod huggingface;
 pub mod llama_cpp;
 pub mod mistral;
 pub mod mlx;
 pub mod ollama;
+pub mod replicate;
 pub mod together;

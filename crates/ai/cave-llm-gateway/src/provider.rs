@@ -54,6 +54,10 @@ pub enum ProviderType {
     Together,
     /// Fireworks AI (OpenAI-compatible SaaS).
     Fireworks,
+    /// Replicate async predictions API.
+    Replicate,
+    /// HuggingFace serverless Inference API (text-generation).
+    HuggingFace,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -446,6 +450,12 @@ impl ProviderRegistry {
                 }
                 ProviderType::Fireworks => {
                     Arc::new(crate::providers::together::TogetherProvider::fireworks(cfg))
+                }
+                ProviderType::Replicate => {
+                    Arc::new(crate::providers::replicate::ReplicateProvider::new(cfg))
+                }
+                ProviderType::HuggingFace => {
+                    Arc::new(crate::providers::huggingface::HuggingFaceProvider::new(cfg))
                 }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
