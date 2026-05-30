@@ -160,13 +160,50 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+/// Substitute `{$VAR}` environment references in `s` using `lookup`.
+///
+/// Faithful port of CoreDNS v1.14.3 `caddyfile/parse.go::replaceEnvReferences`
+/// for the `{$` … `}` delimiter pair: each `{$NAME}` is replaced by
+/// `lookup(NAME)` (empty string when unset). An unterminated `{$` (no closing
+/// brace) is left intact. There is no `:default` syntax upstream — a literal
+/// `:` becomes part of the variable name.
+pub(crate) fn replace_env_vars(s: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+    const REF_START: &str = "{$";
+    const REF_END: &str = "}";
+    let mut s = s.to_string();
+    while let Some(index) = s.find(REF_START) {
+        let Some(rel_end) = s[index..].find(REF_END) else { break };
+        let end_index = index + rel_end;
+        let full_ref = s[index..end_index + REF_END.len()].to_string(); // {$NAME}
+        let name = &s[index + REF_START.len()..end_index]; // NAME
+        let value = lookup(name).unwrap_or_default();
+        // Avoid an infinite loop if the substituted value reintroduces a ref.
+        if value.contains(REF_START) {
+            s = s.replacen(&full_ref, &value, 1);
+            break;
+        }
+        s = s.replace(&full_ref, &value);
+    }
+    s
+}
+
 /// Parse Corefile/Caddyfile `input` into the list of [`ServerBlock`]s.
 ///
 /// Port of `core/caddyfile/parse.go::parseAll` over the token stream produced
 /// by [`tokenize`]. Server blocks with no address keys are dropped (matching
-/// upstream, which only emits blocks where `len(Keys) > 0`).
+/// upstream, which only emits blocks where `len(Keys) > 0`). `{$VAR}`
+/// references in address tokens are resolved against the process environment.
 pub fn parse(input: &str) -> Result<Vec<ServerBlock>, ParseError> {
-    let mut parser = Parser::new(tokenize(input));
+    parse_with_env(input, Box::new(|k| std::env::var(k).ok()))
+}
+
+/// Like [`parse`] but resolves `{$VAR}` address references through `env`
+/// instead of the process environment (used for hermetic testing).
+pub fn parse_with_env(
+    input: &str,
+    env: Box<dyn Fn(&str) -> Option<String>>,
+) -> Result<Vec<ServerBlock>, ParseError> {
+    let mut parser = Parser::new(tokenize(input), env);
     parser.parse_all()
 }
 
@@ -176,11 +213,12 @@ struct Parser {
     cursor: isize,
     block: ServerBlock,
     eof: bool,
+    env: Box<dyn Fn(&str) -> Option<String>>,
 }
 
 impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, cursor: -1, block: ServerBlock::default(), eof: false }
+    fn new(tokens: Vec<Token>, env: Box<dyn Fn(&str) -> Option<String>>) -> Self {
+        Self { tokens, cursor: -1, block: ServerBlock::default(), eof: false, env }
     }
 
     // ── Dispenser primitives ────────────────────────────────────────────
@@ -253,7 +291,7 @@ impl Parser {
     fn addresses(&mut self) -> Result<(), ParseError> {
         let mut expecting_another = false;
         loop {
-            let mut tkn = self.val().to_string();
+            let mut tkn = replace_env_vars(self.val(), self.env.as_ref());
 
             // An open brace ends the address list.
             if tkn == "{" {
