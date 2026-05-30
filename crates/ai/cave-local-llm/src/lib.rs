@@ -50,6 +50,9 @@ pub mod vllm_engine;
 /// vLLM PagedAttention block manager — KV-block alloc, ref-counted CoW, swap.
 pub mod vllm_paged_attention;
 
+/// vLLM automatic prefix caching — content-hashed, ref-counted, LRU-evicting blocks.
+pub mod vllm_prefix_cache;
+
 /// vLLM continuous-batching scheduler — budget, prefill/decode, preemption.
 pub mod vllm_scheduler;
 

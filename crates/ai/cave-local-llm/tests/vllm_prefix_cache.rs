@@ -147,11 +147,10 @@ fn lru_evicts_least_recently_freed_cached_block() {
     assert!(!c.cache_hit);
     assert_eq!(c.block_id, a.block_id); // reused A's physical block
 
-    // A's content is gone from the cache now; re-requesting it is a miss.
-    let a_again = alloc.allocate_immutable(None, &[1, 1]);
-    assert!(a_again.is_err() || !a_again.as_ref().unwrap().cache_hit);
-
-    // B was untouched and is still a hit.
+    // A's content is gone from the cache now (read-only probe, no mutation).
+    assert!(!alloc.is_cached(None, &[1, 1]));
+    // B was untouched and is still resident → still a hit.
+    assert!(alloc.is_cached(None, &[2, 2]));
     let b_again = alloc.allocate_immutable(None, &[2, 2]).unwrap();
     assert!(b_again.cache_hit);
     assert_eq!(b_again.block_id, b.block_id);
