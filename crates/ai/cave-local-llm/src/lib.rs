@@ -43,3 +43,6 @@ pub mod gguf;
 
 /// GGUF quantization file-type helpers (Q4/Q5/Q8 …) — names, bits/weight, size.
 pub mod quant;
+
+/// Pure-Rust Modelfile parser (FROM/PARAMETER/TEMPLATE/SYSTEM/ADAPTER/LICENSE/MESSAGE).
+pub mod modelfile;
