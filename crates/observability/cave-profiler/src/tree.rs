@@ -168,6 +168,14 @@ impl Tree {
     pub fn diff(left: &Tree, right: &Tree) -> Vec<DiffNode> {
         diff_level(&left.root, &right.root)
     }
+
+    /// Render the tree as Brendan-Gregg "folded"/collapsed stacks: one line per
+    /// frame with non-zero self weight, root-first frames joined by `;` then a
+    /// space and the self count. Ports `tree.go` WriteCollapsed.
+    pub fn collapsed(&self) -> String {
+        // RED placeholder
+        String::new()
+    }
 }
 
 /// Sorted merge-join of two name-sorted child lists into diff nodes.
@@ -447,5 +455,30 @@ mod tests {
         assert_eq!(d[0].name, "only_left");
         assert_eq!(d[0].left, 3);
         assert_eq!(d[0].right, 0);
+    }
+
+    #[test]
+    fn collapsed_emits_folded_stacks_root_first() {
+        let mut t = Tree::new();
+        t.insert_stack(2, &["a"]);
+        t.insert_stack(10, &["a", "b"]);
+        t.insert_stack(5, &["a", "c"]);
+        let out = t.collapsed();
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines, vec!["a 2", "a;b 10", "a;c 5"]);
+    }
+
+    #[test]
+    fn collapsed_skips_zero_self_internal_nodes() {
+        let mut t = Tree::new();
+        t.insert_stack(7, &["root", "leaf"]);
+        let out = t.collapsed();
+        // "root" has self 0 -> not emitted; only the leaf line appears
+        assert_eq!(out.lines().collect::<Vec<_>>(), vec!["root;leaf 7"]);
+    }
+
+    #[test]
+    fn collapsed_empty_tree_is_empty() {
+        assert_eq!(Tree::new().collapsed(), "");
     }
 }
