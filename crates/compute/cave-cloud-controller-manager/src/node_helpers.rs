@@ -63,8 +63,26 @@ pub fn parse_ip_sloppy(s: &str) -> Option<IpAddr> {
 /// annotation value into one IP, or a dual-stack pair. Equivalent to
 /// `parseNodeIP(nodeIP, allowDual=true, sloppy=false)`.
 pub fn parse_node_ip_annotation(node_ip: &str) -> Result<Vec<IpAddr>, String> {
-    let _ = node_ip;
-    unimplemented!("RED: parse_node_ip_annotation")
+    // sloppy=false: always enter the parse loop, no trim, hard-fail on a bad IP.
+    let mut node_ips: Vec<IpAddr> = Vec::new();
+    for ip in node_ip.split(',') {
+        match parse_ip_sloppy(ip) {
+            Some(parsed) => node_ips.push(parsed),
+            None => return Err(format!("could not parse {:?}", ip)),
+        }
+    }
+
+    if node_ips.len() > 2
+        || (node_ips.len() == 2 && node_ips[0].is_ipv6() == node_ips[1].is_ipv6())
+    {
+        return Err("must contain either a single IP or a dual-stack pair of IPs".to_string());
+    }
+    // allowDual=true for annotations → no "dual-stack not supported" branch.
+    if node_ips.len() == 2 && (node_ips[0].is_unspecified() || node_ips[1].is_unspecified()) {
+        return Err("dual-stack node IP cannot include '0.0.0.0' or '::'".to_string());
+    }
+
+    Ok(node_ips)
 }
 
 #[cfg(test)]
