@@ -40,6 +40,8 @@ pub fn create_router(state: Arc<State>) -> Router {
             "/api/v1/vulnerability/{id}/analysis",
             post(set_analysis_state),
         )
+        // Audit workflow (AnalysisResource parity).
+        .route("/api/v1/analysis", post(record_analysis))
         // Policies.
         .route("/api/v1/policy", get(list_policies).post(create_policy))
         // Metrics.
@@ -285,6 +287,50 @@ async fn set_analysis_state(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+/// Body for `PUT /api/v1/analysis` — mirrors `AnalysisResource.updateAnalysis`.
+#[derive(Debug, Deserialize)]
+pub struct AuditRequest {
+    pub component: Uuid,
+    pub vulnerability: String,
+    #[serde(default)]
+    pub analysis_state: Option<crate::models::AnalysisState>,
+    #[serde(default)]
+    pub analysis_justification: Option<crate::audit::AnalysisJustification>,
+    #[serde(default)]
+    pub analysis_response: Option<crate::audit::AnalysisResponse>,
+    #[serde(default)]
+    pub analysis_details: Option<String>,
+    #[serde(default)]
+    pub suppressed: Option<bool>,
+    #[serde(default)]
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub commenter: Option<String>,
+}
+
+async fn record_analysis(
+    AxumState(state): AxumState<Arc<State>>,
+    Json(body): Json<AuditRequest>,
+) -> Result<Json<crate::audit::Analysis>, StatusCode> {
+    if body.vulnerability.trim().is_empty() {
+        // vulnerability is @NotNull upstream.
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let mut store = state.analyses.write().unwrap();
+    let analysis = store.record(crate::audit::AnalysisRequest {
+        component_uuid: body.component,
+        vulnerability: body.vulnerability,
+        analysis_state: body.analysis_state,
+        analysis_justification: body.analysis_justification,
+        analysis_response: body.analysis_response,
+        analysis_details: body.analysis_details,
+        suppressed: body.suppressed,
+        comment: body.comment,
+        commenter: body.commenter,
+    });
+    Ok(Json(analysis))
 }
 
 // ── Policy endpoints ────────────────────────────────────────────────────────

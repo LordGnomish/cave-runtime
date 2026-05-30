@@ -45,6 +45,7 @@ pub struct State {
     pub policies: RwLock<Vec<policy::Policy>>,
     pub notification_rules: RwLock<Vec<notifications::NotificationRule>>,
     pub snapshots: RwLock<Vec<portfolio::PortfolioSnapshot>>,
+    pub analyses: RwLock<audit::AnalysisStore>,
 }
 
 /// Create the axum router for this module.
