@@ -32,6 +32,7 @@ pub mod hpa_bridge;
 pub mod in_memory_channel;
 pub mod ksvc;
 pub mod meta;
+pub mod queue_proxy;
 pub mod revision;
 pub mod route;
 pub mod sources_apiserver;
