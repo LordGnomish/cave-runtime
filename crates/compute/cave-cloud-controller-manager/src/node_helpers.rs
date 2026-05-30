@@ -128,6 +128,75 @@ pub fn parse_node_ip_annotation(node_ip: &str) -> Result<Vec<IpAddr>, String> {
     Ok(node_ips)
 }
 
+// ─── taints.go + core/v1.Taint ───────────────────────────────────────────────
+
+/// Mirror of `core/v1.Taint`. Identity (`MatchTaint`) is `(key, effect)`; the
+/// `value` participates only in full equality.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Taint {
+    pub key: String,
+    pub value: String,
+    pub effect: String,
+}
+
+impl Taint {
+    pub fn new(key: impl Into<String>, value: impl Into<String>, effect: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            value: value.into(),
+            effect: effect.into(),
+        }
+    }
+
+    /// `Taint.MatchTaint` — equal iff `key` and `effect` match (value ignored).
+    pub fn match_taint(&self, other: &Taint) -> bool {
+        self.key == other.key && self.effect == other.effect
+    }
+
+    /// `Taint.ToString` — `key=value:effect`, collapsing empty value/effect.
+    pub fn to_string(&self) -> String {
+        if self.effect.is_empty() {
+            if self.value.is_empty() {
+                return self.key.clone();
+            }
+            return format!("{}={}:", self.key, self.value);
+        }
+        if self.value.is_empty() {
+            return format!("{}:{}", self.key, self.effect);
+        }
+        format!("{}={}:{}", self.key, self.value, self.effect)
+    }
+}
+
+/// `taintExists` — linear search by `MatchTaint`.
+pub fn taint_exists(taints: &[Taint], taint: &Taint) -> bool {
+    let _ = (taints, taint);
+    unimplemented!("RED: taint_exists")
+}
+
+/// `addOrUpdateTaint` — returns the new taint list and whether the node changed.
+/// If a `(key,effect)`-matching taint exists and is fully equal → unchanged
+/// (`false`); if it matches but differs → replaced (`true`); if no match → the
+/// taint is appended (`true`).
+pub fn add_or_update_taint(taints: &[Taint], taint: &Taint) -> (Vec<Taint>, bool) {
+    let _ = (taints, taint);
+    unimplemented!("RED: add_or_update_taint")
+}
+
+/// `deleteTaint` — drop every taint matching `(key,effect)`; returns the list
+/// and whether anything was deleted.
+pub fn delete_taint(taints: &[Taint], taint_to_delete: &Taint) -> (Vec<Taint>, bool) {
+    let _ = (taints, taint_to_delete);
+    unimplemented!("RED: delete_taint")
+}
+
+/// `removeTaint` — no-op (`false`) when the list is empty or the taint is
+/// absent; otherwise deletes it and reports `true`.
+pub fn remove_taint(taints: &[Taint], taint: &Taint) -> (Vec<Taint>, bool) {
+    let _ = (taints, taint);
+    unimplemented!("RED: remove_taint")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,5 +398,106 @@ mod tests {
         let cloud = vec![ip(NodeAddressType::InternalIP, "10.0.0.1")];
         let e = get_node_addresses_from_node_ip("garbage", &cloud).unwrap_err();
         assert_eq!(e, "failed to parse node IP \"garbage\": could not parse \"garbage\"");
+    }
+
+    // ── taints ──
+
+    fn taint(k: &str, v: &str, e: &str) -> Taint {
+        Taint::new(k, v, e)
+    }
+
+    #[test]
+    fn match_taint_is_key_and_effect_only() {
+        let a = taint("k1", "v1", "NoSchedule");
+        let b = taint("k1", "DIFFERENT", "NoSchedule");
+        let c = taint("k1", "v1", "NoExecute");
+        assert!(a.match_taint(&b)); // value ignored
+        assert!(!a.match_taint(&c)); // effect differs
+    }
+
+    #[test]
+    fn taint_to_string_variants() {
+        assert_eq!(taint("k", "", "").to_string(), "k");
+        assert_eq!(taint("k", "v", "").to_string(), "k=v:");
+        assert_eq!(taint("k", "", "NoSchedule").to_string(), "k:NoSchedule");
+        assert_eq!(taint("k", "v", "NoSchedule").to_string(), "k=v:NoSchedule");
+    }
+
+    #[test]
+    fn taint_exists_uses_match_taint() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        assert!(taint_exists(&taints, &taint("k1", "other", "NoSchedule")));
+        assert!(!taint_exists(&taints, &taint("k1", "v1", "NoExecute")));
+    }
+
+    #[test]
+    fn add_or_update_appends_new_taint() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        let (out, changed) = add_or_update_taint(&taints, &taint("k2", "v2", "NoExecute"));
+        assert!(changed);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[1], taint("k2", "v2", "NoExecute"));
+    }
+
+    #[test]
+    fn add_or_update_replaces_changed_value() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        let (out, changed) = add_or_update_taint(&taints, &taint("k1", "v2", "NoSchedule"));
+        assert!(changed);
+        assert_eq!(out, vec![taint("k1", "v2", "NoSchedule")]);
+    }
+
+    #[test]
+    fn add_or_update_identical_is_unchanged() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        let (out, changed) = add_or_update_taint(&taints, &taint("k1", "v1", "NoSchedule"));
+        assert!(!changed);
+        assert_eq!(out, taints);
+    }
+
+    #[test]
+    fn delete_taint_removes_all_matches() {
+        let taints = vec![
+            taint("k1", "v1", "NoSchedule"),
+            taint("k2", "v2", "NoExecute"),
+            taint("k1", "ignored", "NoSchedule"),
+        ];
+        let (out, deleted) = delete_taint(&taints, &taint("k1", "x", "NoSchedule"));
+        assert!(deleted);
+        assert_eq!(out, vec![taint("k2", "v2", "NoExecute")]);
+    }
+
+    #[test]
+    fn delete_taint_absent_reports_false() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        let (out, deleted) = delete_taint(&taints, &taint("zzz", "", "NoSchedule"));
+        assert!(!deleted);
+        assert_eq!(out, taints);
+    }
+
+    #[test]
+    fn remove_taint_empty_list_is_noop() {
+        let (out, changed) = remove_taint(&[], &taint("k1", "", "NoSchedule"));
+        assert!(!changed);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn remove_taint_absent_is_noop() {
+        let taints = vec![taint("k1", "v1", "NoSchedule")];
+        let (out, changed) = remove_taint(&taints, &taint("nope", "", "NoSchedule"));
+        assert!(!changed);
+        assert_eq!(out, taints);
+    }
+
+    #[test]
+    fn remove_taint_present_deletes_and_reports_true() {
+        let taints = vec![
+            taint("k1", "v1", "NoSchedule"),
+            taint("k2", "v2", "NoExecute"),
+        ];
+        let (out, changed) = remove_taint(&taints, &taint("k1", "irrelevant", "NoSchedule"));
+        assert!(changed);
+        assert_eq!(out, vec![taint("k2", "v2", "NoExecute")]);
     }
 }
