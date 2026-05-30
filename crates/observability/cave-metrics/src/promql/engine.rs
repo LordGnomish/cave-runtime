@@ -470,6 +470,23 @@ impl Engine {
                 }
             }),
 
+            // ── Trigonometric / hyperbolic / angle (Prometheus #8919) ──────
+            "sin" => self.map_iv(call, ts_ms, |v| v.sin()),
+            "cos" => self.map_iv(call, ts_ms, |v| v.cos()),
+            "tan" => self.map_iv(call, ts_ms, |v| v.tan()),
+            "asin" => self.map_iv(call, ts_ms, |v| v.asin()),
+            "acos" => self.map_iv(call, ts_ms, |v| v.acos()),
+            "atan" => self.map_iv(call, ts_ms, |v| v.atan()),
+            "sinh" => self.map_iv(call, ts_ms, |v| v.sinh()),
+            "cosh" => self.map_iv(call, ts_ms, |v| v.cosh()),
+            "tanh" => self.map_iv(call, ts_ms, |v| v.tanh()),
+            "asinh" => self.map_iv(call, ts_ms, |v| v.asinh()),
+            "acosh" => self.map_iv(call, ts_ms, |v| v.acosh()),
+            "atanh" => self.map_iv(call, ts_ms, |v| v.atanh()),
+            "deg" => self.map_iv(call, ts_ms, |v| v.to_degrees()),
+            "rad" => self.map_iv(call, ts_ms, |v| v.to_radians()),
+            "pi" => Ok(QueryResult::Scalar(std::f64::consts::PI)),
+
             "round" => {
                 let to = match call.args.get(1) {
                     Some(Expr::NumberLiteral(t)) => *t,
