@@ -13,6 +13,181 @@
 //! Only little-endian GGUF v2/v3 (the format every modern Ollama model ships)
 //! is supported; v1 and big-endian files return a clear error.
 
+use std::collections::BTreeMap;
+use thiserror::Error;
+
+/// GGUF little-endian magic — ASCII `GGUF`. Cite fs/ggml/ggml.go
+/// `FILE_MAGIC_GGUF_LE = 0x46554747`.
+pub const GGUF_MAGIC: u32 = 0x4655_4747;
+/// Big-endian variant — recognised only to emit a clear "unsupported" error.
+pub const GGUF_MAGIC_BE: u32 = 0x4747_5546;
+
+/// Errors from [`GgufFile::parse`].
+#[derive(Debug, Error)]
+pub enum GgufError {
+    #[error("not a GGUF file: bad magic {0:#010x}")]
+    BadMagic(u32),
+    #[error("big-endian GGUF is not supported")]
+    BigEndianUnsupported,
+    #[error("unsupported GGUF version {0} (only v2/v3 supported)")]
+    UnsupportedVersion(u32),
+    #[error("unexpected end of data while reading GGUF")]
+    UnexpectedEof,
+    #[error("invalid UTF-8 in GGUF string")]
+    InvalidUtf8,
+    #[error("unknown GGUF metadata value type {0}")]
+    UnknownValueType(u32),
+}
+
+/// A typed GGUF metadata value. Cite fs/ggml/gguf.go value-type ids 0–12.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetaValue {
+    U8(u8),
+    I8(i8),
+    U16(u16),
+    I16(i16),
+    U32(u32),
+    I32(i32),
+    U64(u64),
+    I64(i64),
+    F32(f32),
+    F64(f64),
+    Bool(bool),
+    String(String),
+    Array(Vec<MetaValue>),
+}
+
+/// A parsed GGUF container: header fields + the metadata key/value block.
+#[derive(Debug, Clone)]
+pub struct GgufFile {
+    pub version: u32,
+    pub tensor_count: u64,
+    pub metadata: BTreeMap<String, MetaValue>,
+}
+
+impl GgufFile {
+    /// Parse a GGUF header + metadata block from an in-memory byte slice.
+    pub fn parse(bytes: &[u8]) -> Result<Self, GgufError> {
+        let mut cur = Cursor::new(bytes);
+
+        let magic = cur.read_u32()?;
+        if magic == GGUF_MAGIC_BE {
+            return Err(GgufError::BigEndianUnsupported);
+        }
+        if magic != GGUF_MAGIC {
+            return Err(GgufError::BadMagic(magic));
+        }
+
+        let version = cur.read_u32()?;
+        if version < 2 {
+            return Err(GgufError::UnsupportedVersion(version));
+        }
+        if version > 3 {
+            return Err(GgufError::UnsupportedVersion(version));
+        }
+
+        // v2/v3 use u64 counts.
+        let tensor_count = cur.read_u64()?;
+        let kv_count = cur.read_u64()?;
+
+        let mut metadata = BTreeMap::new();
+        for _ in 0..kv_count {
+            let key = cur.read_string()?;
+            let vtype = cur.read_u32()?;
+            let value = cur.read_value(vtype)?;
+            metadata.insert(key, value);
+        }
+
+        Ok(GgufFile {
+            version,
+            tensor_count,
+            metadata,
+        })
+    }
+
+    /// Borrow a metadata value by key.
+    pub fn get(&self, key: &str) -> Option<&MetaValue> {
+        self.metadata.get(key)
+    }
+
+    /// Convenience: `general.architecture` as a string (e.g. "llama").
+    pub fn architecture(&self) -> Option<&str> {
+        match self.metadata.get("general.architecture") {
+            Some(MetaValue::String(s)) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+}
+
+/// Minimal little-endian byte cursor with bounds checking.
+struct Cursor<'a> {
+    buf: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(buf: &'a [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+
+    fn take(&mut self, n: usize) -> Result<&'a [u8], GgufError> {
+        let end = self.pos.checked_add(n).ok_or(GgufError::UnexpectedEof)?;
+        let slice = self.buf.get(self.pos..end).ok_or(GgufError::UnexpectedEof)?;
+        self.pos = end;
+        Ok(slice)
+    }
+
+    fn read_u8(&mut self) -> Result<u8, GgufError> {
+        Ok(self.take(1)?[0])
+    }
+
+    fn read_u16(&mut self) -> Result<u16, GgufError> {
+        Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
+    }
+
+    fn read_u32(&mut self) -> Result<u32, GgufError> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+
+    fn read_u64(&mut self) -> Result<u64, GgufError> {
+        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+    }
+
+    fn read_string(&mut self) -> Result<String, GgufError> {
+        let len = self.read_u64()? as usize;
+        let bytes = self.take(len)?;
+        String::from_utf8(bytes.to_vec()).map_err(|_| GgufError::InvalidUtf8)
+    }
+
+    /// Read a single metadata value of the given GGUF type id.
+    fn read_value(&mut self, vtype: u32) -> Result<MetaValue, GgufError> {
+        Ok(match vtype {
+            0 => MetaValue::U8(self.read_u8()?),
+            1 => MetaValue::I8(self.read_u8()? as i8),
+            2 => MetaValue::U16(self.read_u16()?),
+            3 => MetaValue::I16(self.read_u16()? as i16),
+            4 => MetaValue::U32(self.read_u32()?),
+            5 => MetaValue::I32(self.read_u32()? as i32),
+            6 => MetaValue::F32(f32::from_bits(self.read_u32()?)),
+            7 => MetaValue::Bool(self.read_u8()? != 0),
+            8 => MetaValue::String(self.read_string()?),
+            9 => {
+                let elem_type = self.read_u32()?;
+                let count = self.read_u64()?;
+                let mut items = Vec::with_capacity(count.min(4096) as usize);
+                for _ in 0..count {
+                    items.push(self.read_value(elem_type)?);
+                }
+                MetaValue::Array(items)
+            }
+            10 => MetaValue::U64(self.read_u64()?),
+            11 => MetaValue::I64(self.read_u64()? as i64),
+            12 => MetaValue::F64(f64::from_bits(self.read_u64()?)),
+            other => return Err(GgufError::UnknownValueType(other)),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
