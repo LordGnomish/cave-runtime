@@ -83,15 +83,132 @@ pub struct CronSchedule {
 impl CronSchedule {
     /// Parse a standard 5-field cron expression. Supports `*`, `a`, `a-b`,
     /// `a,b,c`, `*/n` and `a-b/n` in each field.
-    pub fn parse(_expr: &str) -> Result<Self, CronError> {
-        unimplemented!()
+    pub fn parse(expr: &str) -> Result<Self, CronError> {
+        let fields: Vec<&str> = expr.split_whitespace().collect();
+        if fields.len() != 5 {
+            return Err(CronError::FieldCount(fields.len()));
+        }
+        let minutes = parse_field(fields[0], 0, 59)?;
+        let hours = parse_field(fields[1], 0, 23)?;
+        let doms = parse_field(fields[2], 1, 31)?;
+        let months = parse_field(fields[3], 1, 12)?;
+        // Day-of-week: 0-7 with both 0 and 7 = Sunday; normalize 7→0.
+        let mut dows = parse_field(fields[4], 0, 7)?;
+        if dows.remove(&7) {
+            dows.insert(0);
+        }
+        Ok(Self {
+            minutes,
+            hours,
+            doms,
+            months,
+            dows,
+            dom_restricted: fields[2] != "*",
+            dow_restricted: fields[4] != "*",
+        })
+    }
+
+    fn day_matches(&self, dt: &DateTime<Utc>) -> bool {
+        let dom_ok = self.doms.contains(&dt.day());
+        let dow = dt.weekday().num_days_from_sunday(); // 0 = Sunday
+        let dow_ok = self.dows.contains(&dow);
+        // Vixie cron: when both day-of-month and day-of-week are restricted,
+        // a match on *either* qualifies; otherwise AND with the '*' field.
+        match (self.dom_restricted, self.dow_restricted) {
+            (true, true) => dom_ok || dow_ok,
+            (true, false) => dom_ok,
+            (false, true) => dow_ok,
+            (false, false) => true,
+        }
     }
 
     /// Smallest fire time strictly after `after` (truncated to the minute).
     /// `None` if no match within a 4-year horizon.
-    pub fn next(&self, _after: DateTime<Utc>) -> Option<DateTime<Utc>> {
-        unimplemented!()
+    pub fn next(&self, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+        // Start at the next whole minute strictly after `after`.
+        let mut cur = after
+            .with_second(0)?
+            .with_nanosecond(0)?
+            .checked_add_signed(Duration::minutes(1))?;
+        let horizon = after.checked_add_signed(Duration::days(366 * 4))?;
+        while cur <= horizon {
+            if !self.months.contains(&cur.month()) {
+                // Jump to the first day of next month, 00:00.
+                cur = advance_to_next_month(cur)?;
+                continue;
+            }
+            if !self.day_matches(&cur) {
+                cur = next_midnight(cur)?;
+                continue;
+            }
+            if !self.hours.contains(&cur.hour()) {
+                cur = cur.with_minute(0)?.checked_add_signed(Duration::hours(1))?;
+                continue;
+            }
+            if !self.minutes.contains(&cur.minute()) {
+                cur = cur.checked_add_signed(Duration::minutes(1))?;
+                continue;
+            }
+            return Some(cur);
+        }
+        None
     }
+}
+
+/// Advance to 00:00 on the first day of the following month.
+fn advance_to_next_month(dt: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let (y, m) = if dt.month() == 12 {
+        (dt.year() + 1, 1)
+    } else {
+        (dt.year(), dt.month() + 1)
+    };
+    Utc.with_ymd_and_hms(y, m, 1, 0, 0, 0).single()
+}
+
+/// Advance to 00:00 the next day.
+fn next_midnight(dt: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let midnight = dt.with_hour(0)?.with_minute(0)?.with_second(0)?.with_nanosecond(0)?;
+    midnight.checked_add_signed(Duration::days(1))
+}
+
+/// Parse one cron field into the set of matching values.
+fn parse_field(field: &str, min: u32, max: u32) -> Result<BTreeSet<u32>, CronError> {
+    let mut out = BTreeSet::new();
+    for part in field.split(',') {
+        // Optional step: `range/step`.
+        let (range_spec, step) = match part.split_once('/') {
+            Some((r, s)) => {
+                let step: u32 = s.parse().map_err(|_| CronError::BadField(field.to_string()))?;
+                if step == 0 {
+                    return Err(CronError::BadField(field.to_string()));
+                }
+                (r, step)
+            }
+            None => (part, 1),
+        };
+        let (lo, hi) = if range_spec == "*" {
+            (min, max)
+        } else if let Some((a, b)) = range_spec.split_once('-') {
+            let a: u32 = a.parse().map_err(|_| CronError::BadField(field.to_string()))?;
+            let b: u32 = b.parse().map_err(|_| CronError::BadField(field.to_string()))?;
+            (a, b)
+        } else {
+            let v: u32 = range_spec.parse().map_err(|_| CronError::BadField(field.to_string()))?;
+            (v, v)
+        };
+        if lo < min || hi > max || lo > hi {
+            return Err(CronError::BadField(field.to_string()));
+        }
+        let mut v = lo;
+        while v <= hi {
+            out.insert(v);
+            v += step;
+        }
+    }
+    if out.is_empty() {
+        return Err(CronError::BadField(field.to_string()));
+    }
+    Ok(out)
 }
 
 /// The decision the cron controller makes for one tick.
@@ -113,19 +230,74 @@ pub enum CronDecision {
 
 /// Decide what the cron controller should do at `now`, given the last
 /// scheduled fire time and the set of currently-active workflows.
-pub fn evaluate(_spec: &CronWorkflowSpec, _status: &CronWorkflowStatus, _now: DateTime<Utc>) -> CronDecision {
-    unimplemented!()
+pub fn evaluate(spec: &CronWorkflowSpec, status: &CronWorkflowStatus, now: DateTime<Utc>) -> CronDecision {
+    if spec.suspend {
+        return CronDecision::Suspended;
+    }
+    let schedule = match CronSchedule::parse(&spec.schedule) {
+        Ok(s) => s,
+        Err(_) => return CronDecision::NotDue,
+    };
+    // The fire time we consider is the first one after the last scheduled
+    // time (or after `now - horizon` if never scheduled — use `now` minus a
+    // minute so the immediately-prior fire is found).
+    let anchor = status
+        .last_scheduled_time
+        .unwrap_or_else(|| now - Duration::days(1));
+    let Some(fire) = schedule.next(anchor) else {
+        return CronDecision::NotDue;
+    };
+    if fire > now {
+        return CronDecision::NotDue;
+    }
+    // A fire has elapsed. Check the starting deadline.
+    if let Some(deadline) = spec.starting_deadline_seconds {
+        if (now - fire).num_seconds() > deadline {
+            return CronDecision::MissedDeadline;
+        }
+    }
+    let has_active = !status.active.is_empty();
+    match spec.concurrency_policy {
+        ConcurrencyPolicy::Allow => CronDecision::Run(fire),
+        ConcurrencyPolicy::Forbid => {
+            if has_active {
+                CronDecision::Forbidden
+            } else {
+                CronDecision::Run(fire)
+            }
+        }
+        ConcurrencyPolicy::Replace => {
+            if has_active {
+                CronDecision::Replace(fire)
+            } else {
+                CronDecision::Run(fire)
+            }
+        }
+    }
 }
 
 /// Given finished runs `(uid, succeeded, finished_at)` newest-or-any order,
 /// return the uids that should be deleted to honour the history limits.
 /// `None` limit means unlimited (Argo defaults: 3 successful, 1 failed).
 pub fn history_to_prune(
-    _runs: &[(Uuid, bool, DateTime<Utc>)],
-    _successful_limit: Option<u32>,
-    _failed_limit: Option<u32>,
+    runs: &[(Uuid, bool, DateTime<Utc>)],
+    successful_limit: Option<u32>,
+    failed_limit: Option<u32>,
 ) -> Vec<Uuid> {
-    unimplemented!()
+    // Argo defaults: keep 3 successful, 1 failed.
+    let succ_limit = successful_limit.unwrap_or(3) as usize;
+    let fail_limit = failed_limit.unwrap_or(1) as usize;
+
+    let mut succeeded: Vec<&(Uuid, bool, DateTime<Utc>)> = runs.iter().filter(|r| r.1).collect();
+    let mut failed: Vec<&(Uuid, bool, DateTime<Utc>)> = runs.iter().filter(|r| !r.1).collect();
+    // Newest first.
+    succeeded.sort_by(|a, b| b.2.cmp(&a.2));
+    failed.sort_by(|a, b| b.2.cmp(&a.2));
+
+    let mut prune = Vec::new();
+    prune.extend(succeeded.iter().skip(succ_limit).map(|r| r.0));
+    prune.extend(failed.iter().skip(fail_limit).map(|r| r.0));
+    prune
 }
 
 #[cfg(test)]
