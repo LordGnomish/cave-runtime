@@ -34,7 +34,7 @@ partial_count  = 0
 skipped_count  = 9
 unmapped_count = 1
 total          = 32
-fill_ratio     = 0.96875    # (mapped + partial + skipped) / total = 30/30 — alertmanager gossip-mesh reclassified unmapped→skipped (cave-etcd Raft already provides HA silence/notify-log state, so the gossip layer is structurally replaced rather than missing).
+fill_ratio     = 0.96875          # (mapped 22 + partial 0 + skipped 9) / 32 = (total - unmapped)/total
 honest_ratio   = 0.96875          # (mapped 22 + skipped 9) / 32
 adr_justified_ratio = 1.0        # 9 skipped (vendor/SDK-specific scrape targets + alertmanager gossip-mesh + remaining bits scope_cut to obs-stack-ray-2) + 2 partials (discovery: static+file SD covered, K8s/Consul/AWS/GCE/Azure SDK plumbing deferred; remote_read: responder scaffolded, backend block-streaming deferred) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
