@@ -47,9 +47,20 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # server-side blob/manifest write (model-store persistence) remains skipped.
 # Both were validated against ollama v0.3.0 parser/parser.go + api/types.go.
 #
-# Partial (1): daemon graceful-shutdown — the loop already handles SIGTERM +
-# a stop-signal file (daemon.rs); SIGINT/full in-flight drain is still owned
-# by the cave-runtime host. Kept honest (not inflated to mapped).
+# 2026-05-30 honest_ratio uplift (strict-TDD, 3 RED->GREEN cycles): closed the
+# last partial — daemon graceful-shutdown — by porting ollama/ollama's
+# server.Serve signal lifecycle (server/routes.go) into an in-crate
+# ShutdownController state machine (src/shutdown.rs): Running -> Draining(reason)
+# on the first SIGINT/SIGTERM/stop-file, escalating to Forced on a second
+# signal, with a pure loop_action(state, stop_file) -> Tick/DrainAndStop/StopNow
+# decision table. daemon.rs::run now (a) listens for BOTH SIGINT and SIGTERM
+# (was SIGTERM-only), (b) drains the in-flight do_tick() to completion on a
+# graceful request, and (c) aborts the in-flight tick on a forced second signal.
+# This is genuinely in-crate-ownable (the daemon owns its own scheduler/queue
+# drain, exactly as ollama's server owns its scheduler context cancel), so it is
+# reclassified partial -> mapped, not inflated.
+#
+# Partial (0): none — the former daemon graceful-shutdown partial is now mapped.
 #
 # Skipped (10): /api/pull (NDJSON progress UX deferred), /api/push (no
 # upstream-registry write path in sovereign deploy), server-side /api/create
@@ -59,21 +70,21 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # inference adapters (trait open for extension), embedding-recall RAG store
 # (cave-hermes), KV-cache eviction state machine (runtime-internal), JSON-mode
 # response validation, /api/version surface in extras, /api/blobs upload.
-mapped_count          = 20
-partial_count         = 1
+mapped_count          = 21  # 2026-05-30: +1 daemon graceful-shutdown (ShutdownController) reclassified partial -> mapped
+partial_count         = 0   # 2026-05-30: was 1 (daemon graceful-shutdown) — now mapped
 skipped_count         = 10
 unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
 total                 = 31  # 2026-05-30: +2 (Modelfile parser + /api/create client builder) decomposed from the model-authoring scope-cut and now mapped
 fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 31/31
-honest_ratio          = 0.9677  # (mapped + skipped) / total            = 30/31
-adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
+honest_ratio          = 1.0000  # (mapped + skipped) / total            = 31/31
+adr_justified_ratio   = 1.00    # every [[skipped]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-30"
 infra_only            = false
 
 # adr_justified_ratio breakdown (2026-05-30):
-#   * daemon graceful shutdown partial   → host-preflight: cave-runtime owns SIGINT/full-drain (SIGTERM + stop-file already handled in-crate)
+#   * daemon graceful shutdown            → NOW MAPPED (src/shutdown.rs ShutdownController; SIGINT+SIGTERM+stop-file drain/force in daemon.rs::run). No longer a partial.
 #   * 10 [[skipped]] subsystems          → categorised inline in [parity] comment block above
 #     - /api/pull, /api/push, /api/blobs, /api/create server-side persistence  → out-of-scope-subsystem (client builder + Modelfile parser now mapped; model-store blob/manifest write deferred)
 #     - server-side /v1 hosting                          → parallel-track (cave-portal-api + cave-llm-gateway)
@@ -160,6 +171,12 @@ file          = "src/modelfile.rs"
 upstream_name = "api.CreateRequest (/api/create client)"
 local_name    = "CreateRequest::from_modelfile"
 file          = "src/ollama_extras.rs"
+
+# 2026-05-30 honest_ratio uplift — graceful shutdown (strict-TDD, partial -> mapped).
+[[functions]]
+upstream_name = "server.Serve signal lifecycle (SIGINT/SIGTERM graceful + force)"
+local_name    = "ShutdownController + loop_action"
+file          = "src/shutdown.rs"
 
 [[surfaces]]
 kind          = "http"

@@ -4,7 +4,7 @@
 **Upstream:** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
 **source_sha:** v0.3.0
 **fill_ratio:** 1.0000 (31/31)
-**honest_ratio:** 0.9677 (30/31)
+**honest_ratio:** 1.0000 (31/31) — 2026-05-30: closed the last partial (daemon graceful shutdown)
 **parity_ratio_source:** "manifest"
 **last_audit:** 2026-05-30
 
@@ -44,7 +44,7 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 | `src/metrics.rs`        | prometheus-client gauges/counters    | mapped   | derived                             |
 | `src/bin/cave-local-llm.rs` | one-shot CLI                     | mapped   | derived                             |
 | `src/bin/cave-local-llm-daemon.rs` | daemon supervisor binary  | mapped   | derived                             |
-| daemon graceful shutdown        | SIGINT/full drain (SIGTERM + stop-file done) | partial  | (cave-runtime owns the host signal hook) |
+| `src/shutdown.rs` + `src/daemon.rs::run` | graceful shutdown: SIGINT+SIGTERM+stop-file drain, second-signal force-abort | mapped | server/routes.go (server.Serve) |
 
 ## Scope cuts (counted as `skipped`)
 
@@ -105,6 +105,7 @@ as formal `[[scope_cuts]]`:**
 
 * `/api/pull` blocking client + NDJSON progress decoder — cave-portal-api UX.
 * Concrete `LlamaCppBackend` / `VllmBackend` adapters — cave-llm-gateway.
-* `/v1/chat/completions` streaming response (partial) — mirrors
-  `ollama::chat_stream`, future polish in this crate.
-* Daemon SIGTERM hook in cave-runtime supervisor (partial).
+* ~~`/v1/chat/completions` streaming response (partial)~~ — RESOLVED 2026-05-28
+  (`openai_compat::chat_completions_stream`).
+* ~~Daemon SIGINT/SIGTERM graceful drain (partial)~~ — RESOLVED 2026-05-30
+  (`src/shutdown.rs` + `daemon.rs::run`); see ShutdownController.
