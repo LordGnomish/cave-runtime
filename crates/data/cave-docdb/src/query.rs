@@ -170,6 +170,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_implicit_eq() {
@@ -296,5 +297,124 @@ mod tests {
         query.insert("email".to_string(), Value::Object(op));
 
         assert!(matches_query(&doc, &query));
+    }
+
+    // ── Cycle 1a: $type / $size / $all / $not / $nor + missing-field semantics ──
+
+    fn q(field: &str, op: &str, v: Value) -> Document {
+        let mut m = serde_json::Map::new();
+        m.insert(op.to_string(), v);
+        let mut query = Document::new();
+        query.insert(field.to_string(), Value::Object(m));
+        query
+    }
+
+    fn d(field: &str, v: Value) -> Document {
+        let mut doc = Document::new();
+        doc.insert(field.to_string(), v);
+        doc
+    }
+
+    #[test]
+    fn test_type_string_alias() {
+        let doc = d("name", json!("alice"));
+        assert!(matches_query(&doc, &q("name", "$type", json!("string"))));
+        assert!(!matches_query(&doc, &q("name", "$type", json!("int"))));
+    }
+
+    #[test]
+    fn test_type_number_groups_int_and_double() {
+        assert!(matches_query(&d("n", json!(7)), &q("n", "$type", json!("int"))));
+        assert!(matches_query(
+            &d("n", json!(7.5)),
+            &q("n", "$type", json!("double"))
+        ));
+        // "number" alias matches both int and double.
+        assert!(matches_query(&d("n", json!(7)), &q("n", "$type", json!("number"))));
+        assert!(matches_query(
+            &d("n", json!(7.5)),
+            &q("n", "$type", json!("number"))
+        ));
+    }
+
+    #[test]
+    fn test_type_numeric_bson_code_and_array_form() {
+        // BSON code 2 == string; array form matches any listed type.
+        assert!(matches_query(&d("s", json!("x")), &q("s", "$type", json!(2))));
+        assert!(matches_query(
+            &d("s", json!("x")),
+            &q("s", "$type", json!(["bool", "string"]))
+        ));
+        assert!(!matches_query(
+            &d("s", json!(true)),
+            &q("s", "$type", json!(["string", "int"]))
+        ));
+    }
+
+    #[test]
+    fn test_size_operator() {
+        let doc = d("tags", json!(["a", "b", "c"]));
+        assert!(matches_query(&doc, &q("tags", "$size", json!(3))));
+        assert!(!matches_query(&doc, &q("tags", "$size", json!(2))));
+        // non-array never matches $size.
+        assert!(!matches_query(&d("tags", json!("a")), &q("tags", "$size", json!(1))));
+    }
+
+    #[test]
+    fn test_all_operator() {
+        let doc = d("tags", json!(["a", "b", "c"]));
+        assert!(matches_query(&doc, &q("tags", "$all", json!(["a", "c"]))));
+        assert!(!matches_query(&doc, &q("tags", "$all", json!(["a", "z"]))));
+    }
+
+    #[test]
+    fn test_not_operator_negates_inner() {
+        // $not negates an operator expression.
+        let doc = d("age", json!(30));
+        assert!(matches_query(&doc, &q("age", "$not", json!({"$gt": 50}))));
+        assert!(!matches_query(&doc, &q("age", "$not", json!({"$gt": 10}))));
+    }
+
+    #[test]
+    fn test_not_matches_missing_field() {
+        // A missing field does not match $gt, so $not over it matches.
+        let doc = d("other", json!(1));
+        assert!(matches_query(&doc, &q("age", "$not", json!({"$gt": 10}))));
+    }
+
+    #[test]
+    fn test_nor_top_level() {
+        let doc = d("status", json!("active"));
+        let mut query = Document::new();
+        query.insert(
+            "$nor".to_string(),
+            json!([{"status": "inactive"}, {"status": "deleted"}]),
+        );
+        // none of the conditions match -> $nor true
+        assert!(matches_query(&doc, &query));
+
+        let mut query2 = Document::new();
+        query2.insert(
+            "$nor".to_string(),
+            json!([{"status": "active"}, {"status": "deleted"}]),
+        );
+        // one condition matches -> $nor false
+        assert!(!matches_query(&doc, &query2));
+    }
+
+    #[test]
+    fn test_ne_matches_missing_field() {
+        // $ne against a value matches documents lacking the field entirely.
+        let doc = d("other", json!(1));
+        assert!(matches_query(&doc, &q("status", "$ne", json!("active"))));
+    }
+
+    #[test]
+    fn test_nin_matches_missing_field() {
+        let doc = d("other", json!(1));
+        assert!(matches_query(
+            &doc,
+            &q("status", "$nin", json!(["active", "pending"]))
+        ));
     }
 }
