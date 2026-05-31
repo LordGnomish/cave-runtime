@@ -1790,6 +1790,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-iot-gateway"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "proptest",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "cave-kamaji"
 version = "0.1.0"
 dependencies = [
