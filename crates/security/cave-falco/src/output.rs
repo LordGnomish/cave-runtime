@@ -10,7 +10,35 @@
 
 use crate::engine::EngineMatch;
 use crate::event::FalcoEvent;
+use crate::token_bucket::TokenBucket;
 use serde::{Deserialize, Serialize};
+
+/// Output-stream throttle — mirrors `falco_outputs`' notification token
+/// bucket (`outputs: { rate, max_burst }`). A `rate` of `0` disables
+/// throttling (Falco's default), otherwise alerts beyond `max_burst` in a
+/// burst are dropped until tokens regenerate at `rate`/second.
+#[derive(Debug, Clone)]
+pub struct OutputThrottle {
+    rate: f64,
+    bucket: TokenBucket,
+}
+
+impl OutputThrottle {
+    pub fn new(rate: f64, max_burst: f64, now_ns: u64) -> Self {
+        Self { rate, bucket: TokenBucket::new(rate, max_burst, now_ns) }
+    }
+
+    /// Returns `true` if an alert may be emitted at `now_ns`. When `rate`
+    /// is `<= 0`, throttling is disabled and every alert is allowed.
+    pub fn allow(&mut self, now_ns: u64) -> bool {
+        if self.rate <= 0.0 {
+            return true;
+        }
+        self.bucket.claim(now_ns)
+    }
+
+    pub fn tokens(&self) -> f64 { self.bucket.tokens() }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
