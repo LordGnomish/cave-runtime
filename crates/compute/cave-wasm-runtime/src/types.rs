@@ -60,6 +60,25 @@ pub struct Export {
     pub index: u32,
 }
 
+/// What an import resolves to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImportKind {
+    /// Imported function with the given type index.
+    Func(u32),
+    Table,
+    Memory(Limits),
+    Global,
+}
+
+/// A `(module, name)` import declaration. WASI functions arrive as function
+/// imports from the `wasi_snapshot_preview1` module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Import {
+    pub module: String,
+    pub name: String,
+    pub kind: ImportKind,
+}
+
 /// Min/max limits (pages for memory, elements for tables).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Limits {
@@ -88,7 +107,8 @@ impl FuncBody {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Module {
     pub types: Vec<FuncType>,
-    /// type index for each defined function.
+    pub imports: Vec<Import>,
+    /// type index for each *defined* function (imports are not included).
     pub functions: Vec<u32>,
     pub exports: Vec<Export>,
     pub code: Vec<FuncBody>,
@@ -104,9 +124,48 @@ impl Module {
             .map(|e| e.index)
     }
 
-    /// Signature of a defined function by index.
+    /// Type indices of imported functions, in import order. These occupy the
+    /// low end of the function index space.
+    pub fn imported_func_type_indices(&self) -> Vec<u32> {
+        self.imports
+            .iter()
+            .filter_map(|i| match i.kind {
+                ImportKind::Func(t) => Some(t),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Number of imported functions (the offset at which defined functions
+    /// begin in the combined index space).
+    pub fn imported_func_count(&self) -> usize {
+        self.imports
+            .iter()
+            .filter(|i| matches!(i.kind, ImportKind::Func(_)))
+            .count()
+    }
+
+    /// Signature of any function (imported or defined) by combined index.
     pub fn func_type(&self, func_idx: u32) -> Option<&FuncType> {
-        let tidx = *self.functions.get(func_idx as usize)?;
-        self.types.get(tidx as usize)
+        let imp = self.imported_func_type_indices();
+        let idx = func_idx as usize;
+        if idx < imp.len() {
+            self.types.get(imp[idx] as usize)
+        } else {
+            let tidx = *self.functions.get(idx - imp.len())?;
+            self.types.get(tidx as usize)
+        }
+    }
+
+    /// The defined-function body for a combined index, or `None` if the index
+    /// refers to an imported (host) function.
+    pub fn defined_body(&self, func_idx: u32) -> Option<&FuncBody> {
+        let n = self.imported_func_count();
+        let idx = func_idx as usize;
+        if idx < n {
+            None
+        } else {
+            self.code.get(idx - n)
+        }
     }
 }

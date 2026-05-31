@@ -9,6 +9,7 @@
 use crate::error::{Result, WasmError};
 use crate::limits::{ResourceLimits, Store};
 use crate::types::{Module, ValType};
+use crate::wasi::WasiCtx;
 use serde::{Deserialize, Serialize};
 
 /// A runtime value on the operand stack / in a local slot.
@@ -79,7 +80,22 @@ impl Instance {
             .export_func(name)
             .ok_or_else(|| WasmError::ExportNotFound(name.to_string()))?;
         let mut store = Store::new(self.module.memory, limits);
-        self.exec_func(idx, args.to_vec(), 0, &mut store)
+        let mut wasi = WasiCtx::new();
+        self.exec_func(idx, args.to_vec(), 0, &mut store, &mut wasi)
+    }
+
+    /// Run a WASI command guest: invoke `entry` (typically `_start`) with the
+    /// supplied [`WasiCtx`], returning the context with captured stdout/stderr
+    /// and any `proc_exit` code. A clean `proc_exit` is not treated as an error.
+    pub fn run_wasi(
+        &self,
+        entry: &str,
+        limits: &ResourceLimits,
+        wasi: WasiCtx,
+    ) -> Result<WasiCtx> {
+        // RED stub — host dispatch + capture wired in the GREEN commit.
+        let _ = (entry, limits);
+        Ok(wasi)
     }
 
     /// Execute a function by index, returning its result values. `depth` guards
@@ -90,6 +106,7 @@ impl Instance {
         args: Vec<Value>,
         depth: u32,
         store: &mut Store,
+        _wasi: &mut WasiCtx,
     ) -> Result<Vec<Value>> {
         if depth > 1024 {
             return Err(WasmError::Trap("call stack exhausted".into()));
@@ -235,7 +252,7 @@ impl Instance {
                         return Err(WasmError::StackUnderflow);
                     }
                     let call_args = stack.split_off(stack.len() - n);
-                    let results = self.exec_func(callee, call_args, depth + 1, store)?;
+                    let results = self.exec_func(callee, call_args, depth + 1, store, _wasi)?;
                     stack.extend(results);
                 }
                 0x28 => {
@@ -362,6 +379,7 @@ mod tests {
     fn module1(params: Vec<ValType>, results: Vec<ValType>, code: Vec<u8>) -> Module {
         Module {
             types: vec![FuncType { params, results }],
+            imports: vec![],
             functions: vec![0],
             exports: vec![Export {
                 name: "f".into(),
@@ -478,6 +496,7 @@ mod tests {
                     results: vec![ValType::I32],
                 },
             ],
+            imports: vec![],
             functions: vec![0, 1],
             exports: vec![Export {
                 name: "main".into(),
@@ -604,5 +623,100 @@ mod tests {
         let m = module1_mem(vec![], vec![], code, 1);
         let err = Instance::new(m).invoke("f", &[]).unwrap_err();
         assert!(matches!(err, WasmError::MemoryOutOfBounds { .. }));
+    }
+
+    // ---- cycle 4: WASI preview1 host dispatch ----
+
+    use crate::types::{Import, ImportKind};
+    use crate::wasi::WasiCtx;
+
+    #[test]
+    fn wasi_fd_write_captures_stdout() {
+        // import fd_write : (i32,i32,i32,i32)->i32   (combined func index 0)
+        // defined _start  : ()->()                    (combined func index 1)
+        // _start: write "hi" into memory, build an iovec, call fd_write(1, ..).
+        let code = vec![
+            0x41, 0x10, 0x41, 0xe8, 0x00, 0x3a, 0x00, 0x00, // mem[16] = 'h'
+            0x41, 0x11, 0x41, 0xe9, 0x00, 0x3a, 0x00, 0x00, // mem[17] = 'i'
+            0x41, 0x00, 0x41, 0x10, 0x36, 0x02, 0x00, // iovec.buf = 16 @ mem[0]
+            0x41, 0x04, 0x41, 0x02, 0x36, 0x02, 0x00, // iovec.len = 2  @ mem[4]
+            0x41, 0x01, 0x41, 0x00, 0x41, 0x01, 0x41, 0x08, // fd, iovs, n, nwritten
+            0x10, 0x00, // call fd_write
+            0x1a, // drop errno
+            0x0b, // end
+        ];
+        let m = Module {
+            types: vec![
+                FuncType {
+                    params: vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+                    results: vec![ValType::I32],
+                },
+                FuncType {
+                    params: vec![],
+                    results: vec![],
+                },
+            ],
+            imports: vec![Import {
+                module: "wasi_snapshot_preview1".into(),
+                name: "fd_write".into(),
+                kind: ImportKind::Func(0),
+            }],
+            functions: vec![1],
+            exports: vec![Export {
+                name: "_start".into(),
+                kind: ExternKind::Func,
+                index: 1,
+            }],
+            code: vec![FuncBody {
+                locals: vec![],
+                code,
+            }],
+            memory: Some(MemLimits {
+                min: 1,
+                max: Some(1),
+            }),
+        };
+        let out = Instance::new(m)
+            .run_wasi("_start", &ResourceLimits::default(), WasiCtx::new())
+            .unwrap();
+        assert_eq!(out.stdout_string(), "hi");
+        // nwritten written back to mem[8]
+    }
+
+    #[test]
+    fn wasi_proc_exit_sets_code() {
+        // import proc_exit : (i32)->()  (index 0); _start calls proc_exit(7)
+        let m = Module {
+            types: vec![
+                FuncType {
+                    params: vec![ValType::I32],
+                    results: vec![],
+                },
+                FuncType {
+                    params: vec![],
+                    results: vec![],
+                },
+            ],
+            imports: vec![Import {
+                module: "wasi_snapshot_preview1".into(),
+                name: "proc_exit".into(),
+                kind: ImportKind::Func(0),
+            }],
+            functions: vec![1],
+            exports: vec![Export {
+                name: "_start".into(),
+                kind: ExternKind::Func,
+                index: 1,
+            }],
+            code: vec![FuncBody {
+                locals: vec![],
+                code: vec![0x41, 0x07, 0x10, 0x00, 0x0b],
+            }],
+            memory: None,
+        };
+        let out = Instance::new(m)
+            .run_wasi("_start", &ResourceLimits::default(), WasiCtx::new())
+            .unwrap();
+        assert_eq!(out.exit_code, Some(7));
     }
 }

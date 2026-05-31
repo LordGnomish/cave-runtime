@@ -21,12 +21,14 @@ pub mod exec;
 pub mod limits;
 pub mod parser;
 pub mod types;
+pub mod wasi;
 
 pub use error::{Result, WasmError};
 pub use exec::{Instance, Value};
 pub use limits::{ResourceLimits, Store, PAGE_SIZE};
 pub use parser::parse_module;
-pub use types::{Export, ExternKind, FuncBody, FuncType, Limits, Module, ValType};
+pub use types::{Export, ExternKind, FuncBody, FuncType, Import, ImportKind, Limits, Module, ValType};
+pub use wasi::WasiCtx;
 
 /// Crate version string, surfaced by the CLI / portal.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

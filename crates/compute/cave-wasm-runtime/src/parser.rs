@@ -264,4 +264,26 @@ mod tests {
             index: 0,
         }, FuncBody::default(), FuncType::default());
     }
+
+    #[test]
+    fn decodes_import_section() {
+        use crate::types::{Import, ImportKind};
+        // (module (type (func)) (import "env" "f" (func (type 0))))
+        let bytes = vec![
+            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // preamble
+            0x01, 0x04, 0x01, 0x60, 0x00, 0x00, // type: ()->()
+            // import section: 1 import env.f -> func type 0
+            0x02, 0x09, 0x01, 0x03, 0x65, 0x6e, 0x76, 0x01, 0x66, 0x00, 0x00,
+        ];
+        let m = parse_module(&bytes).unwrap();
+        assert_eq!(
+            m.imports,
+            vec![Import {
+                module: "env".into(),
+                name: "f".into(),
+                kind: ImportKind::Func(0),
+            }]
+        );
+        assert_eq!(m.imported_func_count(), 1);
+    }
 }
