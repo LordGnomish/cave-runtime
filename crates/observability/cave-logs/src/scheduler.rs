@@ -198,8 +198,18 @@ impl<T> RequestQueue<T> {
     /// tenant shard assignments are recomputed. Returns `true` if the consumer
     /// was fully removed.
     pub fn unregister_consumer(&mut self, consumer_id: &str) -> bool {
-        let _ = consumer_id;
-        false // RED stub
+        let remaining = match self.consumers.get_mut(consumer_id) {
+            Some(info) if info.connections > 0 => {
+                info.connections -= 1;
+                info.connections
+            }
+            _ => return false,
+        };
+        if remaining == 0 {
+            self.remove_consumer(consumer_id);
+            return true;
+        }
+        false
     }
 
     /// Number of active connections held by a consumer (0 if unknown).
