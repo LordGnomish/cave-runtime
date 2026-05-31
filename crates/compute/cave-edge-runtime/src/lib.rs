@@ -14,9 +14,12 @@
 //!
 //! Modules:
 //!   edged        — minimal kubelet: pod-worker queue + phase + orphan GC + status cadence
+//!   metamanager  — offline-first local metadata store (cache-through + serve-from-cache)
 
 pub mod edged;
 pub mod error;
+pub mod metamanager;
 
 pub use edged::{Edged, Pod, PodPhase};
 pub use error::{EdgeError, Result};
+pub use metamanager::{MetaManager, QueryOutcome};
