@@ -685,32 +685,33 @@ impl ScalingModifiersEvaluator {
         self.triggers.insert(t.name.clone(), t);
     }
 
+    /// Compute the composite metric the formula produces over the current
+    /// trigger map — the Rust analogue of KEDA's
+    /// `calculateScalingModifiersFormula` result. An empty or malformed
+    /// formula (e.g. one referencing an undefined trigger) degrades to the
+    /// sum of known trigger metrics rather than crashing the scaling loop.
+    pub fn compute_metric(&self) -> f64 {
+        let formula = self.formula.trim();
+        let sum = || self.triggers.values().map(|t| t.metric).sum::<f64>();
+        if formula.is_empty() {
+            return sum();
+        }
+        let vars: BTreeMap<String, f64> = self
+            .triggers
+            .iter()
+            .map(|(k, t)| (k.clone(), t.metric))
+            .collect();
+        eval_formula(formula, &vars).unwrap_or_else(|_| sum())
+    }
+
     /// Evaluate the formula against the trigger map and return the
-    /// recommended replica count.
+    /// recommended replica count: `ceil(composite_metric / target)`,
+    /// matching the HPA division KEDA applies to the composite metric.
     pub fn evaluate(&self) -> i32 {
-        let values: Vec<f64> = self.triggers.values().map(|t| t.metric).collect();
-        let metric = if let Some(args) = self.parse_formula("max") {
-            args.iter()
-                .filter_map(|n| self.triggers.get(n).map(|t| t.metric))
-                .fold(f64::MIN, f64::max)
-        } else if let Some(args) = self.parse_formula("min") {
-            args.iter()
-                .filter_map(|n| self.triggers.get(n).map(|t| t.metric))
-                .fold(f64::MAX, f64::min)
-        } else if let Some(args) = self.parse_formula("sum") {
-            args.iter()
-                .filter_map(|n| self.triggers.get(n).map(|t| t.metric))
-                .sum()
-        } else if values.is_empty() {
-            0.0
-        } else {
-            // Unknown formula → sum of every trigger metric.
-            values.iter().sum()
-        };
         if self.target <= 0.0 {
             return 0;
         }
-        (metric / self.target).ceil().max(0.0) as i32
+        (self.compute_metric() / self.target).ceil().max(0.0) as i32
     }
 
     /// Same metric calculation as [`evaluate`] but returns whether the
@@ -720,14 +721,6 @@ impl ScalingModifiersEvaluator {
             None => self.triggers.values().any(|t| t.is_active),
             Some(threshold) => self.evaluate() > threshold,
         }
-    }
-
-    fn parse_formula(&self, name: &str) -> Option<Vec<String>> {
-        let prefix = format!("{name}(");
-        let trimmed = self.formula.trim();
-        let rest = trimmed.strip_prefix(&prefix)?;
-        let inner = rest.strip_suffix(')')?;
-        Some(inner.split(',').map(|s| s.trim().to_string()).collect())
     }
 }
 
