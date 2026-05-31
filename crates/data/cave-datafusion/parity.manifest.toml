@@ -62,13 +62,20 @@ url      = "https://github.com/apache/datafusion"
 #   the reader needed the Arrow batch IO stack; the line-delimited reader is pure in-crate string
 #   parsing (mirrors the already-mapped CsvSource), so the skip was convertible without persistence.
 #   mapped 17→18, skipped 12→11, honest_ratio 0.5152→0.5455.
-mapped_count   = 18
-partial_count  = 4
+# 2026-05-31 cont2 honest correction: scalar-function physical invocation promoted partial→mapped.
+#   The partial's sole deferred claim was *row-level* scalar-function invocation (a non-literal
+#   argument), which the predecessor landed via strict TDD as PhysicalExpr::Call (RED scalar_call_tdd.rs
+#   → GREEN physical_expr.rs + context.rs lowering) but forgot to reclassify. Now proven complete across
+#   every expression position the MVP exposes — projection, nested call, WHERE predicate
+#   (scalar_fn_contexts_tdd.rs), and ORDER BY (order_by_expr_tdd.rs). mapped 18→19, partial 4→3,
+#   honest_ratio 0.5455→0.5758.
+mapped_count   = 19
+partial_count  = 3
 skipped_count  = 11
 unmapped_count = 0
 total          = 33
 fill_ratio     = 1.0000
-honest_ratio   = 0.5455
+honest_ratio   = 0.5758
 adr_justified_ratio = 1.0      # 11 skipped (ffi/proto/substrait/cli/python/ballista/wasm/physical-optimizer/runtime-env/parquet-writer) all deferred to lakehouse-ray-2 per ADR-147; CSE promoted to mapped 2026-05-30, JSON reader promoted to mapped 2026-05-31
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147"
 parity_ratio_source = "manifest"
@@ -169,10 +176,10 @@ upstream = "crates/datafusion-sql/src/planner/expr.rs (full SQL grammar)"
 local    = "src/sql_parser.rs"
 notes    = "Subset only: SELECT/WHERE/GROUP BY/ORDER BY/LIMIT/OFFSET. JOIN, CTE, subquery, CASE WHEN, window functions, INSERT/UPDATE/DELETE, DDL deferred."
 
-[[partial]]
+[[mapped]]
 upstream = "crates/datafusion-physical-expr/src/scalar_function.rs"
-local    = "src/context.rs"
-notes    = "Scalar function calls fold at lowering time when all args are literals. Row-level scalar function invocation requires PhysicalExpr::Call variant — deferred to v0.2."
+local    = "src/physical_expr.rs"
+note     = "ScalarFunctionExpr — scalar function invocation in two paths: all-literal args fold to a constant at lowering time (constant folding), and any non-literal arg lowers to PhysicalExpr::Call which evaluates each arg expr against the row then invokes the registered fn (FunctionRegistry-rebindable after deser). Proven across projection, nested calls, WHERE predicates, and ORDER BY keys. 2026-05-31 cont2 partial→mapped (predecessor strict-TDD RED scalar_call_tdd.rs → GREEN; contexts pinned by scalar_fn_contexts_tdd.rs + order_by_expr_tdd.rs)."
 
 # ─── Skipped — alt-language / vendor (8) ─────────────────────────────────────
 
