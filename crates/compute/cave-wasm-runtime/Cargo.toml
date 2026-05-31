@@ -1,0 +1,17 @@
+[package]
+name = "cave-wasm-runtime"
+version.workspace = true
+edition.workspace = true
+# License override: this crate ports Apache-2.0 / MIT upstreams (wasmtime,
+# wasmer, spin) and is published under their terms, NOT the workspace-default
+# AGPL. See NOTICE.
+license = "Apache-2.0"
+description = "Pure-Rust WebAssembly execution engine — wasm core interpreter, WASI preview1 host, fuel/memory resource limits, module registry, and a cave-sandbox capability bridge."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+name = "cave_wasm_runtime"
+path = "src/lib.rs"
