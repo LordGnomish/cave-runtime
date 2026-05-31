@@ -22,6 +22,7 @@ pub mod exec;
 pub mod limits;
 pub mod parser;
 pub mod registry;
+pub mod sandbox;
 pub mod types;
 pub mod wasi;
 
@@ -30,6 +31,7 @@ pub use exec::{Instance, Value};
 pub use limits::{ResourceLimits, Store, PAGE_SIZE};
 pub use parser::parse_module;
 pub use registry::{ModuleRef, ModuleRegistry, RegistryEntry};
+pub use sandbox::Capabilities;
 pub use types::{Export, ExternKind, FuncBody, FuncType, Import, ImportKind, Limits, Module, ValType};
 pub use wasi::WasiCtx;
 

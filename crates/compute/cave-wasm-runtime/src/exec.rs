@@ -8,6 +8,7 @@
 
 use crate::error::{Result, WasmError};
 use crate::limits::{ResourceLimits, Store};
+use crate::sandbox::Capabilities;
 use crate::types::{Module, ValType};
 use crate::wasi::WasiCtx;
 use serde::{Deserialize, Serialize};
@@ -104,6 +105,19 @@ impl Instance {
             Err(WasmError::Trap(_)) if wasi.exit_code.is_some() => Ok(wasi),
             Err(e) => Err(e),
         }
+    }
+
+    /// Run a WASI guest under a capability sandbox: host calls the capability
+    /// set does not grant are denied with [`WasmError::CapabilityDenied`], and
+    /// the capability set's fuel/memory limits are applied.
+    pub fn run_sandboxed(
+        &self,
+        entry: &str,
+        caps: &Capabilities,
+        wasi: WasiCtx,
+    ) -> Result<WasiCtx> {
+        // RED stub — capability gating is wired into dispatch in the GREEN commit.
+        self.run_wasi(entry, &caps.to_limits(), wasi)
     }
 
     /// Execute a function by index, returning its result values. `depth` guards
@@ -739,5 +753,74 @@ mod tests {
             .run_wasi("_start", &ResourceLimits::default(), WasiCtx::new())
             .unwrap();
         assert_eq!(out.exit_code, Some(7));
+    }
+
+    // ---- cycle 6: capability sandbox bridge ----
+
+    /// A guest that writes "hi" to stdout via fd_write (import index 0).
+    fn fd_write_hi_module() -> Module {
+        let code = vec![
+            0x41, 0x10, 0x41, 0xe8, 0x00, 0x3a, 0x00, 0x00,
+            0x41, 0x11, 0x41, 0xe9, 0x00, 0x3a, 0x00, 0x00,
+            0x41, 0x00, 0x41, 0x10, 0x36, 0x02, 0x00,
+            0x41, 0x04, 0x41, 0x02, 0x36, 0x02, 0x00,
+            0x41, 0x01, 0x41, 0x00, 0x41, 0x01, 0x41, 0x08,
+            0x10, 0x00, 0x1a, 0x0b,
+        ];
+        Module {
+            types: vec![
+                FuncType {
+                    params: vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+                    results: vec![ValType::I32],
+                },
+                FuncType {
+                    params: vec![],
+                    results: vec![],
+                },
+            ],
+            imports: vec![Import {
+                module: "wasi_snapshot_preview1".into(),
+                name: "fd_write".into(),
+                kind: ImportKind::Func(0),
+            }],
+            functions: vec![1],
+            exports: vec![Export {
+                name: "_start".into(),
+                kind: ExternKind::Func,
+                index: 1,
+            }],
+            code: vec![FuncBody {
+                locals: vec![],
+                code,
+            }],
+            memory: Some(MemLimits {
+                min: 1,
+                max: Some(1),
+            }),
+        }
+    }
+
+    #[test]
+    fn sandbox_denies_stdout() {
+        use crate::sandbox::Capabilities;
+        // stdout denied, but enough fuel/memory to reach the fd_write call.
+        let caps = Capabilities::none().with_fuel(1000).with_memory_pages(1);
+        let err = Instance::new(fd_write_hi_module())
+            .run_sandboxed("_start", &caps, WasiCtx::new())
+            .unwrap_err();
+        assert!(matches!(err, WasmError::CapabilityDenied(_)));
+    }
+
+    #[test]
+    fn sandbox_allows_granted_stdout() {
+        use crate::sandbox::Capabilities;
+        let caps = Capabilities::none()
+            .allow_stdio()
+            .with_fuel(1000)
+            .with_memory_pages(1);
+        let out = Instance::new(fd_write_hi_module())
+            .run_sandboxed("_start", &caps, WasiCtx::new())
+            .unwrap();
+        assert_eq!(out.stdout_string(), "hi");
     }
 }
