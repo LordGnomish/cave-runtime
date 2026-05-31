@@ -60,6 +60,9 @@ pub enum CgroupValue {
     CpusetCpus(String),
     /// `pids.max` — process count cap.
     PidsMax(Option<u64>),
+    /// `cpu.weight` — proportional CPU share (1..=10000). The cgroup v2
+    /// analogue of v1 `cpu.shares`; see [`cpu_shares_to_weight`].
+    CpuWeight(u64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,7 +163,56 @@ fn control_file(v: &CgroupValue) -> &'static str {
         CgroupValue::CpuMax { .. } => "cpu.max",
         CgroupValue::CpusetCpus(_) => "cpuset.cpus",
         CgroupValue::PidsMax(_) => "pids.max",
+        CgroupValue::CpuWeight(_) => "cpu.weight",
     }
+}
+
+// ── CPU request → cgroup translation (helpers_linux.go + libcontainer) ────────
+
+/// cgroup v1 `cpu.shares` per whole CPU (upstream `sharesPerCPU`).
+const SHARES_PER_CPU: u64 = 1024;
+/// milliCPU per whole CPU (upstream `milliCPUToCPU`).
+const MILLI_CPU_TO_CPU: u64 = 1000;
+/// Floor on `cpu.shares` the kernel accepts (upstream `minShares`).
+const MIN_SHARES: u64 = 2;
+/// Floor on the CFS quota in microseconds (upstream `minQuotaPeriod`, 1ms).
+const MIN_QUOTA_PERIOD_US: u64 = 1000;
+
+/// `MilliCPUToShares` — convert a milliCPU request to cgroup v1 `cpu.shares`.
+/// `(milliCPU * 1024) / 1000`, clamped up to the kernel minimum of 2. A zero
+/// request defaults to the minimum (mirrors upstream's `minShares` return).
+pub fn milli_cpu_to_shares(milli_cpu: u64) -> u64 {
+    if milli_cpu == 0 {
+        return MIN_SHARES;
+    }
+    let shares = (milli_cpu * SHARES_PER_CPU) / MILLI_CPU_TO_CPU;
+    shares.max(MIN_SHARES)
+}
+
+/// `ConvertCPUSharesToCgroupV2Value` — map v1 `cpu.shares` (2..=262144) onto
+/// the v2 `cpu.weight` scale (1..=10000). `0` shares maps to `0` (unset);
+/// otherwise `1 + ((shares - 2) * 9999) / 262142`.
+pub fn cpu_shares_to_weight(shares: u64) -> u64 {
+    if shares == 0 {
+        return 0;
+    }
+    1 + ((shares - 2) * 9999) / 262142
+}
+
+/// Convenience: milliCPU request straight to a v2 `cpu.weight` value.
+pub fn milli_cpu_to_weight(milli_cpu: u64) -> u64 {
+    cpu_shares_to_weight(milli_cpu_to_shares(milli_cpu))
+}
+
+/// `MilliCPUToQuota` — convert a milliCPU limit to a CFS quota over `period_us`
+/// microseconds. `(milliCPU * period) / 1000`, floored at the 1ms kernel
+/// minimum. A zero limit means unlimited (`None`, i.e. `cpu.max` = `max`).
+pub fn milli_cpu_to_quota(milli_cpu: u64, period_us: u64) -> Option<u64> {
+    if milli_cpu == 0 {
+        return None;
+    }
+    let quota = (milli_cpu * period_us) / MILLI_CPU_TO_CPU;
+    Some(quota.max(MIN_QUOTA_PERIOD_US))
 }
 
 /// Reject values that cgroup v2 would reject at write time, before any
@@ -175,6 +227,13 @@ fn validate_value(value: &CgroupValue) -> Result<(), CgroupError> {
     if let CgroupValue::CpusetCpus(s) = value {
         if s.is_empty() {
             return Err(CgroupError::Invalid("cpuset.cpus must not be empty".into()));
+        }
+    }
+    if let CgroupValue::CpuWeight(w) = value {
+        if *w < 1 || *w > 10_000 {
+            return Err(CgroupError::Invalid(format!(
+                "cpu.weight must be in 1..=10000, got {w}"
+            )));
         }
     }
     Ok(())
@@ -200,6 +259,7 @@ pub fn serialize_value(value: &CgroupValue) -> (&'static str, String) {
         CgroupValue::CpusetCpus(s) => ("cpuset.cpus", s.clone()),
         CgroupValue::PidsMax(None) => ("pids.max", "max".to_string()),
         CgroupValue::PidsMax(Some(n)) => ("pids.max", n.to_string()),
+        CgroupValue::CpuWeight(w) => ("cpu.weight", w.to_string()),
     }
 }
 
@@ -239,6 +299,10 @@ pub fn parse_value(control: &str, content: &str) -> Result<CgroupValue, CgroupEr
             Ok(CgroupValue::CpuMax { quota, period_us })
         }
         "cpuset.cpus" => Ok(CgroupValue::CpusetCpus(c.to_string())),
+        "cpu.weight" => Ok(CgroupValue::CpuWeight(
+            c.parse()
+                .map_err(|_| CgroupError::Invalid(format!("cpu.weight: {c:?}")))?,
+        )),
         "pids.max" => Ok(CgroupValue::PidsMax(if c == "max" {
             None
         } else {
