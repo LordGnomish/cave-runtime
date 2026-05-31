@@ -204,6 +204,71 @@ pub fn apply_retention(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Log-cleaner selection — which log to compact next (LogCleanerManager)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One compactable log ranked by the cleaner, mirroring Kafka 4.2.0
+/// `kafka.log.LogToClean`.  `cleanable_bytes` is the "dirty" portion past the
+/// last clean offset; `clean_bytes` is everything already compacted.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogToClean {
+    pub name: String,
+    pub clean_bytes: u64,
+    pub cleanable_bytes: u64,
+}
+
+impl LogToClean {
+    pub fn new(name: impl Into<String>, clean_bytes: u64, cleanable_bytes: u64) -> Self {
+        Self {
+            name: name.into(),
+            clean_bytes,
+            cleanable_bytes,
+        }
+    }
+
+    /// Total log size considered by the cleaner.
+    pub fn total_bytes(&self) -> u64 {
+        self.clean_bytes + self.cleanable_bytes
+    }
+
+    /// Kafka `LogToClean.cleanableRatio` — `cleanableBytes / totalBytes`,
+    /// defined as 0.0 for an empty log (no divide-by-zero).
+    pub fn cleanable_ratio(&self) -> f64 {
+        let total = self.total_bytes();
+        if total == 0 {
+            0.0
+        } else {
+            self.cleanable_bytes as f64 / total as f64
+        }
+    }
+}
+
+/// Pick the dirtiest compactable log, mirroring Kafka 4.2.0
+/// `LogCleanerManager.grabFilthiestCompactedLog`: among the candidates whose
+/// `cleanableRatio` is strictly greater than `min_cleanable_dirty_ratio`,
+/// return the one with the highest ratio.  Ties keep the first candidate
+/// (Scala `maxBy` returns the first maximal element); `None` when no log
+/// qualifies.
+pub fn grab_filthiest_compacted_log(
+    candidates: &[LogToClean],
+    min_cleanable_dirty_ratio: f64,
+) -> Option<&LogToClean> {
+    let mut best: Option<&LogToClean> = None;
+    for c in candidates {
+        let ratio = c.cleanable_ratio();
+        if ratio <= min_cleanable_dirty_ratio {
+            continue;
+        }
+        match best {
+            Some(b) if ratio > b.cleanable_ratio() => best = Some(c),
+            None => best = Some(c),
+            _ => {}
+        }
+    }
+    best
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Log-compaction + retention tests — feat/cave-streams-deeper-001
 // ─────────────────────────────────────────────────────────────────────────
 
