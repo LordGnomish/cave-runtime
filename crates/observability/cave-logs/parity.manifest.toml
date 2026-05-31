@@ -33,18 +33,18 @@ language= "Go"
 url     = "https://github.com/grafana/loki"
 
 [parity]
-mapped_count   = 16
-partial_count  = 1
+mapped_count   = 17
+partial_count  = 0
 skipped_count  = 7
 unmapped_count = 0
 total          = 24
 fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 24/24 — every in-scope subsystem is addressed; the cross-ingester queue rebalancer was reclassified unmapped→skipped (mirrors the cross-querier scope_cut row — both deferred together to obs-stack-ray-2 since cave-logs runs single-process tokio mpsc).
-honest_ratio   = 0.9583          # 2026-05-30 honest uplift — (mapped 16 + skipped 7) / 24. The compactor partial graduated to mapped: src/compactor.rs now executes the full merge+dedupe+retention loop (planning + retention-counting already existed). Only the cross-querier query-scheduler remains partial (genuinely multi-node; single-process already covered).
-adr_justified_ratio = 1.0        # 7 skipped (full-cluster sharding modes + multi-tenant gateway + cross-ingester queue rebalancer all deferred to obs-stack-ray-2 / cave-mesh) + 2 partials (compactor retention+dry_run; query-scheduler single-process) all architecturally justified
+honest_ratio   = 1.0             # 2026-05-31 honest uplift (cont3) — (mapped 17 + skipped 7) / 24. The last partial (query-scheduler) graduated to mapped: src/scheduler.rs now ports Loki's pkg/queue fair-share RequestQueue in-process — per-tenant FIFO sub-queues, round-robin lastUserIndex dispatch with wrap, per-tenant queue limits, shuffle-shard consumer pinning (FNV-1a seed + Fisher-Yates), consumer connection lifecycle, and DequeueMany batching. Only the cross-process gRPC transport between frontend↔scheduler↔querier stays out of scope (single-process cave-logs has nothing to schedule across — see [[scope_cuts]]).
+adr_justified_ratio = 1.0        # 7 skipped (full-cluster sharding modes + multi-tenant gateway + cross-ingester queue rebalancer all deferred to obs-stack-ray-2 / cave-mesh) all architecturally justified; 0 partials remain
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "5b9f6a7d3e2c1b8a4f6e9c5d7a2b8e1f3c9d6e4a"  # v3.4.0 tag sha (grafana/loki)
-last_audit     = "2026-05-30"
+last_audit     = "2026-05-31"
 infra_only     = false
 
 [module]
@@ -561,10 +561,10 @@ upstream_pkg = "grafana/loki:pkg/compactor (retention + dedupe + merge)"
 local_files  = ["src/compactor.rs", "src/limits.rs", "src/multitenant.rs"]
 note         = "Full compaction loop now executed: compact() merges chunks per (tenant, stream_fp), de-dupes identical (ts,line) entries, applies the retention cutoff, and re-encodes one chunk per group (idempotent). Planning (plan_compaction) + retention counting (dry_run_retention) already existed. Honest uplift 2026-05-30."
 
-[[partial]]
-upstream_pkg = "grafana/loki:pkg/scheduler (query-scheduler)"
-local_files  = ["src/routes.rs"]
-note         = "Single-process query scheduling covered; cross-querier fair-share scheduler deferred"
+[[mapped]]
+upstream_pkg = "grafana/loki:pkg/queue + pkg/scheduler (query-scheduler fair-share)"
+local_files  = ["src/scheduler.rs", "src/routes.rs"]
+note         = "In-process fair-share RequestQueue ported (cont3 2026-05-31): tombstoned tenant key-mapping with GetNext index advancement, per-tenant FIFO sub-queues + max_user_queue_size (TooManyRequests), round-robin dispatch via lastUserIndex threading + wrap to StartIndex, shuffle-shard consumer pinning per tenant (FNV-1a seed + splitmix64 Fisher-Yates, mirrors util.ShuffleShardSeed + shuffleConsumersForTenants), consumer connection lifecycle (register/notify_shutdown/unregister connection-count), and DequeueMany batch drain. Exposed via POST /loki/api/v1/scheduler/preview. The cross-process gRPC transport (frontend↔scheduler↔querier) stays a documented scope_cut — single-process cave-logs has no peer process to schedule across."
 
 [[skipped]]
 upstream_pkg = "grafana/loki:cmd/"
@@ -600,7 +600,7 @@ deferred_to  = "obs-stack-ray-2"
 # ── Scope cuts (informational; mirror [[unmapped]] above) ────────────────────
 
 [[scope_cuts]]
-name        = "cross-querier-scheduler"
-upstream    = "grafana/loki:pkg/queue + pkg/scheduler (cross-querier fair-share)"
-reason      = "Multi-node fair-share queue rebalancer; single-process cave-logs uses tokio mpsc."
+name        = "cross-process-scheduler-transport"
+upstream    = "grafana/loki:pkg/scheduler (frontend↔scheduler↔querier gRPC) + scheduler.proto"
+reason      = "The fair-share scheduling *algorithm* (pkg/queue) is now ported in-process (src/scheduler.rs, see [[mapped]]). Only the cross-process gRPC transport — query-frontend enqueuing to a remote scheduler that dispatches to remote queriers — stays cut: single-process cave-logs has no peer process to schedule across."
 deferred_to = "obs-stack-ray-2"

@@ -402,6 +402,116 @@ async fn metrics_handler(State(state): State<AppState>) -> Response {
         .into_response()
 }
 
+// ── Query-scheduler fair-share preview ──────────────────────────────────────────
+
+/// One tenant's pending-request count for a scheduling preview.
+#[derive(serde::Deserialize)]
+struct SchedulerTenantSpec {
+    tenant: String,
+    count: usize,
+}
+
+/// Request body for `POST /loki/api/v1/scheduler/preview`.
+#[derive(serde::Deserialize)]
+struct SchedulerPreviewRequest {
+    tenants: Vec<SchedulerTenantSpec>,
+    #[serde(default)]
+    consumers: Vec<String>,
+    /// Shuffle-shard cap per tenant; 0 (default) means all consumers eligible.
+    #[serde(default)]
+    max_consumers: usize,
+    /// Per-tenant queue capacity; defaults to a generous bound.
+    #[serde(default = "default_queue_size")]
+    max_user_queue_size: usize,
+}
+
+fn default_queue_size() -> usize {
+    1_000
+}
+
+/// Demonstrates Loki's query-scheduler fair-share dispatch in-process: builds a
+/// `RequestQueue`, enqueues `count` requests per tenant, then drains it via the
+/// round-robin `dequeue` and reports the dispatch order plus the per-tenant
+/// shuffle-shard consumer assignment. No live cluster transport is involved —
+/// this exposes the scheduling algorithm itself.
+async fn scheduler_preview_handler(
+    State(_state): State<AppState>,
+    Json(req): Json<SchedulerPreviewRequest>,
+) -> Response {
+    use crate::scheduler::{RequestQueue, START_INDEX, shuffle_consumers_for_tenants, shuffle_shard_seed};
+
+    let consumer = req
+        .consumers
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "querier-0".to_string());
+
+    let mut q: RequestQueue<u64> = RequestQueue::new(req.max_user_queue_size, req.max_consumers);
+    let consumers = if req.consumers.is_empty() {
+        vec![consumer.clone()]
+    } else {
+        req.consumers.clone()
+    };
+    let mut sorted = consumers.clone();
+    sorted.sort();
+    for c in &consumers {
+        q.register_consumer(c);
+    }
+
+    let mut seq: u64 = 0;
+    for t in &req.tenants {
+        for _ in 0..t.count {
+            if q.enqueue(&t.tenant, seq).is_err() {
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(json!({"error": "tenant queue full", "tenant": t.tenant})),
+                )
+                    .into_response();
+            }
+            seq += 1;
+        }
+    }
+
+    // Per-tenant shuffle-shard assignment (informational).
+    let mut shards = serde_json::Map::new();
+    for t in &req.tenants {
+        let select = req.max_consumers.min(sorted.len());
+        let select = if req.max_consumers == 0 { 0 } else { select };
+        let assigned = shuffle_consumers_for_tenants(shuffle_shard_seed(&t.tenant), select, &sorted)
+            .map(|s| {
+                let mut v: Vec<String> = s.into_iter().collect();
+                v.sort();
+                v
+            })
+            .unwrap_or_else(|| sorted.clone());
+        shards.insert(t.tenant.clone(), json!(assigned));
+    }
+
+    // Drain in fair round-robin order using the first consumer (single querier
+    // demo). With shuffle-sharding, only its assigned tenants are served.
+    let total = seq as usize;
+    let mut order: Vec<String> = Vec::with_capacity(total);
+    let mut idx = START_INDEX;
+    for _ in 0..total {
+        let (got, ni) = q.dequeue(idx, &consumer);
+        idx = ni;
+        match got {
+            Some((tenant, _)) => order.push(tenant),
+            None => break,
+        }
+    }
+
+    Json(json!({
+        "consumers": sorted,
+        "max_consumers": req.max_consumers,
+        "shuffle_shards": shards,
+        "dispatch_order": order,
+        "served": order.len(),
+        "enqueued": total,
+    }))
+    .into_response()
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 pub fn router(state: AppState) -> Router {
@@ -425,6 +535,11 @@ pub fn router(state: AppState) -> Router {
         .route("/loki/api/v1/index/stats", get(index_stats_handler))
         // Tail (WebSocket)
         .route("/loki/api/v1/tail", get(tail_handler))
+        // Query-scheduler fair-share preview
+        .route(
+            "/loki/api/v1/scheduler/preview",
+            post(scheduler_preview_handler),
+        )
         // Health / metrics
         .route("/api/logs/ready", get(ready_handler))
         .route("/api/logs/metrics", get(metrics_handler))
