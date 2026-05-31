@@ -10,4 +10,5 @@
 
 pub mod coap;
 pub mod http;
+pub mod lorawan;
 pub mod mqtt;
