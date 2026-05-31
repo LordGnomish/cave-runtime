@@ -1,0 +1,339 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! Kubernetes Gateway API translation.
+//!
+//! Translates `gateway.networking.k8s.io/v1` `HTTPRoute` resources into the
+//! gateway's internal Kong-style [`Route`] / [`Service`] model. This lets
+//! cave-gateway be driven declaratively by Gateway API CRDs in addition to the
+//! Kong admin API.
+//!
+//! The headline behaviour is the Gateway API **conflict-resolution
+//! precedence** (`apis/v1/httproute_types.go`): when several matches could
+//! serve a request the most specific wins, ordered by
+//!   1. `Exact` path match
+//!   2. longest `PathPrefix` match (by characters)
+//!   3. method match present
+//!   4. largest number of header matches
+//!   5. largest number of query-param matches
+//!
+//! Only the data-plane subset is translated here (matches / filters /
+//! backendRefs). Cross-resource status reporting and Gateway/GatewayClass
+//! admission live in the k8s control loop (cave-controller-manager).
+
+use crate::models::{Protocol, Route, Service};
+use serde::{Deserialize, Serialize};
+
+// ── Gateway API resource model (v1) ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HttpRoute {
+    #[serde(default)]
+    pub hostnames: Vec<String>,
+    #[serde(default)]
+    pub rules: Vec<HttpRouteRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HttpRouteRule {
+    #[serde(default)]
+    pub matches: Vec<HttpRouteMatch>,
+    #[serde(default)]
+    pub filters: Vec<HttpRouteFilter>,
+    #[serde(default, rename = "backendRefs")]
+    pub backend_refs: Vec<BackendRef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HttpRouteMatch {
+    pub path: Option<PathMatch>,
+    #[serde(default)]
+    pub headers: Vec<HeaderMatch>,
+    pub method: Option<String>,
+    #[serde(default, rename = "queryParams")]
+    pub query_params: Vec<QueryParamMatch>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PathMatchType {
+    Exact,
+    PathPrefix,
+    RegularExpression,
+}
+
+impl Default for PathMatchType {
+    fn default() -> Self {
+        PathMatchType::PathPrefix
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PathMatch {
+    #[serde(default, rename = "type")]
+    pub match_type: PathMatchType,
+    #[serde(default = "default_path_value")]
+    pub value: String,
+}
+
+fn default_path_value() -> String {
+    "/".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderMatch {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryParamMatch {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum HttpRouteFilter {
+    RequestHeaderModifier {
+        #[serde(default)]
+        set: Vec<HeaderKv>,
+        #[serde(default)]
+        add: Vec<HeaderKv>,
+        #[serde(default)]
+        remove: Vec<String>,
+    },
+    RequestRedirect {
+        scheme: Option<String>,
+        hostname: Option<String>,
+        port: Option<u16>,
+        #[serde(rename = "statusCode")]
+        status_code: Option<u16>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderKv {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendRef {
+    pub name: String,
+    pub port: Option<u16>,
+    #[serde(default = "default_weight")]
+    pub weight: u32,
+}
+
+fn default_weight() -> u32 {
+    1
+}
+
+// ── Precedence ───────────────────────────────────────────────────────────────
+
+/// Sortable precedence key — larger compares as **more specific**.
+///
+/// Tuple order mirrors the Gateway API conflict-resolution list.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PrecedenceKey {
+    pub path_rank: u8,
+    pub path_len: usize,
+    pub method: u8,
+    pub header_count: usize,
+    pub query_count: usize,
+}
+
+/// Compute the precedence key for a single match.
+pub fn precedence_key(_m: &HttpRouteMatch) -> PrecedenceKey {
+    // STUB (RED)
+    PrecedenceKey {
+        path_rank: 0,
+        path_len: 0,
+        method: 0,
+        header_count: 0,
+        query_count: 0,
+    }
+}
+
+// ── Translation ──────────────────────────────────────────────────────────────
+
+/// A single translated route: the internal [`Route`] plus the backend
+/// [`Service`]s it forwards to, in precedence order.
+#[derive(Debug, Clone)]
+pub struct TranslatedRoute {
+    pub route: Route,
+    pub services: Vec<Service>,
+    pub precedence: PrecedenceKey,
+}
+
+/// Translate one match into an internal [`Route`] (no backends attached).
+pub fn translate_match(_m: &HttpRouteMatch, _hostnames: &[String]) -> Route {
+    // STUB (RED)
+    Route::new(uuid::Uuid::nil())
+}
+
+/// Translate a backend ref into an internal [`Service`].
+pub fn translate_backend(_b: &BackendRef) -> Service {
+    // STUB (RED)
+    Service::new(String::new(), 0, Protocol::Http)
+}
+
+/// Translate an entire HTTPRoute into precedence-ordered internal routes.
+pub fn translate(_route: &HttpRoute) -> Vec<TranslatedRoute> {
+    // STUB (RED)
+    Vec::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str = r#"{
+        "hostnames": ["shop.example.com"],
+        "rules": [{
+            "matches": [{
+                "path": {"type": "PathPrefix", "value": "/api"},
+                "method": "GET",
+                "headers": [{"name": "x-env", "value": "prod"}]
+            }],
+            "filters": [{"type": "RequestRedirect", "scheme": "https"}],
+            "backendRefs": [
+                {"name": "api-svc", "port": 8080, "weight": 3},
+                {"name": "api-canary", "port": 8080, "weight": 1}
+            ]
+        }]
+    }"#;
+
+    fn pm(t: PathMatchType, v: &str) -> PathMatch {
+        PathMatch { match_type: t, value: v.into() }
+    }
+
+    #[test]
+    fn parses_httproute_json() {
+        let r: HttpRoute = serde_json::from_str(SAMPLE).unwrap();
+        assert_eq!(r.hostnames, vec!["shop.example.com"]);
+        assert_eq!(r.rules.len(), 1);
+        let rule = &r.rules[0];
+        assert_eq!(rule.matches[0].method.as_deref(), Some("GET"));
+        assert_eq!(rule.matches[0].path.as_ref().unwrap().value, "/api");
+        assert_eq!(rule.backend_refs.len(), 2);
+        assert_eq!(rule.backend_refs[0].weight, 3);
+        assert_eq!(rule.backend_refs[1].weight, 1);
+        assert_eq!(rule.filters.len(), 1);
+    }
+
+    #[test]
+    fn backend_ref_weight_defaults_to_one() {
+        let b: BackendRef = serde_json::from_str(r#"{"name":"x","port":80}"#).unwrap();
+        assert_eq!(b.weight, 1);
+    }
+
+    #[test]
+    fn precedence_exact_beats_prefix() {
+        let exact = HttpRouteMatch { path: Some(pm(PathMatchType::Exact, "/a")), ..Default::default() };
+        let prefix = HttpRouteMatch { path: Some(pm(PathMatchType::PathPrefix, "/a/very/long")), ..Default::default() };
+        assert!(precedence_key(&exact) > precedence_key(&prefix));
+    }
+
+    #[test]
+    fn precedence_longer_prefix_wins() {
+        let short = HttpRouteMatch { path: Some(pm(PathMatchType::PathPrefix, "/a")), ..Default::default() };
+        let long = HttpRouteMatch { path: Some(pm(PathMatchType::PathPrefix, "/a/b/c")), ..Default::default() };
+        assert!(precedence_key(&long) > precedence_key(&short));
+    }
+
+    #[test]
+    fn precedence_method_then_headers_then_query() {
+        let base = HttpRouteMatch { path: Some(pm(PathMatchType::PathPrefix, "/a")), ..Default::default() };
+        let with_method = HttpRouteMatch { method: Some("GET".into()), ..base.clone() };
+        assert!(precedence_key(&with_method) > precedence_key(&base));
+
+        let with_headers = HttpRouteMatch {
+            method: Some("GET".into()),
+            headers: vec![HeaderMatch { name: "a".into(), value: "1".into() }],
+            ..base.clone()
+        };
+        assert!(precedence_key(&with_headers) > precedence_key(&with_method));
+
+        let with_query = HttpRouteMatch {
+            method: Some("GET".into()),
+            headers: vec![HeaderMatch { name: "a".into(), value: "1".into() }],
+            query_params: vec![QueryParamMatch { name: "q".into(), value: "1".into() }],
+            ..base
+        };
+        assert!(precedence_key(&with_query) > precedence_key(&with_headers));
+    }
+
+    #[test]
+    fn precedence_regex_ranks_below_prefix() {
+        let regex = HttpRouteMatch { path: Some(pm(PathMatchType::RegularExpression, "/a/.*")), ..Default::default() };
+        let prefix = HttpRouteMatch { path: Some(pm(PathMatchType::PathPrefix, "/a")), ..Default::default() };
+        assert!(precedence_key(&prefix) > precedence_key(&regex));
+    }
+
+    #[test]
+    fn translate_match_sets_path_method_host_headers() {
+        let m = HttpRouteMatch {
+            path: Some(pm(PathMatchType::PathPrefix, "/api")),
+            method: Some("POST".into()),
+            headers: vec![HeaderMatch { name: "x-env".into(), value: "prod".into() }],
+            ..Default::default()
+        };
+        let route = translate_match(&m, &["shop.example.com".into()]);
+        assert_eq!(route.paths.as_ref().unwrap(), &vec!["/api".to_string()]);
+        assert_eq!(route.methods.as_ref().unwrap(), &vec!["POST".to_string()]);
+        assert_eq!(route.hosts.as_ref().unwrap(), &vec!["shop.example.com".to_string()]);
+        let hdrs = route.headers.as_ref().unwrap();
+        assert_eq!(hdrs.get("x-env").unwrap(), &vec!["prod".to_string()]);
+    }
+
+    #[test]
+    fn translate_match_regex_gets_priority() {
+        let m = HttpRouteMatch { path: Some(pm(PathMatchType::RegularExpression, "/x/[0-9]+")), ..Default::default() };
+        let route = translate_match(&m, &[]);
+        // Regex routes are flagged via a non-zero regex_priority for the matcher.
+        assert!(route.regex_priority > 0);
+        assert_eq!(route.paths.as_ref().unwrap(), &vec!["/x/[0-9]+".to_string()]);
+    }
+
+    #[test]
+    fn translate_backend_builds_service() {
+        let b = BackendRef { name: "orders".into(), port: Some(9000), weight: 5 };
+        let svc = translate_backend(&b);
+        assert_eq!(svc.host, "orders");
+        assert_eq!(svc.port, 9000);
+        assert_eq!(svc.name.as_deref(), Some("orders"));
+    }
+
+    #[test]
+    fn translate_backend_defaults_port_to_80() {
+        let b = BackendRef { name: "orders".into(), port: None, weight: 1 };
+        let svc = translate_backend(&b);
+        assert_eq!(svc.port, 80);
+    }
+
+    #[test]
+    fn translate_full_route_is_precedence_ordered() {
+        let route: HttpRoute = serde_json::from_str(r#"{
+            "hostnames": ["h.example.com"],
+            "rules": [
+                {"matches": [{"path": {"type": "PathPrefix", "value": "/a"}}], "backendRefs": [{"name":"s1","port":80}]},
+                {"matches": [{"path": {"type": "Exact", "value": "/a/exact"}}], "backendRefs": [{"name":"s2","port":80}]}
+            ]
+        }"#).unwrap();
+        let translated = translate(&route);
+        assert_eq!(translated.len(), 2);
+        // Exact match must be first (highest precedence).
+        assert_eq!(translated[0].route.paths.as_ref().unwrap(), &vec!["/a/exact".to_string()]);
+        assert_eq!(translated[0].services[0].host, "s2");
+        assert!(translated[0].precedence > translated[1].precedence);
+    }
+
+    #[test]
+    fn translate_attaches_all_backends() {
+        let route: HttpRoute = serde_json::from_str(SAMPLE).unwrap();
+        let translated = translate(&route);
+        assert_eq!(translated.len(), 1);
+        assert_eq!(translated[0].services.len(), 2);
+        assert_eq!(translated[0].services[0].host, "api-svc");
+    }
+}
