@@ -1422,6 +1422,132 @@ mod tests {
         assert_eq!(v.published_targets[0].pod_uid, "podZ");
     }
 
+    // ── NodeExpandVolume — online volume expansion ────────────────────────────
+
+    #[test]
+    fn expand_grows_staged_volume_capacity() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1024,
+        )
+        .unwrap();
+        let new_cap = m.node_expand_volume("v1", "/s", 4096).unwrap();
+        assert_eq!(new_cap, 4096);
+        assert_eq!(m.staged.get("v1").unwrap().size_bytes, 4096);
+    }
+
+    #[test]
+    fn expand_requires_staged_volume() {
+        let m = VolumeManager::new();
+        let err = m.node_expand_volume("ghost", "/s", 4096).unwrap_err();
+        assert!(matches!(err, CsiError::FailedPrecondition(_)));
+    }
+
+    #[test]
+    fn expand_rejects_shrink_with_out_of_range() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            4096,
+        )
+        .unwrap();
+        let err = m.node_expand_volume("v1", "/s", 1024).unwrap_err();
+        assert!(matches!(err, CsiError::OutOfRange(_)));
+        // Capacity must be unchanged after a rejected shrink.
+        assert_eq!(m.staged.get("v1").unwrap().size_bytes, 4096);
+    }
+
+    #[test]
+    fn expand_to_same_size_is_idempotent() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            2048,
+        )
+        .unwrap();
+        let cap = m.node_expand_volume("v1", "/s", 2048).unwrap();
+        assert_eq!(cap, 2048);
+    }
+
+    #[test]
+    fn expand_accepts_published_target_path() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1024,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/pods/p1/v1", "p1", false)
+            .unwrap();
+        // Online expansion through the per-pod mount path.
+        let cap = m.node_expand_volume("v1", "/pods/p1/v1", 8192).unwrap();
+        assert_eq!(cap, 8192);
+    }
+
+    #[test]
+    fn expand_rejects_unknown_volume_path() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1024,
+        )
+        .unwrap();
+        let err = m.node_expand_volume("v1", "/bogus", 8192).unwrap_err();
+        assert!(matches!(err, CsiError::FailedPrecondition(_)));
+    }
+
+    #[test]
+    fn expand_rejects_empty_arguments() {
+        let m = VolumeManager::new();
+        assert!(matches!(
+            m.node_expand_volume("", "/s", 1).unwrap_err(),
+            CsiError::InvalidArgument(_)
+        ));
+        assert!(matches!(
+            m.node_expand_volume("v1", "", 1).unwrap_err(),
+            CsiError::InvalidArgument(_)
+        ));
+    }
+
+    #[test]
+    fn expand_block_volume_advances_capacity() {
+        let m = VolumeManager::new();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            VolumeCapability::block(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1024,
+        )
+        .unwrap();
+        // Block volumes have no filesystem to resize, but the recorded
+        // device capacity still advances.
+        let cap = m.node_expand_volume("v1", "/s", 16384).unwrap();
+        assert_eq!(cap, 16384);
+    }
+
     #[test]
     fn unpublish_releases_rwop_holder_only_when_no_remaining_targets() {
         // Same pod with two targets — RWOP allowed for one pod across multiple mounts.
