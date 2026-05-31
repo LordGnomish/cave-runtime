@@ -83,6 +83,13 @@ Hand-curated against the FerretDB v2.0.0 layout
 > hashed / partial / wildcard indexes stay skipped. Counts: mapped 24→25,
 > skipped 26→25, total 52.
 
+> **projection partial → mapped.** `src/projection.rs` now covers FerretDB's
+> projection surface: inclusion/exclusion with dotted nested paths, `$slice`
+> (`n` / `-n` / `[skip, limit]`), and `$elemMatch` (first matching element).
+> `$meta` (textScore) stays out-of-scope like `$where`. Counts: mapped 25→26,
+> partial 2→1, total 52 → **honest_ratio 0.9615 → 0.9808 (51/52)**. The lone
+> remaining partial is the aggregate pipeline.
+
 ## 8-gate close-out
 
 | # | Gate                              | Result | Evidence                                  |

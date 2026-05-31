@@ -36,13 +36,20 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 # indexes, capped collections, views, plan cache, query hints) are counted
 # as `skipped`. ($text index is now mapped — src/text.rs.) Items declared
 # in-scope but not yet built are `unmapped`.
-mapped_count          = 25
-partial_count         = 2
+mapped_count          = 26
+partial_count         = 1
 skipped_count         = 25
 unmapped_count        = 0
 total                 = 52
 fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 52/52
-honest_ratio          = 0.9615   # (mapped + skipped) / total = 50/52 — partial excluded
+honest_ratio          = 0.9808   # (mapped + skipped) / total = 51/52 — partial excluded
+# 2026-05-31 cont2: projection partial -> mapped. src/projection.rs now covers
+# the FerretDB-supported projection surface: inclusion/exclusion incl. dotted
+# nested paths, $slice (n / -n / [skip,limit]), and $elemMatch (first matching
+# element). $meta (textScore relevance) stays out-of-scope — like $where it is
+# not part of FerretDB's supported projection surface. The sole remaining
+# partial is the aggregate pipeline ($group accumulators broad but not every
+# operator; $redact/$replaceRoot/$out/$merge unported).
 # 2026-05-31 cont2: $text index moved skipped -> mapped. src/text.rs implements
 # a clean-room text index (tokenizer, $search parser with terms/-negations/
 # "phrases", OR matcher) wired through Index::text + Collection::text_search +
