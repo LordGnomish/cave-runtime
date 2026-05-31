@@ -6,6 +6,7 @@ pub mod core;
 pub mod engines;
 pub mod error;
 pub mod external_secrets;
+pub mod plugins;
 pub mod response;
 pub mod sealed_secrets;
 pub mod storage;
