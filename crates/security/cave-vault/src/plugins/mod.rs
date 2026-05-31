@@ -223,6 +223,21 @@ impl PluginCatalog {
         names.into_iter().collect()
     }
 
+    /// All registered versions of a given external plugin, ordered with the
+    /// unversioned registration (`""`) first then ascending semver. Mirrors the
+    /// version enumeration `vault/plugin_catalog.go` performs when resolving the
+    /// best plugin version for a mount.
+    pub fn list_versions(&self, name: &str, plugin_type: PluginType) -> Vec<String> {
+        let mut versions: Vec<String> = self
+            .external
+            .values()
+            .filter(|r| r.plugin_type == plugin_type && r.name == name)
+            .map(|r| r.version.clone())
+            .collect();
+        versions.sort_by(|a, b| semver_key(a).cmp(&semver_key(b)));
+        versions
+    }
+
     /// Remove an external registration, returning it if present.
     pub fn delete(
         &mut self,
@@ -259,6 +274,19 @@ fn decode_sha256(hex: &str) -> Result<Vec<u8>, PluginError> {
         i += 2;
     }
     Ok(out)
+}
+
+/// Decompose a semver string into a comparable component vector. The empty
+/// (unversioned) string yields the empty vector, which sorts before any real
+/// version under `Vec` lexicographic ordering. Non-numeric segments degrade
+/// to `0` rather than erroring.
+fn semver_key(v: &str) -> Vec<i64> {
+    if v.is_empty() {
+        return Vec::new();
+    }
+    v.split('.')
+        .map(|p| p.trim_start_matches('v').parse::<i64>().unwrap_or(0))
+        .collect()
 }
 
 fn hex_nibble(b: u8) -> Option<u8> {
