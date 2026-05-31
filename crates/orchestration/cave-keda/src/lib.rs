@@ -58,7 +58,7 @@ pub use redis_scaler::{RedisDataType, RedisScaler};
 pub use scaledjob::{ScaledJob, ScalingStrategy};
 pub use scaledobject::ScaledObject;
 pub use scaler::{Scaler, ScalerTrait, ScalingModifiers, replicas_from_metric};
-pub use scaling_modifiers::{ScalingModifiersEvaluator, Trigger};
+pub use scaling_modifiers::{FormulaError, ScalingModifiersEvaluator, Trigger, eval_formula};
 pub use splunk_scaler::{SearchResponse, SplunkScaler, SplunkValidationError};
 pub use trigger_authentication::{EnvTargetRef, SecretTargetRef, TriggerAuthentication};
 
