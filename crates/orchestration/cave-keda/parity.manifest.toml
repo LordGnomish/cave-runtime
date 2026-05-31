@@ -11,15 +11,21 @@
 #     Event Hub, GCP Pub/Sub, NATS JetStream, Etcd, Datadog, Splunk
 #     (saved-search value-field), Dynatrace (metric data points), New
 #     Relic (NRQL result extraction)
-#   - ScalingModifiers formula evaluator (max / min / sum + activation_target)
+#   - ScalingModifiers expr-lang formula engine (full numeric subset:
+#     arithmetic, comparison, logical, ternary, array builtins +
+#     count-predicate) + activation_target
 #   - Hibernation schedules (cron-based weekday-locked windows)
 #
-# Out of MVP (see [[skipped]] below): full CEL expression engine
-# (reuses cave-apiserver CEL when it lands), Selenium Grid + CloudEvents
+# Out of MVP (see [[skipped]] below): Selenium Grid + CloudEvents
 # scalers (low-signal niches), WASM scaler plugin runtime (needs wasmtime),
 # HPA-direct integration. New Relic + Splunk + Dynatrace scaler decision
 # logic line-ported 2026-05-30 (was skipped vendor-niche, now mapped —
-# pure in-crate result extraction + validation + activation gates).
+# pure in-crate result extraction + validation + activation gates). The
+# ScalingModifiers formula engine was line-ported 2026-05-31 from
+# pkg/scaling/modifiers/formula.go (github.com/expr-lang/expr, NOT CEL —
+# the earlier note was factually wrong), promoting the former partial to
+# [[mapped]]; string/map/macro expr-lang operations are out of scope since
+# scaling-modifier formulas operate on a float map and must return a float.
 
 [upstream]
 org         = "kedacore"
@@ -34,22 +40,25 @@ source_sha  = "v2.16.1"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0     # (mapped + partial + skipped) / total = 28/28 — all in-scope subsystems addressed (mapped, partial-with-justification, or ADR-skipped)
-honest_ratio        = 0.8571  # mapped / total = 24/28 (strict accounting, partials excluded)
-adr_justified_ratio = 1.0      # 3 skipped (wasm-scaler needs wasmtime (Ambient-only mandate removed it), hpa-direct→cave-controller-manager, cloudevents-source→cave-knative) + 1 partial (CEL → reuses cave-apiserver CEL engine when it lands) all architecturally justified
+honest_ratio        = 0.8929  # mapped / total = 25/28 (strict accounting, partials excluded)
+adr_justified_ratio = 1.0      # 3 skipped (wasm-scaler needs wasmtime (Ambient-only mandate removed it), hpa-direct→cave-controller-manager, cloudevents-source→cave-knative) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-30"
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 24
-partial_count       = 1
+mapped_count        = 25
+partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
 total               = 28
 
 # fill_ratio derivation (Charter v2, charter-aligned 100-pct basis per ADR-RUNTIME-PARITY-100-PCT-001):
-#   (mapped 24 + partial 1 + skipped 3) / total 28 = 28/28 = 1.0
-#   Zero unmapped — every in-scope subsystem is either ported, has a documented partial,
-#   or is ADR-justified as out of scope. honest_ratio (0.8571) preserves the strict
-#   accounting (mapped/total) for transparency.
+#   (mapped 25 + partial 0 + skipped 3) / total 28 = 28/28 = 1.0
+#   Zero unmapped — every in-scope subsystem is either ported or ADR-justified
+#   as out of scope. honest_ratio (0.8929) preserves the strict accounting
+#   (mapped/total) for transparency. The former scaling-modifiers-cel partial
+#   was promoted to [[mapped]] on 2026-05-31: the formula engine is now a real
+#   expr-lang evaluator (NOT CEL — upstream uses github.com/expr-lang/expr),
+#   complete for the numeric scaling-modifier formula surface.
 #
 # Supplementary LOC measurement (transparency):
 #   impl_lines               = ~1380 (cave-keda src/, excl #[cfg(test)])
@@ -79,7 +88,7 @@ total               = 28
 #   pkg/scalers/splunk_scaler.go + splunk/splunk.go (decision)  60 / 230
 #   pkg/scalers/dynatrace_scaler.go (decision)                  60 / 210
 #   pkg/scalers/newrelic_scaler.go (decision)                   55 / 200
-#   pkg/scaling/scaledobject_modifiers.go (CEL subset)         110 / 280
+#   pkg/scaling/modifiers/formula.go (expr-lang engine)        240 / 280
 #   pkg/scaling/scaledobject_hibernation.go                    180 / 250
 #  ─────────────────────────────────────
 #  Total upstream in-scope LOC                                ~2 400
@@ -172,7 +181,7 @@ upstream = "pkg/scalers/newrelic_scaler.go"
 local    = "src/newrelic_scaler.rs"
 
 [[files]]
-upstream = "pkg/scaling/scaledobject_modifiers.go"
+upstream = "pkg/scaling/modifiers/formula.go"
 local    = "src/scaling_modifiers.rs"
 
 [[files]]
@@ -219,6 +228,11 @@ file          = "src/trigger_authentication.rs"
 [[functions]]
 upstream_name = "scaling.ScalingModifiers.Evaluate"
 local_name    = "ScalingModifiersEvaluator::evaluate"
+file          = "src/scaling_modifiers.rs"
+
+[[functions]]
+upstream_name = "modifiers.calculateScalingModifiersFormula"
+local_name    = "eval_formula"
 file          = "src/scaling_modifiers.rs"
 
 [[functions]]
@@ -358,20 +372,14 @@ note = "NRQL query-result scaler. Line-port of executeNewRelicQuery result extra
 
 [[mapped]]
 name = "scaling-modifiers"
-upstream = "pkg/scaling/scaledobject_modifiers.go"
-note = "Formula evaluator over trigger metrics (max/min/sum) + activation_target gating."
+upstream = "pkg/scaling/modifiers/formula.go"
+local = "src/scaling_modifiers.rs"
+note = "ScalingModifiers formula engine — line-port of calculateScalingModifiersFormula (expr-lang evaluation over a trigger float-map) + the webhook's castToFloatIfNecessary/AsFloat64 coercion. Real lexer + precedence-climbing parser + evaluator: number/float literals, trigger variables, arithmetic + - * / % (unary -), comparison < <= > >= == !=, logical && || ! (and/or/not word forms), ternary ?:, array literals, and builtins float/int/abs/ceil/floor/round/len/sum/avg/mean/min/max + count(arr, {# > k}) predicate (the KEDA docs example). Was the scaling-modifiers-cel partial (mislabelled 'CEL' — upstream uses github.com/expr-lang/expr); promoted to mapped 2026-05-31. String/map/macro operations are out of scope (formulas operate on a float map and must return a float). TDD RED→GREEN 2026-05-31."
 
 [[mapped]]
 name = "hibernation-schedules"
 upstream = "pkg/scaling/scaledobject_hibernation.go"
 note = "Cron-based weekday-locked hibernation windows; per-day calendar evaluator handles cross-midnight + weekend exclusion."
-
-# ── Partial subsystems ──────────────────────────────────────────────────────
-
-[[partial]]
-name = "scaling-modifiers-cel"
-upstream = "pkg/scalers/scaling_modifiers.go (full CEL)"
-note = "Max/Min/Sum formula evaluator covers the common case; full CEL evaluation will reuse the cave-apiserver CEL engine when it lands."
 
 # ── Skipped subsystems (out-of-scope MVP, Charter v2 [[skipped]]) ───────────
 
