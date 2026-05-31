@@ -162,43 +162,67 @@ impl RaftNode {
         x.wrapping_mul(0x2545F4914F6CDD1D)
     }
 
-    /// `electiontimeout + rand(0, electiontimeout)` (etcd raft.go).
+    /// `electiontimeout + rand(0, electiontimeout)` (etcd raft.go
+    /// `resetRandomizedElectionTimeout`).
     pub fn reset_randomized_election_timeout(&mut self) {
-        // RED placeholder: not yet randomized.
-        self.randomized_election_timeout = self.election_timeout;
+        let span = self.election_timeout.max(1);
+        let jitter = (self.next_rand() as usize) % span;
+        self.randomized_election_timeout = self.election_timeout + jitter;
     }
 
-    /// Reset volatile per-term state on a term change.
+    /// Reset volatile per-term state on a term change (etcd `raft.reset`).
+    /// Bumps to `term` (clearing the vote when the term actually advances),
+    /// drops the known leader, and restarts both logical clocks with a fresh
+    /// randomized election timeout.
     pub fn reset(&mut self, term: u64) {
-        // RED placeholder: only bumps the term.
-        self.term = term;
+        if self.term != term {
+            self.term = term;
+            self.vote = NONE;
+        } else {
+            // Same-term reset still clears the vote when re-entering a
+            // candidate cycle; etcd clears it on every reset.
+            self.vote = NONE;
+        }
+        self.lead = NONE;
+        self.election_elapsed = 0;
+        self.heartbeat_elapsed = 0;
+        self.reset_randomized_election_timeout();
     }
 
     pub fn become_follower(&mut self, term: u64, lead: u64) {
-        // RED placeholder.
-        self.term = term;
+        self.reset(term);
+        self.state = RaftState::Follower;
         self.lead = lead;
     }
 
     pub fn become_pre_candidate(&mut self) {
-        // RED placeholder.
-        self.state = RaftState::Candidate;
+        // PreVote: campaign WITHOUT mutating term or vote (etcd
+        // becomePreCandidate). Only the role and election clock change.
+        self.election_elapsed = 0;
+        self.reset_randomized_election_timeout();
+        self.lead = NONE;
+        self.state = RaftState::PreCandidate;
     }
 
     pub fn become_candidate(&mut self) {
-        // RED placeholder: does not advance the term or vote for self.
+        let next_term = self.term + 1;
+        self.reset(next_term);
+        self.vote = self.id;
         self.state = RaftState::Candidate;
     }
 
     pub fn become_leader(&mut self) {
-        // RED placeholder: does not set lead.
+        // Term is unchanged; we won the election at the current term.
+        self.election_elapsed = 0;
+        self.heartbeat_elapsed = 0;
+        self.lead = self.id;
         self.state = RaftState::Leader;
     }
 
-    /// True once the election clock has passed the randomized timeout.
+    /// True once the election clock has reached the randomized timeout
+    /// (etcd `pastElectionTimeout`: `electionElapsed >= randomized`).
     pub fn past_election_timeout(&self) -> bool {
-        // RED placeholder.
-        false
+        self.election_elapsed >= self.randomized_election_timeout
     }
 }
 
