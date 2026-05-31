@@ -29,6 +29,7 @@
 
 use std::collections::BTreeMap;
 
+pub mod claiming;
 pub mod dashboard;
 pub mod ota;
 pub mod provisioning;
