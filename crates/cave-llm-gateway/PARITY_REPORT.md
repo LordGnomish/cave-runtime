@@ -1,7 +1,7 @@
 # cave-llm-gateway — Charter v2 PARITY_REPORT
 
 **Upstream**: [BerriAI/litellm](https://github.com/BerriAI/litellm) @ `v1.85.1` (commit `f9c2a417a530a8369aeed96d259992040739c0f0`)
-**Last audit**: 2026-05-21
+**Last audit**: 2026-05-31  •  **honest_ratio**: 0.5532 (26 mapped / 47)
 **ADR**: [ADR-153 — cave-llm-gateway MVP scope and provider matrix](../../docs/adr/0153-cave-llm-gateway-mvp.md)
 
 ## 8-gate summary
@@ -12,19 +12,19 @@
 | 2 | Source SHA present (`f9c2a417…`, 40 hex chars) | PASS |
 | 3 | fill_ratio measured (`1.0`, floor 0.95) | PASS |
 | 4 | parity_ratio_source = `manifest` | PASS |
-| 5 | last_audit = `2026-05-21` | PASS |
-| 6 | mapped + partial + skipped + unmapped == total (23 + 3 + 20 + 0 == 46), unmapped == 0 | PASS |
+| 5 | last_audit is a 2026 ISO date (`2026-05-31`) | PASS |
+| 6 | mapped + partial + skipped + unmapped == total (26 + 2 + 19 + 0 == 47), unmapped == 0 | PASS |
 | 7 | No `unimplemented!()` / `todo!()` macros in `src/` | PASS |
 | 8 | AGPL-3.0-or-later SPDX header on every `.rs` file (≥18 files) | PASS |
 | 9 (runtime) | All six MVP providers dispatch from `ProviderRegistry::from_config` and appear in the capability seed catalogue + hermes bridge classifier | PASS |
 
 ## Coverage
 
-- **Mapped** 23 — provider trait + 7 backends + keychain + capability router + cost + cache + retry + metrics + health + rate-limit + alias + api-keys + guardrails + logging + router-strategies + routes + streaming + cavectl `llm-gateway` subcommand.
-- **Partial** 3 — `models.rs`, `store.rs`, `budget.rs` are scaffold-only (not in lib.rs module tree yet); kept honest as partial.
-- **Skipped** 20 — see `[[skipped]]` in `parity.manifest.toml`. Three scope_cut groups:
-  - `cloud-saas-matrix` (7): Bedrock / Azure-OpenAI / Vertex-Google / Cohere / Together-Fireworks / Replicate-HuggingFace / Groq-DeepSeek → Phase 2.
-  - `non-text-endpoints` (4): audio / images / embeddings-rerank / batch → sibling cave-llm-gateway-{audio,images,embeddings,batch} crates.
+- **Mapped** 26 — provider trait + 9 backends (incl. Groq + DeepSeek, OpenAI-compat SaaS) + keychain + capability router + cost + cache + retry + metrics + health + rate-limit + alias + api-keys + guardrails + logging + router-strategies + routes + streaming + cavectl `llm-gateway` subcommand + **live BudgetManager** (litellm/budget_manager.py, enforced in `complete()`) + **`/v1/embeddings`** (OpenAI-compat).
+- **Partial** 2 — `models.rs`, `store.rs` are scaffold-only (not in lib.rs module tree) AND duplicate capabilities already live behind `GatewayRouter` (cost/cache/logging/rate-limit); kept honest as partial rather than double-counted. (`budget.rs` was promoted to mapped this round.)
+- **Skipped** 19 — see `[[skipped]]` in `parity.manifest.toml`. Three scope_cut groups:
+  - `cloud-saas-matrix` (6): Bedrock / Azure-OpenAI / Vertex-Google / Cohere / Together-Fireworks / Replicate-HuggingFace → Phase 2 (bespoke wire). Groq + DeepSeek shipped.
+  - `non-text-endpoints` (4): audio / images / rerank / batch → sibling cave-llm-gateway-{audio,images,rerank,batch} crates. (embeddings shipped.)
   - `owned-by-other-cave-crates` (9): admin-ui → `cave-portal-web`; spend-store-postgres → `cave-rdbms`; cache-redis-back-end → `cave-cache`; auth-sso-oidc + auth-scim-provisioning → `cave-auth`; notifications-slack-discord → `cave-oncall`; rate-limit-parallel-request → `cave-rate-limit-gateway`; log-store-multi-backend → `cave-logs`; team-management → `cave-portal-api`.
 - **Unmapped** 0 — every upstream subsystem is classified.
 
