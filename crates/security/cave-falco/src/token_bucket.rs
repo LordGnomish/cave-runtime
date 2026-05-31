@@ -9,6 +9,76 @@
 //! `now`-injectable port (no wall-clock dependency) so it can be tested and
 //! driven deterministically by the event timeline.
 
+const NS_PER_SEC: f64 = 1_000_000_000.0;
+
+/// A leaky/token bucket: `rate` tokens accrue per second up to `max_tokens`,
+/// and each `claim` debits one (or more) token(s) if available.
+///
+/// Mirrors `libsinsp::token_bucket` (`m_rate`, `m_max_tokens`, `m_tokens`,
+/// `m_last_seen`). The wall-clock `m_timer` is replaced by an explicit
+/// `now_ns` argument so the bucket is deterministic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenBucket {
+    rate: f64,
+    max_tokens: f64,
+    tokens: f64,
+    last_seen: u64,
+}
+
+impl TokenBucket {
+    /// `init(rate, max_tokens, now)` — the bucket starts **full**
+    /// (`tokens = max_tokens`), matching libsinsp's `init`.
+    pub fn new(rate: f64, max_tokens: f64, now_ns: u64) -> Self {
+        Self { rate, max_tokens, tokens: max_tokens, last_seen: now_ns }
+    }
+
+    /// Re-initialise in place (libsinsp `init`).
+    pub fn init(&mut self, rate: f64, max_tokens: f64, now_ns: u64) {
+        self.rate = rate;
+        self.max_tokens = max_tokens;
+        self.tokens = max_tokens;
+        self.last_seen = now_ns;
+    }
+
+    /// Attempt to claim `tokens` at time `now_ns`. First accrues
+    /// `rate * elapsed_seconds` (capped at `max_tokens`), then debits the
+    /// requested amount if the balance covers it.
+    ///
+    /// Returns `true` if the claim succeeded, `false` if throttled.
+    pub fn claim_at(&mut self, tokens: f64, now_ns: u64) -> bool {
+        let elapsed_ns = now_ns.saturating_sub(self.last_seen) as f64;
+        let gained = self.rate * (elapsed_ns / NS_PER_SEC);
+        self.last_seen = now_ns;
+        self.tokens += gained;
+        if self.tokens > self.max_tokens {
+            self.tokens = self.max_tokens;
+        }
+        if tokens <= self.tokens {
+            self.tokens -= tokens;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Claim a single token (libsinsp `claim()`).
+    pub fn claim(&mut self, now_ns: u64) -> bool {
+        self.claim_at(1.0, now_ns)
+    }
+
+    pub fn tokens(&self) -> f64 { self.tokens }
+    pub fn last_seen(&self) -> u64 { self.last_seen }
+    pub fn rate(&self) -> f64 { self.rate }
+    pub fn max_tokens(&self) -> f64 { self.max_tokens }
+}
+
+impl Default for TokenBucket {
+    /// libsinsp default constructor calls `init(1, 1)`.
+    fn default() -> Self {
+        Self::new(1.0, 1.0, 0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
