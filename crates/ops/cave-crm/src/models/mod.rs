@@ -37,6 +37,7 @@ pub use calendar_event::{
     AttendanceTally, CalendarEvent, CalendarEventAttendee, CalendarEventVisibility, Rsvp,
 };
 pub use company::Company;
+pub use connected_account::{ConnectedAccount, ConnectedAccountProvider};
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
 pub use lead::{Lead, LeadStatus};

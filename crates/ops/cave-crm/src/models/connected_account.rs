@@ -52,6 +52,75 @@ pub struct ConnectedAccount {
     pub updated_at: DateTime<Utc>,
 }
 
+impl ConnectedAccount {
+    /// Link a freshly-authorized account. Tokens / scopes are filled in by
+    /// the OAuth callback; a new account starts healthy (no `authFailedAt`).
+    pub fn new(
+        workspace_id: Uuid,
+        account_owner_id: Uuid,
+        provider: ConnectedAccountProvider,
+        handle: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            workspace_id,
+            account_owner_id,
+            provider,
+            handle: Some(handle.into()),
+            access_token: None,
+            refresh_token: None,
+            handle_aliases: Vec::new(),
+            scopes: Vec::new(),
+            last_sync_history_id: None,
+            last_credentials_refreshed_at: None,
+            auth_failed_at: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Credentials are usable iff no auth failure is outstanding.
+    pub fn is_healthy(&self) -> bool {
+        self.auth_failed_at.is_none()
+    }
+
+    /// Record an auth failure observed at `at` — the sync worker stops
+    /// polling until the member re-grants and a refresh clears the flag.
+    pub fn mark_auth_failed(&mut self, at: DateTime<Utc>) {
+        self.auth_failed_at = Some(at);
+        self.updated_at = at;
+    }
+
+    /// Record a successful credential refresh at `at`, clearing any
+    /// outstanding auth failure.
+    pub fn record_refresh(&mut self, at: DateTime<Utc>) {
+        self.last_credentials_refreshed_at = Some(at);
+        self.auth_failed_at = None;
+        self.updated_at = at;
+    }
+
+    /// Primary handle followed by aliases — every address this account
+    /// can send/receive as.
+    pub fn all_handles(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if let Some(h) = &self.handle {
+            out.push(h.clone());
+        }
+        out.extend(self.handle_aliases.iter().cloned());
+        out
+    }
+
+    /// Case-insensitive membership check across the primary handle and
+    /// every alias.
+    pub fn owns_handle(&self, candidate: &str) -> bool {
+        let candidate = candidate.trim().to_ascii_lowercase();
+        self.all_handles()
+            .iter()
+            .any(|h| h.trim().to_ascii_lowercase() == candidate)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
