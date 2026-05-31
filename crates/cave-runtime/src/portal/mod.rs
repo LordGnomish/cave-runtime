@@ -12,11 +12,13 @@ pub mod adr;
 pub mod artifacts;
 pub mod attribution;
 pub mod auth;
+pub mod llm_tracker;
 pub mod upstream;
 
 use axum::Router;
 
-/// Build the combined portal router (auth + upstream + ADR + attribution + artifacts).
+/// Build the combined portal router (auth + upstream + ADR + attribution +
+/// artifacts + llm-tracker).
 pub fn router() -> Router {
     Router::new()
         .merge(auth::router())
@@ -24,6 +26,7 @@ pub fn router() -> Router {
         .merge(adr::router())
         .merge(attribution::router())
         .merge(artifacts::router())
+        .merge(llm_tracker::router())
 }
 
 /// Resolve the workspace root used by upstream/ADR/attribution handlers.
