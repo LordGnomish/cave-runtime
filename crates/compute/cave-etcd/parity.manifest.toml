@@ -60,17 +60,29 @@ url        = "https://github.com/etcd-io/etcd"
 # Counts: mapped 32→33, skipped 36→35, partial/unmapped/total unchanged.
 # fill_ratio   = (33+3+35)/71 = 71/71 = 1.0000
 # honest_ratio = (mapped + partial)/total = (33+3)/71 = 36/71 = 0.5070
+#
+# 2026-05-31 raft/ skipped(parallel-track) → partial: ported the in-process Raft
+# consensus state machine (raft.go/rawnode.go/log.go data-plane) into
+# src/raft_node.rs — role transitions, randomized election + heartbeat clocks,
+# Step() term reconciliation + vote granting/tally, leader propose + quorum
+# commit (Figure-8 current-term rule, via the ported majority/joint quorum), and
+# follower MsgApp append/match-check. Residual scope-cut: the network message
+# driver / Ready-Advance loop stays in cave-runtime (rafthttp parallel track),
+# hence partial not mapped. 28 strict-TDD tests in src/raft_node.rs.
+# Counts: partial 3→4, skipped 35→34, mapped/unmapped/total unchanged.
+# fill_ratio   = (33+4+34)/71 = 71/71 = 1.0000
+# honest_ratio = (mapped + partial)/total = (33+4)/71 = 37/71 = 0.5211
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.5070
+honest_ratio        = 0.5211
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 mapped_count        = 33
-partial_count       = 3
-skipped_count       = 35
+partial_count       = 4
+skipped_count       = 34
 unmapped_count      = 0
 total               = 71
-last_audit          = "2026-05-30"
+last_audit          = "2026-05-31"
 infra_only          = false
 
 [module]
@@ -1074,10 +1086,10 @@ note         = "TLS credential handling moved to cave-runtime cluster boot"
 # Each entry must cite an allowed-reason: stdlib-analog | proxy-mode | CLI |
 # test-harness | wire-format-detail | v2-only | parallel-track | go-bootstrap.
 
-[[skipped]]
+[[partial]]
 upstream_pkg = "raft/"
-reason       = "parallel-track"
-note         = "Multi-node Raft transport/consensus loop tracked in cave-runtime cluster-plumbing; the joint-consensus data-plane (confchange + quorum) is ported below."
+local_files  = ["src/raft_node.rs"]
+note         = "In-process Raft consensus state machine (raft.go / rawnode.go / log.go data-plane): role transitions (become_follower/pre_candidate/candidate/leader + reset), the randomized election & heartbeat logical clocks, full Step() term reconciliation + vote granting/tally (PreVote-aware), leader log replication (propose + maybe_commit via the ported majority/joint quorum with the Figure-8 current-term commit rule), and follower MsgApp append/match-check/commit-advance. Reuses the already-mapped raft/confchange + raft/quorum + raft/tracker primitives. Scope cut (residual): the network driver that pumps Messages between peers (the Ready/Advance batch loop + durable storage adapter) lives in the cave-runtime cluster listener / rafthttp parallel track. 28 strict-TDD tests in src/raft_node.rs."
 
 [[mapped]]
 upstream_pkg = "raft/confchange/"

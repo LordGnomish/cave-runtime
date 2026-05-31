@@ -109,13 +109,13 @@ fn parity_honest_ratio_does_not_exceed_fill() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_30() {
+fn parity_last_audit_is_current() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-30"),
-        "[parity] last_audit must reflect the 2026-05-30 honest close-out (raft/tracker port)"
+        Some("2026-05-31"),
+        "[parity] last_audit must reflect the 2026-05-31 honest close-out (raft/ state-machine port)"
     );
 }
 
