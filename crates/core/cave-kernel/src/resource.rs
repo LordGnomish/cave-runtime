@@ -29,7 +29,7 @@
 //!
 //! Adopters: cave-apiserver (object envelope), cave-controller-manager
 //! + the operators (reconcile-loop object identity), cave-crossplane
-//! (composed-resource GVKs).
+//!   (composed-resource GVKs).
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

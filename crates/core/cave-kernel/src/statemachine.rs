@@ -221,13 +221,13 @@ where
                 });
             }
         };
-        if let Some(guard) = &edge.guard {
-            if !guard(&self.current, &event) {
-                return Err(TransitionError::GuardBlocked {
-                    from: self.current.clone(),
-                    event,
-                });
-            }
+        if let Some(guard) = &edge.guard
+            && !guard(&self.current, &event)
+        {
+            return Err(TransitionError::GuardBlocked {
+                from: self.current.clone(),
+                event,
+            });
         }
         let to = edge.to.clone();
         let from = std::mem::replace(&mut self.current, to.clone());
