@@ -30,6 +30,7 @@ pub mod parity;
 pub mod pool;
 pub mod ratelimiter;
 pub mod reconcile;
+pub mod resource;
 pub mod retrypolicy;
 pub mod secrets;
 pub mod semaphore;
