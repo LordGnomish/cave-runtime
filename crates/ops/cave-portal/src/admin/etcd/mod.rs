@@ -24,6 +24,7 @@ pub mod keyspace;
 pub mod leases;
 pub mod members;
 pub mod metrics;
+pub mod raft;
 
 pub use keyspace::{list_kv, watch_stream};
 pub use leases::list_leases;
@@ -41,6 +42,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, EtcdViewEr
     let leases_html = leases::render_section(state, ctx)?;
     let alarms_html = alarms::render_section(state, ctx)?;
     let metrics_html = metrics::render_section(state, ctx)?;
+    let raft_html = raft::render_section(state, ctx)?;
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
   etcdctl parity surface (cave-etcd). etcd ships no canonical web UI;
@@ -53,17 +55,20 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, EtcdViewEr
   <a href="#etcd-leases">Leases</a>
   <a href="#etcd-alarms">Alarms</a>
   <a href="#etcd-metrics">Metrics</a>
+  <a href="#etcd-raft">Raft</a>
 </nav>
 {members}
 {keyspace}
 {leases}
 {alarms}
-{metrics}"##,
+{metrics}
+{raft}"##,
         members = members_html,
         keyspace = keyspace_html,
         leases = leases_html,
         alarms = alarms_html,
         metrics = metrics_html,
+        raft = raft_html,
     );
     Ok(page_shell_full(
         ctx,
@@ -92,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn render_includes_all_five_tabs() {
+    fn render_includes_all_six_tabs() {
         let html = render(
             &AdminState::seeded(),
             &ctx(&[Permission::EtcdRead, Permission::EtcdWatch]),
@@ -104,6 +109,7 @@ mod tests {
             "#etcd-leases",
             "#etcd-alarms",
             "#etcd-metrics",
+            "#etcd-raft",
         ] {
             assert!(html.contains(anchor));
         }
