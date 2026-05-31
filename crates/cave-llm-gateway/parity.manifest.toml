@@ -23,16 +23,16 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5217
+honest_ratio         = 0.5319
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-31"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 24
+mapped_count         = 25
 partial_count        = 2
 skipped_count        = 20
 unmapped_count       = 0
-total                = 46
+total                = 47
 
 [module]
 name        = "cave-llm-gateway"
@@ -275,7 +275,7 @@ kind          = "http"
 upstream_path = "/metrics"
 local_path    = "/metrics"
 
-# ── Mapped subsystems (24) ───────────────────────────────────────────────────
+# ── Mapped subsystems (25) ───────────────────────────────────────────────────
 
 [[mapped]]
 name = "provider-trait"
@@ -350,6 +350,10 @@ name = "cavectl-llm-gateway-subcmd"
 name  = "budget-tracking"
 notes = "src/budget.rs BudgetManager (port of litellm/budget_manager.py) is wired into GatewayRouter and enforced live in complete(): reset_on_duration → is_within_budget gate (402 BudgetExceeded) → update_cost debit. Admin routes /api/gateway/budgets{,/:user,/:user/reset}."
 
+[[mapped]]
+name  = "endpoint-embeddings"
+notes = "POST /v1/embeddings (OpenAI-compat). EmbeddingRequest/Response in openai.rs, LlmProvider::embeddings (default 'unsupported'), OpenAI + local-OpenAI-compat overrides via openai_compat_embeddings, router.embeddings() rate-limit + dispatch. Rerank stays skipped (see endpoint-rerank)."
+
 # ── Partial subsystems (2) ───────────────────────────────────────────────────
 # Scaffold present but not yet wired into the live module tree. Both duplicate
 # capabilities already live behind GatewayRouter (cost.rs/cache.rs/logging.rs/
@@ -413,9 +417,9 @@ reason = "images/generations, images/edits — MVP cut"
 cut_to = "cave-llm-gateway-images"
 
 [[skipped]]
-name   = "endpoint-embeddings-rerank"
-reason = "v1/embeddings, v1/rerank — MVP cut"
-cut_to = "cave-llm-gateway-embeddings"
+name   = "endpoint-rerank"
+reason = "v1/rerank (Cohere/Jina cross-encoder rerank) — still MVP cut; embeddings now mapped, see [[mapped]] endpoint-embeddings"
+cut_to = "cave-llm-gateway-rerank"
 
 [[skipped]]
 name   = "endpoint-batch"
@@ -478,8 +482,8 @@ reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plu
 
 [[scope_cuts]]
 group   = "non-text-endpoints"
-members = ["endpoint-audio", "endpoint-images", "endpoint-embeddings-rerank", "endpoint-batch"]
-reason  = "MVP is chat-completions only; audio/image/embeddings/batch ship as sibling crates"
+members = ["endpoint-audio", "endpoint-images", "endpoint-rerank", "endpoint-batch"]
+reason  = "MVP is chat-completions + embeddings; audio/image/rerank/batch ship as sibling crates"
 
 [[scope_cuts]]
 group   = "owned-by-other-cave-crates"

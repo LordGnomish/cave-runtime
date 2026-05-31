@@ -3,7 +3,9 @@
 //! LLM provider abstraction — OpenAI, Anthropic, local models.
 
 use crate::error::{GatewayError, GatewayResult};
-use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, Usage};
+use crate::openai::{
+    ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse, Usage,
+};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,50 @@ pub trait LlmProvider: Send + Sync {
     fn supported_models(&self) -> Vec<String>;
     async fn complete(&self, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse>;
     async fn health_check(&self) -> bool;
+
+    /// Compute embeddings (`POST /v1/embeddings`). Defaults to "unsupported"
+    /// so only providers with a real embeddings endpoint advertise it.
+    async fn embeddings(&self, _req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        Err(GatewayError::InvalidRequest(format!(
+            "provider '{}' does not support embeddings",
+            self.name()
+        )))
+    }
+}
+
+/// Forward an embeddings request to an OpenAI-compatible `/v1/embeddings`
+/// endpoint, optionally bearer-authenticated. Shared by every OpenAI-shaped
+/// backend (OpenAI, local OpenAI-compat, and the SaaS OpenAI-compat providers).
+async fn openai_compat_embeddings(
+    client: &reqwest::Client,
+    base_url: &str,
+    name: &str,
+    api_key: Option<&str>,
+    req: &EmbeddingRequest,
+) -> GatewayResult<EmbeddingResponse> {
+    let url = format!("{base_url}/v1/embeddings");
+    let mut builder = client.post(&url).json(req);
+    if let Some(key) = api_key {
+        builder = builder.bearer_auth(key);
+    }
+    let resp = builder
+        .send()
+        .await
+        .map_err(|e| GatewayError::ProviderUnavailable {
+            provider: name.to_string(),
+            reason: e.to_string(),
+        })?;
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(GatewayError::UpstreamError { status, body });
+    }
+    resp.json::<EmbeddingResponse>()
+        .await
+        .map_err(|e| GatewayError::ProviderUnavailable {
+            provider: name.to_string(),
+            reason: format!("deserialize: {e}"),
+        })
 }
 
 // ── Provider config ───────────────────────────────────────────────────────────
@@ -139,6 +185,17 @@ impl LlmProvider for OpenAiProvider {
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    async fn embeddings(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        openai_compat_embeddings(
+            &self.client,
+            &self.config.base_url,
+            &self.config.name,
+            self.config.api_key.as_deref(),
+            req,
+        )
+        .await
     }
 }
 
@@ -344,6 +401,17 @@ impl LlmProvider for LocalProvider {
             .map(|r| r.status().is_success())
             .unwrap_or(false)
     }
+
+    async fn embeddings(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        openai_compat_embeddings(
+            &self.client,
+            &self.config.base_url,
+            &self.config.name,
+            self.config.api_key.as_deref(),
+            req,
+        )
+        .await
+    }
 }
 
 /// Mock provider for tests — echos back a canned response.
@@ -385,6 +453,29 @@ impl LlmProvider for MockProvider {
     }
     async fn health_check(&self) -> bool {
         true
+    }
+    async fn embeddings(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        // Deterministic stand-in: one zero-filled vector per input, sized to
+        // the requested `dimensions` (default 3). Lets the router/route layer
+        // be exercised end-to-end without a live embeddings backend.
+        let dims = req.dimensions.unwrap_or(3) as usize;
+        let data = req
+            .input
+            .as_vec()
+            .into_iter()
+            .enumerate()
+            .map(|(index, _)| crate::openai::EmbeddingData {
+                object: "embedding".into(),
+                embedding: vec![0.0; dims],
+                index,
+            })
+            .collect();
+        Ok(EmbeddingResponse {
+            object: "list".into(),
+            data,
+            model: req.model.clone(),
+            usage: Usage::new(req.input.len() as u32, 0),
+        })
     }
 }
 

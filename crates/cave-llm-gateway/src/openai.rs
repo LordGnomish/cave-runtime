@@ -240,6 +240,64 @@ impl Usage {
     }
 }
 
+// ── Embeddings (POST /v1/embeddings) ──────────────────────────────────────────
+
+/// OpenAI `input` field — a single string or a batch of strings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    Single(String),
+    Batch(Vec<String>),
+}
+
+impl EmbeddingInput {
+    /// Normalise to a flat list of input strings.
+    pub fn as_vec(&self) -> Vec<String> {
+        match self {
+            Self::Single(s) => vec![s.clone()],
+            Self::Batch(v) => v.clone(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Batch(v) => v.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingRequest {
+    pub model: String,
+    pub input: EmbeddingInput,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingData {
+    pub object: String,
+    pub embedding: Vec<f32>,
+    pub index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingResponse {
+    pub object: String,
+    pub data: Vec<EmbeddingData>,
+    pub model: String,
+    pub usage: Usage,
+}
+
 // ── SSE streaming chunk ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -426,6 +484,9 @@ mod tests {
         assert_eq!(v["object"], "list");
         assert_eq!(v["data"][0]["object"], "embedding");
         assert_eq!(v["data"][0]["index"], 0);
-        assert_eq!(v["data"][0]["embedding"][1], 0.2);
+        assert_eq!(v["data"][0]["embedding"].as_array().unwrap().len(), 3);
+        // f32 → JSON widens precision; compare with tolerance.
+        let second = v["data"][0]["embedding"][1].as_f64().unwrap();
+        assert!((second - 0.2).abs() < 1e-6);
     }
 }

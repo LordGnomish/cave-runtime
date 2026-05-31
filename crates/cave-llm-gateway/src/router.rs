@@ -181,6 +181,35 @@ impl GatewayRouter {
         Ok(resp)
     }
 
+    /// Route an embeddings request: resolve the model alias to a provider,
+    /// rate-limit the consumer, then dispatch to that provider's `/v1/embeddings`.
+    pub async fn embeddings(
+        &self,
+        consumer: &str,
+        mut req: crate::openai::EmbeddingRequest,
+    ) -> GatewayResult<crate::openai::EmbeddingResponse> {
+        let (provider_name, model) = self.resolve_model(&req.model);
+        req.model = model;
+
+        // Rate-limit on a rough token estimate of the inputs.
+        let estimated_tokens: u32 = req
+            .input
+            .as_vec()
+            .iter()
+            .map(|t| crate::cost::estimate_tokens(t))
+            .sum();
+        self.rate_limiter.check(consumer, estimated_tokens)?;
+
+        let provider =
+            self.providers
+                .get(&provider_name)
+                .ok_or_else(|| GatewayError::ProviderUnavailable {
+                    provider: provider_name.clone(),
+                    reason: "not registered".into(),
+                })?;
+        provider.embeddings(&req).await
+    }
+
     fn resolve_model(&self, model: &str) -> (String, String) {
         if let Some(alias) = self.aliases.resolve(model) {
             (alias.provider, alias.model)
@@ -373,9 +402,26 @@ mod tests {
 
     #[tokio::test]
     async fn embeddings_dispatch_routes_to_provider() {
-        let router = make_router();
+        // Alias the embedding model to the registered mock provider so
+        // resolve_model() routes the request there.
+        let registry = Arc::new(ProviderRegistry::new());
+        registry.register(Arc::new(MockProvider::new("mock")));
+        let aliases = Arc::new(AliasRegistry::new());
+        aliases.register(crate::alias::ModelAlias {
+            alias: "embed-me".into(),
+            provider: "mock".into(),
+            model: "mock-embed".into(),
+            description: None,
+        });
+        let router = GatewayRouter::new(
+            registry,
+            aliases,
+            RoutingStrategy::Fixed {
+                provider: "mock".into(),
+            },
+        );
         let req = crate::openai::EmbeddingRequest {
-            model: "mock-model".into(),
+            model: "embed-me".into(),
             input: crate::openai::EmbeddingInput::Single("vectorise me".into()),
             encoding_format: None,
             dimensions: Some(8),
