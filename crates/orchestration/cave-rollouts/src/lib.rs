@@ -21,6 +21,7 @@
 //! - Slack webhook, generic webhook, Teams, PagerDuty
 
 pub mod analysis;
+pub mod conditions;
 pub mod engine;
 pub mod experiment;
 pub mod models;
