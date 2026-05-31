@@ -1,0 +1,311 @@
+# parity.manifest.toml — cave-tools
+# Primary upstream: modelcontextprotocol/modelcontextprotocol  https://github.com/modelcontextprotocol/modelcontextprotocol
+#   spec revision 2025-11-25 (schema/2025-11-25/schema.ts)
+# Reference patterns (NOTICE): OpenAI Function Calling wire format + LangChain
+#   tool framework (MIT, Copyright LangChain Inc.).
+#
+# cave-tools is the Cave runtime's LLM tool-calling framework. It ports the
+# *tool* half of the Model Context Protocol — the Tool object, JSON Schema
+# argument validation, and the JSON-RPC server methods (initialize /
+# tools/list / tools/call) — and layers on the host-side concerns MCP delegates
+# to implementors (per-tool/per-user authorization, a tamper-evident audit
+# log) plus the affordances production tool stacks need (sandboxed built-ins,
+# streaming + batch execution, semantic tool search) and OpenAI/LangChain
+# interop adapters.
+#
+# Scope boundary (see [[skipped]]): cave-tools owns *tools*. The MCP Resources
+# and Prompts primitives, the client-side features (sampling/roots/elicitation),
+# the wire transports (stdio/HTTP+SSE), and authorization/OAuth are out of
+# scope — owned by sibling crates or by the host — and are ADR-justified skips,
+# not unmapped gaps.
+
+[upstream]
+org         = "modelcontextprotocol"
+repo        = "modelcontextprotocol"
+version     = "2025-11-25"
+name        = "Model Context Protocol"
+license     = "MIT"
+language    = "TypeScript"
+url         = "https://github.com/modelcontextprotocol/modelcontextprotocol"
+source_sha  = "2025-11-25"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.875
+honest_ratio        = 0.875
+adr_justified_ratio = 1.0      # all 8 skipped subsystems are out-of-scope by ADR (sibling-crate- or host-owned); the 4 partials are the honest in-scope gaps
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit          = "2026-05-31"
+infra_only          = false
+mapped_count        = 28
+partial_count       = 4
+skipped_count       = 8
+unmapped_count      = 0
+total               = 40       # 28 + 4 + 8 + 0 = 40
+
+# honest_ratio derivation (Charter v2 honest measurement):
+#   In-scope subsystems  = mapped + partial + unmapped = 28 + 4 + 0 = 32
+#   Fully mapped         = 28
+#   28 / 32              = 0.875
+# The 8 [[skipped]] subsystems are excluded from the denominator: each is a
+# documented out-of-scope boundary (adr_justified_ratio = 1.0), not an
+# unfinished obligation. honest_ratio therefore rises ONLY by converting a
+# partial → mapped, never by reclassifying a real gap as skipped.
+#
+# impl LOC (src/, excludes tests/ which are integration tests):
+#   error 67 · tool 266 · schema 204 · mcp 164 · permission 177 · audit 198 ·
+#   builtin 553 · streaming 157 · batch 200 · search 148 · adapters 114 ·
+#   lib 65  ──  2313 impl LOC, 1138 test LOC across 10 RED→GREEN cycles.
+
+[module]
+name        = "cave-tools"
+description = "LLM tool-calling framework — Tool trait + JSON Schema validation, MCP server, sandboxed built-ins, permissions, audit, streaming, batch, semantic search, OpenAI/LangChain adapters"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "schema/2025-11-25/schema.ts (Tool, CallToolResult)"
+local    = "src/tool.rs"
+
+[[files]]
+upstream = "schema/2025-11-25/schema.ts (Tool.inputSchema — JSON Schema)"
+local    = "src/schema.rs"
+
+[[files]]
+upstream = "basic/index.mdx + server/tools.mdx (JSON-RPC: initialize, tools/list, tools/call)"
+local    = "src/mcp.rs"
+
+[[files]]
+upstream = "basic/security_best_practices.mdx (tool-safety consent/authorization)"
+local    = "src/permission.rs"
+
+[[files]]
+upstream = "basic/security_best_practices.mdx (auditability) + OpenAI usage logging"
+local    = "src/audit.rs"
+
+[[files]]
+upstream = "server/tools.mdx (representative tool surfaces) — file/web/exec/calendar/email"
+local    = "src/builtin.rs"
+
+[[files]]
+upstream = "basic/utilities/progress.mdx (notifications/progress)"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "LangChain RunnableParallel / OpenAI parallel tool calls (batch pattern)"
+local    = "src/batch.rs"
+
+[[files]]
+upstream = "LangChain tool-retriever / semantic tool selection pattern"
+local    = "src/search.rs"
+
+[[files]]
+upstream = "OpenAI function-calling tools[] + tool_calls; LangChain convert_to_openai_tool"
+local    = "src/adapters.rs"
+
+[[files]]
+upstream = "schema/2025-11-25/schema.ts (JSONRPCError) error envelope"
+local    = "src/error.rs"
+
+# ── Mapped subsystems ──────────────────────────────────────────────────────
+
+[[mapped]]
+name     = "tool.Tool trait (name + description + input_schema + execute)"
+upstream = "schema.ts:Tool"
+local    = "src/tool.rs:Tool"
+
+[[mapped]]
+name     = "tool.ToolResult (MCP CallToolResult: content[]/isError/structuredContent)"
+upstream = "schema.ts:CallToolResult"
+local    = "src/tool.rs:ToolResult"
+
+[[mapped]]
+name     = "tool.ToolSpec (MCP Tool object / tools/list entry)"
+upstream = "schema.ts:Tool (listing)"
+local    = "src/tool.rs:ToolSpec"
+
+[[mapped]]
+name     = "tool.ToolRegistry (register/get/invoke/list_specs/names)"
+upstream = "MCP server tool table"
+local    = "src/tool.rs:ToolRegistry"
+
+[[mapped]]
+name     = "tool.FnTool closure adapter"
+upstream = "LangChain StructuredTool.from_function"
+local    = "src/tool.rs:FnTool"
+
+[[mapped]]
+name     = "schema.validate (Draft-2020-12 subset)"
+upstream = "Tool.inputSchema validation"
+local    = "src/schema.rs:validate"
+
+[[mapped]]
+name     = "schema.validate_args + ToolRegistry::invoke_validated (arg gating)"
+upstream = "tools/call argument validation"
+local    = "src/schema.rs:validate_args + src/tool.rs:invoke_validated"
+
+[[mapped]]
+name     = "mcp.initialize (capability negotiation + serverInfo + protocolVersion)"
+upstream = "basic/lifecycle initialize"
+local    = "src/mcp.rs:initialize"
+
+[[mapped]]
+name     = "mcp.tools/list (cursor pagination)"
+upstream = "server/tools tools/list"
+local    = "src/mcp.rs:tools_list"
+
+[[mapped]]
+name     = "mcp.tools/call (CallToolResult + protocol/tool error split)"
+upstream = "server/tools tools/call"
+local    = "src/mcp.rs:tools_call"
+
+[[mapped]]
+name     = "mcp.JSON-RPC envelope + error mapping (ping, notifications drop)"
+upstream = "schema.ts:JSONRPCRequest/Response/Error"
+local    = "src/mcp.rs:handle + src/error.rs:json_rpc_code"
+
+[[mapped]]
+name     = "permission.PermissionPolicy (per-user/per-tool deny-overrides)"
+upstream = "security_best_practices tool-safety consent"
+local    = "src/permission.rs:PermissionPolicy"
+
+[[mapped]]
+name     = "permission.filter_visible (per-user tools/list view)"
+upstream = "host authorization UI surface"
+local    = "src/permission.rs:filter_visible"
+
+[[mapped]]
+name     = "audit.AuditLog (hash-chained append-only invocation history)"
+upstream = "auditability best-practice + usage logging"
+local    = "src/audit.rs:AuditLog"
+
+[[mapped]]
+name     = "audit.RecordOutcome classification + verify (tamper detection)"
+upstream = "auditability integrity"
+local    = "src/audit.rs:RecordOutcome + verify"
+
+[[mapped]]
+name     = "builtin.FileSandbox (read/write/list, root jail + traversal guard)"
+upstream = "filesystem tool surface (sandboxed)"
+local    = "src/builtin.rs:FileSandbox + file_*_tool"
+
+[[mapped]]
+name     = "builtin.web_search (injected WebSearchProvider)"
+upstream = "web/search tool surface"
+local    = "src/builtin.rs:web_search_tool"
+
+[[mapped]]
+name     = "builtin.code_exec (sandboxed arithmetic evaluator, no IO)"
+upstream = "code-execution tool surface (sandboxed subset)"
+local    = "src/builtin.rs:code_exec_tool + eval_arithmetic"
+
+[[mapped]]
+name     = "builtin.calendar (add/list, in-memory store)"
+upstream = "calendar tool surface"
+local    = "src/builtin.rs:Calendar + calendar_*_tool"
+
+[[mapped]]
+name     = "builtin.email (send→outbox, in-memory, no network)"
+upstream = "email tool surface"
+local    = "src/builtin.rs:Mailbox + email_send_tool"
+
+[[mapped]]
+name     = "builtin.register_builtins (default full set wiring)"
+upstream = "MCP server tool registration"
+local    = "src/builtin.rs:register_builtins + BuiltinConfig"
+
+[[mapped]]
+name     = "streaming.StreamingTool + StreamChunk (ordered incremental output)"
+upstream = "progress-bearing long-running tool"
+local    = "src/streaming.rs:StreamingTool + StreamChunk"
+
+[[mapped]]
+name     = "streaming.progress_notification (MCP notifications/progress mapping)"
+upstream = "basic/utilities/progress"
+local    = "src/streaming.rs:progress_notification"
+
+[[mapped]]
+name     = "streaming.into_buffered (streaming tool → regular Tool adapter)"
+upstream = "buffered tool result"
+local    = "src/streaming.rs:into_buffered"
+
+[[mapped]]
+name     = "batch.BatchExecutor (FailFast/ContinueOnError + dependency DAG topo-sort)"
+upstream = "OpenAI parallel tool calls / LangChain RunnableParallel"
+local    = "src/batch.rs:BatchExecutor"
+
+[[mapped]]
+name     = "search.ToolSearchIndex (TF-IDF cosine semantic tool search)"
+upstream = "LangChain semantic tool selection"
+local    = "src/search.rs:ToolSearchIndex"
+
+[[mapped]]
+name     = "adapters.OpenAI function-calling (to_openai_tool(s)/parse_tool_calls/tool_message)"
+upstream = "OpenAI tools[] + tool_calls wire format"
+local    = "src/adapters.rs"
+
+[[mapped]]
+name     = "adapters.LangChain tool descriptor (StructuredTool args)"
+upstream = "LangChain convert_to_openai_tool / StructuredTool.args"
+local    = "src/adapters.rs:to_langchain_tool"
+
+# ── Partials (honest in-scope gaps) ─────────────────────────────────────────
+
+[[partial]]
+name     = "tool.Content block types"
+upstream = "schema.ts:TextContent | ImageContent | AudioContent | EmbeddedResource"
+local    = "src/tool.rs:Content (Text only)"
+note     = "Only text content blocks are modelled; image/audio/embedded-resource blocks are deferred until a Cave modality pipeline needs them. The Content enum is the single extension point."
+
+[[partial]]
+name     = "builtin.code_exec execution surface"
+upstream = "general code-execution tool (subprocess / WASM sandbox)"
+local    = "src/builtin.rs:eval_arithmetic"
+note     = "Ships a pure no-IO arithmetic evaluator as the safe sandbox MVP. General code execution (subprocess, WASM, language runtimes) is deferred to a hardened executor crate; the FnTool wiring is unchanged when it lands."
+
+[[partial]]
+name     = "search.ToolSearchIndex ranking backend"
+upstream = "embedding-vector semantic tool selection"
+local    = "src/search.rs:ToolSearchIndex (TF-IDF lexical)"
+note     = "Lexical TF-IDF cosine ranking, deterministic and dependency-free. An embedding-backed index is hot-swappable behind the same search() API once cave-search exposes a vector store."
+
+[[partial]]
+name     = "mcp.tools listChanged notifications"
+upstream = "server/tools notifications/tools/list_changed"
+local    = "src/mcp.rs:initialize (capabilities.tools.listChanged = false)"
+note     = "The capability is negotiated (advertised false). Emitting live list_changed notifications needs a mutable/observed registry + a transport push channel, deferred with the transport layer."
+
+# ── Skipped (ADR-justified out-of-scope) ────────────────────────────────────
+
+[[skipped]]
+name   = "MCP Resources primitive (resources/list, resources/read, subscriptions)"
+reason = "cave-tools owns *tools*. The Resources primitive (context/data exposure) is a separate MCP feature; if the runtime needs it, it belongs in a dedicated resources crate, not the tool-calling framework."
+
+[[skipped]]
+name   = "MCP Prompts primitive (prompts/list, prompts/get)"
+reason = "Templated prompt/workflow messages are a distinct MCP feature owned by cave-hermes' prompt assembly (src/prompt.rs), not by the tool framework."
+
+[[skipped]]
+name   = "MCP client features (sampling, roots, elicitation)"
+reason = "These are capabilities a host/client offers to servers (server-initiated LLM calls, filesystem roots, user prompts). cave-tools is the server/tool side; client features belong to the host runtime."
+
+[[skipped]]
+name   = "MCP transport layer (stdio, Streamable HTTP + SSE)"
+reason = "McpServer is deliberately transport-agnostic (handle(Value)->Option<Value>). Wiring stdio/HTTP/SSE framing is owned by the host (cave-runtime route mount / a CLI bridge), keeping the core testable."
+
+[[skipped]]
+name   = "MCP authorization / OAuth 2.1 resource-server flow"
+reason = "Authentication and token issuance are owned by cave-auth / cave-vault. The permission layer here is the host-side per-user/per-tool policy that runs *after* the caller identity is established."
+
+[[skipped]]
+name   = "Live web-search backend (HTTP client + result parsing)"
+reason = "web_search takes an injected WebSearchProvider so the framework opens no sockets. A concrete backend belongs in cave-search; the trait is the seam."
+
+[[skipped]]
+name   = "Persistent audit sink (database / on-disk JSONL)"
+reason = "AuditLog is an in-memory hash-chained ledger. Durable persistence + retention is owned by cave-store / observability; the hash chain is the integrity contract a sink preserves."
+
+[[skipped]]
+name   = "Concurrent / async batch fan-out"
+reason = "BatchExecutor is synchronous and deterministic (topo order). Parallel fan-out across a tokio runtime is a host-runtime concern layered on the same DAG; the sequential semantics are the spec the parallel version must match."
