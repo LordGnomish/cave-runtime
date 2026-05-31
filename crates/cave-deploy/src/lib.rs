@@ -26,6 +26,7 @@ pub mod health;
 pub mod helm_deps;
 pub mod image_updater;
 pub mod models;
+pub mod notif_engine;
 pub mod notifications;
 pub mod rbac;
 pub mod rollout;
