@@ -44,6 +44,7 @@ pub mod spanmetrics;
 pub mod spanmetrics_routes;
 pub mod spm;
 pub mod storage;
+pub mod trace_combiner;
 pub mod storage_badger;
 pub mod storage_cassandra;
 pub mod storage_es;
