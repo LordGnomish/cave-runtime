@@ -77,6 +77,9 @@ pub fn create_router(state: Arc<PolicyState>) -> Router {
         .route("/v1/compile", post(opa_compile))
         // ── OPA Query API ──────────────────────────────────────────────────
         .route("/v1/query", get(opa_get_query).post(opa_post_query))
+        // ── OPA test runner + fmt (rego::tester / rego::format) ─────────────
+        .route("/v1/test", post(opa_test))
+        .route("/v1/fmt", post(opa_fmt))
         // ── OPA Status & Health ────────────────────────────────────────────
         .route("/v1/health", get(opa_health))
         .route("/v1/status", get(opa_status))
@@ -395,6 +398,97 @@ async fn opa_compile(
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
                 code: "compile_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
+    }
+}
+
+// ─── OPA test runner + fmt API ────────────────────────────────────────────────
+
+/// POST /v1/test — run `test_*` rules (rego::tester). Tests an ad-hoc module
+/// set when `modules` is provided, otherwise the loaded policy set.
+async fn opa_test(
+    State(state): State<Arc<PolicyState>>,
+    Json(req): Json<PolicyTestRequest>,
+) -> Response {
+    use crate::rego::tester::{summarize, Runner};
+
+    let mut runner = Runner::new();
+    if let Some(filter) = req.run.as_deref().filter(|s| !s.is_empty()) {
+        runner = runner.with_name_filter(filter);
+    }
+
+    // Build the engine to test against. Ad-hoc modules win; otherwise clone
+    // the loaded set so we never mutate shared state.
+    let results = if req.modules.is_empty() {
+        let engine = state.rego.read().unwrap();
+        runner.run(&engine)
+    } else {
+        let mut engine = crate::rego::PolicyEngine::new();
+        for (id, src) in &req.modules {
+            if let Err(e) = engine.load_module(id, src) {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        code: "test_compile_error".into(),
+                        message: format!("{id}: {e}"),
+                        errors: None,
+                    }),
+                )
+                    .into_response();
+            }
+        }
+        runner.run(&engine)
+    };
+
+    let summary = summarize(&results);
+    let cases = results
+        .into_iter()
+        .map(|r| {
+            let result = if r.error.is_some() {
+                "error"
+            } else if r.skip {
+                "skip"
+            } else if r.fail {
+                "fail"
+            } else {
+                "pass"
+            };
+            PolicyTestCase {
+                package: r.package,
+                name: r.name,
+                result: result.into(),
+                duration_ns: r.duration_ns,
+                error: r.error,
+            }
+        })
+        .collect();
+
+    Json(PolicyTestResponse {
+        results: cases,
+        total: summary.total,
+        passed: summary.passed,
+        failed: summary.failed,
+        skipped: summary.skipped,
+        all_passed: summary.all_passed(),
+    })
+    .into_response()
+}
+
+/// POST /v1/fmt — canonicalize Rego source (rego::format).
+async fn opa_fmt(Json(req): Json<PolicyFmtRequest>) -> Response {
+    match crate::rego::format::format_source(&req.source) {
+        Ok(formatted) => {
+            let changed = formatted != req.source;
+            Json(PolicyFmtResponse { formatted, changed }).into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                code: "fmt_parse_error".into(),
                 message: e.to_string(),
                 errors: None,
             }),

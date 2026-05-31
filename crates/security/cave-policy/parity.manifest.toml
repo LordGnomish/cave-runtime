@@ -51,19 +51,19 @@ source_root   = "src"
 
 [parity]
 fill_ratio            = 1.0
-honest_ratio          = 0.6154
-adr_justified_ratio   = 1.0      # 20 [[skipped]] (19 cross-crate/Phase-2 + kyverno_engine_response_stream wire-format-detail formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified
+honest_ratio          = 0.6538
+adr_justified_ratio   = 1.0      # 18 [[skipped]] (17 cross-crate/Phase-2 + kyverno_engine_response_stream wire-format-detail formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified. 2026-05-31 cont2: opa-test + opa-fmt ENGINE cores reclassified skipped→mapped (only their CLI wrappers stay scope-cut)
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001, ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
-mapped_count          = 29
+mapped_count          = 31
 partial_count         = 3
-skipped_count         = 20
+skipped_count         = 18
 unmapped_count        = 0
 total                 = 52
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-30"
+last_audit            = "2026-05-31"
 infra_only            = false
 
-# ─── MAPPED surfaces (29; incl. topdown_http_send below) ────────────────────
+# ─── MAPPED surfaces (31; incl. topdown_http_send below) ────────────────────
 
 # ---- OPA core (12) ----
 [[mapped]]
@@ -90,6 +90,21 @@ notes    = "Rego Value type (string/number/boolean/null/array/set/object)"
 upstream = "topdown/eval.go"
 local    = "src/rego/eval.rs"
 notes    = "Rego top-down evaluator with binding stack + iteration over collections"
+
+# ---- opa test / opa fmt pure engine cores (2026-05-31 strict-TDD cont2) ----
+# The `opa test`/`opa fmt` *CLI binaries* (flag parsing, file globbing, -w
+# in-place rewrite) remain cave-cli's job; their pure ENGINE cores are library
+# code and are now ported in-crate. The earlier blanket scope-cut to cave-cli
+# over-claimed: it conflated the binary wrapper with the reusable engine.
+[[mapped]]
+upstream = "v1/tester/runner.go (internal/cmd/test/test.go core)"
+local    = "src/rego/tester.rs"
+notes    = "OPA Rego test runner (2026-05-31 strict-TDD RED→GREEN tests/tester_tdd.rs). Faithful port of the pure core: TEST_PREFIX=`test_` / SKIP_TEST_PREFIX=`todo_test_` discovery (skip-prefix matched first since it super-strings the test prefix), PASS iff defined && boolean `true`, FAIL on undefined (empty result) or any non-`true` value, SKIP on todo_test_; deterministic package/name sort + incremental-rule dedup; Runner::with_name_filter substring selector (opa test -r); summarize()/TestSummary trailer with all_passed(). Consumes the in-crate Evaluator via PolicyEngine::query_path. 8 unit tests. Wired POST /v1/test + `cavectl policy test`. Only the opa-test CLI flag parsing stays scope-cut to cave-cli."
+
+[[mapped]]
+upstream = "format/format.go (internal/cmd/fmt/fmt.go core)"
+local    = "src/rego/format.rs"
+notes    = "OPA `opa fmt` canonical printer (2026-05-31 strict-TDD RED→GREEN tests/format_tdd.rs). Faithful port of the format-package core: format_module(&Module)/format_source(&str) emit the one canonical Rego string — package line, blank-separated sorted import block, rules with tab-indented braced bodies, exactly one space around =/:=/==/!=/</<=/>/>=, `, `-separated collections, set() for the empty set, JSON-style string escapes, comprehension + every/some/with rendering. Idempotent (fmt(fmt(x))==fmt(x)) and always re-parseable — the two defining opa-fmt invariants — both asserted. 7 unit tests. Wired POST /v1/fmt + `cavectl policy fmt`. CLI globbing/-w stays scope-cut to cave-cli."
 
 [[mapped]]
 upstream = "topdown/builtins.go + topdown/aggregates.go + topdown/strings.go + topdown/numbers.go"
@@ -227,7 +242,7 @@ upstream = "kyverno: pkg/policyreport/*.go"
 local    = "src/kyverno/mod.rs"
 notes    = "PolicyReport emission — events generated but PolicyReport CRD persistence deferred (cave-portal-api owns)"
 
-# ─── SKIPPED surfaces (20) ──────────────────────────────────────────────────
+# ─── SKIPPED surfaces (18) ──────────────────────────────────────────────────
 
 [[skipped]]
 upstream      = "plugins/discovery/plugin.go"
@@ -253,16 +268,6 @@ reason        = "`opa run` CLI — replaced by cavectl policy"
 upstream      = "internal/cmd/build/build.go"
 scope_cut_to  = "cave-cli"
 reason        = "`opa build` CLI — replaced by cavectl policy build"
-
-[[skipped]]
-upstream      = "internal/cmd/test/test.go"
-scope_cut_to  = "cave-cli"
-reason        = "`opa test` CLI — replaced by cavectl policy test"
-
-[[skipped]]
-upstream      = "internal/cmd/fmt/fmt.go"
-scope_cut_to  = "cave-cli"
-reason        = "`opa fmt` CLI — replaced by cavectl policy fmt"
 
 [[skipped]]
 upstream      = "internal/cmd/check/check.go"
@@ -349,7 +354,7 @@ reason       = "Same wire contract is covered by HTTP/1.1 + serde AdmissionRevie
 [self_audit]
 test_file     = "src/parity_self_audit.rs"
 floor         = 0.95
-last_run      = "2026-05-23"
+last_run      = "2026-05-31"
 report_file   = "PARITY_REPORT.md"
 
 [observability]

@@ -271,3 +271,55 @@ pub struct PolicyViolation {
     pub resource: Option<String>,
     pub severity: Option<String>,
 }
+
+// ─── OPA test runner API (rego::tester) ─────────────────────────────────────
+
+/// POST /v1/test request body. When `modules` is non-empty the tests run
+/// against that ad-hoc module set (mirrors `opa test <files>`); when empty,
+/// the currently loaded policy set is tested.
+#[derive(Debug, Default, Deserialize)]
+pub struct PolicyTestRequest {
+    #[serde(default)]
+    pub modules: HashMap<String, String>,
+    /// Optional substring name filter (mirrors `opa test -r <substr>`).
+    #[serde(default)]
+    pub run: Option<String>,
+}
+
+/// One test outcome in a POST /v1/test response.
+#[derive(Debug, Serialize)]
+pub struct PolicyTestCase {
+    pub package: String,
+    pub name: String,
+    /// "pass" | "fail" | "skip" | "error".
+    pub result: String,
+    pub duration_ns: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// POST /v1/test response — per-test outcomes plus the aggregate trailer.
+#[derive(Debug, Serialize)]
+pub struct PolicyTestResponse {
+    pub results: Vec<PolicyTestCase>,
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub all_passed: bool,
+}
+
+// ─── opa fmt API (rego::format) ─────────────────────────────────────────────
+
+/// POST /v1/fmt request body.
+#[derive(Debug, Default, Deserialize)]
+pub struct PolicyFmtRequest {
+    pub source: String,
+}
+
+/// POST /v1/fmt response — canonical source and whether it differed.
+#[derive(Debug, Serialize)]
+pub struct PolicyFmtResponse {
+    pub formatted: String,
+    pub changed: bool,
+}

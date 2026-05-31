@@ -1,8 +1,8 @@
 # cave-policy — Charter v2 close-out report
 
-**Date:** 2026-05-23  
-**Branch:** `claude/cave-policy-close-2026-05-23`  
-**Status:** ≥0.95 fill ratio, 8/8 Charter v2 gates GREEN.
+**Date:** 2026-05-31  
+**Branch:** `claude/cave-policy-honest-cont2`  
+**Status:** 1.0 fill ratio, 8/8 Charter v2 gates GREEN.
 
 ## Triumvirate upstreams
 
@@ -18,13 +18,23 @@ All three are Apache-2.0 — line-port is permitted under cave-runtime's AGPL-3.
 
 | Metric | Value |
 |---|---|
-| mapped | 27 |
+| mapped | 31 |
 | partial | 3 |
-| skipped (scope_cut) | 20 |
-| unmapped (honest gap) | 2 |
+| skipped (scope_cut) | 18 |
+| unmapped (honest gap) | 0 |
 | total | 52 |
-| **fill_ratio** | **0.9615** (`(m+p+s)/total`) |
-| honest_ratio | 0.5769 (`(m+p)/total`) |
+| **fill_ratio** | **1.0** (`(m+p+s)/total`) |
+| honest_ratio | 0.6538 (`(m+p)/total`) |
+
+> **2026-05-31 cont2 (honest uplift):** the `opa test` and `opa fmt` *engine
+> cores* were reclassified `skipped → mapped` (honest_ratio 0.6154 → 0.6538)
+> via strict-TDD ports — `src/rego/tester.rs` (OPA `v1/tester` runner:
+> `test_`/`todo_test_` discovery, PASS iff defined && `true`) and
+> `src/rego/format.rs` (the `format` package canonical printer: idempotent,
+> re-parseable). The earlier blanket scope-cut to cave-cli over-claimed — only
+> the CLI flag-parsing wrappers belong to cave-cli; the reusable engines are
+> in-crate library code. Wired `POST /v1/test`, `POST /v1/fmt`,
+> `cavectl policy test|fmt`, and the portal tile's live health endpoint.
 
 ## Architecture map
 

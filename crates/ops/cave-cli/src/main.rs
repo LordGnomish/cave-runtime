@@ -2457,6 +2457,21 @@ enum PolicyCmd {
     },
     /// View policy audit log
     Audit,
+    /// Run `test_*` rules in a Rego file (opa test)
+    Test {
+        /// Path to a .rego file containing test_ rules
+        #[arg(long)]
+        file: String,
+        /// Only run tests whose name contains this substring (opa test -r)
+        #[arg(long)]
+        run: Option<String>,
+    },
+    /// Canonicalize a Rego file to stdout (opa fmt)
+    Fmt {
+        /// Path to a .rego file to format
+        #[arg(long)]
+        file: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4011,6 +4026,20 @@ async fn run(cli: Cli) -> Result<()> {
                 .await
             }
             PolicyCmd::Audit => c.get("/api/policy/audit").await,
+            PolicyCmd::Test { file, run } => {
+                let src = std::fs::read_to_string(&file)
+                    .map_err(|e| anyhow::anyhow!("read {file}: {e}"))?;
+                c.post(
+                    "/v1/test",
+                    json!({ "modules": { file: src }, "run": run }),
+                )
+                .await
+            }
+            PolicyCmd::Fmt { file } => {
+                let src = std::fs::read_to_string(&file)
+                    .map_err(|e| anyhow::anyhow!("read {file}: {e}"))?;
+                c.post("/v1/fmt", json!({ "source": src })).await
+            }
         },
 
         // ── DAST ──────────────────────────────────────────────────────────────
@@ -6711,6 +6740,33 @@ mod sbom_parse_tests {
                 cmd: SbomCmd::Policy(SbomPolicyCmd::List)
             }
         ));
+    }
+
+    #[test]
+    fn policy_test_parses_file_and_run_filter() {
+        let cli = parse(&[
+            "cavectl", "policy", "test", "--file", "rbac_test.rego", "--run", "admin",
+        ]);
+        match cli.command {
+            Commands::Policy {
+                cmd: PolicyCmd::Test { file, run },
+            } => {
+                assert_eq!(file, "rbac_test.rego");
+                assert_eq!(run.as_deref(), Some("admin"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn policy_fmt_parses_file() {
+        let cli = parse(&["cavectl", "policy", "fmt", "--file", "authz.rego"]);
+        match cli.command {
+            Commands::Policy {
+                cmd: PolicyCmd::Fmt { file },
+            } => assert_eq!(file, "authz.rego"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
     }
 
     #[test]
