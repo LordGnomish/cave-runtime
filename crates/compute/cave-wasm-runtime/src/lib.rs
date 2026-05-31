@@ -16,6 +16,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cli;
 pub mod digest;
 pub mod error;
 pub mod exec;

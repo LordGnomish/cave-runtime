@@ -2839,6 +2839,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-wasm-runtime"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cave-workflows"
 version = "0.1.0"
 dependencies = [

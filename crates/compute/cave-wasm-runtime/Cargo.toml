@@ -15,3 +15,7 @@ serde_json = { workspace = true }
 [lib]
 name = "cave_wasm_runtime"
 path = "src/lib.rs"
+
+[[bin]]
+name = "cave-wasm"
+path = "src/main.rs"
