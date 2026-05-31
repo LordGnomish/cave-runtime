@@ -24,6 +24,7 @@ pub mod request_size_limiting;
 pub mod request_termination;
 pub mod request_transformer;
 pub mod response_transformer;
+pub mod statsd;
 pub mod zipkin;
 
 use async_trait::async_trait;
@@ -184,6 +185,7 @@ impl PluginChain {
             "correlation-id".to_string(),
             Arc::new(correlation_id::CorrelationIdPlugin::new()),
         );
+        plugins.insert("statsd".to_string(), Arc::new(statsd::StatsdPlugin));
         plugins.insert(
             "grpc-gateway".to_string(),
             Arc::new(grpc_gateway::GrpcGatewayPlugin),
