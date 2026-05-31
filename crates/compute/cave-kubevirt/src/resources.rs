@@ -43,6 +43,31 @@ pub fn calc_vcpus(cpu: Option<&DomainCpu>) -> i64 {
     }
 }
 
+/// `hardware.safeAppend` — push `cpu_num` onto `list`, refusing once the list
+/// has already grown past `limit`. Upstream checks `len > limit` *before* the
+/// append, so a list may legitimately reach `limit + 1` elements.
+fn safe_append(list: &mut Vec<i32>, cpu_num: i32, limit: usize) -> Result<(), String> {
+    if list.len() > limit {
+        return Err(format!(
+            "cpuset line exceeds the limit of {limit} cpus"
+        ));
+    }
+    list.push(cpu_num);
+    Ok(())
+}
+
+/// `hardware.ParseCPUSetLine(cpusetLine, limit)` — expand a Linux cpuset string
+/// such as `"0-3,7"` into the explicit CPU id list `[0,1,2,3,7]`.
+///
+/// Comma-separated items; an item containing `-` is an inclusive range. Every
+/// id is bounds-checked against `limit` via [`safe_append`]. A non-numeric
+/// token, or overflowing the limit, returns `Err`.
+pub fn parse_cpu_set_line(cpuset_line: &str, limit: usize) -> Result<Vec<i32>, String> {
+    // RED placeholder.
+    let _ = (cpuset_line, limit);
+    Ok(Vec::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,5 +114,39 @@ mod tests {
     fn calc_vcpus_delegates_when_present() {
         assert_eq!(calc_vcpus(Some(&cpu(2, 1, 1))), 2);
         assert_eq!(calc_vcpus(Some(&cpu(0, 0, 0))), 0);
+    }
+
+    #[test]
+    fn parse_single_range() {
+        assert_eq!(parse_cpu_set_line("0-3", 100).unwrap(), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn parse_mixed_ranges_and_singletons() {
+        assert_eq!(
+            parse_cpu_set_line("0-3,7", 100).unwrap(),
+            vec![0, 1, 2, 3, 7]
+        );
+        assert_eq!(parse_cpu_set_line("1,3,5", 100).unwrap(), vec![1, 3, 5]);
+    }
+
+    #[test]
+    fn parse_degenerate_range_is_one_cpu() {
+        assert_eq!(parse_cpu_set_line("5-5", 100).unwrap(), vec![5]);
+    }
+
+    #[test]
+    fn parse_rejects_non_numeric_tokens() {
+        assert!(parse_cpu_set_line("a-b", 100).is_err());
+        assert!(parse_cpu_set_line("x", 100).is_err());
+    }
+
+    #[test]
+    fn parse_enforces_limit_with_upstream_off_by_one() {
+        // Upstream checks len > limit *before* the append, so a list may reach
+        // limit + 1 elements: "0-2" (3 ids) is accepted with limit 2 ...
+        assert_eq!(parse_cpu_set_line("0-2", 2).unwrap(), vec![0, 1, 2]);
+        // ... but a 4th id (len already 3 > 2 at the next check) is rejected.
+        assert!(parse_cpu_set_line("0-3", 2).is_err());
     }
 }
