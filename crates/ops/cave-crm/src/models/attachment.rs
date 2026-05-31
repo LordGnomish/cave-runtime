@@ -67,6 +67,71 @@ pub struct Attachment {
     pub updated_at: DateTime<Utc>,
 }
 
+impl Attachment {
+    /// Build an unattached attachment, deriving `file_category` from the
+    /// `full_path` extension.
+    pub fn new(
+        workspace_id: Uuid,
+        name: impl Into<String>,
+        full_path: impl Into<String>,
+    ) -> Self {
+        let full_path = full_path.into();
+        let file_category = Self::categorize(&full_path);
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            workspace_id,
+            name: name.into(),
+            full_path,
+            file_category,
+            author_id: None,
+            target_kind: None,
+            target_id: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Classify a filename/path by extension — mirrors Twenty's
+    /// `fileCategory` derivation. Unknown / extensionless paths fall through
+    /// to [`FileCategory::Other`]. Matching is case-insensitive.
+    pub fn categorize(path: &str) -> FileCategory {
+        let ext = path
+            .rsplit('/')
+            .next()
+            .unwrap_or(path)
+            .rsplit('.')
+            .next()
+            .map(|e| e.to_ascii_lowercase())
+            .filter(|e| e != &path.to_ascii_lowercase()); // no '.' → no extension
+        match ext.as_deref() {
+            Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "heic") => {
+                FileCategory::Image
+            }
+            Some("mp4" | "mov" | "webm" | "avi" | "mkv") => FileCategory::Video,
+            Some("mp3" | "wav" | "ogg" | "flac" | "m4a") => FileCategory::Audio,
+            Some("pdf") => FileCategory::Pdf,
+            Some("xls" | "xlsx" | "csv" | "tsv" | "ods") => FileCategory::Spreadsheet,
+            Some("ppt" | "pptx" | "odp" | "key") => FileCategory::Presentation,
+            Some("doc" | "docx" | "txt" | "md" | "rtf" | "odt") => FileCategory::TextDocument,
+            Some("zip" | "gz" | "tar" | "rar" | "7z" | "bz2") => FileCategory::Archive,
+            _ => FileCategory::Other,
+        }
+    }
+
+    /// Attach this file to a CRM record (consuming builder).
+    pub fn attach_to(mut self, kind: AttachmentTargetKind, target_id: Uuid) -> Self {
+        self.target_kind = Some(kind);
+        self.target_id = Some(target_id);
+        self
+    }
+
+    /// True once a polymorphic target is set.
+    pub fn is_attached(&self) -> bool {
+        self.target_kind.is_some() && self.target_id.is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
