@@ -22,17 +22,25 @@ use crate::models::DomainCpu;
 /// seeds the running total (if it is still zero) or multiplies into it. This
 /// means `{sockets: 4}` alone yields 4, not 0 — matching upstream exactly.
 pub fn number_of_vcpus(cpu: &DomainCpu) -> i64 {
-    // RED placeholder.
-    let _ = cpu;
-    0
+    let mut vcpus = cpu.cores.unwrap_or(0) as i64;
+    if let Some(sockets) = cpu.sockets.filter(|&s| s != 0) {
+        let sockets = sockets as i64;
+        vcpus = if vcpus == 0 { sockets } else { vcpus * sockets };
+    }
+    if let Some(threads) = cpu.threads.filter(|&t| t != 0) {
+        let threads = threads as i64;
+        vcpus = if vcpus == 0 { threads } else { vcpus * threads };
+    }
+    vcpus
 }
 
 /// `calcVCPUs(cpu)` — vCPU count for a VMI domain, defaulting to a single
 /// vCPU when the CPU topology is entirely absent.
 pub fn calc_vcpus(cpu: Option<&DomainCpu>) -> i64 {
-    // RED placeholder.
-    let _ = cpu;
-    0
+    match cpu {
+        Some(c) => number_of_vcpus(c),
+        None => 1,
+    }
 }
 
 #[cfg(test)]
