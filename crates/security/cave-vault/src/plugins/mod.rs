@@ -125,6 +125,29 @@ impl PluginCatalog {
         Self::default()
     }
 
+    /// Seed the builtin registry with the backends cave-vault ships in-binary
+    /// (the [[mapped]] secret engines + auth methods). These are what `Get`
+    /// falls back to when no external plugin shadows them.
+    pub fn with_builtins() -> Self {
+        let mut cat = Self::default();
+        for name in ["kv", "pki", "transit", "database", "ssh", "totp", "aws", "cubbyhole"] {
+            cat.register_builtin(name, PluginType::Secrets);
+        }
+        for name in [
+            "token",
+            "userpass",
+            "approle",
+            "kubernetes",
+            "oidc",
+            "cert",
+            "ldap",
+            "jwt",
+        ] {
+            cat.register_builtin(name, PluginType::Credential);
+        }
+        cat
+    }
+
     /// `storageKey := path.Join(pluginType.String(), name[, version])`.
     pub fn storage_key(plugin_type: PluginType, name: &str, version: &str) -> String {
         let base = format!("{}/{}", plugin_type.as_str(), name);

@@ -70,6 +70,8 @@ pub struct VaultState {
     pub oidc_store: Arc<RwLock<oidc::OidcStore>>,
     pub cert_store: Arc<RwLock<cert::CertStore>>,
     pub namespace_store: Arc<RwLock<NamespaceStore>>,
+    /// Plugin catalog — external plugin registry (`/v1/sys/plugins/catalog/*`).
+    pub plugin_catalog: Arc<RwLock<plugins::PluginCatalog>>,
 }
 
 #[derive(Default)]
@@ -360,6 +362,7 @@ impl VaultState {
             oidc_store: Arc::new(RwLock::new(oidc::OidcStore::default())),
             cert_store: Arc::new(RwLock::new(cert::CertStore::default())),
             namespace_store: Arc::new(RwLock::new(NamespaceStore::default())),
+            plugin_catalog: Arc::new(RwLock::new(plugins::PluginCatalog::with_builtins())),
         })
     }
 }

@@ -599,9 +599,113 @@ pub async fn capabilities_self(
     Ok(VaultResponse::new().with_data(serde_json::to_value(caps).unwrap_or_default()))
 }
 
+// ── Plugin catalog (/v1/sys/plugins/catalog/*) ──────────────────────────────
+// openbao vault/logical_system_paths.go — sys/plugins/catalog/:type[/:name]
+
+#[derive(Deserialize)]
+pub struct RegisterPluginBody {
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<String>,
+    #[serde(default)]
+    pub sha256: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub oci_image: bool,
+}
+
+/// GET /v1/sys/plugins/catalog/{type} — list plugin names of a type.
+pub async fn list_plugins(
+    State(state): State<Arc<VaultState>>,
+    headers: HeaderMap,
+    Path(plugin_type): Path<String>,
+) -> Result<VaultResponse, VaultError> {
+    let _token = extract_token(&headers)?;
+    let pt = crate::plugins::PluginType::parse(&plugin_type)
+        .map_err(|e| VaultError::InvalidRequest(e.to_string()))?;
+    let cat = state.plugin_catalog.read().await;
+    Ok(VaultResponse::new().with_data(json!({ "keys": cat.list(pt) })))
+}
+
+/// GET /v1/sys/plugins/catalog/{type}/{name} — read one plugin's runner config.
+pub async fn read_plugin(
+    State(state): State<Arc<VaultState>>,
+    headers: HeaderMap,
+    Path((plugin_type, name)): Path<(String, String)>,
+) -> Result<VaultResponse, VaultError> {
+    let _token = extract_token(&headers)?;
+    let pt = crate::plugins::PluginType::parse(&plugin_type)
+        .map_err(|e| VaultError::InvalidRequest(e.to_string()))?;
+    let cat = state.plugin_catalog.read().await;
+    let runner = cat
+        .get(&name, pt, "")
+        .ok_or_else(|| VaultError::NotFound(format!("plugin {name:?} not found in catalog")))?;
+    Ok(VaultResponse::new().with_data(json!({
+        "name": runner.name,
+        "type": runner.plugin_type.as_str(),
+        "version": runner.version,
+        "command": runner.command,
+        "args": runner.args,
+        "sha256": runner.sha256.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+        "builtin": runner.builtin,
+        "oci_image": runner.oci,
+        "versions": cat.list_versions(&name, pt),
+    })))
+}
+
+/// POST /v1/sys/plugins/catalog/{type}/{name} — register an external plugin.
+pub async fn register_plugin(
+    State(state): State<Arc<VaultState>>,
+    headers: HeaderMap,
+    Path((plugin_type, name)): Path<(String, String)>,
+    Json(body): Json<RegisterPluginBody>,
+) -> Result<VaultResponse, VaultError> {
+    let _token = extract_token(&headers)?;
+    let pt = crate::plugins::PluginType::parse(&plugin_type)
+        .map_err(|e| VaultError::InvalidRequest(e.to_string()))?;
+    let mut cat = state.plugin_catalog.write().await;
+    cat.set(crate::plugins::SetPluginInput {
+        name,
+        plugin_type: pt,
+        version: body.version,
+        command: body.command,
+        args: body.args,
+        env: body.env,
+        sha256_hex: body.sha256,
+        oci: body.oci_image,
+    })
+    .map_err(|e| VaultError::InvalidRequest(e.to_string()))?;
+    Ok(VaultResponse::new())
+}
+
+/// DELETE /v1/sys/plugins/catalog/{type}/{name} — deregister an external plugin.
+pub async fn deregister_plugin(
+    State(state): State<Arc<VaultState>>,
+    headers: HeaderMap,
+    Path((plugin_type, name)): Path<(String, String)>,
+) -> Result<VaultResponse, VaultError> {
+    let _token = extract_token(&headers)?;
+    let pt = crate::plugins::PluginType::parse(&plugin_type)
+        .map_err(|e| VaultError::InvalidRequest(e.to_string()))?;
+    let mut cat = state.plugin_catalog.write().await;
+    cat.delete(&name, pt, "");
+    Ok(VaultResponse::new())
+}
+
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/sys/seal-status", get(seal_status))
+        .route("/v1/sys/plugins/catalog/{type}", get(list_plugins))
+        .route(
+            "/v1/sys/plugins/catalog/{type}/{name}",
+            get(read_plugin)
+                .post(register_plugin)
+                .delete(deregister_plugin),
+        )
         .route("/v1/sys/health", get(health))
         .route("/v1/sys/init", get(init_status).post(initialize))
         .route("/v1/sys/unseal", post(unseal))

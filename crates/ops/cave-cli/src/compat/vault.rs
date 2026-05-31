@@ -805,4 +805,84 @@ mod tests {
         let r = prepare(&VaultCmd::Status).unwrap();
         assert!(r.path.starts_with("/api/compat/vault/v1/"));
     }
+
+    // ── plugin catalog ──────────────────────────────────────────────────────
+
+    #[test]
+    fn plugin_list_path() {
+        let r = prepare(&VaultCmd::Plugin {
+            cmd: PluginCmd::List {
+                plugin_type: "secret".into(),
+            },
+        })
+        .unwrap();
+        assert_eq!(r.verb, HttpVerb::Get);
+        assert_eq!(r.path, "/api/compat/vault/v1/sys/plugins/catalog/secret");
+    }
+
+    #[test]
+    fn plugin_info_path() {
+        let r = prepare(&VaultCmd::Plugin {
+            cmd: PluginCmd::Info {
+                plugin_type: "database".into(),
+                name: "mysql".into(),
+            },
+        })
+        .unwrap();
+        assert_eq!(r.verb, HttpVerb::Get);
+        assert_eq!(
+            r.path,
+            "/api/compat/vault/v1/sys/plugins/catalog/database/mysql"
+        );
+    }
+
+    #[test]
+    fn plugin_register_posts_body() {
+        let r = prepare(&VaultCmd::Plugin {
+            cmd: PluginCmd::Register {
+                plugin_type: "secret".into(),
+                name: "vault-plugin-foo".into(),
+                command: "foo".into(),
+                sha256: "a".repeat(64),
+                version: Some("1.2.0".into()),
+            },
+        })
+        .unwrap();
+        assert_eq!(r.verb, HttpVerb::Post);
+        assert_eq!(
+            r.path,
+            "/api/compat/vault/v1/sys/plugins/catalog/secret/vault-plugin-foo"
+        );
+        let body = r.body.unwrap();
+        assert_eq!(body["command"], "foo");
+        assert_eq!(body["sha256"], "a".repeat(64));
+        assert_eq!(body["version"], "1.2.0");
+    }
+
+    #[test]
+    fn plugin_register_rejects_unknown_type() {
+        assert!(prepare(&VaultCmd::Plugin {
+            cmd: PluginCmd::Register {
+                plugin_type: "widget".into(),
+                name: "x".into(),
+                command: "x".into(),
+                sha256: "a".repeat(64),
+                version: None,
+            },
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn plugin_deregister_deletes() {
+        let r = prepare(&VaultCmd::Plugin {
+            cmd: PluginCmd::Deregister {
+                plugin_type: "auth".into(),
+                name: "vault-plugin-bar".into(),
+            },
+        })
+        .unwrap();
+        assert_eq!(r.verb, HttpVerb::Delete);
+        assert!(r.path.ends_with("/sys/plugins/catalog/auth/vault-plugin-bar"));
+    }
 }
