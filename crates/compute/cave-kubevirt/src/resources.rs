@@ -102,9 +102,13 @@ pub const DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO: f64 = 2.0;
 /// [`DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO`]. The namespace-informer lookup that
 /// surfaces the label is cave-runtime's concern; this is the pure validation.
 pub fn resolve_memory_limits_ratio(label_value: Option<&str>) -> f64 {
-    // RED placeholder.
-    let _ = label_value;
-    0.0
+    match label_value {
+        Some(v) => match v.parse::<f64>() {
+            Ok(ratio) if ratio >= 1.0 => ratio,
+            _ => DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO,
+        },
+        None => DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO,
+    }
 }
 
 #[cfg(test)]
