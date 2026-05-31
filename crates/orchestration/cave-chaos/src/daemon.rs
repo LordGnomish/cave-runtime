@@ -127,6 +127,10 @@ pub fn injection_plan(exp: &ChaosExperiment, dev: &str) -> Vec<String> {
             .packet_loss_percent
             .map(|pct| vec![tc_netem(dev, &NetemFault::Corrupt { percent: pct as u8, correlation: None })])
             .unwrap_or_default(),
+        ExperimentType::NetworkDuplicate => p
+            .packet_loss_percent
+            .map(|pct| vec![tc_netem(dev, &NetemFault::Duplicate { percent: pct as u8, correlation: None })])
+            .unwrap_or_default(),
         ExperimentType::NetworkPartition => {
             vec![iptables_partition(Direction::Output, "chaos_blocked")]
         }
