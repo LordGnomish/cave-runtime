@@ -31,6 +31,7 @@ pub mod error;
 pub mod mcp;
 pub mod permission;
 pub mod schema;
+pub mod streaming;
 pub mod tool;
 
 pub use error::{Result, ToolError};
