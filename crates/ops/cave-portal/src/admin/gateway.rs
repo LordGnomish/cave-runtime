@@ -42,7 +42,11 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GatewayVie
         })
         .collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Gateway ({n})</h2>{tbl}</section>"#,
+        r#"<section><h2 class="text-lg font-semibold mb-2">Gateway ({n})</h2>{tbl}</section>
+<section class="mt-4"><h3 class="text-md font-semibold mb-1">Data-plane plugins</h3>
+<p class="text-sm text-gray-500">21 Kong-compatible plugins incl. correlation-id (uuid / uuid#counter / tracker) and statsd (StatsD/DogStatsD UDP push sink).</p></section>
+<section class="mt-3"><h3 class="text-md font-semibold mb-1">Kubernetes Gateway API</h3>
+<p class="text-sm text-gray-500">HTTPRoute translation with conflict-resolution precedence (Exact &gt; longest PathPrefix &gt; method &gt; headers &gt; queryParams). Dry-run: <code>POST /admin/v1/gateway-api/httproutes/translate</code></p></section>"#,
         n = rows.len(),
         tbl = table(&["name", "listener", "hostname", "backend"], &table_rows),
     );

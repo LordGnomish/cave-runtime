@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-31";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const KONG_VERSION: &str = "3.9.1";
 const KONG_SHA: &str = "b724fc7154de3a9971e33490097d5ea2c1bae93b";

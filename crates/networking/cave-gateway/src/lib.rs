@@ -136,6 +136,7 @@ pub fn gravitee_router(state: Arc<GatewayState>) -> Router {
 pub fn router(state: Arc<GatewayState>) -> Router {
     Router::new()
         .merge(admin_router(state.clone()))
+        .nest("/admin/v1/gateway-api", gateway_api::router())
         .merge(gravitee_router(state.clone()))
         .merge(proxy_router(state))
 }

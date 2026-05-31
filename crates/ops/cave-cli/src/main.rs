@@ -1526,6 +1526,21 @@ enum GatewayCmd {
         #[command(subcommand)]
         cmd: GraviteeCmd,
     },
+    /// Kubernetes Gateway API translation (HTTPRoute → internal routes)
+    GatewayApi {
+        #[command(subcommand)]
+        cmd: GatewayApiCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum GatewayApiCmd {
+    /// Translate (dry-run) a Gateway API HTTPRoute JSON file into the
+    /// precedence-ordered internal route/service model.
+    Translate {
+        /// Path to an HTTPRoute spec JSON file.
+        file: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3588,6 +3603,15 @@ async fn run(cli: Cli) -> Result<()> {
                 GraviteeCmd::Applications => c.get("/api/gateway/gravitee/applications").await,
                 GraviteeCmd::Subscriptions => c.get("/api/gateway/gravitee/subscriptions").await,
                 GraviteeCmd::Portal => c.get("/api/gateway/gravitee/portal/apis").await,
+            },
+            GatewayCmd::GatewayApi { cmd } => match cmd {
+                GatewayApiCmd::Translate { file } => {
+                    let raw = std::fs::read_to_string(&file)
+                        .map_err(|e| anyhow::anyhow!("reading {file}: {e}"))?;
+                    let body: serde_json::Value = serde_json::from_str(&raw)
+                        .map_err(|e| anyhow::anyhow!("parsing HTTPRoute JSON: {e}"))?;
+                    c.post("/admin/v1/gateway-api/httproutes/translate", body).await
+                }
             },
         },
 

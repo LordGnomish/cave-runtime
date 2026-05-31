@@ -133,7 +133,7 @@ fn default_weight() -> u32 {
 /// Sortable precedence key — larger compares as **more specific**.
 ///
 /// Tuple order mirrors the Gateway API conflict-resolution list.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct PrecedenceKey {
     pub path_rank: u8,
     pub path_len: usize,
@@ -166,7 +166,7 @@ pub fn precedence_key(m: &HttpRouteMatch) -> PrecedenceKey {
 
 /// A single translated route: the internal [`Route`] plus the backend
 /// [`Service`]s it forwards to, in precedence order.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TranslatedRoute {
     pub route: Route,
     pub services: Vec<Service>,
@@ -238,6 +238,26 @@ pub fn translate(route: &HttpRoute) -> Vec<TranslatedRoute> {
     // list order for ties, matching "first matching rule in list order".
     out.sort_by(|a, b| b.precedence.cmp(&a.precedence));
     out
+}
+
+// ── HTTP surface ─────────────────────────────────────────────────────────────
+
+use axum::{Json, Router, routing::post};
+
+/// `POST /admin/v1/gateway-api/httproutes/translate` — dry-run translation of a
+/// Gateway API HTTPRoute into the precedence-ordered internal route/service
+/// model. Returns the same data the controller loop would apply to the store.
+async fn translate_handler(Json(route): Json<HttpRoute>) -> Json<serde_json::Value> {
+    let translated = translate(&route);
+    Json(serde_json::json!({
+        "count": translated.len(),
+        "routes": translated,
+    }))
+}
+
+/// Router for the Gateway API translation surface.
+pub fn router() -> Router {
+    Router::new().route("/httproutes/translate", post(translate_handler))
 }
 
 #[cfg(test)]

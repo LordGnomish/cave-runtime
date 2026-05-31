@@ -81,17 +81,17 @@ source_sha = "33ac33b9f4e061e024eaff6efd457fa10bf998e8"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9667
-honest_ratio        = 0.7333
+fill_ratio          = 0.9677
+honest_ratio        = 0.7581
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001"
-last_audit          = "2026-05-24"
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 42
+mapped_count        = 45
 partial_count       = 2
-skipped_count       = 14
+skipped_count       = 13
 unmapped_count      = 2
-total               = 60
+total               = 62
 
 # 2026-05-23 Charter v2 close — claude/cave-gateway-close-2026-05-23:
 #   * Pre-close state: parity.ratio = 0.0 (scaffold-only manifest; no
@@ -112,13 +112,33 @@ total               = 60
 #   * source_sha pinned to Kong 3.9.1 commit
 #     b724fc7154de3a9971e33490097d5ea2c1bae93b and Gravitee 4.11.7 commit
 #     33ac33b9f4e061e024eaff6efd457fa10bf998e8.
+#
+# 2026-05-31 honest-uplift cont — claude/cave-gateway-honest-cont:
+#   * honest_ratio 0.7333 → 0.7581 via 3 strict-TDD (RED→GREEN) ports, all
+#     genuinely data-plane / gateway-ownable:
+#       - kong-plugin-correlation-id  : skipped→mapped (src/plugins/correlation_id.rs)
+#       - kong-plugin-statsd          : split from legacy-log-sinks skip → mapped
+#                                       (src/plugins/statsd.rs); a UDP push metric
+#                                       sink, not covered by pull-based prometheus.
+#       - k8s-gateway-api-httproute   : NEW mapped (src/gateway_api.rs) + route
+#                                       /admin/v1/gateway-api/httproutes/translate
+#                                       + cavectl gateway gateway-api translate.
+#     mapped 42→45, skipped 14→13, total 60→62; +27 lib tests (90→117).
+#   * 1.00 is structurally UNREACHABLE honestly and is NOT claimed:
+#       - envoy-xds-control-plane (unmapped) — rejected by 7 ADRs.
+#       - gravitee-cockpit-multicluster (unmapped) — Phase 2, cave-portal-api.
+#       - 13 skipped are real cross-crate cuts: persistent stores→cave-rdbms,
+#         vault→cave-vault, lambda→cave-cloud, Lua→cave-hermes, the auth/SSO
+#         plugins (session/ldap/oauth2-introspection/saml/mtls/access-mgmt)
+#         →cave-auth+cave-pki, the Angular console→cave-portal-web. Reclaiming
+#         these into cave-gateway would be dishonest inflation, not parity.
 
 [module]
 name        = "cave-gateway"
 description = "API gateway — Kong reimplementation + Gravitee API/plan/application/subscription/portal/governance surface"
 source_root = "src"
 
-# ─── Mapped subsystems (42) ─────────────────────────────────────────────────
+# ─── Mapped subsystems (45) ─────────────────────────────────────────────────
 
 [[mapped]]
 name = "kong-admin-api"
@@ -355,6 +375,21 @@ name = "gravitee-protocols"
 upstream = "gravitee-apim-definition/.../Protocol.java"
 note = "Protocol negotiation HTTP/1.1 + HTTP/2 + WebSocket. src/protocols.rs."
 
+[[mapped]]
+name = "kong-plugin-correlation-id"
+upstream = "kong/plugins/correlation-id/handler.lua"
+note = "Correlation-id header guarantee on the upstream request + optional downstream echo. Generators uuid / uuid#counter (per-worker uuid + monotonic counter) / tracker (connection-context composite). src/plugins/correlation_id.rs. 2026-05-31 reclassified skipped→mapped: the prior 'covered by zipkin B3' rationale was a stretch — correlation-id is a distinct data-plane plugin that works without tracing enabled."
+
+[[mapped]]
+name = "kong-plugin-statsd"
+upstream = "kong/plugins/statsd/handler.lua"
+note = "StatsD / DogStatsD UDP push sink — wire line protocol (metric:value|type|@rate, abbreviations c/g/ms/h/m/s) + default Kong metric set (request.count / request.size / response.size / status.<code> / latency / upstream_latency / kong_latency) + per-consumer unique_users(set)/request.count. src/plugins/statsd.rs. 2026-05-31 split out of the legacy-log-sinks skip bundle: a push metric sink is NOT superseded by pull-based prometheus."
+
+[[mapped]]
+name = "k8s-gateway-api-httproute"
+upstream = "kubernetes-sigs/gateway-api apis/v1/httproute_types.go"
+note = "Kubernetes Gateway API HTTPRoute → internal Kong-style Route/Service translation: path Exact/PathPrefix/RegularExpression, method, header & hostname matches; backendRefs→Service (port default 80, weights); Gateway API conflict-resolution precedence (Exact > longest PathPrefix > method > #headers > #queryParams). src/gateway_api.rs, POST /admin/v1/gateway-api/httproutes/translate, cavectl gateway gateway-api translate."
+
 # ─── Partial subsystems (2) ─────────────────────────────────────────────────
 
 [[partial]]
@@ -367,7 +402,7 @@ name = "gravitee-extended-policy-dsl"
 upstream = "gravitee-apim-policy-spi-* (50+ policies)"
 note = "12 of the most common Gravitee policies are mapped via Kong-equivalent plugins (cors, rate-limit, oauth2, jwt, key-auth, hmac, request-transformer, response-transformer, ip-filter, request-content-limit, mock, latency). The remaining ~38 niche policies (json-validation, xml-validation, geoip, captcha, etc.) emit a deny in src/gravitee/apis.rs::evaluate_policy with note 'phase-2-policy-not-implemented'."
 
-# ─── Skipped subsystems (14 — formalised scope cuts) ───────────────────────
+# ─── Skipped subsystems (13 — formalised scope cuts) ───────────────────────
 
 [[skipped]]
 name = "kong-postgres-store"
@@ -390,19 +425,14 @@ upstream = "kong/plugins/aws-lambda"
 reason = "AWS Lambda upstream invocation — handled by cave-cloud serverless adapter."
 
 [[skipped]]
-name = "kong-statsd-datadog-loggly-syslog"
-upstream = "kong/plugins/{statsd,datadog,loggly,syslog}"
-reason = "Legacy log sinks — superseded by file-log + prometheus + zipkin which are mapped."
+name = "kong-datadog-loggly-syslog"
+upstream = "kong/plugins/{datadog,loggly,syslog}"
+reason = "SaaS / legacy log sinks (Datadog + Loggly HTTP APIs, RFC5424 syslog) — superseded by file-log + prometheus + zipkin which are mapped. statsd was split out to [[mapped]] kong-plugin-statsd 2026-05-31 (a UDP push metric sink, not log-covered)."
 
 [[skipped]]
 name = "kong-pre-post-function-lua"
 upstream = "kong/plugins/{pre-function,post-function}"
 reason = "Inline Lua execution — cave-gateway has no Lua VM; Phase 2 hermes-policy-engine alternative."
-
-[[skipped]]
-name = "kong-correlation-id-plugin"
-upstream = "kong/plugins/correlation-id"
-reason = "Correlation-id header — covered by the mapped zipkin tracing plugin (B3 trace ID is the correlation id)."
 
 [[skipped]]
 name = "kong-session-cookie-plugin"
@@ -466,7 +496,7 @@ items = ["kong-aws-lambda-plugin"]
 [[scope_cuts]]
 group = "legacy-log-sinks"
 crates = ["cave-gateway"]
-items = ["kong-statsd-datadog-loggly-syslog"]
+items = ["kong-datadog-loggly-syslog"]
 
 [[scope_cuts]]
 group = "policy-engine"
