@@ -16,6 +16,7 @@ pub mod pod_mgmt;
 pub mod routes;
 pub mod status;
 pub mod webhook;
+pub mod leaderelection;
 
 use axum::{
     Router,
