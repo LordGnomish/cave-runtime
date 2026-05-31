@@ -15,6 +15,136 @@
 //! decision, not an unattended one — the Phase 0 mandate that the cron
 //! never swaps on its own is preserved.
 
+use serde::{Deserialize, Serialize};
+
+use crate::config::TrackerConfig;
+use crate::error::{TrackerError, TrackerResult};
+use crate::report::DailyReport;
+use crate::selection::SelectionStatus;
+use crate::trend::TrendHistory;
+
+/// The outcome of evaluating a swap. Always rendered to the operator;
+/// `eligible` is the only field that gates [`apply_swap`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwapPlan {
+    pub from: String,
+    pub to: String,
+    /// Candidate footprint carried from the poll row so [`apply_swap`]
+    /// can stamp the new baseline correctly.
+    pub to_vram_gib: f32,
+    pub to_disk_gib: f32,
+    pub to_quant: String,
+    pub eligible: bool,
+    pub consecutive_days: u32,
+    pub required_days: u32,
+    pub reasons: Vec<String>,
+}
+
+/// Pick the strongest UpgradeCandidate in today's report: highest
+/// quality delta, throughput as the tiebreak.
+fn best_upgrade<'a>(report: &'a DailyReport) -> Option<&'a crate::selection::Verdict> {
+    report
+        .verdicts
+        .iter()
+        .filter(|v| v.status == SelectionStatus::UpgradeCandidate)
+        .max_by(|a, b| {
+            a.quality_delta
+                .partial_cmp(&b.quality_delta)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    a.throughput_uplift
+                        .partial_cmp(&b.throughput_uplift)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        })
+}
+
+/// Decide whether the seat should swap to today's best candidate. Returns
+/// `None` when there is nothing to consider. The plan is `eligible` only
+/// when the operator opted in **and** the candidate cleared a floor on
+/// `required_days` consecutive days.
+pub fn plan_swap(
+    cfg: &TrackerConfig,
+    report: &DailyReport,
+    history: &TrendHistory,
+    opt_in: bool,
+    required_days: u32,
+) -> Option<SwapPlan> {
+    let best = best_upgrade(report)?;
+    let to = best.model_id.clone();
+
+    let consecutive_days = history
+        .model(&to)
+        .map(|m| m.consecutive_upgrade_days())
+        .unwrap_or(0);
+
+    let footprint = report.poll.candidates.iter().find(|c| c.model_id == to);
+    let to_vram_gib = footprint.map(|c| c.vram_gib).unwrap_or(cfg.baseline.vram_gib);
+    let to_disk_gib = footprint.map(|c| c.disk_gib).unwrap_or(cfg.baseline.disk_gib);
+    let to_quant = footprint
+        .map(|c| c.quant.clone())
+        .unwrap_or_else(|| cfg.baseline.quant.clone());
+
+    let mut reasons = Vec::new();
+    let streak_ok = consecutive_days >= required_days;
+    if streak_ok {
+        reasons.push(format!(
+            "cleared a floor on {} consecutive days (>= required {})",
+            consecutive_days, required_days
+        ));
+    } else {
+        reasons.push(format!(
+            "streak {} < required {} consecutive days",
+            consecutive_days, required_days
+        ));
+    }
+    if !opt_in {
+        reasons.push(
+            "Phase 1 opt-in required: pass --opt-in to apply (auto-swap stays off by default)"
+                .to_string(),
+        );
+    }
+
+    let eligible = opt_in && streak_ok;
+    if eligible {
+        reasons.push("operator opt-in confirmed → swap eligible".to_string());
+    }
+
+    Some(SwapPlan {
+        from: cfg.baseline.model.clone(),
+        to,
+        to_vram_gib,
+        to_disk_gib,
+        to_quant,
+        eligible,
+        consecutive_days,
+        required_days,
+        reasons,
+    })
+}
+
+/// Materialise an eligible plan into a new [`TrackerConfig`]. Errors when
+/// the plan is not eligible. The returned config keeps `auto_swap = false`
+/// so it passes `validate()` and the daily cron stays report-only.
+pub fn apply_swap(cfg: &TrackerConfig, plan: &SwapPlan) -> TrackerResult<TrackerConfig> {
+    if !plan.eligible {
+        return Err(TrackerError::Config(format!(
+            "swap to `{}` is not eligible: {}",
+            plan.to,
+            plan.reasons.join("; ")
+        )));
+    }
+    let mut next = cfg.clone();
+    next.baseline.model = plan.to.clone();
+    next.baseline.vram_gib = plan.to_vram_gib;
+    next.baseline.disk_gib = plan.to_disk_gib;
+    next.baseline.quant = plan.to_quant.clone();
+    // Explicit operator decision — never flip auto_swap on.
+    next.selection.auto_swap = false;
+    next.validate()?;
+    Ok(next)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

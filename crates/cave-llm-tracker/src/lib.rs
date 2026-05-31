@@ -32,6 +32,7 @@ pub mod report;
 pub mod selection;
 pub mod trend;
 
+pub use apply::{apply_swap, plan_swap, SwapPlan};
 pub use bench::{cave_prompts, run_bench, score_response, synth_snapshot, BenchSnapshot, EvalPrompt, EvalResult};
 pub use config::{BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig, TrackerConfig};
 pub use error::{TrackerError, TrackerResult};
