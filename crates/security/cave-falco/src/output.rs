@@ -109,6 +109,29 @@ mod tests {
             .with("container.id", "abc123")
     }
 
+    const SEC: u64 = 1_000_000_000;
+
+    #[test]
+    fn throttle_rate_zero_allows_everything() {
+        let mut t = OutputThrottle::new(0.0, 1.0, 0);
+        for _ in 0..1000 {
+            assert!(t.allow(0));
+        }
+    }
+
+    #[test]
+    fn throttle_drops_beyond_burst_then_recovers() {
+        // rate 1/s, burst 3. Three alerts at t=0 pass, the fourth is dropped.
+        let mut t = OutputThrottle::new(1.0, 3.0, 0);
+        assert!(t.allow(0));
+        assert!(t.allow(0));
+        assert!(t.allow(0));
+        assert!(!t.allow(0));
+        // one second later, one token regenerates → one more allowed.
+        assert!(t.allow(SEC));
+        assert!(!t.allow(SEC));
+    }
+
     #[test]
     fn template_substitution_replaces_fields() {
         let s = format_output_template("%proc.name in %container.id", &ev());
