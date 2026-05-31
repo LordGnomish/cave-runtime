@@ -21,6 +21,7 @@ pub mod ca_issuer;
 pub mod cli;
 pub mod controller;
 pub mod error;
+pub mod failover;
 pub mod issuer;
 pub mod metrics;
 pub mod models;
