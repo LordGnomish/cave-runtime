@@ -31,6 +31,7 @@ pub mod rekor;
 pub mod routes;
 pub mod sct;
 pub mod signature;
+pub mod sigstore_bundle;
 pub mod signing_config;
 pub mod store;
 pub mod tlog;
