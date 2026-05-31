@@ -27,6 +27,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 
 use crate::saml::SamlError;
+use std::collections::HashMap;
 
 /// Length of a SAML 2.0 type-0x0004 artifact in bytes.
 pub const ARTIFACT_LEN: usize = 44;
@@ -145,6 +146,241 @@ pub fn wrap_soap(saml_body_xml: &str) -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>{}</soap:Body></soap:Envelope>"#,
         saml_body_xml
     )
+}
+
+// ===========================================================================
+// Back-channel resolver layer — <samlp:ArtifactResolve> / <ArtifactResponse>
+// parsing + the source-side single-use artifact store. Mirrors
+// keycloak `ArtifactResolveType` / `ArtifactResponseType` and the
+// `SamlService.artifactResolution` source store (SAML Bindings §3.6.3-3.6.4).
+// XML/format only — no network, no SOAP transport beyond [`wrap_soap`].
+// ===========================================================================
+
+/// SAML 2.0 top-level `Success` status URI.
+pub const STATUS_SUCCESS: &str = "urn:oasis:names:tc:SAML:2.0:status:Success";
+
+/// A parsed `<samlp:ArtifactResolve>` request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactResolve {
+    pub id: String,
+    pub issuer: String,
+    /// Base64 `SAMLart` value to resolve.
+    pub artifact: String,
+}
+
+/// A parsed `<samlp:ArtifactResponse>` reply.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactResponse {
+    pub id: String,
+    pub in_response_to: String,
+    pub issuer: String,
+    /// Top-level status URI (e.g. [`STATUS_SUCCESS`]).
+    pub status: String,
+    /// Raw XML of the resolved protocol message (e.g. a `<samlp:Response>`).
+    pub payload: String,
+}
+
+/// Parse a `<samlp:ArtifactResolve>` (bare or SOAP-wrapped).
+pub fn parse_artifact_resolve(xml: &str) -> Result<ArtifactResolve, SamlError> {
+    if open_tag_lt(xml, "ArtifactResolve", 0).is_none() {
+        return Err(SamlError::Parse("not an ArtifactResolve".into()));
+    }
+    let id = attr(xml, "ArtifactResolve", "ID")
+        .ok_or_else(|| SamlError::MissingField("ArtifactResolve@ID".into()))?;
+    let issuer =
+        elem_text(xml, "Issuer").ok_or_else(|| SamlError::MissingField("Issuer".into()))?;
+    let artifact =
+        elem_text(xml, "Artifact").ok_or_else(|| SamlError::MissingField("Artifact".into()))?;
+    Ok(ArtifactResolve { id, issuer, artifact })
+}
+
+/// Build a `<samlp:ArtifactResponse>` carrying `payload` (raw XML). XML
+/// emission only; wrap with [`wrap_soap`] for the back-channel POST.
+/// Mirrors `ArtifactResponseType` from `saml-core-api`.
+pub fn build_artifact_response(
+    id: &str,
+    issue_instant: &str,
+    in_response_to: &str,
+    issuer: &str,
+    status: &str,
+    payload: &str,
+) -> String {
+    format!(
+        r#"<samlp:ArtifactResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{id}" Version="2.0" IssueInstant="{issue_instant}" InResponseTo="{in_response_to}"><saml:Issuer>{issuer}</saml:Issuer><samlp:Status><samlp:StatusCode Value="{status}"/></samlp:Status>{payload}</samlp:ArtifactResponse>"#,
+        id = id,
+        issue_instant = issue_instant,
+        in_response_to = in_response_to,
+        issuer = issuer,
+        status = status,
+        payload = payload.trim(),
+    )
+}
+
+/// Parse a `<samlp:ArtifactResponse>` (bare or SOAP-wrapped), recovering the
+/// inner protocol message.
+pub fn parse_artifact_response(xml: &str) -> Result<ArtifactResponse, SamlError> {
+    let ar_lt = open_tag_lt(xml, "ArtifactResponse", 0)
+        .ok_or_else(|| SamlError::Parse("not an ArtifactResponse".into()))?;
+    let id = attr(xml, "ArtifactResponse", "ID")
+        .ok_or_else(|| SamlError::MissingField("ArtifactResponse@ID".into()))?;
+    let in_response_to = attr(xml, "ArtifactResponse", "InResponseTo").unwrap_or_default();
+    let issuer =
+        elem_text(xml, "Issuer").ok_or_else(|| SamlError::MissingField("Issuer".into()))?;
+    let status = attr(xml, "StatusCode", "Value")
+        .ok_or_else(|| SamlError::MissingField("StatusCode@Value".into()))?;
+
+    // Payload = everything between the end of <Status> and the
+    // </ArtifactResponse> close tag.
+    let ar_gt = start_tag_gt(xml, ar_lt)
+        .ok_or_else(|| SamlError::Parse("unterminated ArtifactResponse start tag".into()))?;
+    let inner_start = ar_gt + 1;
+    let status_end = close_tag_end(xml, "Status", inner_start)
+        .ok_or_else(|| SamlError::Parse("unterminated Status".into()))?;
+    let ar_close_end = close_tag_end(xml, "ArtifactResponse", inner_start)
+        .ok_or_else(|| SamlError::Parse("unterminated ArtifactResponse".into()))?;
+    let ar_close_lt = xml[..ar_close_end]
+        .rfind("</")
+        .ok_or_else(|| SamlError::Parse("bad ArtifactResponse close".into()))?;
+    let payload = xml[status_end..ar_close_lt].trim().to_string();
+
+    Ok(ArtifactResponse {
+        id,
+        in_response_to,
+        issuer,
+        status,
+        payload,
+    })
+}
+
+/// Source-side single-use artifact store (SAML Bindings §3.6.3). The issuer
+/// stores a protocol message keyed by the artifact it hands out, then
+/// resolves-and-consumes it exactly once when the peer presents a matching
+/// `<ArtifactResolve>`. Mirrors the transient artifact map Keycloak's
+/// `SamlService` keeps for the source-site role.
+#[derive(Debug, Default, Clone)]
+pub struct ArtifactResolver {
+    map: HashMap<String, String>,
+}
+
+impl ArtifactResolver {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Store `message` keyed by the artifact's base64 form; returns the
+    /// `SAMLart` the issuer hands to the peer.
+    pub fn store(&mut self, artifact: &Artifact, message: &str) -> String {
+        let key = artifact.to_base64();
+        self.map.insert(key.clone(), message.to_string());
+        key
+    }
+
+    /// Resolve and **consume** (single-use). Errors if the artifact was never
+    /// issued or has already been resolved — artifacts are one-time-use per
+    /// the spec, which thwarts replay.
+    pub fn resolve(&mut self, artifact_b64: &str) -> Result<String, SamlError> {
+        self.map.remove(artifact_b64.trim()).ok_or_else(|| {
+            SamlError::Other("artifact not found (already resolved or never issued)".into())
+        })
+    }
+
+    /// Number of artifacts still awaiting resolution.
+    pub fn pending(&self) -> usize {
+        self.map.len()
+    }
+}
+
+// ---- minimal namespace-insensitive XML helpers (hand-rolled, matching the
+//      string-extraction idiom this module already uses) ----
+
+/// Byte index of `<` for the opening tag of the element with local name
+/// `local`, searching from `from`. Namespace-prefix insensitive; skips
+/// `</`, `<!`, `<?`.
+fn open_tag_lt(xml: &str, local: &str, from: usize) -> Option<usize> {
+    let mut i = from;
+    while let Some(rel) = xml[i..].find('<') {
+        let lt = i + rel;
+        let after = &xml[lt + 1..];
+        if after.starts_with('/') || after.starts_with('!') || after.starts_with('?') {
+            i = lt + 1;
+            continue;
+        }
+        let name_end = after
+            .find(|c: char| {
+                c == ' ' || c == '>' || c == '/' || c == '\t' || c == '\n' || c == '\r'
+            })
+            .unwrap_or(after.len());
+        let name = &after[..name_end];
+        let local_part = name.rsplit(':').next().unwrap_or(name);
+        if local_part == local {
+            return Some(lt);
+        }
+        i = lt + 1;
+    }
+    None
+}
+
+/// Byte index of the `>` ending the start tag that begins at `lt`.
+fn start_tag_gt(xml: &str, lt: usize) -> Option<usize> {
+    xml[lt..].find('>').map(|r| lt + r)
+}
+
+/// Byte index just after the `>` of the first matching close tag
+/// `</...local>` at/after `from`. Namespace-prefix insensitive.
+fn close_tag_end(xml: &str, local: &str, from: usize) -> Option<usize> {
+    let mut i = from;
+    while let Some(rel) = xml[i..].find("</") {
+        let lt = i + rel;
+        let after = &xml[lt + 2..];
+        let name_end = after
+            .find(|c: char| c == ' ' || c == '>' || c == '\t' || c == '\n' || c == '\r')
+            .unwrap_or(after.len());
+        let name = &after[..name_end];
+        let local_part = name.rsplit(':').next().unwrap_or(name);
+        if local_part == local {
+            let gt = xml[lt..].find('>')? + lt;
+            return Some(gt + 1);
+        }
+        i = lt + 2;
+    }
+    None
+}
+
+/// Text content of the first element with local name `local`.
+fn elem_text(xml: &str, local: &str) -> Option<String> {
+    let lt = open_tag_lt(xml, local, 0)?;
+    let gt = start_tag_gt(xml, lt)?;
+    if xml.as_bytes().get(gt.wrapping_sub(1)) == Some(&b'/') {
+        return Some(String::new()); // self-closing
+    }
+    let inner_start = gt + 1;
+    let close_end = close_tag_end(xml, local, inner_start)?;
+    let close_lt = xml[inner_start..close_end]
+        .rfind('<')
+        .map(|r| inner_start + r)?;
+    Some(xunesc(xml[inner_start..close_lt].trim()))
+}
+
+/// Value of attribute `name` on the first element with local name `local`.
+fn attr(xml: &str, local: &str, name: &str) -> Option<String> {
+    let lt = open_tag_lt(xml, local, 0)?;
+    let gt = start_tag_gt(xml, lt)?;
+    let tag = &xml[lt..=gt];
+    let needle = format!("{name}=\"");
+    let p = tag.find(&needle)? + needle.len();
+    let rest = &tag[p..];
+    let end = rest.find('"')?;
+    Some(xunesc(&rest[..end]))
+}
+
+/// Decode the five predefined XML entities. `&amp;` is decoded last so an
+/// already-escaped `&amp;lt;` does not collapse to `<`.
+fn xunesc(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 #[cfg(test)]
