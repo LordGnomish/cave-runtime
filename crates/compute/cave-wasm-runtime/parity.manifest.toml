@@ -1,0 +1,146 @@
+[upstream]
+name = "cave-wasm-runtime"
+project = "wasmtime"
+upstream_version = "v37.0.0"
+repo = "bytecodealliance/wasmtime"
+path_in_repo = "crates/wasmtime + crates/wasi (concept port)"
+license = "Apache-2.0"
+commit = "unknown"
+last_audit = "2026-05-31"
+# Multi-upstream concept port (NOT vendored). Secondary references:
+#   wasmerio/wasmer   (MIT)        — runtime/registry shapes
+#   spinframework/spin (Apache-2.0) — serverless registry + trigger model
+# Engine published under Apache-2.0 (NOT the workspace-default AGPL). See NOTICE.
+
+[parity]
+total_features = 20
+mapped = 9
+skipped = 7
+partial = 4
+honest_ratio = 0.45
+
+# ---- mapped: genuinely implemented + strict-TDD tested ----
+
+[[features]]
+id = "wasm-binary-parser"
+status = "mapped"
+upstream_ref = "wasmtime: crates/wasmparser (binary decoder)"
+notes = "src/parser.rs — \\0asm preamble + version gate, LEB128, section walk (type/import/function/memory/export/code), RLE locals. Strict-TDD cycle 1."
+
+[[features]]
+id = "core-interpreter-numeric"
+status = "mapped"
+upstream_ref = "wasmtime: runtime execution semantics; core spec numeric instrs"
+notes = "src/exec.rs — stack interpreter: i32 const/arith/bitwise/shift/compare/eqz, signed-LEB consts, div/rem traps (÷0, MIN/-1). Cycle 2."
+
+[[features]]
+id = "function-calls"
+status = "mapped"
+upstream_ref = "core spec: call; combined func index space"
+notes = "src/exec.rs — cross-function call with arg marshalling + 1024-frame recursion guard; combined import/defined index space. Cycles 2 + 4."
+
+[[features]]
+id = "linear-memory"
+status = "mapped"
+upstream_ref = "core spec: memory; wasm32 64KiB pages"
+notes = "src/limits.rs + exec.rs — i32 load/store/load8_u/store8, memory.size/grow with cap, bounds-checked (OOB trap). Cycle 3."
+
+[[features]]
+id = "resource-limits-fuel"
+status = "mapped"
+upstream_ref = "wasmtime: Config::consume_fuel"
+notes = "src/limits.rs — per-instruction fuel charge, FuelExhausted trap on depletion. Cycle 3."
+
+[[features]]
+id = "module-imports-host-dispatch"
+status = "mapped"
+upstream_ref = "core spec: import section; wasmtime Linker host funcs"
+notes = "src/parser.rs + exec.rs — import section decode (func/table/memory/global) + dispatch of imported (host) calls to the WASI layer. Cycle 4."
+
+[[features]]
+id = "content-addressed-registry"
+status = "mapped"
+upstream_ref = "spin: oci/content store; OCI name:tag + sha256 digest"
+notes = "src/registry.rs — push/pull/get_by_digest/resolve/list/remove; identical bytes collapse to one sha256-keyed blob. Cycle 5."
+
+[[features]]
+id = "sha256-digest"
+status = "mapped"
+upstream_ref = "FIPS 180-4 (content addressing backend)"
+notes = "src/digest.rs — pure-Rust SHA-256, verified against empty/abc/multi-block NIST vectors. Cycle 5."
+
+[[features]]
+id = "capability-sandbox"
+status = "mapped"
+upstream_ref = "wasmtime-wasi: WasiCtxBuilder capabilities; spin: allowed_outbound"
+notes = "src/sandbox.rs — Capabilities gate every WASI host call (fd_write per-descriptor, others by name); denied -> CapabilityDenied; caps.to_limits() drives fuel/memory. Cycle 6."
+
+# ---- partial: real but incomplete ----
+
+[[features]]
+id = "wasi-preview1"
+status = "partial"
+upstream_ref = "wasmtime-wasi: wasi_snapshot_preview1"
+notes = "src/wasi.rs — stdio (fd_write), proc_exit, args/environ (sizes+get), clock_time_get, fd_read(EOF). Missing: filesystem, sockets, poll_oneoff, the rich fd/path surface."
+
+[[features]]
+id = "structured-control-flow"
+status = "partial"
+upstream_ref = "core spec: block/loop/if/else/br/br_if/br_table"
+notes = "Straight-line + call + return + drop implemented. Structured control flow (block/loop/if/br*) not yet decoded/executed."
+
+[[features]]
+id = "float-and-i64-ops"
+status = "partial"
+upstream_ref = "core spec: f32/f64 + full i64 arithmetic"
+notes = "Value model + locals + i64.const carry f32/f64/i64; i32 op set is complete, but f32/f64 arithmetic and the full i64 op set are not yet implemented."
+
+[[features]]
+id = "cave-sandbox-triumvirate-bridge"
+status = "partial"
+upstream_ref = "cave-sandbox (seccomp + namespace + landlock)"
+notes = "In-crate software capability denial implemented (src/sandbox.rs). OS-level confinement (handing caps to the cave-sandbox triumvirate around the host process) is the deferred half."
+
+# ---- skipped / scope_cut: not implemented, tracked honestly ----
+
+[[features]]
+id = "cranelift-jit-compiler"
+status = "skipped"
+upstream_ref = "wasmtime: cranelift codegen backend"
+notes = "scope_cut: an interpreter was chosen for a safe (#![forbid(unsafe_code)]) pure-Rust engine. A JIT requires the cranelift codegen dependency + unsafe executable-memory management."
+
+[[features]]
+id = "wasi-preview2"
+status = "skipped"
+upstream_ref = "wasmtime-wasi: preview2 (component-model based)"
+notes = "Depends on the component model (below); not implemented."
+
+[[features]]
+id = "component-model"
+status = "skipped"
+upstream_ref = "wasmtime: crates/component"
+notes = "Component model (canonical ABI, resources, worlds) is a large separate subsystem; not implemented."
+
+[[features]]
+id = "wit-bindgen"
+status = "skipped"
+upstream_ref = "bytecodealliance/wit-bindgen"
+notes = "WIT parsing + binding generation; depends on the component model."
+
+[[features]]
+id = "wasmcloud-actor-model"
+status = "skipped"
+upstream_ref = "wasmCloud actor/provider model"
+notes = "Distributed actor runtime; out of scope for the core engine."
+
+[[features]]
+id = "spin-trigger-framework"
+status = "skipped"
+upstream_ref = "spin: triggers (http/redis/sqs/mqtt)"
+notes = "Trigger framework needs an async runtime + network/broker integration; not implemented."
+
+[[features]]
+id = "distributed-module-registry"
+status = "skipped"
+upstream_ref = "spin/OCI: remote registry push/pull transport"
+notes = "The local content-addressed store is mapped; the remote transport (OCI distribution / registry auth) is not implemented."

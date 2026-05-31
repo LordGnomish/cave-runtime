@@ -1,0 +1,23 @@
+cave-wasm-runtime
+=================
+
+This crate is a clean-room *concept port* — it does not vendor or copy source
+from the projects below; it reimplements documented behaviour in safe Rust.
+It is published under the Apache License 2.0 (see the `license` field in
+Cargo.toml), NOT the cave-runtime workspace-default AGPL-3.0.
+
+Behaviour and ABI shapes are referenced from:
+
+  bytecodealliance/wasmtime   — Apache-2.0 WITH LLVM-exception
+      https://github.com/bytecodealliance/wasmtime
+      (binary decoder, execution semantics, fuel metering, WASI preview1 ABI)
+
+  wasmerio/wasmer             — MIT
+      https://github.com/wasmerio/wasmer
+      (runtime / registry shapes)
+
+  spinframework/spin          — Apache-2.0
+      https://github.com/spinframework/spin
+      (content-addressed module registry, serverless trigger model)
+
+SHA-256 follows FIPS 180-4. No third-party code is bundled.
