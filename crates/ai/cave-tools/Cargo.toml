@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-tools — LLM tool-calling framework (MCP-spec compatible).
+# Primary upstream: modelcontextprotocol/modelcontextprotocol, spec revision 2025-11-25
+#   (schema/2025-11-25/schema.ts). https://github.com/modelcontextprotocol/modelcontextprotocol
+# Reference patterns (NOTICE): OpenAI Function Calling wire format and
+#   LangChain tool framework (MIT, Copyright LangChain Inc.).
+# cave-tools is AGPL-3.0-or-later.
+
+[package]
+name = "cave-tools"
+description = "LLM tool-calling framework — Tool trait + JSON Schema validation, MCP JSON-RPC server, sandboxed built-ins, per-tool/per-user permissions, audit log, streaming + batch execution, semantic tool search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
