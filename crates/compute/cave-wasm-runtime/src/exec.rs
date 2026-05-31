@@ -91,11 +91,19 @@ impl Instance {
         &self,
         entry: &str,
         limits: &ResourceLimits,
-        wasi: WasiCtx,
+        mut wasi: WasiCtx,
     ) -> Result<WasiCtx> {
-        // RED stub — host dispatch + capture wired in the GREEN commit.
-        let _ = (entry, limits);
-        Ok(wasi)
+        let idx = self
+            .module
+            .export_func(entry)
+            .ok_or_else(|| WasmError::ExportNotFound(entry.to_string()))?;
+        let mut store = Store::new(self.module.memory, limits);
+        match self.exec_func(idx, Vec::new(), 0, &mut store, &mut wasi) {
+            Ok(_) => Ok(wasi),
+            // A guest `proc_exit` unwinds via a trap; treat it as a clean exit.
+            Err(WasmError::Trap(_)) if wasi.exit_code.is_some() => Ok(wasi),
+            Err(e) => Err(e),
+        }
     }
 
     /// Execute a function by index, returning its result values. `depth` guards
@@ -106,15 +114,14 @@ impl Instance {
         args: Vec<Value>,
         depth: u32,
         store: &mut Store,
-        _wasi: &mut WasiCtx,
+        wasi: &mut WasiCtx,
     ) -> Result<Vec<Value>> {
         if depth > 1024 {
             return Err(WasmError::Trap("call stack exhausted".into()));
         }
         let body = self
             .module
-            .code
-            .get(func_idx as usize)
+            .defined_body(func_idx)
             .ok_or(WasmError::IndexOutOfBounds(func_idx))?;
 
         // locals = params (the args) followed by zero-initialised declared locals.
@@ -252,7 +259,21 @@ impl Instance {
                         return Err(WasmError::StackUnderflow);
                     }
                     let call_args = stack.split_off(stack.len() - n);
-                    let results = self.exec_func(callee, call_args, depth + 1, store, _wasi)?;
+                    let imported = self.module.imported_func_count();
+                    let results = if (callee as usize) < imported {
+                        // Host (imported) function — dispatch to the WASI layer.
+                        let name = self
+                            .module
+                            .imports
+                            .iter()
+                            .filter(|im| matches!(im.kind, crate::types::ImportKind::Func(_)))
+                            .nth(callee as usize)
+                            .map(|im| im.name.clone())
+                            .ok_or(WasmError::IndexOutOfBounds(callee))?;
+                        crate::wasi::dispatch(&name, wasi, store, &call_args)?
+                    } else {
+                        self.exec_func(callee, call_args, depth + 1, store, wasi)?
+                    };
                     stack.extend(results);
                 }
                 0x28 => {

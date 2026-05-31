@@ -6,7 +6,9 @@
 //! function, memory, export, code). LEB128 is decoded per the core spec.
 
 use crate::error::{Result, WasmError};
-use crate::types::{Export, ExternKind, FuncBody, FuncType, Limits, Module, ValType};
+use crate::types::{
+    Export, ExternKind, FuncBody, FuncType, Import, ImportKind, Limits, Module, ValType,
+};
 
 const WASM_MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6d];
 
@@ -94,12 +96,13 @@ pub fn parse_module(bytes: &[u8]) -> Result<Module> {
         let mut s = Reader::new(payload);
         match id {
             1 => module.types = parse_type_section(&mut s)?,
+            2 => module.imports = parse_import_section(&mut s)?,
             3 => module.functions = parse_function_section(&mut s)?,
             5 => module.memory = parse_memory_section(&mut s)?,
             7 => module.exports = parse_export_section(&mut s)?,
             10 => module.code = parse_code_section(&mut s)?,
             // Custom (0) and other known-but-unmodelled sections are skipped.
-            0 | 2 | 4 | 6 | 8 | 9 | 11 | 12 | 13 => {}
+            0 | 4 | 6 | 8 | 9 | 11 | 12 | 13 => {}
             other => return Err(WasmError::InvalidSection(other)),
         }
     }
@@ -126,6 +129,35 @@ fn parse_type_section(s: &mut Reader<'_>) -> Result<Vec<FuncType>> {
             results.push(s.valtype()?);
         }
         out.push(FuncType { params, results });
+    }
+    Ok(out)
+}
+
+fn parse_import_section(s: &mut Reader<'_>) -> Result<Vec<Import>> {
+    let count = s.u32()?;
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let module = s.name()?;
+        let name = s.name()?;
+        let kind_byte = s.byte()?;
+        let kind = match kind_byte {
+            0x00 => ImportKind::Func(s.u32()?),
+            0x01 => {
+                // table: elemtype byte + limits (parsed and discarded)
+                let _elem = s.byte()?;
+                let _lim = parse_limits(s)?;
+                ImportKind::Table
+            }
+            0x02 => ImportKind::Memory(parse_limits(s)?),
+            0x03 => {
+                // global: valtype + mutability
+                let _vt = s.byte()?;
+                let _mutab = s.byte()?;
+                ImportKind::Global
+            }
+            other => return Err(WasmError::InvalidSection(other)),
+        };
+        out.push(Import { module, name, kind });
     }
     Ok(out)
 }
