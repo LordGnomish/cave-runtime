@@ -36,18 +36,21 @@
 //!
 //! ## Honest limitations
 //!
-//! * Full XML canonicalization is **not** implemented. The
-//!   sign / verify path operates over pre-canonicalized bytes
-//!   the caller supplies. A real production IdP integration
-//!   still needs a c14n implementation; the framework is in
-//!   place but the canonicalization step is intentionally
-//!   pluggable.
+//! * XML canonicalization (exc-c14n) is implemented in
+//!   [`canonicalization`] — Canonical XML 1.0 escaping plus the
+//!   xml-exc-c14n §2.2 `InclusiveNamespaces` PrefixList — so signing
+//!   strict third-party IdPs (ADFS / Shibboleth) no longer needs an
+//!   external xmlsec1 plug.
 //! * Encrypted Assertions (`<saml:EncryptedAssertion>`) are
 //!   parsed-but-not-decrypted. Decryption requires XML-Enc
 //!   key-transport which is its own RFC. Tracked, not landed.
-//! * Artifact Resolution binding (back-channel) is out of scope —
-//!   the two front-channel bindings (Redirect + POST) cover
-//!   every IdP cave customers federate with.
+//! * Artifact Resolution binding (back-channel) is implemented at
+//!   the message layer: [`bindings::http_artifact`] builds/parses
+//!   `<ArtifactResolve>` / `<ArtifactResponse>` and keeps a single-use
+//!   source-side artifact store, and [`broker::SamlBroker`] drives the
+//!   resolve flow (`issue_artifact` / `resolve_artifact`). The live
+//!   SOAP transport (the back-channel HTTP POST itself) remains the
+//!   caller's responsibility.
 
 pub mod authn_request;
 pub mod binding;
