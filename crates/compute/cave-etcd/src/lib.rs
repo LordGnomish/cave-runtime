@@ -85,6 +85,7 @@ pub mod models;
 pub mod quota;
 pub mod raft_bridge;
 pub mod raft_joint_quorum;
+pub mod raft_node;
 pub mod raft_tracker;
 pub mod rbac_deeper;
 pub mod routes;
