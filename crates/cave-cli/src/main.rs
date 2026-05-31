@@ -622,6 +622,8 @@ enum LlmGwCmd {
     Cost,
     /// Response cache stats
     Cache,
+    /// Per-consumer spend budgets (LiteLLM BudgetManager)
+    Budgets,
     /// Trigger a cave-llm-tracker bench run via the gateway
     Bench,
 }
@@ -4614,6 +4616,7 @@ source_root = "src"
             LlmGwCmd::Capabilities => c.get("/api/llm-gateway/capabilities").await,
             LlmGwCmd::Cost => c.get("/api/llm-gateway/cost").await,
             LlmGwCmd::Cache => c.get("/api/llm-gateway/cache/stats").await,
+            LlmGwCmd::Budgets => c.get("/api/gateway/budgets").await,
             LlmGwCmd::Bench => c.post("/api/llm-gateway/bench", json!({})).await,
         },
         Commands::Logs { cmd } => match cmd {

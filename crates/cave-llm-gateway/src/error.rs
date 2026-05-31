@@ -35,6 +35,13 @@ pub enum GatewayError {
     #[error("Token budget exceeded: requested={requested}, budget={budget}")]
     TokenBudgetExceeded { requested: u32, budget: u32 },
 
+    #[error("Budget exceeded for '{scope}': spent ${spent:.4} of ${limit:.4}")]
+    BudgetExceeded {
+        scope: String,
+        spent: f64,
+        limit: f64,
+    },
+
     #[error("Blocked by guardrail '{rule}': {reason}")]
     GuardrailBlocked { rule: String, reason: String },
 
@@ -67,6 +74,7 @@ impl GatewayError {
             Self::RateLimitExceeded { .. } => 429,
             Self::InvalidRequest(_) => 400,
             Self::TokenBudgetExceeded { .. } => 402,
+            Self::BudgetExceeded { .. } => 402,
             Self::NoProvidersAvailable | Self::ProviderUnavailable { .. } => 503,
             _ => 500,
         }

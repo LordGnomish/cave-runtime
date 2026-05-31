@@ -23,13 +23,13 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5
+honest_ratio         = 0.5217
 parity_ratio_source  = "manifest"
-last_audit           = "2026-05-21"
+last_audit           = "2026-05-31"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 23
-partial_count        = 3
+mapped_count         = 24
+partial_count        = 2
 skipped_count        = 20
 unmapped_count       = 0
 total                = 46
@@ -139,11 +139,20 @@ local    = "src/hermes_bridge.rs"
 upstream = "litellm/llms/custom_llm.py"
 local    = "src/bench_wire.rs"
 
+[[files]]
+upstream = "litellm/budget_manager.py"
+local    = "src/budget.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 
 [[functions]]
-upstream_name = "spend_log_track_request"
-local_name    = "track_usage"
+upstream_name = "BudgetManager.update_cost"
+local_name    = "update_cost"
+file          = "src/budget.rs"
+
+[[functions]]
+upstream_name = "BudgetManager.reset_on_duration"
+local_name    = "reset_on_duration"
 file          = "src/budget.rs"
 
 [[functions]]
@@ -266,7 +275,7 @@ kind          = "http"
 upstream_path = "/metrics"
 local_path    = "/metrics"
 
-# ── Mapped subsystems (23) ───────────────────────────────────────────────────
+# ── Mapped subsystems (24) ───────────────────────────────────────────────────
 
 [[mapped]]
 name = "provider-trait"
@@ -337,8 +346,14 @@ name = "streaming-sse"
 [[mapped]]
 name = "cavectl-llm-gateway-subcmd"
 
-# ── Partial subsystems (3) ───────────────────────────────────────────────────
-# Scaffold present but not yet wired into the live module tree.
+[[mapped]]
+name  = "budget-tracking"
+notes = "src/budget.rs BudgetManager (port of litellm/budget_manager.py) is wired into GatewayRouter and enforced live in complete(): reset_on_duration → is_within_budget gate (402 BudgetExceeded) → update_cost debit. Admin routes /api/gateway/budgets{,/:user,/:user/reset}."
+
+# ── Partial subsystems (2) ───────────────────────────────────────────────────
+# Scaffold present but not yet wired into the live module tree. Both duplicate
+# capabilities already live behind GatewayRouter (cost.rs/cache.rs/logging.rs/
+# rate_limit.rs), so they stay honestly partial rather than be double-counted.
 
 [[partial]]
 name  = "models-domain-types"
@@ -347,10 +362,6 @@ notes = "src/models.rs defines BudgetScope/RateLimit/RequestLog/CacheEntry but i
 [[partial]]
 name  = "store-in-memory"
 notes = "src/store.rs LlmGatewayStore depends on the not-yet-wired models module"
-
-[[partial]]
-name  = "budget-tracking"
-notes = "src/budget.rs functions assume a state.budgets field that does not exist on GatewayState yet"
 
 # ── Skipped subsystems (20) ──────────────────────────────────────────────────
 # Each row documents a scope cut. Most defer to a dedicated cave-* crate;

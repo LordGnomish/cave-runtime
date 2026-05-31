@@ -59,6 +59,13 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
         // Admin — usage / cost
         .route("/api/gateway/usage", get(global_usage))
         .route("/api/gateway/usage/{consumer}", get(consumer_usage))
+        // Admin — spend budgets (LiteLLM BudgetManager)
+        .route(
+            "/api/gateway/budgets",
+            get(list_budgets).post(create_budget),
+        )
+        .route("/api/gateway/budgets/{user}", get(get_budget))
+        .route("/api/gateway/budgets/{user}/reset", post(reset_budget))
         // Admin — cache
         .route("/api/gateway/cache/stats", get(cache_stats))
         .route("/api/gateway/cache/clear", post(clear_cache))
@@ -108,6 +115,14 @@ async fn chat_completions(
                 format!("{}", retry_after_ms / 1000 + 1).parse().unwrap(),
             );
             resp
+        }
+        Err(e @ GatewayError::BudgetExceeded { .. }) => {
+            let err = OpenAIError::invalid_request(&e.to_string());
+            (
+                StatusCode::PAYMENT_REQUIRED,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
         }
         Err(GatewayError::GuardrailBlocked { rule, .. }) => {
             let err =
@@ -325,6 +340,61 @@ async fn consumer_usage(
 ) -> Json<serde_json::Value> {
     let stats = s.router.cost_tracker.consumer_stats(&consumer);
     Json(serde_json::to_value(stats).unwrap())
+}
+
+#[derive(Deserialize)]
+struct CreateBudgetRequest {
+    user: String,
+    total_budget: f64,
+    /// "daily" | "weekly" | "monthly" | "yearly" — omit for a non-resetting budget.
+    duration: Option<String>,
+}
+
+async fn create_budget(
+    State(s): State<AppState>,
+    Json(req): Json<CreateBudgetRequest>,
+) -> impl IntoResponse {
+    let duration = req.duration.as_deref().and_then(|d| match d {
+        "daily" => Some(crate::budget::BudgetDuration::Daily),
+        "weekly" => Some(crate::budget::BudgetDuration::Weekly),
+        "monthly" => Some(crate::budget::BudgetDuration::Monthly),
+        "yearly" => Some(crate::budget::BudgetDuration::Yearly),
+        _ => None,
+    });
+    s.router
+        .budget
+        .create_budget(req.total_budget, &req.user, duration);
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "user": req.user,
+            "total_budget": req.total_budget,
+        })),
+    )
+        .into_response()
+}
+
+async fn list_budgets(State(s): State<AppState>) -> Json<serde_json::Value> {
+    Json(json!({ "budgets": s.router.budget.list() }))
+}
+
+async fn get_budget(State(s): State<AppState>, Path(user): Path<String>) -> impl IntoResponse {
+    match s.router.budget.snapshot(&user) {
+        Some(b) => Json(serde_json::to_value(b).unwrap()).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn reset_budget(State(s): State<AppState>, Path(user): Path<String>) -> impl IntoResponse {
+    if !s.router.budget.is_valid_user(&user) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    s.router.budget.reset_cost(&user);
+    Json(json!({
+        "user": user,
+        "current_cost": s.router.budget.get_current_cost(&user),
+    }))
+    .into_response()
 }
 
 async fn cache_stats(State(s): State<AppState>) -> Json<serde_json::Value> {

@@ -3,6 +3,7 @@
 //! GatewayRouter — multi-provider routing with load balancing and fallback chains.
 
 use crate::alias::AliasRegistry;
+use crate::budget::BudgetManager;
 use crate::cache::{CacheConfig, PromptCache};
 use crate::cost::CostTracker;
 use crate::error::{GatewayError, GatewayResult};
@@ -40,6 +41,7 @@ pub struct GatewayRouter {
     pub cost_tracker: Arc<CostTracker>,
     pub logger: Arc<RequestLogger>,
     pub guardrails: Arc<GuardrailEngine>,
+    pub budget: Arc<BudgetManager>,
     strategy: RoutingStrategy,
     /// Rotating counter for round-robin
     rr_counter: std::sync::atomic::AtomicUsize,
@@ -60,6 +62,7 @@ impl GatewayRouter {
             cost_tracker: Arc::new(CostTracker::new()),
             logger: Arc::new(RequestLogger::new(10_000)),
             guardrails: Arc::new(GuardrailEngine::new()),
+            budget: Arc::new(BudgetManager::new()),
             rr_counter: std::sync::atomic::AtomicUsize::new(0),
         }
     }
@@ -92,6 +95,27 @@ impl GatewayRouter {
                 &req.model,
                 0,
                 LogStatus::RateLimited,
+                &e.to_string(),
+            );
+            return Err(e);
+        }
+
+        // Spend-budget enforcement (LiteLLM BudgetManager). Roll the window
+        // first so a daily/monthly reset frees a previously-blocked consumer,
+        // then reject once cumulative spend has passed the allocated limit.
+        self.budget.reset_on_duration(consumer);
+        if !self.budget.is_within_budget(consumer) {
+            let e = GatewayError::BudgetExceeded {
+                scope: consumer.to_string(),
+                spent: self.budget.get_current_cost(consumer),
+                limit: self.budget.get_total_budget(consumer).unwrap_or(0.0),
+            };
+            self.logger.log_error(
+                consumer,
+                &provider_name,
+                &req.model,
+                0,
+                LogStatus::Error,
                 &e.to_string(),
             );
             return Err(e);
@@ -135,14 +159,16 @@ impl GatewayRouter {
             return Err(e);
         }
 
-        // Record cost
-        self.cost_tracker.record(
+        // Record cost, then debit the consumer's spend budget so the next
+        // request sees the updated cumulative total.
+        let usage = self.cost_tracker.record(
             consumer,
             &req.model,
             &provider_name,
             resp.usage.prompt_tokens,
             resp.usage.completion_tokens,
         );
+        self.budget.update_cost(consumer, &req.model, usage.cost_usd);
 
         // Cache store
         self.cache.insert(&req, resp.clone());
@@ -315,6 +341,34 @@ mod tests {
         let stats = router.cache.stats();
         // At least one hit
         assert!(stats.hits >= 1);
+    }
+
+    #[tokio::test]
+    async fn over_budget_consumer_is_blocked_by_pipeline() {
+        let router = make_router();
+        // $0 budget → the very first non-free request is rejected. Use a priced
+        // model so cost accrues (mock-model is free in the pricing table).
+        router.budget.create_budget(0.0, "broke", None);
+        // Seed spend directly to simulate a prior request having exhausted it.
+        router.budget.update_cost("broke", "gpt-4o", 0.01);
+        let mut req = make_req();
+        req.model = "gpt-4o".into();
+        let err = router.complete("broke", req).await.unwrap_err();
+        assert!(
+            matches!(err, GatewayError::BudgetExceeded { .. }),
+            "expected BudgetExceeded, got {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn within_budget_consumer_passes_and_spend_is_debited() {
+        let router = make_router();
+        router.budget.create_budget(100.0, "rich", None);
+        // mock-model is free, so spend stays 0 but the request must succeed
+        // and pass through the budget gate.
+        let resp = router.complete("rich", make_req()).await.unwrap();
+        assert!(!resp.choices.is_empty());
+        assert!(router.budget.is_within_budget("rich"));
     }
 
     #[tokio::test]

@@ -40,7 +40,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LlmGateway
         })
         .collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Llm Gateway ({n})</h2>{tbl}</section>"#,
+        r#"<section><h2 class="text-lg font-semibold mb-2">Llm Gateway ({n})</h2>{tbl}</section>
+<section class="mt-4"><h3 class="text-md font-semibold mb-1">Spend budgets</h3>
+<p class="text-sm text-gray-500">Per-consumer USD spend limits (LiteLLM BudgetManager). The live gateway rejects over-budget requests with <code>402</code>.</p>
+<ul class="text-sm list-disc ml-5">
+<li><code>GET /api/gateway/budgets</code> — list every tracked consumer budget</li>
+<li><code>POST /api/gateway/budgets</code> — <code>{{user, total_budget, duration?}}</code> (daily/weekly/monthly/yearly)</li>
+<li><code>GET /api/gateway/budgets/:user</code> — one consumer's ledger</li>
+<li><code>POST /api/gateway/budgets/:user/reset</code> — clear accrued spend</li>
+</ul></section>"#,
         n = rows.len(),
         tbl = table(
             &["name", "upstream", "rpm_limit", "daily_tokens"],

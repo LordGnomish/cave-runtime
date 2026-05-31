@@ -41,6 +41,7 @@ use axum::Router;
 use std::sync::Arc;
 
 pub use bench_wire::{BenchOutcome, BenchPrompt, BenchSummary, BenchTarget, BENCH_PROMPT_IDS};
+pub use budget::{BudgetDuration, BudgetManager, UserBudget};
 pub use capability::{
     seed_catalogue, seeded_router, CapabilityRequest, CapabilityRouter, Locality, ModelCapability,
 };
