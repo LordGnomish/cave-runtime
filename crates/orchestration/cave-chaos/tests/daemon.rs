@@ -186,3 +186,24 @@ fn test_injection_plan_packet_loss_emits_netem_loss() {
     let plan = injection_plan(&exp, "eth0");
     assert_eq!(plan, vec!["tc qdisc add dev eth0 root netem loss 10".to_string()]);
 }
+
+#[test]
+fn test_injection_plan_network_duplicate_emits_netem_duplicate() {
+    // NetworkDuplicate reuses packet_loss_percent as the duplicate percentage,
+    // exactly as Chaos Mesh's NetworkChaos duplicate action does.
+    let exp = experiment(
+        ExperimentType::NetworkDuplicate,
+        ExperimentParams { latency_ms: None, packet_loss_percent: Some(2.0), cpu_load_percent: None, memory_mb: None },
+    );
+    let plan = injection_plan(&exp, "eth0");
+    assert_eq!(plan, vec!["tc qdisc add dev eth0 root netem duplicate 2".to_string()]);
+}
+
+#[test]
+fn test_injection_plan_network_duplicate_without_percent_is_empty() {
+    let exp = experiment(
+        ExperimentType::NetworkDuplicate,
+        ExperimentParams { latency_ms: None, packet_loss_percent: None, cpu_load_percent: None, memory_mb: None },
+    );
+    assert!(injection_plan(&exp, "eth0").is_empty());
+}
