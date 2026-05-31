@@ -15,16 +15,16 @@ source_sha = "838d4e792be666ec11bd0c80331e0c5511b5010e"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.78125
+honest_ratio        = 0.80
 adr_justified_ratio = 1.0      # 7 skipped, all ADR-justified scope_cuts to sibling crates (cave-portal-ui / cave-metrics / cave-deploy / cave-gateway / cave-controller-manager). 2026-05-30: Traefik + Ambassador (first-party in-tree) reclassified scope_cut→mapped; AppMesh added as new in-tree mapped — Contour/Gloo stay scope_cut (genuinely out-of-tree plugins, not in v1.9.0 rollout/trafficrouting).
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-30"
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 25
+mapped_count        = 28
 partial_count       = 0
 skipped_count       = 7
 unmapped_count      = 0
-total               = 32
+total               = 35
 
 # 2026-05-24 close-out — claude/cave-rollouts-close-2026-05-24:
 #   * 10 src/ modules (~2 800 LOC), 42 lib + 9 self-audit PASS.
@@ -44,6 +44,27 @@ total               = 32
 #     under rollout/trafficrouting in v1.9.0; map onto the Plugin provider).
 #   * honest_ratio = (mapped + partial) / total = 25 / 32 = 0.78125.
 #   * fill_ratio   = (25 + 0 + 7) / 32 = 1.0.
+#
+# 2026-05-31 honest-cont3 — claude/cave-rollouts-honest-cont3:
+#   * 3 strict-TDD NEW in-tree subsystems (previously untracked), each a pure
+#     reducer the controller drives:
+#       - replicaset-replica-calculator  (utils/replicaset/canary.go): weight→
+#         replica math — trafficWeightToReplicas, CheckMinPodsPerReplicaSet,
+#         CalculateReplicaCountsFor{TrafficRouted,Basic}Canary, maxSurge/
+#         maxUnavailable fenceposts; src/replicaset.rs (7 tests).
+#       - rollout-conditions             (utils/conditions/conditions.go):
+#         RolloutCompleted, replicas-healthy, canary/blue-green RolloutHealthy,
+#         RolloutTimedOut (reason + progressDeadline), newCondition;
+#         src/conditions.rs (6 tests).
+#       - ephemeral-metadata             (rollout/ephemeralmetadata.go):
+#         SyncEphemeralPodMetadata inject/strip via the
+#         rollout.argoproj.io/ephemeral-metadata annotation + reconcile target
+#         selection; src/ephemeral.rs (6 tests).
+#   * Wired POST /api/rollouts/replicas/preview + cavectl rollouts
+#     replicas-preview. +19 lib tests (45→64).
+#   * mapped 25→28, total 32→35.
+#   * honest_ratio = (mapped + partial) / total = 28 / 35 = 0.80.
+#   * fill_ratio   = (28 + 0 + 7) / 35 = 1.0.
 
 [module]
 name        = "cave-rollouts"
@@ -174,6 +195,21 @@ note = "Pure reducer: clones base Mapping (getambassador.io/v2) into <name>-cana
 name = "traffic-router-appmesh"
 upstream = "rollout/trafficrouting/appmesh (VirtualRouter SetWeight)"
 note = "Pure reducer: VirtualRouter (appmesh.k8s.aws/v1beta2), spec.routes[].httpRoute.action.weightedTargets[] keyed by virtualNodeRef.name; src/traffic_router.rs. First-party in-tree provider, previously untracked — new mapped item."
+
+[[mapped]]
+name = "replicaset-replica-calculator"
+upstream = "utils/replicaset/canary.go (CalculateReplicaCountsForCanary + trafficWeightToReplicas + CheckMinPodsPerReplicaSet)"
+note = "Pure weight→replica arithmetic: traffic_weight_to_replicas (ceil(weight/maxWeight*spec)), check_min_pods_per_replica_set, calculate_replica_counts_for_{traffic_routed,basic}_canary (static + dynamic stable scale), maxSurge/maxUnavailable fenceposts; src/replicaset.rs (7 lib tests). New in-tree mapped — the live ReplicaSet scaling stays in cave-controller-manager. 2026-05-31 honest-cont3."
+
+[[mapped]]
+name = "rollout-conditions"
+upstream = "utils/conditions/conditions.go (RolloutComplete / RolloutHealthy / RolloutTimedOut / newCondition)"
+note = "Pure status predicates over ReplicaCounts: rollout_complete, replicas_healthy, canary_healthy, blue_green_healthy (active+optional preview selector), rollout_timed_out (reason short-circuit + progressDeadline), new_rollout_condition; src/conditions.rs (6 lib tests). New in-tree mapped — controller owns the live conditions reconcile. 2026-05-31 honest-cont3."
+
+[[mapped]]
+name = "ephemeral-metadata"
+upstream = "rollout/ephemeralmetadata.go + utils/replicaset.SyncEphemeralPodMetadata"
+note = "Pure map reconcile: inject canary/stable ephemeral labels+annotations, strip previously-injected keys via the rollout.argoproj.io/ephemeral-metadata annotation, no-op detection, fully-rolled-out vs mid-rollout target selection; src/ephemeral.rs (6 lib tests). New in-tree mapped — live pod patch stays in cave-controller-manager. 2026-05-31 honest-cont3."
 
 [[scope_cuts]]
 group = "cave-portal-ui"

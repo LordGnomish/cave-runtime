@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-30";
+const TODAY: &str = "2026-05-31";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v1.9.0";
 const PINNED_SHA: &str = "838d4e792be666ec11bd0c80331e0c5511b5010e";

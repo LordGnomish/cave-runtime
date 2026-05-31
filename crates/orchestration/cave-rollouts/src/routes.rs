@@ -20,6 +20,7 @@ use crate::{
     RolloutsState,
     engine::{advance_canary, apply_canary_action, initial_status},
     models::*,
+    replicaset,
     traffic_router::{TrafficProvider, WeightSplit, render_patch},
 };
 
@@ -39,6 +40,8 @@ pub fn create_router(state: Arc<RolloutsState>) -> Router {
         .route("/api/rollouts/{rollout_id}/action", post(rollout_action))
         // Traffic-router patch preview (Istio/SMI/NGINX/ALB/Apisix/Plugin/Traefik/Ambassador/AppMesh)
         .route("/api/rollouts/traffic/preview", post(traffic_preview))
+        // Replica-count preview (utils/replicaset/canary.go weight→replica math)
+        .route("/api/rollouts/replicas/preview", post(replicas_preview))
         // Analysis templates
         .route(
             "/api/rollouts/analysis/templates",
@@ -175,6 +178,56 @@ async fn traffic_preview(Json(req): Json<TrafficPreviewRequest>) -> impl IntoRes
         &req.canary_service,
     );
     (StatusCode::OK, Json(patch))
+}
+
+// ── Replica-count preview ──────────────────────────────────────────────────────
+
+fn default_max_weight() -> i32 {
+    100
+}
+
+#[derive(serde::Deserialize)]
+struct ReplicasPreviewRequest {
+    spec_replicas: i32,
+    desired_weight: i32,
+    #[serde(default = "default_max_weight")]
+    max_weight: i32,
+    #[serde(default)]
+    min_pods_per_replica_set: Option<i32>,
+    #[serde(default)]
+    dynamic_stable_scale: bool,
+    #[serde(default)]
+    max_surge: i32,
+    #[serde(default)]
+    max_unavailable: i32,
+}
+
+/// POST /api/rollouts/replicas/preview — translate a desired canary traffic
+/// weight into canary/stable ReplicaSet replica counts (both the traffic-routed
+/// and the basic-canary forms) plus the maxSurge/maxUnavailable fenceposts.
+/// Pure function; the live ReplicaSet scaling is cave-controller-manager's job.
+async fn replicas_preview(Json(req): Json<ReplicasPreviewRequest>) -> impl IntoResponse {
+    let (tr_canary, tr_stable) = replicaset::calculate_replica_counts_for_traffic_routed_canary(
+        req.spec_replicas,
+        req.desired_weight,
+        req.max_weight,
+        req.min_pods_per_replica_set,
+        req.dynamic_stable_scale,
+    );
+    let (basic_canary, basic_stable) = replicaset::calculate_replica_counts_for_basic_canary(
+        req.spec_replicas,
+        req.desired_weight,
+        req.max_weight,
+    );
+    let body = serde_json::json!({
+        "traffic_routed": { "canary": tr_canary, "stable": tr_stable },
+        "basic": { "canary": basic_canary, "stable": basic_stable },
+        "max_replica_count_allowed":
+            replicaset::max_replica_count_allowed(req.spec_replicas, req.max_surge),
+        "min_available_replica_count":
+            replicaset::min_available_replica_count(req.spec_replicas, req.max_unavailable),
+    });
+    (StatusCode::OK, Json(body))
 }
 
 // ── Analysis Templates ────────────────────────────────────────────────────────

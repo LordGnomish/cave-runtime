@@ -4889,6 +4889,23 @@ source_root = "src"
                 )
                 .await
             }
+            RolloutsCmd::ReplicasPreview {
+                replicas,
+                weight,
+                max_weight,
+                dynamic_stable_scale,
+            } => {
+                c.post(
+                    "/api/rollouts/replicas/preview",
+                    json!({
+                        "spec_replicas": replicas,
+                        "desired_weight": weight,
+                        "max_weight": max_weight,
+                        "dynamic_stable_scale": dynamic_stable_scale,
+                    }),
+                )
+                .await
+            }
         },
         Commands::Security { cmd } => match cmd {
             SecurityCmd::Events => c.get("/api/security/events").await,
