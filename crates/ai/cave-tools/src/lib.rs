@@ -26,6 +26,7 @@
 //! [Model Context Protocol]: https://modelcontextprotocol.io
 
 pub mod error;
+pub mod schema;
 pub mod tool;
 
 pub use error::{Result, ToolError};

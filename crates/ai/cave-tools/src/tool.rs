@@ -248,4 +248,16 @@ impl ToolRegistry {
             .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
         tool.execute(args)
     }
+
+    /// Dispatch a call after validating `args` against the tool's JSON
+    /// Schema. Invalid arguments are rejected with
+    /// [`ToolError::InvalidArguments`] *before* the handler runs. This is
+    /// the path the MCP server and batch executor use.
+    pub fn invoke_validated(&self, name: &str, args: &Value) -> Result<ToolResult> {
+        let tool = self
+            .get(name)
+            .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
+        crate::schema::validate_args(name, &tool.input_schema(), args)?;
+        tool.execute(args)
+    }
 }
