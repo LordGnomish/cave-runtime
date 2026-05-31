@@ -325,4 +325,72 @@ mod tests {
         e.load_pack(pack(vec![rule("a", "1=1"), rule("b", "1=1")])).unwrap();
         assert_eq!(e.rule_count(), 2);
     }
+
+    fn tagged(name: &str, tags: &[&str]) -> Rule {
+        let mut r = rule(name, "1=1");
+        r.tags = tags.iter().map(|s| s.to_string()).collect();
+        r
+    }
+
+    #[test]
+    fn disable_by_tags_turns_off_matching_rules() {
+        // Falco `-T network`: any rule tagged `network` is disabled.
+        let mut e = Engine::new();
+        e.load_pack(pack(vec![
+            tagged("a", &["network", "container"]),
+            tagged("b", &["filesystem"]),
+        ])).unwrap();
+        let n = e.disable_by_tags(&["network"]);
+        assert_eq!(n, 1);
+        let ev = FalcoEvent::syscall("execve");
+        let fired: Vec<_> = e.evaluate(&ev).into_iter().map(|m| m.rule_name).collect();
+        assert_eq!(fired, vec!["b".to_string()]);
+    }
+
+    #[test]
+    fn run_only_tags_disables_everything_else() {
+        // Falco `-t container`: only rules tagged `container` run.
+        let mut e = Engine::new();
+        e.load_pack(pack(vec![
+            tagged("a", &["network"]),
+            tagged("b", &["container"]),
+            tagged("c", &[]),
+        ])).unwrap();
+        let kept = e.run_only_tags(&["container"]);
+        assert_eq!(kept, 1);
+        let ev = FalcoEvent::syscall("execve");
+        let fired: Vec<_> = e.evaluate(&ev).into_iter().map(|m| m.rule_name).collect();
+        assert_eq!(fired, vec!["b".to_string()]);
+    }
+
+    #[test]
+    fn run_only_tags_matches_any_of_listed() {
+        let mut e = Engine::new();
+        e.load_pack(pack(vec![
+            tagged("a", &["network"]),
+            tagged("b", &["container"]),
+            tagged("c", &["mitre_execution"]),
+        ])).unwrap();
+        let kept = e.run_only_tags(&["network", "mitre_execution"]);
+        assert_eq!(kept, 2);
+        let ev = FalcoEvent::syscall("execve");
+        let mut fired: Vec<_> = e.evaluate(&ev).into_iter().map(|m| m.rule_name).collect();
+        fired.sort();
+        assert_eq!(fired, vec!["a".to_string(), "c".to_string()]);
+    }
+
+    #[test]
+    fn disable_by_tags_is_additive_across_calls() {
+        let mut e = Engine::new();
+        e.load_pack(pack(vec![
+            tagged("a", &["network"]),
+            tagged("b", &["filesystem"]),
+            tagged("c", &["process"]),
+        ])).unwrap();
+        e.disable_by_tags(&["network"]);
+        e.disable_by_tags(&["filesystem"]);
+        let ev = FalcoEvent::syscall("execve");
+        let fired: Vec<_> = e.evaluate(&ev).into_iter().map(|m| m.rule_name).collect();
+        assert_eq!(fired, vec!["c".to_string()]);
+    }
 }
