@@ -405,6 +405,21 @@ impl<T> RequestQueue<T> {
             None => (None, uid),
         }
     }
+
+    /// Batch-dequeue up to `max_items` requests from a single tenant, mirroring
+    /// `DequeueMany`. It selects one tenant fairly (round-robin from
+    /// `last_user_index`) and drains that tenant only — never crossing a tenant
+    /// boundary within one call — returning the tenant name, the drained
+    /// requests, and the updated index. The tenant queue is deleted if drained.
+    pub fn dequeue_many(
+        &mut self,
+        last_user_index: i64,
+        consumer_id: &str,
+        max_items: usize,
+    ) -> (Option<String>, Vec<T>, i64) {
+        let _ = (last_user_index, consumer_id, max_items);
+        (None, Vec::new(), START_INDEX) // RED stub
+    }
 }
 
 #[cfg(test)]
@@ -609,5 +624,55 @@ mod tests {
             q.dequeue(START_INDEX, &eligible_id).0,
             Some(("tenant-a".to_string(), 42))
         );
+    }
+
+    // ── Cycle 4: batch dequeue (DequeueMany) ────────────────────────────────
+
+    #[test]
+    fn dequeue_many_batches_up_to_max_items_from_one_tenant() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        for i in 0..5 {
+            q.enqueue("a", i).unwrap();
+        }
+        let (tenant, batch, _) = q.dequeue_many(START_INDEX, "c1", 3);
+        assert_eq!(tenant, Some("a".to_string()));
+        assert_eq!(batch, vec![0, 1, 2]);
+        // The remaining two are still queued.
+        assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn dequeue_many_does_not_cross_tenant_boundary() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        q.enqueue("a", 1).unwrap();
+        q.enqueue("b", 2).unwrap();
+        // max_items=5 but tenant "a" only has one — must not pull from "b".
+        let (tenant, batch, _) = q.dequeue_many(START_INDEX, "c1", 5);
+        assert_eq!(tenant, Some("a".to_string()));
+        assert_eq!(batch, vec![1]);
+        assert_eq!(q.tenant_count(), 1); // "a" drained+deleted, "b" remains
+    }
+
+    #[test]
+    fn dequeue_many_drains_and_deletes_tenant() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        q.enqueue("a", 1).unwrap();
+        q.enqueue("a", 2).unwrap();
+        let (tenant, batch, _) = q.dequeue_many(START_INDEX, "c1", 10);
+        assert_eq!(tenant, Some("a".to_string()));
+        assert_eq!(batch, vec![1, 2]);
+        assert_eq!(q.tenant_count(), 0);
+    }
+
+    #[test]
+    fn dequeue_many_empty_returns_empty() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        let (tenant, batch, _) = q.dequeue_many(START_INDEX, "c1", 4);
+        assert_eq!(tenant, None);
+        assert!(batch.is_empty());
     }
 }
