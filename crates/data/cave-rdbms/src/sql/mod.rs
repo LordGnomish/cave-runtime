@@ -3,12 +3,14 @@
 //! SQL parsing and planning.
 
 pub mod ast;
+pub mod costsize;
 pub mod lexer;
 pub mod optimizer;
 pub mod parser;
 pub mod planner;
 
 pub use ast::{Ast, Statement};
+pub use costsize::{clamp_row_est, cost_seqscan, Cost, CostConstants};
 pub use lexer::Lexer;
 pub use parser::Parser;
 pub use planner::{LogicalPlan, PhysicalPlan, Planner};
