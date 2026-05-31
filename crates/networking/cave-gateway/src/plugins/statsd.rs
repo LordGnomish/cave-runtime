@@ -33,8 +33,14 @@ pub enum StatType {
 impl StatType {
     /// StatsD wire abbreviation.
     pub fn wire(&self) -> &'static str {
-        // STUB (RED)
-        ""
+        match self {
+            StatType::Counter => "c",
+            StatType::Gauge => "g",
+            StatType::Timer => "ms",
+            StatType::Histogram => "h",
+            StatType::Meter => "m",
+            StatType::Set => "s",
+        }
     }
 }
 
@@ -57,16 +63,66 @@ pub struct RequestStats {
 
 /// Format a single StatsD line.
 pub fn format_line(name: &str, value: i64, stat: StatType, sample_rate: Option<f64>) -> String {
-    // STUB (RED)
-    let _ = (name, value, stat, sample_rate);
-    String::new()
+    match sample_rate {
+        Some(rate) => format!("{name}:{value}|{}|@{rate}", stat.wire()),
+        None => format!("{name}:{value}|{}", stat.wire()),
+    }
 }
 
 /// Build the default Kong metric set for a completed request.
 pub fn build_metrics(prefix: &str, s: &RequestStats) -> Vec<String> {
-    // STUB (RED)
-    let _ = (prefix, s);
-    Vec::new()
+    let svc = &s.service;
+    let mut lines = vec![
+        format_line(&format!("{prefix}.{svc}.request.count"), 1, StatType::Counter, None),
+        format_line(
+            &format!("{prefix}.{svc}.request.size"),
+            s.request_size as i64,
+            StatType::Counter,
+            None,
+        ),
+        format_line(
+            &format!("{prefix}.{svc}.response.size"),
+            s.response_size as i64,
+            StatType::Counter,
+            None,
+        ),
+        format_line(
+            &format!("{prefix}.{svc}.status.{}", s.status),
+            1,
+            StatType::Counter,
+            None,
+        ),
+        format_line(
+            &format!("{prefix}.{svc}.latency"),
+            s.latency_ms as i64,
+            StatType::Timer,
+            None,
+        ),
+        format_line(
+            &format!("{prefix}.{svc}.upstream_latency"),
+            s.upstream_latency_ms as i64,
+            StatType::Timer,
+            None,
+        ),
+        format_line(
+            &format!("{prefix}.{svc}.kong_latency"),
+            s.kong_latency_ms as i64,
+            StatType::Timer,
+            None,
+        ),
+    ];
+
+    // Per-consumer metrics only when authenticated (unique_users + request_per_user).
+    if let Some(user) = &s.consumer {
+        lines.push(format!("{prefix}.{svc}.user.uniques:{user}|s"));
+        lines.push(format_line(
+            &format!("{prefix}.{svc}.user.{user}.request.count"),
+            1,
+            StatType::Counter,
+            None,
+        ));
+    }
+    lines
 }
 
 pub struct StatsdPlugin;
