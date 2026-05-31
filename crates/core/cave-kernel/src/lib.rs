@@ -27,6 +27,7 @@ pub mod lease;
 pub mod ns;
 pub mod observability;
 pub mod parity;
+pub mod pool;
 pub mod ratelimiter;
 pub mod reconcile;
 pub mod retrypolicy;
