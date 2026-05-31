@@ -32,3 +32,7 @@ pub use tenant::{
     DataClassification, Tenant, TenantEnvironment, TenantRateLimits, TenantState, TenantTier,
     WorkloadCriticality,
 };
+
+pub use layered::{LayeredConfig, Source};
+pub use pqc::{CompositeSignature, KemEngine, PqcAlgorithm, PqcError, PqcSizes, SignatureEngine};
+pub use rbac::{Decision, Permission, Policy, Role};
