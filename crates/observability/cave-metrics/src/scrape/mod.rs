@@ -5,6 +5,7 @@
 
 pub mod discovery;
 pub mod dns_sd;
+pub mod limits;
 pub mod manager;
 pub mod relabel;
 pub mod target;

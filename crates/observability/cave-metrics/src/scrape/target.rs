@@ -18,6 +18,16 @@ pub struct ScrapeConfig {
     pub static_configs: Vec<StaticConfig>,
     pub file_sd_configs: Vec<FileSdConfig>,
     pub kubernetes_sd_configs: Vec<KubernetesSdConfig>,
+    /// Per-scrape limits (Prometheus `sample_limit`, `label_limit`,
+    /// `label_name_length_limit`, `label_value_length_limit`). 0 = disabled.
+    #[serde(default)]
+    pub sample_limit: usize,
+    #[serde(default)]
+    pub label_limit: usize,
+    #[serde(default)]
+    pub label_name_length_limit: usize,
+    #[serde(default)]
+    pub label_value_length_limit: usize,
 }
 
 impl Default for ScrapeConfig {
@@ -33,6 +43,10 @@ impl Default for ScrapeConfig {
             static_configs: Vec::new(),
             file_sd_configs: Vec::new(),
             kubernetes_sd_configs: Vec::new(),
+            sample_limit: 0,
+            label_limit: 0,
+            label_name_length_limit: 0,
+            label_value_length_limit: 0,
         }
     }
 }

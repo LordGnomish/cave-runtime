@@ -9,6 +9,7 @@ use tokio::time::interval;
 use tracing::{error, info, warn};
 
 use super::discovery;
+use super::limits::{verify_label_limits, LabelLimits, SampleLimiter};
 use super::target::{ScrapeConfig, ScrapeTarget};
 use crate::ingestion::exposition;
 use crate::ingestion::openmetrics;
@@ -114,6 +115,13 @@ impl ScrapeManager {
         let n = batch.len();
         let ts_ms = now_ms();
 
+        let label_limits = LabelLimits {
+            label_limit: target.config.label_limit,
+            label_name_length_limit: target.config.label_name_length_limit,
+            label_value_length_limit: target.config.label_value_length_limit,
+        };
+        let mut sample_limiter = SampleLimiter::new(target.config.sample_limit);
+
         for mut ts in batch {
             // Apply target labels (honor_labels controls precedence)
             if target.config.honor_labels {
@@ -130,10 +138,17 @@ impl ScrapeManager {
                 }
             }
 
+            // Enforce label limits before ingesting the series (Prometheus
+            // verifyLabelLimits): a breach fails the whole scrape.
+            verify_label_limits(&ts.labels, &label_limits)?;
+
             for mut sample in ts.samples {
                 if !target.config.honor_timestamps {
                     sample.timestamp_ms = ts_ms;
                 }
+                // Enforce sample_limit (Prometheus limitAppender): stale markers
+                // are exempt; exceeding the limit fails the scrape.
+                sample_limiter.accept(sample.value)?;
                 self.tsdb.append(ts.labels.clone(), sample);
             }
         }
