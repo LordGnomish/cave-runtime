@@ -274,6 +274,10 @@ pub enum WorkflowPhase {
     Failed,
     Error,
     Suspended,
+    /// A node whose `when:` conditional resolved to `false`. Treated as a
+    /// fulfilled (non-blocking) phase for dependency + aggregate purposes —
+    /// mirrors Argo's `NodeSkipped`.
+    Skipped,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

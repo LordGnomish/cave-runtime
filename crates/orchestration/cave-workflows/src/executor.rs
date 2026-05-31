@@ -32,6 +32,13 @@ pub enum NodeAction {
         node_id: String,
         phase: WorkflowPhase,
     },
+    /// A task whose `when` clause resolved to `false`. The runtime records the
+    /// node as [`WorkflowPhase::Skipped`] — a fulfilled phase that satisfies
+    /// dependents without running the underlying template.
+    Skip {
+        node_id: String,
+        template_name: String,
+    },
 }
 
 /// Resolved parameter + artifact bindings for one node — passed into the

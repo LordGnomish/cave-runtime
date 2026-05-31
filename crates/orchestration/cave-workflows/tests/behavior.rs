@@ -17,8 +17,8 @@ use cave_workflows::executor::{
 };
 use cave_workflows::store::WorkflowStore;
 use cave_workflows::workflow_crd::{
-    Arguments, Artifact, ArtifactRepository, ContainerTemplate, DagTemplate, Inputs, NodeStatus,
-    Outputs, ResourceTemplate, RetryStrategy, StepsTemplate, SuspendTemplate, Template,
+    Arguments, Artifact, ArtifactRepository, ContainerTemplate, DagTask, DagTemplate, Inputs,
+    NodeStatus, Outputs, ResourceTemplate, RetryStrategy, StepsTemplate, SuspendTemplate, Template,
     TemplateBody, Workflow, WorkflowPhase, WorkflowSpec, WorkflowStep,
 };
 use std::collections::HashMap;
@@ -501,4 +501,106 @@ fn list_filters_by_namespace() {
     assert_eq!(store.list(Some("prod")).len(), 1);
     // None → all namespaces.
     assert_eq!(store.list(None).len(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// executor::next_actions — `when` conditional gating (Skip / Skipped)
+// argoproj/argo-workflows workflow/controller/operator.go shouldExecute
+// ---------------------------------------------------------------------------
+
+fn dag_task(name: &str, deps: &[&str], when: Option<&str>) -> DagTask {
+    DagTask {
+        name: name.into(),
+        template: "t".into(),
+        dependencies: deps.iter().map(|d| d.to_string()).collect(),
+        arguments: Arguments::default(),
+        when: when.map(|w| w.to_string()),
+    }
+}
+
+fn dag_wf_when(tasks: Vec<DagTask>) -> Workflow {
+    Workflow::new(
+        "wf",
+        "argo",
+        spec(
+            "d",
+            vec![
+                cont_template("t"),
+                Template {
+                    name: "d".into(),
+                    inputs: Inputs::default(),
+                    outputs: Outputs::default(),
+                    body: TemplateBody::Dag(DagTemplate { tasks, fail_fast: None }),
+                    retry_strategy: None,
+                    timeout: None,
+                },
+            ],
+        ),
+    )
+}
+
+fn skipped_ids(actions: &[NodeAction]) -> Vec<String> {
+    actions
+        .iter()
+        .filter_map(|a| match a {
+            NodeAction::Skip { node_id, .. } => Some(node_id.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Record `a` succeeded with a result, then b's `when` references it.
+fn complete_a_with_result(wf: &mut Workflow, result: &str) {
+    record_success(
+        wf,
+        "d.a",
+        "t",
+        Outputs {
+            result: Some(result.into()),
+            ..Outputs::default()
+        },
+    );
+}
+
+#[test]
+fn dag_skips_task_when_condition_false() {
+    let mut wf = dag_wf_when(vec![
+        dag_task("a", &[], None),
+        dag_task("b", &["a"], Some("{{tasks.a.outputs.result}} == go")),
+    ]);
+    complete_a_with_result(&mut wf, "stop");
+    let actions = next_actions(&wf);
+    // `b`'s when is false → it is offered as a Skip, never a Schedule.
+    assert!(scheduled_ids(&actions).iter().all(|s| s != "d.b"));
+    assert_eq!(skipped_ids(&actions), vec!["d.b".to_string()]);
+}
+
+#[test]
+fn dag_schedules_task_when_condition_true() {
+    let mut wf = dag_wf_when(vec![
+        dag_task("a", &[], None),
+        dag_task("b", &["a"], Some("{{tasks.a.outputs.result}} == go")),
+    ]);
+    complete_a_with_result(&mut wf, "go");
+    let actions = next_actions(&wf);
+    assert!(scheduled_ids(&actions).contains(&"d.b".to_string()));
+    assert!(skipped_ids(&actions).is_empty());
+}
+
+#[test]
+fn skipped_dependency_satisfies_dependents_and_aggregate() {
+    // a → b → c. `b` is Skipped; `c` must still become eligible, and a graph
+    // of {Succeeded, Skipped} aggregates to Succeeded (Skipped is fulfilled).
+    let mut wf = dag_wf_when(vec![
+        dag_task("a", &[], None),
+        dag_task("b", &["a"], Some("false")),
+        dag_task("c", &["b"], None),
+    ]);
+    record_success(&mut wf, "d.a", "t", Outputs::default());
+    put_node(&mut wf, "d.b", WorkflowPhase::Skipped);
+    let actions = next_actions(&wf);
+    assert!(scheduled_ids(&actions).contains(&"d.c".to_string()));
+
+    record_success(&mut wf, "d.c", "t", Outputs::default());
+    assert_eq!(aggregate_phase(&wf), WorkflowPhase::Succeeded);
 }
