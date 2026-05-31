@@ -1,5 +1,232 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+//! Kubernetes-compatible resource plumbing — the canonical
+//! `TypeMeta` / `ObjectMeta` / `GroupVersionKind` shapes plus a
+//! `Resource` trait that every CAVE API object can implement.
+//!
+//! Many CAVE modules (cave-apiserver, cave-controller-manager,
+//! cave-crossplane, the operators) speak a Kubernetes-style object
+//! model: each object carries an `apiVersion`/`kind` header
+//! (`TypeMeta`) and per-object identity/metadata (`ObjectMeta`).
+//! Each crate used to re-declare these by hand, which made cross-crate
+//! plumbing (watch caches, admission, the reconcile loop) re-marshal
+//! between subtly-different definitions. This module gives the kernel
+//! one faithful copy of `k8s.io/apimachinery`'s `TypeMeta`,
+//! `ObjectMeta`, and `GroupVersionKind`.
+//!
+//! The central rule, lifted directly from apimachinery's
+//! `GroupVersion.String()`, is how the `(group, version)` pair folds
+//! into the on-the-wire `apiVersion` string:
+//!
+//! - **core group** (empty group, e.g. Pod/Service) → bare version,
+//!   `"v1"`.
+//! - **named group** (e.g. `apps`) → `"group/version"`,
+//!   `"apps/v1"`.
+//!
+//! `Resource::api_version()` composes that for you from `gvk()`, so an
+//! implementor only declares its `GroupVersionKind` once and never
+//! hand-writes the split-and-join logic.
+//!
+//! Adopters: cave-apiserver (object envelope), cave-controller-manager
+//! + the operators (reconcile-loop object identity), cave-crossplane
+//! (composed-resource GVKs).
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fmt;
+
+/// Per-message type header — the `apiVersion` + `kind` that prefix every
+/// Kubernetes object. Mirrors `metav1.TypeMeta`.
+///
+/// `BTreeMap` is intentionally *not* used here; `TypeMeta` is two flat
+/// strings. The `kind` is the un-pluralized resource kind (`"Pod"`,
+/// not `"pods"`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeMeta {
+    /// e.g. `"v1"` (core) or `"apps/v1"` (named group). Empty for an
+    /// unset/embedded object.
+    #[serde(default, rename = "apiVersion", skip_serializing_if = "String::is_empty")]
+    pub api_version: String,
+    /// e.g. `"Pod"`, `"Deployment"`. Empty for an unset object.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub kind: String,
+}
+
+impl TypeMeta {
+    pub fn new(api_version: impl Into<String>, kind: impl Into<String>) -> Self {
+        Self {
+            api_version: api_version.into(),
+            kind: kind.into(),
+        }
+    }
+}
+
+/// Per-object identity + metadata. A faithful (single-node) subset of
+/// `metav1.ObjectMeta` — the fields CAVE controllers actually read.
+///
+/// `labels` and `annotations` use `BTreeMap` so serialization is
+/// deterministic (key-sorted), which keeps resource hashes and
+/// `apply`/diff comparisons stable across runs.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObjectMeta {
+    /// Object name, unique within its namespace.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// Namespace; empty for cluster-scoped objects.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub namespace: String,
+    /// Selectable identifying key/value pairs.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+    /// Non-identifying side metadata.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub annotations: BTreeMap<String, String>,
+    /// Opaque optimistic-concurrency token. Server-assigned; callers
+    /// must echo it unchanged on update.
+    #[serde(
+        default,
+        rename = "resourceVersion",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub resource_version: String,
+    /// Cluster-unique identity for this object across its whole
+    /// lifetime (survives delete + recreate of the same name).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub uid: String,
+}
+
+impl ObjectMeta {
+    /// A bare named object — the common controller case.
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ..Self::default()
+        }
+    }
+
+    /// A namespaced named object.
+    pub fn namespaced(namespace: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            namespace: namespace.into(),
+            ..Self::default()
+        }
+    }
+
+    /// Builder: add a label.
+    pub fn with_label(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.labels.insert(key.into(), value.into());
+        self
+    }
+
+    /// Builder: add an annotation.
+    pub fn with_annotation(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.annotations.insert(key.into(), value.into());
+        self
+    }
+}
+
+/// The `(group, version, kind)` triple — apimachinery's
+/// `schema.GroupVersionKind`. This is the *unique type coordinate* of a
+/// resource; `TypeMeta.api_version` is its serialized projection.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct GroupVersionKind {
+    /// API group; empty string for the legacy "core" group.
+    pub group: String,
+    /// API version, e.g. `"v1"`, `"v1beta1"`.
+    pub version: String,
+    /// Resource kind, e.g. `"Pod"`, `"Deployment"`.
+    pub kind: String,
+}
+
+impl GroupVersionKind {
+    /// Construct a GVK. Use `""` for `group` to denote the core group.
+    pub fn new(
+        group: impl Into<String>,
+        version: impl Into<String>,
+        kind: impl Into<String>,
+    ) -> Self {
+        Self {
+            group: group.into(),
+            version: version.into(),
+            kind: kind.into(),
+        }
+    }
+
+    /// Compose `group`/`version` into the on-the-wire `apiVersion`
+    /// string, matching `schema.GroupVersion.String()`:
+    ///
+    /// - empty group → bare `version` (`"v1"`)
+    /// - named group → `"group/version"` (`"apps/v1"`)
+    pub fn to_api_version(&self) -> String {
+        if self.group.is_empty() {
+            self.version.clone()
+        } else {
+            format!("{}/{}", self.group, self.version)
+        }
+    }
+
+    /// Project this GVK into a `TypeMeta` (apiVersion composed + kind).
+    pub fn to_type_meta(&self) -> TypeMeta {
+        TypeMeta::new(self.to_api_version(), self.kind.clone())
+    }
+}
+
+impl fmt::Display for GroupVersionKind {
+    /// `apimachinery` renders a GVK as `"{group}/{version}, Kind={kind}"`
+    /// (with a leading `/` when the group is empty), which is what
+    /// `GroupVersionKind.String()` emits and what shows up in
+    /// controller/admission errors.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}, Kind={}", self.group, self.version, self.kind)
+    }
+}
+
+/// Implemented by every CAVE API object. The associated type metadata
+/// (`type_meta`, `gvk`) is intrinsic to the *type*, so those are
+/// associated functions; `object_meta` is per-instance.
+///
+/// Implementors only declare `gvk()` (and expose their stored
+/// `ObjectMeta`); the provided methods derive everything else, so the
+/// `(group, version) → apiVersion` folding rule lives in exactly one
+/// place.
+pub trait Resource {
+    /// The static type coordinate of this resource.
+    fn gvk() -> GroupVersionKind
+    where
+        Self: Sized;
+
+    /// Per-instance metadata (name/namespace/labels/...).
+    fn object_meta(&self) -> &ObjectMeta;
+
+    /// The `apiVersion`/`kind` header for this type. Provided: derived
+    /// from [`Self::gvk`].
+    fn type_meta() -> TypeMeta
+    where
+        Self: Sized,
+    {
+        Self::gvk().to_type_meta()
+    }
+
+    /// The composed `apiVersion` string for this type. Provided:
+    /// derived from [`Self::gvk`] via
+    /// [`GroupVersionKind::to_api_version`].
+    fn api_version() -> String
+    where
+        Self: Sized,
+    {
+        Self::gvk().to_api_version()
+    }
+
+    /// The resource kind for this type. Provided: derived from
+    /// [`Self::gvk`].
+    fn kind() -> String
+    where
+        Self: Sized,
+    {
+        Self::gvk().kind
+    }
+}
 
 #[cfg(test)]
 mod tests {
