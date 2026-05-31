@@ -171,18 +171,75 @@ async fn find(
     let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
-    let docs = collection
+    let mut docs = collection
         .find(filter.as_ref())
         .await
         .map_err(|e| err_internal(&e))?;
 
+    // sort -> skip -> limit -> projection (MongoDB query-stage order).
+    if let Some(Value::Object(sort)) = req.sort.as_ref() {
+        sort_documents(&mut docs, sort);
+    }
+    if let Some(skip) = req.skip {
+        if skip > 0 {
+            docs = docs.into_iter().skip(skip as usize).collect();
+        }
+    }
+    if let Some(limit) = req.limit {
+        if limit >= 0 {
+            docs.truncate(limit as usize);
+        }
+    }
+
+    let projection = req.projection.as_ref().and_then(|p| {
+        p.as_object()
+            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Document>())
+    });
+
     let count = docs.len();
     let documents = docs
         .into_iter()
-        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
+        .map(|doc| {
+            let projected = crate::projection::apply_projection(&doc, projection.as_ref());
+            Value::Object(projected.into_iter().collect())
+        })
         .collect();
 
     Ok(Json(FindResponse { documents, count }))
+}
+
+/// Stable multi-key sort honoring a `{field: 1|-1}` sort spec.
+fn sort_documents(docs: &mut [Document], sort: &serde_json::Map<String, Value>) {
+    docs.sort_by(|a, b| {
+        for (key, dir) in sort {
+            let d = dir.as_i64().unwrap_or(1);
+            let av = a.get(key);
+            let bv = b.get(key);
+            let ord = cmp_opt(av, bv);
+            if ord != std::cmp::Ordering::Equal {
+                return if d >= 0 { ord } else { ord.reverse() };
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+}
+
+fn cmp_opt(a: Option<&Value>, b: Option<&Value>) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => {
+            if let (Some(xf), Some(yf)) = (x.as_f64(), y.as_f64()) {
+                xf.partial_cmp(&yf).unwrap_or(Ordering::Equal)
+            } else if let (Some(xs), Some(ys)) = (x.as_str(), y.as_str()) {
+                xs.cmp(ys)
+            } else {
+                Ordering::Equal
+            }
+        }
+    }
 }
 
 async fn insert(
