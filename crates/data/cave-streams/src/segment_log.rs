@@ -55,6 +55,78 @@ impl Segment {
     }
 }
 
+/// Sparse offset → byte-position index for one log segment.
+///
+/// Byte-for-byte semantics of Kafka 4.2.0 `OffsetIndex`: a Fetch at offset T
+/// binary-searches for the largest indexed offset ≤ T
+/// (`AbstractIndex.largestLowerBoundSlotFor`) and begins the on-disk scan
+/// from the recorded position.  An empty index — or a target below the first
+/// indexed offset — floors to the segment base at position 0.
+#[derive(Debug, Clone)]
+pub struct OffsetIndex {
+    base_offset: u64,
+    /// `(absolute_offset, byte_position)`, strictly increasing in offset.
+    entries: Vec<(u64, u32)>,
+}
+
+impl OffsetIndex {
+    pub fn new(base_offset: u64) -> Self {
+        Self {
+            base_offset,
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn base_offset(&self) -> u64 {
+        self.base_offset
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Record a sparse `(offset, position)` entry.  Offsets must be ≥ the
+    /// segment base and strictly greater than the previous entry — Kafka
+    /// rejects non-increasing index appends.
+    pub fn append(&mut self, offset: u64, position: u32) -> StreamsResult<()> {
+        if offset < self.base_offset {
+            return Err(StreamsError::Internal(format!(
+                "index offset {} is below segment base {}",
+                offset, self.base_offset
+            )));
+        }
+        if let Some(&(last, _)) = self.entries.last() {
+            if offset <= last {
+                return Err(StreamsError::Internal(format!(
+                    "index offset {} not greater than last indexed offset {}",
+                    offset, last
+                )));
+            }
+        }
+        self.entries.push((offset, position));
+        Ok(())
+    }
+
+    /// Largest indexed offset ≤ `target_offset` with its position; floors to
+    /// `(base_offset, 0)` when the index is empty or the target precedes the
+    /// first entry.
+    pub fn lookup(&self, target_offset: u64) -> (u64, u32) {
+        // Count of entries with offset ≤ target (entries are sorted ascending).
+        let count = self
+            .entries
+            .partition_point(|&(off, _)| off <= target_offset);
+        if count == 0 {
+            (self.base_offset, 0)
+        } else {
+            self.entries[count - 1]
+        }
+    }
+}
+
 /// Append-only log split into rolling segments.
 pub struct SegmentLog {
     /// Maximum bytes in an active segment before rolling.
