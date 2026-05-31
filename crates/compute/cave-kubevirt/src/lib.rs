@@ -60,6 +60,9 @@ pub mod snapshot;
 /// virt-api subresource HTTP surface (console / vnc / migrate / ...).
 pub mod virt_api;
 
+/// Schedulable-resource computations (vCPU accounting + CPU-set + mem ratio).
+pub mod resources;
+
 /// Re-export the `desired_phase` function from the lifecycle module.
 pub use lifecycle::desired_phase;
 
