@@ -31,30 +31,101 @@ pub struct TextQuery {
 
 /// Tokenize a string into lowercase alphanumeric word tokens.
 pub fn tokenize(s: &str) -> Vec<String> {
-    let _ = s;
-    Vec::new() // stub
+    s.split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .collect()
 }
 
 /// Parse a `$text` `$search` string into its term / negation / phrase parts.
+///
+/// Quoted runs (`"..."`) become phrases; outside quotes, whitespace-separated
+/// words are terms, and a leading `-` marks a negation.
 pub fn parse_search(search: &str) -> TextQuery {
-    let _ = search;
-    TextQuery::default() // stub
+    let mut q = TextQuery::default();
+    let mut chars = search.chars().peekable();
+    let mut buf = String::new();
+
+    // Flush the accumulated non-quoted word, classifying it.
+    let flush = |buf: &mut String, q: &mut TextQuery| {
+        if buf.is_empty() {
+            return;
+        }
+        let word = std::mem::take(buf);
+        if let Some(neg) = word.strip_prefix('-') {
+            for t in tokenize(neg) {
+                q.negations.push(t);
+            }
+        } else {
+            for t in tokenize(&word) {
+                q.terms.push(t);
+            }
+        }
+    };
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                flush(&mut buf, &mut q);
+                // Consume until the closing quote.
+                let mut phrase = String::new();
+                for pc in chars.by_ref() {
+                    if pc == '"' {
+                        break;
+                    }
+                    phrase.push(pc);
+                }
+                let phrase = phrase.trim().to_lowercase();
+                if !phrase.is_empty() {
+                    q.phrases.push(phrase);
+                }
+            }
+            c if c.is_whitespace() => flush(&mut buf, &mut q),
+            c => buf.push(c),
+        }
+    }
+    flush(&mut buf, &mut q);
+    q
 }
 
 /// Evaluate a parsed text query against a document's indexed text.
 ///
-/// `full_text` is the concatenation (space-joined) of the document's
+/// `full_text_lower` is the lowercase concatenation of the document's
 /// text-indexed field values; `tokens` is its tokenized word set.
 pub fn matches(query: &TextQuery, tokens: &HashSet<String>, full_text_lower: &str) -> bool {
-    let _ = (query, tokens, full_text_lower);
-    false // stub
+    // A negated term anywhere disqualifies the document.
+    if query.negations.iter().any(|n| tokens.contains(n)) {
+        return false;
+    }
+    // Every phrase must appear contiguously.
+    if !query.phrases.iter().all(|p| full_text_lower.contains(p)) {
+        return false;
+    }
+    // If there are positive terms or phrases, require at least one positive hit.
+    let has_positive = !query.terms.is_empty() || !query.phrases.is_empty();
+    if !has_positive {
+        // Negation-only query: matches anything that survived the exclusion.
+        return true;
+    }
+    let term_hit = query.terms.iter().any(|t| tokens.contains(t));
+    term_hit || !query.phrases.is_empty()
 }
 
 /// Collect the indexed text of `doc` over the given fields: a `(token_set,
 /// space-joined lowercase text)` pair ready for [`matches`].
 pub fn doc_text(doc: &Document, fields: &[String]) -> (HashSet<String>, String) {
-    let _ = (doc, fields);
-    (HashSet::new(), String::new()) // stub
+    let mut tokens = HashSet::new();
+    let mut parts: Vec<String> = Vec::new();
+    for f in fields {
+        if let Some(s) = doc.get(f).and_then(|v| v.as_str()) {
+            let lower = s.to_lowercase();
+            for t in tokenize(&lower) {
+                tokens.insert(t);
+            }
+            parts.push(lower);
+        }
+    }
+    (tokens, parts.join(" "))
 }
 
 #[cfg(test)]
