@@ -65,6 +65,129 @@ pub struct ProvisionService {
     token_seq: u64,
 }
 
+/// Result of a bulk-provisioning batch.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BulkReport {
+    pub created: usize,
+    pub failed: usize,
+}
+
+impl ProvisionService {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a provisioning configuration, keyed by its device key.
+    pub fn register_config(&mut self, config: ProvisionConfig) {
+        self.configs
+            .insert(config.provision_device_key.clone(), config);
+    }
+
+    fn next_token(&mut self) -> String {
+        self.token_seq += 1;
+        // Deterministic per service for testability; real deployments swap in
+        // a CSPRNG-backed minter. Includes a uuid suffix for global uniqueness.
+        format!("prov-{}-{}", self.token_seq, uuid::Uuid::new_v4().simple())
+    }
+
+    /// Process one provisioning request against the registered configs.
+    pub fn provision(
+        &mut self,
+        registry: &mut DeviceRegistry,
+        req: &ProvisionRequest,
+    ) -> ProvisionResponse {
+        let Some(cfg) = self.configs.get(&req.provision_device_key).cloned() else {
+            return ProvisionResponse::NotFound;
+        };
+        if cfg.provision_device_secret != req.provision_device_secret {
+            return ProvisionResponse::NotFound;
+        }
+        match cfg.strategy {
+            ProvisionStrategy::Disabled => ProvisionResponse::Failure {
+                reason: "provisioning disabled for device profile".into(),
+            },
+            ProvisionStrategy::CheckPreProvisionedDevices => {
+                // Device must already exist in the tenant.
+                let existing = registry
+                    .devices_of_tenant(&cfg.tenant_id)
+                    .find(|d| d.name == req.device_name)
+                    .map(|d| d.id.clone());
+                match existing {
+                    Some(id) => self.issue(registry, id),
+                    None => ProvisionResponse::NotFound,
+                }
+            }
+            ProvisionStrategy::AllowCreateNewDevices => {
+                // Reuse an existing same-name device, else create one.
+                let existing = registry
+                    .devices_of_tenant(&cfg.tenant_id)
+                    .find(|d| d.name == req.device_name)
+                    .map(|d| d.id.clone());
+                let device_id = match existing {
+                    Some(id) => id,
+                    None => match registry.create_device(
+                        &cfg.tenant_id,
+                        &req.device_name,
+                        &cfg.device_profile_id,
+                        None,
+                    ) {
+                        Ok(d) => d.id,
+                        Err(e) => {
+                            return ProvisionResponse::Failure { reason: e.to_string() }
+                        }
+                    },
+                };
+                self.issue(registry, device_id)
+            }
+        }
+    }
+
+    /// Mint + attach an access token to a device and return Success.
+    fn issue(&mut self, registry: &mut DeviceRegistry, device_id: String) -> ProvisionResponse {
+        let token = self.next_token();
+        match registry.set_credentials(DeviceCredentials {
+            device_id: device_id.clone(),
+            credentials_type: CredentialsType::AccessToken,
+            credentials_id: token.clone(),
+            credentials_value: None,
+        }) {
+            Ok(()) => ProvisionResponse::Success {
+                device_id,
+                access_token: token,
+            },
+            Err(e) => ProvisionResponse::Failure { reason: e.to_string() },
+        }
+    }
+
+    /// Provision many devices by name under one config. Bad names (empty /
+    /// duplicate) are counted as failures rather than aborting the batch.
+    pub fn bulk_provision(
+        &mut self,
+        registry: &mut DeviceRegistry,
+        key: &str,
+        secret: &str,
+        names: &[String],
+    ) -> BulkReport {
+        let mut created = 0;
+        let mut failed = 0;
+        for name in names {
+            let resp = self.provision(
+                registry,
+                &ProvisionRequest {
+                    device_name: name.clone(),
+                    provision_device_key: key.to_string(),
+                    provision_device_secret: secret.to_string(),
+                },
+            );
+            match resp {
+                ProvisionResponse::Success { .. } => created += 1,
+                _ => failed += 1,
+            }
+        }
+        BulkReport { created, failed }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
