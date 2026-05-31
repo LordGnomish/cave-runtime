@@ -248,6 +248,12 @@ enum Commands {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
     },
+    /// Daily always-latest local-LLM tracker (poll/bench/report + Phase 1 apply)
+    #[command(name = "llm-tracker")]
+    LlmTracker {
+        #[command(subcommand)]
+        cmd: LlmTrackerCmd,
+    },
     /// Distributed key-value store (etcd v3 replacement; etcdctl parity)
     Etcd {
         #[command(subcommand)]
@@ -2493,6 +2499,33 @@ enum LocalLlmCmd {
     Queue,
 }
 
+/// `cavectl llm-tracker` — daily always-latest local-LLM tracker. Shells
+/// the leaf `cave-llm-tracker` binary (installed in `~/.local/bin`), so
+/// the CLI stays decoupled from the tracker's network + bench logic.
+#[derive(Debug, clap::Subcommand)]
+enum LlmTrackerCmd {
+    /// Run the daily poll + bench + report (Phase 0: never swaps).
+    Report,
+    /// Print the upgrade notification for the latest report (or quiet).
+    Notify,
+    /// Print the per-model benchmark-history trend across daily reports.
+    Trend,
+    /// Print the latest report's cost × quality matrix.
+    Matrix,
+    /// Phase 1 opt-in: evaluate (and with --opt-in, apply) a baseline swap.
+    Apply {
+        /// Operator opt-in. Without it, only previews the plan.
+        #[arg(long, default_value_t = false)]
+        opt_in: bool,
+        /// Consecutive UpgradeCandidate days required before a swap is eligible.
+        #[arg(long, default_value_t = 3)]
+        required_days: u32,
+        /// Persist the new config here when the swap is eligible.
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
 #[derive(Subcommand)]
 enum DaemonSubCmd {
     /// Start the daemon in the foreground (runs cave-local-llm-daemon start)
@@ -4135,6 +4168,51 @@ source_root = "src"
                 Ok(())
             }
         },
+
+        // ── LLM tracker ───────────────────────────────────────────────────────
+        Commands::LlmTracker { cmd } => {
+            // Shell the leaf `cave-llm-tracker` binary; the CLI owns no
+            // network/bench logic of its own.
+            let mut command = std::process::Command::new("cave-llm-tracker");
+            match cmd {
+                LlmTrackerCmd::Report => {
+                    command.args(["--mode", "report"]);
+                }
+                LlmTrackerCmd::Notify => {
+                    command.args(["--mode", "notify"]);
+                }
+                LlmTrackerCmd::Trend => {
+                    command.args(["--mode", "trend"]);
+                }
+                LlmTrackerCmd::Matrix => {
+                    command.args(["--mode", "matrix"]);
+                }
+                LlmTrackerCmd::Apply {
+                    opt_in,
+                    required_days,
+                    output,
+                } => {
+                    command.args(["--mode", "apply"]);
+                    command.args(["--required-days", &required_days.to_string()]);
+                    if opt_in {
+                        command.arg("--opt-in");
+                    }
+                    if let Some(out) = output {
+                        command.args(["--output", &out]);
+                    }
+                }
+            }
+            let status = command
+                .status()
+                .map_err(|e| anyhow::anyhow!("failed to spawn cave-llm-tracker: {e}"))?;
+            if !status.success() {
+                return Err(anyhow::anyhow!(
+                    "cave-llm-tracker exited with {}",
+                    status
+                ));
+            }
+            Ok(())
+        }
 
         // ── etcd ──────────────────────────────────────────────────────────────
         Commands::Etcd { cmd } => match cmd {
