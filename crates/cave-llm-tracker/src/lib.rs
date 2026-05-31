@@ -28,6 +28,7 @@ pub mod poll;
 pub mod registry;
 pub mod report;
 pub mod selection;
+pub mod trend;
 
 pub use bench::{cave_prompts, run_bench, score_response, synth_snapshot, BenchSnapshot, EvalPrompt, EvalResult};
 pub use config::{BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig, TrackerConfig};
