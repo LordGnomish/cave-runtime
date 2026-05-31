@@ -1,7 +1,83 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //
-//! Device claiming. (RED.)
+//! Device claiming — ThingsBoard `DeviceClaimService`.
+//!
+//! A device is made claimable for a bounded window by registering a claim
+//! secret + expiry. A customer then presents the secret within the window to
+//! bind (claim) the device to themselves. `reclaim` releases the device and
+//! drops the claim info (the device must be made claimable again to re-bind).
+//! Clocks are injected for determinism.
+
+use crate::{IotError, Result};
+use std::collections::HashMap;
+
+/// Outcome of a successful claim.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaimResult {
+    Claimed { customer_id: String },
+}
+
+#[derive(Debug, Clone)]
+struct ClaimInfo {
+    secret: String,
+    expires_at: i64,
+}
+
+/// Device-claiming service.
+#[derive(Debug, Default)]
+pub struct ClaimingService {
+    claim_info: HashMap<String, ClaimInfo>,
+    owners: HashMap<String, String>, // device → customer
+}
+
+impl ClaimingService {
+    pub fn new() -> ClaimingService {
+        ClaimingService::default()
+    }
+
+    /// Make a device claimable with `secret` until `expires_at` (inclusive).
+    pub fn register_claim_info(&mut self, device_id: &str, secret: &str, expires_at: i64) {
+        self.claim_info.insert(
+            device_id.to_string(),
+            ClaimInfo { secret: secret.to_string(), expires_at },
+        );
+    }
+
+    /// Attempt to claim a device for a customer at `now_ms`.
+    pub fn claim(
+        &mut self,
+        device_id: &str,
+        secret: &str,
+        customer_id: &str,
+        now_ms: i64,
+    ) -> Result<ClaimResult> {
+        let info = self
+            .claim_info
+            .get(device_id)
+            .ok_or_else(|| IotError::NotFound(format!("device {device_id} is not claimable")))?;
+        if info.secret != secret {
+            return Err(IotError::Invalid("claim secret mismatch".into()));
+        }
+        if now_ms > info.expires_at {
+            return Err(IotError::Invalid("claim window expired".into()));
+        }
+        self.owners
+            .insert(device_id.to_string(), customer_id.to_string());
+        Ok(ClaimResult::Claimed { customer_id: customer_id.to_string() })
+    }
+
+    /// The customer a device is currently claimed by, if any.
+    pub fn owner(&self, device_id: &str) -> Option<&str> {
+        self.owners.get(device_id).map(String::as_str)
+    }
+
+    /// Release a device: drop its customer binding and claim info.
+    pub fn reclaim(&mut self, device_id: &str) {
+        self.owners.remove(device_id);
+        self.claim_info.remove(device_id);
+    }
+}
 
 #[cfg(test)]
 mod tests {
