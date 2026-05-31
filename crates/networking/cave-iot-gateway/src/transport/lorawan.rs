@@ -79,7 +79,14 @@ pub fn parse_uplink(phy: &[u8]) -> Result<UplinkHeader> {
     } else {
         (None, Vec::new())
     };
-    Ok(UplinkHeader { mtype, dev_addr, fctrl, fcnt, fport, frm_payload })
+    Ok(UplinkHeader {
+        mtype,
+        dev_addr,
+        fctrl,
+        fcnt,
+        fport,
+        frm_payload,
+    })
 }
 
 /// A Cayenne LPP sensor reading kind.
@@ -186,7 +193,11 @@ pub fn decode_lpp(buf: &[u8]) -> Result<Vec<LppReading>> {
                 KvValue::Json(serde_json::json!({"lat": lat, "lon": lon, "alt": alt}))
             }
         };
-        out.push(LppReading { channel, kind, value });
+        out.push(LppReading {
+            channel,
+            kind,
+            value,
+        });
         i += 2 + len;
     }
     Ok(out)

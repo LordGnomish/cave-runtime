@@ -10,8 +10,8 @@
 //! rendering itself lives in `cave-portal` (SSR) — see manifest `[[skipped]]`
 //! — this layer is the data contract behind it.
 
-use crate::timeseries::{Aggregation, TsStore};
 use crate::KvMap;
+use crate::timeseries::{Aggregation, TsStore};
 use std::collections::BTreeMap;
 
 /// Widget category (`widgetType`).
@@ -106,8 +106,8 @@ pub fn resolve_series(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::timeseries::{Aggregation, TsStore};
     use crate::KvValue;
+    use crate::timeseries::{Aggregation, TsStore};
 
     fn store() -> TsStore {
         let mut s = TsStore::new();
@@ -120,8 +120,20 @@ mod tests {
     #[test]
     fn dashboard_collects_widgets() {
         let mut d = Dashboard::new("dash1", "t1", "Overview");
-        d.add_widget(Widget::new("w1", "Temp", WidgetType::Latest, "dev", &["temp"]));
-        d.add_widget(Widget::new("w2", "Trend", WidgetType::TimeSeries, "dev", &["temp"]));
+        d.add_widget(Widget::new(
+            "w1",
+            "Temp",
+            WidgetType::Latest,
+            "dev",
+            &["temp"],
+        ));
+        d.add_widget(Widget::new(
+            "w2",
+            "Trend",
+            WidgetType::TimeSeries,
+            "dev",
+            &["temp"],
+        ));
         assert_eq!(d.widgets.len(), 2);
         assert_eq!(d.tenant_id, "t1");
     }

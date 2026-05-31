@@ -49,7 +49,10 @@ pub struct ProvisionRequest {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "status")]
 pub enum ProvisionResponse {
     /// Device provisioned — carries the issued access token.
-    Success { device_id: String, access_token: String },
+    Success {
+        device_id: String,
+        access_token: String,
+    },
     /// Key/secret matched no configuration, or pre-provisioned check failed.
     NotFound,
     /// Strategy is `Disabled`.
@@ -132,7 +135,9 @@ impl ProvisionService {
                     ) {
                         Ok(d) => d.id,
                         Err(e) => {
-                            return ProvisionResponse::Failure { reason: e.to_string() }
+                            return ProvisionResponse::Failure {
+                                reason: e.to_string(),
+                            };
                         }
                     },
                 };
@@ -154,7 +159,9 @@ impl ProvisionService {
                 device_id,
                 access_token: token,
             },
-            Err(e) => ProvisionResponse::Failure { reason: e.to_string() },
+            Err(e) => ProvisionResponse::Failure {
+                reason: e.to_string(),
+            },
         }
     }
 
@@ -218,7 +225,10 @@ mod tests {
             },
         );
         let (device_id, token) = match resp {
-            ProvisionResponse::Success { device_id, access_token } => (device_id, access_token),
+            ProvisionResponse::Success {
+                device_id,
+                access_token,
+            } => (device_id, access_token),
             other => panic!("expected success, got {other:?}"),
         };
         // The device now exists and the issued token authenticates it.

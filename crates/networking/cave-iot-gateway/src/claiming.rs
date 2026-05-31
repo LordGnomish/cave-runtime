@@ -40,7 +40,10 @@ impl ClaimingService {
     pub fn register_claim_info(&mut self, device_id: &str, secret: &str, expires_at: i64) {
         self.claim_info.insert(
             device_id.to_string(),
-            ClaimInfo { secret: secret.to_string(), expires_at },
+            ClaimInfo {
+                secret: secret.to_string(),
+                expires_at,
+            },
         );
     }
 
@@ -64,7 +67,9 @@ impl ClaimingService {
         }
         self.owners
             .insert(device_id.to_string(), customer_id.to_string());
-        Ok(ClaimResult::Claimed { customer_id: customer_id.to_string() })
+        Ok(ClaimResult::Claimed {
+            customer_id: customer_id.to_string(),
+        })
     }
 
     /// The customer a device is currently claimed by, if any.
@@ -94,7 +99,12 @@ mod tests {
     fn valid_claim_binds_device_to_customer() {
         let mut s = svc();
         let res = s.claim("d1", "S", "cust-1", 500);
-        assert_eq!(res, Ok(ClaimResult::Claimed { customer_id: "cust-1".into() }));
+        assert_eq!(
+            res,
+            Ok(ClaimResult::Claimed {
+                customer_id: "cust-1".into()
+            })
+        );
         assert_eq!(s.owner("d1"), Some("cust-1"));
     }
 

@@ -90,7 +90,11 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(max_per_window: u64, window_ms: i64) -> RateLimiter {
-        RateLimiter { max_per_window, window_ms, state: HashMap::new() }
+        RateLimiter {
+            max_per_window,
+            window_ms,
+            state: HashMap::new(),
+        }
     }
 
     /// Record an attempt at `now_ms`; returns whether it is within budget.
@@ -100,7 +104,10 @@ impl RateLimiter {
         } else {
             0
         };
-        let entry = self.state.entry(tenant_id.to_string()).or_insert((window, 0));
+        let entry = self
+            .state
+            .entry(tenant_id.to_string())
+            .or_insert((window, 0));
         if entry.0 != window {
             *entry = (window, 0);
         }
@@ -120,7 +127,13 @@ mod tests {
     #[test]
     fn device_quota_blocks_at_limit() {
         let mut tm = TenantManager::new();
-        tm.register("t1", TenantLimits { max_devices: Some(2), max_messages_per_min: None });
+        tm.register(
+            "t1",
+            TenantLimits {
+                max_devices: Some(2),
+                max_messages_per_min: None,
+            },
+        );
         assert!(tm.can_add_device("t1").is_ok());
         tm.incr_device("t1");
         tm.incr_device("t1");
@@ -132,7 +145,13 @@ mod tests {
     #[test]
     fn decr_device_frees_quota() {
         let mut tm = TenantManager::new();
-        tm.register("t1", TenantLimits { max_devices: Some(1), max_messages_per_min: None });
+        tm.register(
+            "t1",
+            TenantLimits {
+                max_devices: Some(1),
+                max_messages_per_min: None,
+            },
+        );
         tm.incr_device("t1");
         assert!(tm.can_add_device("t1").is_err());
         tm.decr_device("t1");
@@ -142,7 +161,13 @@ mod tests {
     #[test]
     fn unlimited_quota_never_blocks() {
         let mut tm = TenantManager::new();
-        tm.register("t1", TenantLimits { max_devices: None, max_messages_per_min: None });
+        tm.register(
+            "t1",
+            TenantLimits {
+                max_devices: None,
+                max_messages_per_min: None,
+            },
+        );
         for _ in 0..1000 {
             tm.incr_device("t1");
         }

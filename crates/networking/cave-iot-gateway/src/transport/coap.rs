@@ -147,7 +147,9 @@ impl CoapMessage {
         }
         let version = buf[0] >> 6;
         if version != 1 {
-            return Err(IotError::Codec(format!("unsupported CoAP version {version}")));
+            return Err(IotError::Codec(format!(
+                "unsupported CoAP version {version}"
+            )));
         }
         let msg_type = CoapType::from_bits((buf[0] >> 4) & 0x03)
             .ok_or_else(|| IotError::Codec("bad CoAP type".into()))?;
@@ -182,7 +184,10 @@ impl CoapMessage {
                 .ok_or_else(|| IotError::Codec("truncated option value".into()))?
                 .to_vec();
             pos += length;
-            options.push(CoapOption { number: current, value });
+            options.push(CoapOption {
+                number: current,
+                value,
+            });
         }
         Ok(CoapMessage {
             version,
@@ -249,8 +254,14 @@ mod tests {
             message_id: 1,
             token: vec![],
             options: vec![
-                CoapOption { number: 11, value: b"telemetry".to_vec() },
-                CoapOption { number: 12, value: vec![0x32] },
+                CoapOption {
+                    number: 11,
+                    value: b"telemetry".to_vec(),
+                },
+                CoapOption {
+                    number: 12,
+                    value: vec![0x32],
+                },
             ],
             payload: vec![],
         };
@@ -270,7 +281,10 @@ mod tests {
             code: CoapCode::new(0, 1),
             message_id: 5,
             token: vec![],
-            options: vec![CoapOption { number: 270, value: b"x".to_vec() }],
+            options: vec![CoapOption {
+                number: 270,
+                value: b"x".to_vec(),
+            }],
             payload: vec![],
         };
         let back = CoapMessage::decode(&msg.encode()).unwrap();

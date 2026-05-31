@@ -125,7 +125,11 @@ pub fn parse_tcp_frame(buf: &[u8]) -> Result<TcpFrame> {
         .get(7..6 + length)
         .ok_or_else(|| IotError::Codec("MBAP length exceeds frame".into()))?
         .to_vec();
-    Ok(TcpFrame { transaction_id, unit_id, pdu })
+    Ok(TcpFrame {
+        transaction_id,
+        unit_id,
+        pdu,
+    })
 }
 
 #[cfg(test)]

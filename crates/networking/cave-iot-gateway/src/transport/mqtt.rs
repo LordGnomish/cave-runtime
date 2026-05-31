@@ -178,7 +178,12 @@ pub fn decode_publish(buf: &[u8]) -> Result<Publish> {
         payload_start += 2;
     }
     let payload = body.get(payload_start..).unwrap_or(&[]).to_vec();
-    Ok(Publish { topic, qos, retain, payload })
+    Ok(Publish {
+        topic,
+        qos,
+        retain,
+        payload,
+    })
 }
 
 /// Encode a PUBLISH packet (QoS 0) for a topic + payload.
@@ -205,7 +210,11 @@ pub fn parse_telemetry(payload: &[u8]) -> Result<KvMap> {
             .and_then(|x| x.as_object())
             .ok_or_else(|| IotError::Codec("'values' is not an object".into()))?,
         serde_json::Value::Object(m) => m,
-        _ => return Err(IotError::Codec("telemetry payload must be an object".into())),
+        _ => {
+            return Err(IotError::Codec(
+                "telemetry payload must be an object".into(),
+            ));
+        }
     };
     let mut out = KvMap::new();
     for (k, val) in obj {
@@ -235,7 +244,10 @@ mod tests {
 
     #[test]
     fn parses_known_device_topics() {
-        assert_eq!(DeviceTopic::parse("v1/devices/me/telemetry").unwrap(), DeviceTopic::Telemetry);
+        assert_eq!(
+            DeviceTopic::parse("v1/devices/me/telemetry").unwrap(),
+            DeviceTopic::Telemetry
+        );
         assert_eq!(
             DeviceTopic::parse("v1/devices/me/attributes").unwrap(),
             DeviceTopic::PostAttributes

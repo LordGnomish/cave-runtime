@@ -49,8 +49,16 @@ pub enum Predicate {
 impl Predicate {
     pub fn eval(&self, msg: &Message) -> bool {
         match self {
-            Predicate::Gt(k, n) => msg.data.get(k).and_then(KvValue::as_f64).is_some_and(|v| v > *n),
-            Predicate::Lt(k, n) => msg.data.get(k).and_then(KvValue::as_f64).is_some_and(|v| v < *n),
+            Predicate::Gt(k, n) => msg
+                .data
+                .get(k)
+                .and_then(KvValue::as_f64)
+                .is_some_and(|v| v > *n),
+            Predicate::Lt(k, n) => msg
+                .data
+                .get(k)
+                .and_then(KvValue::as_f64)
+                .is_some_and(|v| v < *n),
             Predicate::Eq(k, val) => msg.data.get(k) == Some(val),
             Predicate::Exists(k) => msg.data.contains_key(k),
             Predicate::And(a, b) => a.eval(msg) && b.eval(msg),
@@ -155,7 +163,9 @@ impl RuleChain {
                 break;
             }
             visited += 1;
-            let Some(node) = self.nodes.get(idx) else { break };
+            let Some(node) = self.nodes.get(idx) else {
+                break;
+            };
             let label = match node {
                 RuleNode::Filter { predicate } => {
                     if predicate.eval(&msg) {
@@ -175,7 +185,11 @@ impl RuleChain {
             };
             current = self.relations.get(&(idx, label.to_string())).copied();
         }
-        RuleOutcome { actions, message: msg, visited }
+        RuleOutcome {
+            actions,
+            message: msg,
+            visited,
+        }
     }
 }
 
@@ -218,14 +232,21 @@ mod tests {
         let root = chain.add_node(RuleNode::Filter {
             predicate: Predicate::Gt("temperature".into(), 30.0),
         });
-        let hot = chain.add_node(RuleNode::Action { action: ActionKind::PushToTopic("alarms".into()) });
-        let cold = chain.add_node(RuleNode::Action { action: ActionKind::SaveTimeseries });
+        let hot = chain.add_node(RuleNode::Action {
+            action: ActionKind::PushToTopic("alarms".into()),
+        });
+        let cold = chain.add_node(RuleNode::Action {
+            action: ActionKind::SaveTimeseries,
+        });
         chain.set_root(root);
         chain.link(root, "True", hot);
         chain.link(root, "False", cold);
 
         let hot_out = chain.process(msg(40.0));
-        assert_eq!(hot_out.actions, vec![ActionKind::PushToTopic("alarms".into())]);
+        assert_eq!(
+            hot_out.actions,
+            vec![ActionKind::PushToTopic("alarms".into())]
+        );
         let cold_out = chain.process(msg(10.0));
         assert_eq!(cold_out.actions, vec![ActionKind::SaveTimeseries]);
     }
@@ -239,14 +260,19 @@ mod tests {
         let t = chain.add_node(RuleNode::Transform {
             op: TransformOp::SetMetadata("processed".into(), "yes".into()),
         });
-        let a = chain.add_node(RuleNode::Action { action: ActionKind::SaveTimeseries });
+        let a = chain.add_node(RuleNode::Action {
+            action: ActionKind::SaveTimeseries,
+        });
         chain.set_root(f);
         chain.link(f, "True", t);
         chain.link(t, "Success", a);
 
         let out = chain.process(msg(22.0));
         assert_eq!(out.actions, vec![ActionKind::SaveTimeseries]);
-        assert_eq!(out.message.metadata.get("processed").map(String::as_str), Some("yes"));
+        assert_eq!(
+            out.message.metadata.get("processed").map(String::as_str),
+            Some("yes")
+        );
     }
 
     #[test]
@@ -257,7 +283,9 @@ mod tests {
         });
         chain.set_root(root);
         // Only a True branch is linked; a cold message has nowhere to go.
-        let sink = chain.add_node(RuleNode::Action { action: ActionKind::Log });
+        let sink = chain.add_node(RuleNode::Action {
+            action: ActionKind::Log,
+        });
         chain.link(root, "True", sink);
         let out = chain.process(msg(5.0));
         assert!(out.actions.is_empty());

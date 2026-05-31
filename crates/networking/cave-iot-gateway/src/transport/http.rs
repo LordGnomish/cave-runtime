@@ -43,7 +43,10 @@ pub fn route(method: &str, path: &str) -> Result<HttpRequestRoute> {
         if method != "POST" {
             return Err(IotError::Codec("provision requires POST".into()));
         }
-        return Ok(HttpRequestRoute { token: String::new(), kind: HttpEndpointKind::Provision });
+        return Ok(HttpRequestRoute {
+            token: String::new(),
+            kind: HttpEndpointKind::Provision,
+        });
     }
 
     let rest = p
@@ -64,10 +67,13 @@ pub fn route(method: &str, path: &str) -> Result<HttpRequestRoute> {
         (m, e) => {
             return Err(IotError::Codec(format!(
                 "unsupported device endpoint {m} {e}"
-            )))
+            )));
         }
     };
-    Ok(HttpRequestRoute { token: token.to_string(), kind })
+    Ok(HttpRequestRoute {
+        token: token.to_string(),
+        kind,
+    })
 }
 
 /// Parse the `clientKeys` / `sharedKeys` attribute-filter query string into

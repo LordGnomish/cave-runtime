@@ -5,6 +5,7 @@
 //! telemetry parse → time-series store → rule-engine routing. Exercises the
 //! public surface of every major module as one coherent flow.
 
+use cave_iot_gateway::KvValue;
 use cave_iot_gateway::provisioning::{
     ProvisionConfig, ProvisionRequest, ProvisionResponse, ProvisionService, ProvisionStrategy,
 };
@@ -14,14 +15,18 @@ use cave_iot_gateway::rule_engine::{
 };
 use cave_iot_gateway::timeseries::{Aggregation, TsStore};
 use cave_iot_gateway::transport::mqtt;
-use cave_iot_gateway::KvValue;
 
 #[test]
 fn full_ingest_pipeline() {
     // 1. Registry + profile + provisioning config.
     let mut reg = DeviceRegistry::new();
     let pid = reg
-        .save_profile(DeviceProfile::new("p", "tenant-a", "sensors", TransportType::Mqtt))
+        .save_profile(DeviceProfile::new(
+            "p",
+            "tenant-a",
+            "sensors",
+            TransportType::Mqtt,
+        ))
         .unwrap();
     let mut prov = ProvisionService::new();
     prov.register_config(ProvisionConfig {
@@ -47,7 +52,10 @@ fn full_ingest_pipeline() {
 
     // 3. The device publishes telemetry over MQTT; the gateway authenticates
     //    it by the token and decodes the PUBLISH packet.
-    let device = reg.authenticate(&token).expect("token authenticates").clone();
+    let device = reg
+        .authenticate(&token)
+        .expect("token authenticates")
+        .clone();
     let packet = mqtt::encode_publish("v1/devices/me/telemetry", br#"{"temperature":82.5}"#);
     let publish = mqtt::decode_publish(&packet).unwrap();
     assert_eq!(
@@ -62,7 +70,14 @@ fn full_ingest_pipeline() {
         ts.insert(&device.id, k, 10_000, v.clone());
     }
     ts.insert(&device.id, "temperature", 20_000, KvValue::Double(90.0));
-    let agg = ts.aggregate(&device.id, "temperature", 0, 30_000, 30_000, Aggregation::Max);
+    let agg = ts.aggregate(
+        &device.id,
+        "temperature",
+        0,
+        30_000,
+        30_000,
+        Aggregation::Max,
+    );
     assert_eq!(agg, vec![(0, 90.0)]);
 
     // 5. Route the message through a rule chain: high-temp → alarm topic.
@@ -83,7 +98,10 @@ fn full_ingest_pipeline() {
     let mut msg = Message::new(&device.id, "POST_TELEMETRY");
     msg.data = kv;
     let outcome = chain.process(msg);
-    assert_eq!(outcome.actions, vec![ActionKind::PushToTopic("alarms".into())]);
+    assert_eq!(
+        outcome.actions,
+        vec![ActionKind::PushToTopic("alarms".into())]
+    );
     assert_eq!(
         outcome.message.metadata.get("severity").map(String::as_str),
         Some("critical")

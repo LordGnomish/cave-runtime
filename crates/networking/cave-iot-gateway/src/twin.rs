@@ -124,7 +124,12 @@ mod tests {
     #[test]
     fn attribute_store_scopes_are_isolated() {
         let mut store = AttributeStore::new();
-        store.save("dev", AttributeScope::Server, "fw", KvValue::Str("1.0".into()));
+        store.save(
+            "dev",
+            AttributeScope::Server,
+            "fw",
+            KvValue::Str("1.0".into()),
+        );
         store.save("dev", AttributeScope::Shared, "target", KvValue::Long(5));
         assert_eq!(
             store.get("dev", AttributeScope::Server, "fw"),

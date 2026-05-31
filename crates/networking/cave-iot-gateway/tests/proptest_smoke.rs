@@ -5,8 +5,8 @@
 //! arbitrary inputs.
 
 use cave_iot_gateway::transport::coap::{CoapCode, CoapMessage, CoapType};
-use cave_iot_gateway::transport::mqtt;
 use cave_iot_gateway::transport::modbus;
+use cave_iot_gateway::transport::mqtt;
 use proptest::prelude::*;
 
 proptest! {

@@ -102,9 +102,10 @@ impl DeviceRegistry {
             return Err(IotError::Invalid("device profile name is empty".into()));
         }
         if profile.is_default {
-            let clash = self.profiles.values().any(|p| {
-                p.tenant_id == profile.tenant_id && p.is_default && p.id != profile.id
-            });
+            let clash = self
+                .profiles
+                .values()
+                .any(|p| p.tenant_id == profile.tenant_id && p.is_default && p.id != profile.id);
             if clash {
                 return Err(IotError::Invalid(format!(
                     "tenant {} already has a default device profile",
@@ -221,7 +222,9 @@ impl DeviceRegistry {
 
     /// All devices belonging to a tenant.
     pub fn devices_of_tenant<'a>(&'a self, tenant_id: &'a str) -> impl Iterator<Item = &'a Device> {
-        self.devices.values().filter(move |d| d.tenant_id == tenant_id)
+        self.devices
+            .values()
+            .filter(move |d| d.tenant_id == tenant_id)
     }
 }
 
@@ -243,7 +246,10 @@ mod tests {
             .unwrap();
         assert!(!dev.id.is_empty());
         assert_eq!(reg.get_device(&dev.id).unwrap().name, "thermostat-1");
-        assert_eq!(reg.get_device(&dev.id).unwrap().label.as_deref(), Some("Lobby"));
+        assert_eq!(
+            reg.get_device(&dev.id).unwrap().label.as_deref(),
+            Some("Lobby")
+        );
     }
 
     #[test]
@@ -267,7 +273,9 @@ mod tests {
     #[test]
     fn create_device_with_unknown_profile_fails() {
         let mut reg = DeviceRegistry::new();
-        let err = reg.create_device("t1", "x", "nonexistent", None).unwrap_err();
+        let err = reg
+            .create_device("t1", "x", "nonexistent", None)
+            .unwrap_err();
         assert!(matches!(err, IotError::NotFound(_)));
     }
 

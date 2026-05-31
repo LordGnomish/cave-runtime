@@ -99,7 +99,11 @@ impl OtaCampaign {
             .iter()
             .map(|d| (d.clone(), OtaStatus::Queued))
             .collect();
-        OtaCampaign { id: id.to_string(), package, statuses }
+        OtaCampaign {
+            id: id.to_string(),
+            package,
+            statuses,
+        }
     }
 
     pub fn status(&self, device_id: &str) -> Option<OtaStatus> {
@@ -184,7 +188,10 @@ mod tests {
             OtaStatus::Updating,
             OtaStatus::Updated,
         ] {
-            assert!(c.advance("d1", s).is_ok(), "transition to {s:?} should be allowed");
+            assert!(
+                c.advance("d1", s).is_ok(),
+                "transition to {s:?} should be allowed"
+            );
         }
         assert_eq!(c.status("d1"), Some(OtaStatus::Updated));
     }
