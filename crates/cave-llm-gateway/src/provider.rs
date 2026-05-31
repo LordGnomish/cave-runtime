@@ -582,6 +582,26 @@ mod tests {
         assert!(registry.get("nonexistent").is_none());
     }
 
+    #[test]
+    fn from_config_dispatches_groq_and_deepseek() {
+        let mk = |name: &str, pt: ProviderType| ProviderConfig {
+            name: name.into(),
+            provider_type: pt,
+            base_url: "".into(),
+            api_key: Some("x".into()),
+            timeout_secs: 5,
+            max_retries: 0,
+            weight: 1,
+            enabled: true,
+        };
+        let reg = ProviderRegistry::from_config(vec![
+            mk("groq", ProviderType::Groq),
+            mk("deepseek", ProviderType::DeepSeek),
+        ]);
+        assert!(reg.get("groq").is_some());
+        assert!(reg.get("deepseek").is_some());
+    }
+
     #[tokio::test]
     async fn default_provider_embeddings_is_unsupported() {
         // AnthropicProvider does not override embeddings(); the default trait
