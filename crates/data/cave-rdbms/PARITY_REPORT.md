@@ -59,6 +59,34 @@ the explicit `ON CONFLICT (cols)` target, falling back to the primary-key
 columns when omitted — matching the `oid_index` / `primary_unique`
 selection rule in postgres `nodeModifyTable.c`.
 
+### 2026-05-31 cont2 storage + optimizer deep-port (strict-TDD)
+
+Five strict-TDD RED→GREEN cycles (test commit fails → impl commit passes),
+porting subsystems previously declared out-of-scope `skipped`:
+
+| # | Subsystem | Upstream | Local | Tests |
+|---|-----------|----------|-------|------:|
+| 1 | Cost-based optimizer | `optimizer/path/costsize.c` + `utils/adt/selfuncs.c` | `src/sql/costsize.rs` | 9+2 |
+| 2 | Heap page layout | `storage/bufpage.h` + `storage/itemptr.h` | `src/storage/heap.rs` | 8+2 |
+| 3 | Replication | `replication/{slot,walsender,logical/reorderbuffer}.c` | `src/storage/replication.rs` | 5+2 |
+| 4 | Extension framework | `commands/extension.c` + `.control` | `src/storage/extension.rs` | 5+2 |
+| 5 | pgvector | `pgvector/src/vector.c` (separate upstream) | `src/storage/pgvector.rs` | 7+2 |
+
+Combined with the predecessor's WAL/MVCC/GIN/GiST/BRIN ports, **seven
+subsystems** (WAL, MVCC, GIN, GiST, BRIN, replication, extensions) move
+`skipped` → `mapped` — they are now genuinely built, tested, and in-crate,
+so the prior "out-of-scope" claim is withdrawn.
+
+- **mapped 33 → 40**, **skipped 32 → 25**, partial/unmapped unchanged (4/0)
+- **honest_ratio 0.9130 → 0.9420** = (40 + 25) / 69 (also corrects the stale
+  0.9130, whose `(mapped+skipped)` arithmetic had drifted to 63 vs 65)
+- The 4 partials (planner cost-driven path selection, optimizer beyond the
+  new cost model, multi-thread transactions, JIT executor) are **held** as
+  partial — the cost model is a building block, not yet wired into plan
+  selection, so reclassifying them would be inflation.
+- Cost model wired: `POST /api/rdbms/cost/estimate`, `cavectl rdbms-engine
+  cost`, and a new portal `rdbms` SQL-engine card.
+
 ## 8-gate close-out
 
 | # | Gate                              | Result | Evidence                                  |

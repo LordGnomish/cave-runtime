@@ -21,22 +21,32 @@ url         = "https://github.com/postgres/postgres"
 # 2026-05-18 against the postgres source layout (src/backend/{libpq,parser,
 # optimizer,executor,access,catalog,storage,utils}, src/include/catalog).
 # cave-rdbms targets a minimal subset: wire-v3 + SQL grammar + executor +
-# in-memory storage + info_schema/pg_catalog. Out-of-scope subsystems
-# (WAL/replication/MVCC/autovacuum/triggers/FDW/extensions/FTS/jsonb ops/
-# GIN/GiST/BRIN/COPY/LISTEN/NOTIFY/SSL+SCRAM/RLS/window-funcs/CTEs) are
-# counted as `skipped`. Items declared in-scope but not yet built are
-# `unmapped`.
-mapped_count          = 33
+# in-memory storage + info_schema/pg_catalog. Remaining out-of-scope
+# subsystems (autovacuum/triggers/FDW/FTS/jsonb ops/COPY/LISTEN/NOTIFY/
+# SSL+SCRAM/RLS/window-funcs/CTEs) are counted as `skipped`. Items declared
+# in-scope but not yet built are `unmapped`.
+#
+# 2026-05-31 (cont2, strict-TDD): seven subsystems previously declared
+# `skipped` are now genuinely built, tested, and in-crate, so they are
+# reclassified `skipped` → `mapped` (a dishonest out-of-scope claim removed):
+#   WAL (storage/wal.rs)            MVCC (storage/mvcc.rs)
+#   GIN/GiST/BRIN (storage/index/)  replication (storage/replication.rs)
+#   extensions (storage/extension.rs)
+# Added depth not re-counted (already-mapped or off-core upstream): the
+# cost-based optimizer cost model (sql/costsize.rs, depth on optimizer.rs),
+# heap access method (storage/heap.rs), and pgvector (storage/pgvector.rs,
+# a separate upstream).
+mapped_count          = 40
 partial_count         = 4
-skipped_count         = 32
+skipped_count         = 25
 unmapped_count        = 0
 total                 = 69
 fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 69/69
-honest_ratio          = 0.9130  # (mapped + skipped) / total            = 63/69 preserved
-adr_justified_ratio   = 1.0      # 32 skipped (30 original out-of-scope subsystems + 2 formalized 2026-05-28: Lease→cave-ha, connect-verbs→cave-cri) all architecturally justified per ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 §1 (sibling-crate ownership)
+honest_ratio          = 0.9420  # (mapped + skipped) / total            = 65/69 (corrects stale 0.9130 + 7 skipped→mapped)
+adr_justified_ratio   = 1.0      # 25 remaining skipped all architecturally justified per ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 §1 (out-of-scope subsystems + Lease→cave-ha, connect-verbs→cave-cri sibling-crate ownership)
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-28"
+last_audit            = "2026-05-31"
 infra_only            = false
 [module]
 name        = "cave-rdbms"
@@ -164,6 +174,56 @@ local    = "src/storage/schema.rs"
 [[files]]
 upstream = "src/backend/storage/buffer/bufmgr.c"
 local    = "src/storage/mod.rs"
+
+# ── 2026-05-30/31 storage + optimizer deep-port (skipped → mapped) ─────────────
+[[files]]
+upstream = "src/backend/access/transam/xlog.c"
+local    = "src/storage/wal.rs"
+
+[[files]]
+upstream = "src/backend/access/heap/heapam_visibility.c"
+local    = "src/storage/mvcc.rs"
+
+[[files]]
+upstream = "src/include/storage/bufpage.h"
+local    = "src/storage/heap.rs"
+
+[[files]]
+upstream = "src/backend/access/nbtree/nbtree.c"
+local    = "src/storage/index/btree.rs"
+
+[[files]]
+upstream = "src/backend/access/hash/hash.c"
+local    = "src/storage/index/hash.rs"
+
+[[files]]
+upstream = "src/backend/access/gin/ginget.c"
+local    = "src/storage/index/gin.rs"
+
+[[files]]
+upstream = "src/backend/access/gist/gist.c"
+local    = "src/storage/index/gist.rs"
+
+[[files]]
+upstream = "src/backend/access/brin/brin.c"
+local    = "src/storage/index/brin.rs"
+
+[[files]]
+upstream = "src/backend/replication/slot.c"
+local    = "src/storage/replication.rs"
+
+[[files]]
+upstream = "src/backend/commands/extension.c"
+local    = "src/storage/extension.rs"
+
+[[files]]
+upstream = "src/backend/optimizer/path/costsize.c"
+local    = "src/sql/costsize.rs"
+
+[[files]]
+# pgvector (separate upstream: github.com/pgvector/pgvector src/vector.c)
+upstream = "contrib/vector/src/vector.c"
+local    = "src/storage/pgvector.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
