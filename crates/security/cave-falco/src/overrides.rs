@@ -156,7 +156,8 @@ mod tests {
     #[test]
     fn append_condition_space_joins() {
         let mut r = base();
-        append(&mut r, &RuleUpdate::new(&r.name.clone()).with_condition("and not proc.name=foo")).unwrap();
+        let name = r.name.clone();
+        append(&mut r, &RuleUpdate::new(name).with_condition("and not proc.name=foo")).unwrap();
         assert_eq!(r.condition, "evt.type=open and fd.name startswith /etc and not proc.name=foo");
     }
 
@@ -215,7 +216,8 @@ mod tests {
     #[test]
     fn replace_condition_overwrites() {
         let mut r = base();
-        replace(&mut r, &RuleUpdate::new(&r.name.clone()).with_condition("evt.type=connect")).unwrap();
+        let name = r.name.clone();
+        replace(&mut r, &RuleUpdate::new(name).with_condition("evt.type=connect")).unwrap();
         assert_eq!(r.condition, "evt.type=connect");
     }
 
