@@ -15,11 +15,14 @@
 //! Modules:
 //!   edged        — minimal kubelet: pod-worker queue + phase + orphan GC + status cadence
 //!   metamanager  — offline-first local metadata store (cache-through + serve-from-cache)
+//!   eventbus     — MQTT-topic ↔ internal message bridge over a cave-streams local queue
 
 pub mod edged;
 pub mod error;
+pub mod eventbus;
 pub mod metamanager;
 
 pub use edged::{Edged, Pod, PodPhase};
 pub use error::{EdgeError, Result};
+pub use eventbus::{EdgeTopicKind, EventBus, Message, topic_matches};
 pub use metamanager::{MetaManager, QueryOutcome};
