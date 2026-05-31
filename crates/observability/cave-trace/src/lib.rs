@@ -40,6 +40,7 @@ pub mod adaptive_sampling;
 pub mod adaptive_sampling_routes;
 pub mod sampling;
 pub mod servicegraph;
+pub mod spanmetrics;
 pub mod spm;
 pub mod storage;
 pub mod storage_badger;
