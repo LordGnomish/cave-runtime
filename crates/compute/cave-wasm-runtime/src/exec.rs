@@ -7,6 +7,7 @@
 //! out-of-scope in the parity manifest.
 
 use crate::error::{Result, WasmError};
+use crate::limits::{ResourceLimits, Store};
 use crate::types::{Module, ValType};
 use serde::{Deserialize, Serialize};
 
@@ -62,11 +63,7 @@ impl Instance {
 
     /// Invoke an exported function by name with the given arguments.
     pub fn invoke(&self, name: &str, args: &[Value]) -> Result<Vec<Value>> {
-        let idx = self
-            .module
-            .export_func(name)
-            .ok_or_else(|| WasmError::ExportNotFound(name.to_string()))?;
-        self.exec_func(idx, args.to_vec(), 0)
+        self.invoke_with(name, args, &ResourceLimits::default())
     }
 
     /// Invoke an exported function under explicit resource limits (fuel +
@@ -75,16 +72,25 @@ impl Instance {
         &self,
         name: &str,
         args: &[Value],
-        limits: &crate::limits::ResourceLimits,
+        limits: &ResourceLimits,
     ) -> Result<Vec<Value>> {
-        // RED stub — fuel/memory wiring is added in the GREEN commit.
-        let _ = limits;
-        self.invoke(name, args)
+        let idx = self
+            .module
+            .export_func(name)
+            .ok_or_else(|| WasmError::ExportNotFound(name.to_string()))?;
+        let mut store = Store::new(self.module.memory, limits);
+        self.exec_func(idx, args.to_vec(), 0, &mut store)
     }
 
     /// Execute a function by index, returning its result values. `depth` guards
     /// against runaway recursion.
-    pub(crate) fn exec_func(&self, func_idx: u32, args: Vec<Value>, depth: u32) -> Result<Vec<Value>> {
+    pub(crate) fn exec_func(
+        &self,
+        func_idx: u32,
+        args: Vec<Value>,
+        depth: u32,
+        store: &mut Store,
+    ) -> Result<Vec<Value>> {
         if depth > 1024 {
             return Err(WasmError::Trap("call stack exhausted".into()));
         }
@@ -127,6 +133,7 @@ impl Instance {
         }
 
         while pc < code.len() {
+            store.charge()?;
             let op = code[pc];
             pc += 1;
             match op {
@@ -228,8 +235,45 @@ impl Instance {
                         return Err(WasmError::StackUnderflow);
                     }
                     let call_args = stack.split_off(stack.len() - n);
-                    let results = self.exec_func(callee, call_args, depth + 1)?;
+                    let results = self.exec_func(callee, call_args, depth + 1, store)?;
                     stack.extend(results);
+                }
+                0x28 => {
+                    // i32.load
+                    let (_align, offset) = read_memarg(code, &mut pc)?;
+                    let addr = pop!().as_i32()? as u32;
+                    stack.push(Value::I32(store.read_i32(addr, offset)?));
+                }
+                0x2d => {
+                    // i32.load8_u
+                    let (_align, offset) = read_memarg(code, &mut pc)?;
+                    let addr = pop!().as_i32()? as u32;
+                    stack.push(Value::I32(store.read_u8(addr, offset)? as i32));
+                }
+                0x36 => {
+                    // i32.store
+                    let (_align, offset) = read_memarg(code, &mut pc)?;
+                    let value = pop!().as_i32()?;
+                    let addr = pop!().as_i32()? as u32;
+                    store.write_i32(addr, offset, value)?;
+                }
+                0x3a => {
+                    // i32.store8
+                    let (_align, offset) = read_memarg(code, &mut pc)?;
+                    let value = pop!().as_i32()?;
+                    let addr = pop!().as_i32()? as u32;
+                    store.write_u8(addr, offset, (value & 0xff) as u8)?;
+                }
+                0x3f => {
+                    // memory.size (mem index byte)
+                    let _mem = read_u32(code, &mut pc)?;
+                    stack.push(Value::I32(store.pages() as i32));
+                }
+                0x40 => {
+                    // memory.grow (mem index byte)
+                    let _mem = read_u32(code, &mut pc)?;
+                    let delta = pop!().as_i32()? as u32;
+                    stack.push(Value::I32(store.grow(delta)));
                 }
                 other => return Err(WasmError::UnsupportedOpcode(other)),
             }
@@ -256,6 +300,13 @@ fn read_u32(code: &[u8], pc: &mut usize) -> Result<u32> {
         }
     }
     Ok(result as u32)
+}
+
+/// Decode a memory immediate (`align`, `offset`) — both unsigned LEB128.
+fn read_memarg(code: &[u8], pc: &mut usize) -> Result<(u32, u32)> {
+    let align = read_u32(code, pc)?;
+    let offset = read_u32(code, pc)?;
+    Ok((align, offset))
 }
 
 /// Signed LEB128 (32-bit) from a code stream at `*pc`.
