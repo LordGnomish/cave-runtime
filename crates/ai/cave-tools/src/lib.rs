@@ -25,6 +25,7 @@
 //!
 //! [Model Context Protocol]: https://modelcontextprotocol.io
 
+pub mod audit;
 pub mod error;
 pub mod mcp;
 pub mod permission;
