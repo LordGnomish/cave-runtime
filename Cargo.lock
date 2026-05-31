@@ -2359,6 +2359,7 @@ dependencies = [
  "cave-docs-site",
  "cave-erp",
  "cave-etcd",
+ "cave-falco",
  "cave-flags",
  "cave-forensics",
  "cave-gateway",
