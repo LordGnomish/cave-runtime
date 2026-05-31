@@ -8,6 +8,105 @@
 //! constructor. These drive `.status.conditions`; the controller owns the live
 //! reconcile, this module owns the arithmetic.
 
+use crate::models::RolloutCondition;
+use chrono::{DateTime, Duration, Utc};
+
+/// Condition reasons mirrored from upstream `utils/conditions`.
+pub const TIMED_OUT_REASON: &str = "ProgressDeadlineExceeded";
+/// Reason set on the Progressing condition when a Rollout is aborted.
+pub const ROLLOUT_ABORTED_REASON: &str = "RolloutAborted";
+/// Reason set on the Progressing condition while a Rollout is paused.
+pub const ROLLOUT_PAUSED_REASON: &str = "RolloutPaused";
+
+/// Replica tallies a Rollout's status carries, consumed by the health predicates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReplicaCounts {
+    pub desired: i32,
+    pub updated: i32,
+    pub ready: i32,
+    pub available: i32,
+    pub total: i32,
+}
+
+/// `RolloutCompleted` — the stable ReplicaSet hash equals the current pod hash
+/// and is non-empty (a never-rolled-out Rollout is not "complete").
+pub fn rollout_complete(stable_rs: &str, current_pod_hash: &str) -> bool {
+    !stable_rs.is_empty() && stable_rs == current_pod_hash
+}
+
+/// Replica-level health shared by both strategies: every replica is updated and
+/// available, with no surplus (old) replicas lingering.
+pub fn replicas_healthy(c: &ReplicaCounts) -> bool {
+    c.updated == c.desired && c.available == c.desired && c.total == c.desired
+}
+
+/// Canary `RolloutHealthy`: replicas at desired, every step executed, and the
+/// stable ReplicaSet promoted to the current pod hash.
+pub fn canary_healthy(
+    c: &ReplicaCounts,
+    current_step_index: i32,
+    step_count: i32,
+    stable_rs: &str,
+    current_pod_hash: &str,
+) -> bool {
+    replicas_healthy(c)
+        && current_step_index == step_count
+        && rollout_complete(stable_rs, current_pod_hash)
+}
+
+/// Blue/Green `RolloutHealthy`: replicas at desired, the active selector points
+/// at the current pod hash, and — if a preview service is defined — so does the
+/// preview selector.
+pub fn blue_green_healthy(
+    c: &ReplicaCounts,
+    active_selector: &str,
+    current_pod_hash: &str,
+    preview_selector: &str,
+    preview_defined: bool,
+) -> bool {
+    replicas_healthy(c)
+        && active_selector == current_pod_hash
+        && (!preview_defined || preview_selector == current_pod_hash)
+}
+
+/// `RolloutTimedOut`: an explicit timed-out reason short-circuits to true; an
+/// aborted/paused Rollout never times out; otherwise the Progressing condition
+/// has gone longer than `progress_deadline_seconds` since its last update.
+pub fn rollout_timed_out(
+    progressing_reason: &str,
+    last_update_time: DateTime<Utc>,
+    progress_deadline_seconds: i64,
+    now: DateTime<Utc>,
+) -> bool {
+    if progressing_reason == TIMED_OUT_REASON {
+        return true;
+    }
+    if progressing_reason == ROLLOUT_ABORTED_REASON
+        || progressing_reason == ROLLOUT_PAUSED_REASON
+    {
+        return false;
+    }
+    let deadline = last_update_time + Duration::seconds(progress_deadline_seconds);
+    now > deadline
+}
+
+/// `newCondition` — construct a `RolloutCondition` stamped at `now`.
+pub fn new_rollout_condition(
+    condition_type: &str,
+    status: &str,
+    reason: &str,
+    message: &str,
+    now: DateTime<Utc>,
+) -> RolloutCondition {
+    RolloutCondition {
+        condition_type: condition_type.to_string(),
+        status: status.to_string(),
+        reason: reason.to_string(),
+        message: message.to_string(),
+        last_update_time: now,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
