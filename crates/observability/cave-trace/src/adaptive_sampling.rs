@@ -53,8 +53,24 @@ impl PercentageIncreaseCappedCalculator {
     }
 
     /// `Calculate(targetQPS, curQPS, oldProbability)`.
-    pub fn calculate(&self, _target_qps: f64, _cur_qps: f64, _old_probability: f64) -> f64 {
-        unimplemented!("RED")
+    ///
+    /// `factor = targetQPS / curQPS`; the new probability is `old * factor`, but
+    /// when growing (`factor > 1`) the per-window increase is capped so the result
+    /// never exceeds `old * (1 + cap)`. Decreases are unrestricted. A zero current
+    /// QPS leaves the probability unchanged (no observations to act on).
+    pub fn calculate(&self, target_qps: f64, cur_qps: f64, old_probability: f64) -> f64 {
+        if cur_qps == 0.0 {
+            return old_probability;
+        }
+        let factor = target_qps / cur_qps;
+        let mut new_probability = old_probability * factor;
+        if factor > 1.0 {
+            let percent_increase = (new_probability - old_probability) / old_probability;
+            if percent_increase > self.percentage_increase_cap {
+                new_probability = old_probability * (1.0 + self.percentage_increase_cap);
+            }
+        }
+        new_probability
     }
 }
 
@@ -113,23 +129,60 @@ impl AdaptiveSamplingProcessor {
         self
     }
 
-    pub fn qps(&self, _count: u64) -> f64 {
-        unimplemented!("RED")
+    /// Convert a span count over the window into queries-per-second.
+    pub fn qps(&self, count: u64) -> f64 {
+        if self.calculation_interval_secs <= 0.0 {
+            return 0.0;
+        }
+        count as f64 / self.calculation_interval_secs
     }
 
-    pub fn probability_for(&self, _service: &str, _operation: &str) -> f64 {
-        unimplemented!("RED")
+    /// Look up the current probability for an operation, falling back to the
+    /// initial probability when unseen.
+    pub fn probability_for(&self, service: &str, operation: &str) -> f64 {
+        self.probabilities
+            .get(service)
+            .and_then(|ops| ops.get(operation))
+            .copied()
+            .unwrap_or(self.initial_sampling_probability)
     }
 
-    pub fn calculate_probability(&self, _service: &str, _operation: &str, _qps: f64) -> f64 {
-        unimplemented!("RED")
+    /// Compute the next probability for one operation given its observed QPS.
+    ///
+    /// Clamped to `[MIN_SAMPLING_PROBABILITY, MAX_SAMPLING_PROBABILITY]`. Operations
+    /// whose QPS is below `min_samples_per_second` are never lowered below their old
+    /// probability (rare endpoints keep their sampling rate).
+    pub fn calculate_probability(&self, service: &str, operation: &str, qps: f64) -> f64 {
+        let old = self.probability_for(service, operation);
+        let mut new_probability =
+            self.calculator
+                .calculate(self.target_samples_per_second, qps, old);
+        // Rare operations (below the minimum sample rate) must not be lowered.
+        if qps < self.min_samples_per_second {
+            new_probability = new_probability.max(old);
+        }
+        new_probability
+            .min(MAX_SAMPLING_PROBABILITY)
+            .max(MIN_SAMPLING_PROBABILITY)
     }
 
+    /// Recompute the whole probability table from a batch of throughput records and
+    /// store it. Returns the new table (service -> operation -> probability).
     pub fn calculate_probabilities(
         &mut self,
-        _throughput: &[Throughput],
+        throughput: &[Throughput],
     ) -> HashMap<String, HashMap<String, f64>> {
-        unimplemented!("RED")
+        let mut table: HashMap<String, HashMap<String, f64>> = HashMap::new();
+        for tp in throughput {
+            let qps = self.qps(tp.count);
+            let probability = self.calculate_probability(&tp.service, &tp.operation, qps);
+            table
+                .entry(tp.service.clone())
+                .or_default()
+                .insert(tp.operation.clone(), probability);
+        }
+        self.probabilities = table.clone();
+        table
     }
 
     pub fn probabilities(&self) -> &HashMap<String, HashMap<String, f64>> {

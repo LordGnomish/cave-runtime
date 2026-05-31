@@ -37,6 +37,7 @@ pub mod propagation;
 pub mod query;
 pub mod routes;
 pub mod adaptive_sampling;
+pub mod adaptive_sampling_routes;
 pub mod sampling;
 pub mod servicegraph;
 pub mod spm;
@@ -132,12 +133,14 @@ impl TraceState {
 pub fn router(state: Arc<TraceState>) -> Router {
     let ingest_router = routes::ingest::create_router(state.clone());
     let jaeger_router = routes::jaeger::create_router(state.clone());
-    let tempo_router = routes::tempo::create_router(state);
+    let tempo_router = routes::tempo::create_router(state.clone());
+    let adaptive_sampling_router = adaptive_sampling_routes::create_router(state);
 
     Router::new()
         .merge(ingest_router)
         .merge(jaeger_router)
         .merge(tempo_router)
+        .merge(adaptive_sampling_router)
 }
 
 // ─── Background services ───────────────────────────────────────────────────
