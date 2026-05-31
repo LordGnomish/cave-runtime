@@ -2845,6 +2845,7 @@ dependencies = [
  "axum 0.8.9",
  "chrono",
  "proptest",
+ "regex",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
