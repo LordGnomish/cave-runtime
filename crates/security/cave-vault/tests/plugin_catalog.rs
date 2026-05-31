@@ -164,3 +164,94 @@ fn list_scopes_by_type() {
     assert_eq!(cat.list(PluginType::Credential), vec!["ldap"]);
     assert!(cat.list(PluginType::Secrets).is_empty());
 }
+
+// ── Cycle 3: PluginType string round-trip + versioned keys + version select ──
+
+#[test]
+fn plugin_type_string_and_iota() {
+    // Discriminants match upstream iota order, and the asymmetric String()
+    // mapping (Credential→"auth", Secrets→"secret").
+    assert_eq!(PluginType::Unknown as i32, 0);
+    assert_eq!(PluginType::Credential as i32, 1);
+    assert_eq!(PluginType::Database as i32, 2);
+    assert_eq!(PluginType::Secrets as i32, 3);
+    assert_eq!(PluginType::Unknown.as_str(), "unknown");
+    assert_eq!(PluginType::Credential.as_str(), "auth");
+    assert_eq!(PluginType::Database.as_str(), "database");
+    assert_eq!(PluginType::Secrets.as_str(), "secret");
+}
+
+#[test]
+fn parse_plugin_type_round_trips() {
+    for t in [
+        PluginType::Unknown,
+        PluginType::Credential,
+        PluginType::Database,
+        PluginType::Secrets,
+    ] {
+        assert_eq!(PluginType::parse(t.as_str()).unwrap(), t);
+    }
+}
+
+#[test]
+fn parse_plugin_type_rejects_unknown_string() {
+    assert_eq!(
+        PluginType::parse("widget"),
+        Err(PluginError::UnsupportedType("widget".to_string()))
+    );
+}
+
+#[test]
+fn versioned_storage_key_includes_version_segment() {
+    assert_eq!(
+        PluginCatalog::storage_key(PluginType::Database, "mysql", "1.2.0"),
+        "database/mysql/1.2.0"
+    );
+}
+
+#[test]
+fn versioned_and_unversioned_registrations_are_distinct() {
+    let mut cat = PluginCatalog::new();
+    let mut v1 = valid_input("mysql", PluginType::Database);
+    v1.version = "1.0.0".to_string();
+    v1.command = "mysql-v1".to_string();
+    cat.set(v1).unwrap();
+    cat.set(valid_input("mysql", PluginType::Database)).unwrap(); // unversioned
+
+    // Each version selectable independently.
+    assert_eq!(
+        cat.get("mysql", PluginType::Database, "1.0.0").unwrap().command,
+        "mysql-v1"
+    );
+    assert_eq!(
+        cat.get("mysql", PluginType::Database, "").unwrap().command,
+        "mysql-plugin"
+    );
+    // A version that was never registered does not fall back to builtin/unversioned.
+    assert!(cat.get("mysql", PluginType::Database, "9.9.9").is_none());
+}
+
+#[test]
+fn list_versions_returns_all_registered_versions_sorted() {
+    let mut cat = PluginCatalog::new();
+    for v in ["1.10.0", "1.2.0", "1.9.0"] {
+        let mut input = valid_input("mysql", PluginType::Database);
+        input.version = v.to_string();
+        cat.set(input).unwrap();
+    }
+    cat.set(valid_input("mysql", PluginType::Database)).unwrap(); // unversioned -> ""
+    // Distinct name we must not pick up.
+    cat.set(valid_input("redis", PluginType::Database)).unwrap();
+
+    // Semver-aware ordering, unversioned ("") sorts first.
+    let versions = cat.list_versions("mysql", PluginType::Database);
+    assert_eq!(versions, vec!["", "1.2.0", "1.9.0", "1.10.0"]);
+}
+
+#[test]
+fn list_versions_empty_for_unregistered() {
+    let cat = PluginCatalog::new();
+    assert!(cat
+        .list_versions("ghost", PluginType::Secrets)
+        .is_empty());
+}
