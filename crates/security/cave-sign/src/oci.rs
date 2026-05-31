@@ -62,13 +62,62 @@ impl ImageRef {
         format!("sha256-{}.att", hex)
     }
 
+    /// Cosign SBOM discovery tag — `<algorithm>-<hex>.sbom`.
+    pub fn sbom_tag(&self) -> String {
+        let hex = self.digest.trim_start_matches("sha256:");
+        format!("sha256-{}.sbom", hex)
+    }
+
     pub fn signature_uri(&self) -> String {
-        format!(
-            "{}/{}:{}",
-            self.registry,
-            self.repository,
-            self.signature_tag()
-        )
+        self.tag_uri(&self.signature_tag())
+    }
+
+    pub fn attestation_uri(&self) -> String {
+        self.tag_uri(&self.attestation_tag())
+    }
+
+    pub fn sbom_uri(&self) -> String {
+        self.tag_uri(&self.sbom_tag())
+    }
+
+    fn tag_uri(&self, tag: &str) -> String {
+        format!("{}/{}:{}", self.registry, self.repository, tag)
+    }
+
+    /// `cosign triangulate --type <signature|attestation|sbom>` — derive the
+    /// OCI reference where the associated artifact is stored, by digest-tag
+    /// convention. Maps cmd/cosign/cli/triangulate.go + ociremote.*Tag.
+    pub fn triangulate(&self, kind: CosignArtifactType) -> String {
+        match kind {
+            CosignArtifactType::Signature => self.signature_uri(),
+            CosignArtifactType::Attestation => self.attestation_uri(),
+            CosignArtifactType::Sbom => self.sbom_uri(),
+        }
+    }
+}
+
+/// The kinds of cosign-attached artifacts a `triangulate` can resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CosignArtifactType {
+    Signature,
+    Attestation,
+    Sbom,
+}
+
+impl CosignArtifactType {
+    /// Parse the `--type` flag value (cosign accepts `signature`, the default,
+    /// plus `attestation` and `sbom`).
+    pub fn parse(s: &str) -> Result<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "signature" | "sig" => Ok(Self::Signature),
+            "attestation" | "att" => Ok(Self::Attestation),
+            "sbom" => Ok(Self::Sbom),
+            other => Err(SignError::InvalidDigest(format!(
+                "unknown triangulate type: {} (want signature|attestation|sbom)",
+                other
+            ))),
+        }
     }
 }
 

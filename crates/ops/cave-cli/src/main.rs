@@ -2707,6 +2707,15 @@ enum SignCmd {
         #[arg(long)]
         bundle_json: String,
     },
+    /// Derive the OCI reference of an attached artifact (cosign triangulate)
+    Triangulate {
+        /// Image reference `registry/repo@sha256:<hex>`
+        #[arg(long)]
+        image: String,
+        /// Artifact type: signature (default), attestation, or sbom
+        #[arg(long = "type", default_value = "signature")]
+        artifact_type: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4226,6 +4235,12 @@ source_root = "src"
                     "/api/sign/sigstore-bundle",
                     json!({ "bundle_json": bundle_json }),
                 )
+                .await
+            }
+            SignCmd::Triangulate { image, artifact_type } => {
+                c.get(&format!(
+                    "/api/sign/triangulate?image={image}&type={artifact_type}"
+                ))
                 .await
             }
         },

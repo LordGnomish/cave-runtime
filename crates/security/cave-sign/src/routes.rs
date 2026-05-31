@@ -40,6 +40,7 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/sign/rekor", get(rekor_route))
         .route("/api/sign/list", get(list_route))
         .route("/api/sign/sigstore-bundle", post(sigstore_bundle_route))
+        .route("/api/sign/triangulate", get(triangulate_route))
         .with_state(state)
 }
 
@@ -228,6 +229,29 @@ async fn rekor_route(
 
 async fn list_route(AxumState(state): AxumState<Arc<State>>) -> Json<Vec<SignedArtifact>> {
     Json(state.store.all().unwrap_or_default())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TriangulateQuery {
+    /// `registry/repo@sha256:<hex>` image reference.
+    pub image: String,
+    /// `signature` (default) | `attestation` | `sbom`.
+    #[serde(default)]
+    pub r#type: Option<String>,
+}
+
+/// `cosign triangulate` — derive the OCI reference of an attached artifact.
+async fn triangulate_route(
+    Query(q): Query<TriangulateQuery>,
+) -> std::result::Result<Json<serde_json::Value>, ApiError> {
+    let image = crate::oci::ImageRef::parse(&q.image).map_err(ApiError::from)?;
+    let kind = crate::oci::CosignArtifactType::parse(q.r#type.as_deref().unwrap_or("signature"))
+        .map_err(ApiError::from)?;
+    Ok(Json(json!({
+        "image": q.image,
+        "type": kind,
+        "reference": image.triangulate(kind),
+    })))
 }
 
 #[derive(Debug, Deserialize)]
