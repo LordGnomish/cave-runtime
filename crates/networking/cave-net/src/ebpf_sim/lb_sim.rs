@@ -39,6 +39,11 @@
 //!     drops on timeout or when the backend leaves the service
 //!     (`cilium_lb_affinity_match` miss). Mirrors
 //!     `__lb4_affinity_backend_id` / `__lb4_update_affinity`.
+//!   * **Source-range ACL.** A service may restrict client CIDRs
+//!     (`LoadBalancerSourceRanges`). `lb4_src_range_ok` does an LPM
+//!     lookup of the source IP in `cilium_lb4_source_range`; with no
+//!     ranges the service is open, and `SVC_FLAG_SOURCE_RANGE_DENY`
+//!     inverts the allow-list into a block-list.
 //!
 //! Out of scope (kernel BPF harness owns these): packet-buffer writes,
 //! L3/L4 checksum recomputation, and the Linux netfilter loopback-SNAT
@@ -207,6 +212,26 @@ pub struct LbMaps {
     /// A miss means the backend was removed, so the sticky entry is
     /// stale and must be dropped.
     affinity_match: std::collections::BTreeSet<(u16, u32)>,
+    /// `cilium_lb4_source_range` — per-service LPM trie of allowed (or,
+    /// with the deny flag, blocked) client CIDRs, keyed by
+    /// `rev_nat_id`. Each entry is `(network, prefix_len)`.
+    source_ranges: std::collections::BTreeMap<u16, Vec<(u32, u8)>>,
+    /// Services whose source ranges act as a block-list
+    /// (`SVC_FLAG_SOURCE_RANGE_DENY`).
+    source_range_deny: std::collections::BTreeSet<u16>,
+}
+
+/// `(addr & mask) == (network & mask)` for an IPv4 CIDR. A `/0` prefix
+/// matches every address; a `/32` is an exact host route.
+fn ipv4_cidr_contains(addr: u32, network: u32, prefix_len: u8) -> bool {
+    let mask = if prefix_len == 0 {
+        0
+    } else if prefix_len >= 32 {
+        u32::MAX
+    } else {
+        u32::MAX << (32 - prefix_len as u32)
+    };
+    (addr & mask) == (network & mask)
 }
 
 impl LbMaps {
@@ -219,6 +244,8 @@ impl LbMaps {
             maglev: std::collections::BTreeMap::new(),
             affinity: Map::new_hash(),
             affinity_match: std::collections::BTreeSet::new(),
+            source_ranges: std::collections::BTreeMap::new(),
+            source_range_deny: std::collections::BTreeSet::new(),
         }
     }
 
@@ -397,6 +424,41 @@ impl LbMaps {
     /// Sticky entries still pointing at it become stale on next lookup.
     pub fn remove_affinity_match(&mut self, rev_nat_id: u16, backend_id: u32) {
         self.affinity_match.remove(&(rev_nat_id, backend_id));
+    }
+
+    /// Register an allowed (or, with the deny flag, blocked) client
+    /// CIDR for a service — one entry in `cilium_lb4_source_range`.
+    pub fn add_source_range(&mut self, rev_nat_id: u16, network: u32, prefix_len: u8) {
+        self.source_ranges.entry(rev_nat_id).or_default().push((network, prefix_len));
+    }
+
+    /// Set / clear `SVC_FLAG_SOURCE_RANGE_DENY` for a service. When set,
+    /// the source ranges act as a block-list rather than an allow-list.
+    pub fn set_source_range_deny(&mut self, rev_nat_id: u16, deny: bool) {
+        if deny {
+            self.source_range_deny.insert(rev_nat_id);
+        } else {
+            self.source_range_deny.remove(&rev_nat_id);
+        }
+    }
+
+    /// `lb4_src_range_ok` — verdict for a client `saddr` against a
+    /// service's source ranges. With no ranges configured
+    /// (`!svc.has_src_range_check()`) the service is open and this
+    /// returns `true`. Otherwise an LPM lookup decides membership; the
+    /// `SVC_FLAG_SOURCE_RANGE_DENY` flag XOR-inverts the result, turning
+    /// the allow-list into a block-list.
+    pub fn lb4_src_range_ok(&self, rev_nat_id: u16, saddr: u32) -> bool {
+        let ranges = match self.source_ranges.get(&rev_nat_id) {
+            Some(r) if !r.is_empty() => r,
+            // has_src_range_check() == false ⇒ open to all.
+            _ => return true,
+        };
+        let found = ranges
+            .iter()
+            .any(|&(network, prefix_len)| ipv4_cidr_contains(saddr, network, prefix_len));
+        let deny = self.source_range_deny.contains(&rev_nat_id);
+        found ^ deny
     }
 
     /// Forward path honoring session affinity (the `lb4_local`
