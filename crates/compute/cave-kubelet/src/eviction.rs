@@ -116,6 +116,26 @@ impl EvictionThreshold {
     pub fn is_hard(&self) -> bool {
         self.grace_period_seconds == 0
     }
+
+    /// Attach a `--eviction-minimum-reclaim` value: once this threshold is
+    /// crossed the kubelet over-evicts until `available` reaches
+    /// `value + minReclaim`, leaving headroom so pressure doesn't immediately
+    /// re-trigger.
+    pub fn with_min_reclaim(mut self, min_reclaim: ThresholdValue) -> Self {
+        self.min_reclaim = Some(min_reclaim);
+        self
+    }
+
+    /// The effective availability target — `value` plus any minimum-reclaim
+    /// band — resolved against `capacity`. Mirrors helpers.go thresholdsMet
+    /// with `enforceMinReclaim` set.
+    pub fn effective_target(&self, capacity: u64) -> u64 {
+        let base = self.value.resolve(capacity);
+        match self.min_reclaim {
+            Some(mr) => base + mr.resolve(capacity),
+            None => base,
+        }
+    }
 }
 
 /// A single observation of a node-level signal.
@@ -207,6 +227,28 @@ pub fn signal_crosses(threshold: &EvictionThreshold, obs: &SignalObservation) ->
             obs.available <= value
         }
     }
+}
+
+/// Like [`signal_crosses`], but against the minimum-reclaim band: the kubelet
+/// keeps evicting until `available` clears `value + minReclaim`. With no
+/// `min_reclaim` configured this is identical to [`signal_crosses`].
+pub fn signal_crosses_with_min_reclaim(
+    threshold: &EvictionThreshold,
+    obs: &SignalObservation,
+) -> bool {
+    match threshold.op {
+        ThresholdOp::LessThan => obs.available <= threshold.effective_target(obs.capacity),
+    }
+}
+
+/// How much of the signal must still be reclaimed to clear the effective
+/// (`value + minReclaim`) target — `0` once the band is satisfied. Port of the
+/// `available` vs `value+minReclaim` gap helpers.go uses to decide whether to
+/// keep evicting after the bare threshold is no longer met.
+pub fn reclaim_target(threshold: &EvictionThreshold, obs: &SignalObservation) -> u64 {
+    threshold
+        .effective_target(obs.capacity)
+        .saturating_sub(obs.available)
 }
 
 /// Decision returned by the eviction manager for a tick.
