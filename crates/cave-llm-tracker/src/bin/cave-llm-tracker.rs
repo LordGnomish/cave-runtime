@@ -27,6 +27,17 @@ enum Mode {
     /// Selection only against the precomputed seed candidates; useful
     /// to validate verdicts logic without touching the network.
     Select,
+    /// Print the upgrade notification for the latest report (or a quiet
+    /// note when nothing cleared a floor). Reads `latest.json`.
+    Notify,
+    /// Print the per-model benchmark-history trend across every
+    /// `daily-<date>.json` in the report dir.
+    Trend,
+    /// Print the cost × quality matrix for the latest report.
+    Matrix,
+    /// Phase 1 opt-in: evaluate (and with `--opt-in`, apply) a baseline
+    /// swap to the latest report's best candidate.
+    Apply,
 }
 
 #[derive(Debug, Parser)]
@@ -51,6 +62,27 @@ struct Cli {
     /// real Ollama time). Default 8.
     #[arg(long, default_value_t = 8)]
     bench_cap: usize,
+    /// Report directory `notify`/`trend`/`matrix`/`apply` read history
+    /// from. Defaults to the config's `report.output_dir`.
+    #[arg(long)]
+    report_dir: Option<PathBuf>,
+    /// Phase 1 `apply`: operator opt-in. Without this flag `apply` only
+    /// previews the plan and never swaps.
+    #[arg(long, default_value_t = false)]
+    opt_in: bool,
+    /// Phase 1 `apply`: consecutive UpgradeCandidate days required before
+    /// a swap is eligible.
+    #[arg(long, default_value_t = 3)]
+    required_days: u32,
+}
+
+impl Cli {
+    /// Directory the history-reading modes operate on.
+    fn report_dir(&self, cfg: &TrackerConfig) -> PathBuf {
+        self.report_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(cfg.expanded_output_dir()))
+    }
 }
 
 #[tokio::main]
@@ -70,7 +102,98 @@ async fn main() -> TrackerResult<()> {
         Mode::Poll => mode_poll(cfg).await,
         Mode::Bench => mode_bench(cfg).await,
         Mode::Select => mode_select(cfg).await,
+        Mode::Notify => mode_notify(&cli, &cfg),
+        Mode::Trend => mode_trend(&cli, &cfg),
+        Mode::Matrix => mode_matrix(&cli, &cfg),
+        Mode::Apply => mode_apply(&cli, &cfg),
     }
+}
+
+/// Read the most recent report (`latest.json`, falling back to scanning
+/// the newest `daily-<date>.json`) from the report dir.
+fn load_latest_report(dir: &std::path::Path) -> TrackerResult<DailyReport> {
+    let latest = dir.join("latest.json");
+    let path = if latest.exists() {
+        latest
+    } else {
+        let mut dated: Vec<PathBuf> = std::fs::read_dir(dir)
+            .map_err(|e| {
+                cave_llm_tracker::error::TrackerError::Report(format!(
+                    "report dir {}: {}",
+                    dir.display(),
+                    e
+                ))
+            })?
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.starts_with("daily-") && n.ends_with(".json"))
+                    .unwrap_or(false)
+            })
+            .collect();
+        dated.sort();
+        dated.pop().ok_or_else(|| {
+            cave_llm_tracker::error::TrackerError::Report(format!(
+                "no daily-*.json reports found in {}",
+                dir.display()
+            ))
+        })?
+    };
+    let text = std::fs::read_to_string(&path)?;
+    let report: DailyReport = serde_json::from_str(&text)?;
+    Ok(report)
+}
+
+fn mode_notify(cli: &Cli, cfg: &TrackerConfig) -> TrackerResult<()> {
+    let report = load_latest_report(&cli.report_dir(cfg))?;
+    match cave_llm_tracker::build_notification(&report) {
+        Some(n) => println!("{}", n.render_text()),
+        None => println!("cave-llm-tracker: no upgrade candidate today (quiet)"),
+    }
+    Ok(())
+}
+
+fn mode_trend(cli: &Cli, cfg: &TrackerConfig) -> TrackerResult<()> {
+    let history = cave_llm_tracker::load_history(&cli.report_dir(cfg))?;
+    println!("{}", serde_json::to_string_pretty(&history)?);
+    Ok(())
+}
+
+fn mode_matrix(cli: &Cli, cfg: &TrackerConfig) -> TrackerResult<()> {
+    let report = load_latest_report(&cli.report_dir(cfg))?;
+    let matrix = cave_llm_tracker::build_matrix(&report, cfg);
+    println!("{}", serde_json::to_string_pretty(&matrix)?);
+    Ok(())
+}
+
+fn mode_apply(cli: &Cli, cfg: &TrackerConfig) -> TrackerResult<()> {
+    let dir = cli.report_dir(cfg);
+    let report = load_latest_report(&dir)?;
+    let history = cave_llm_tracker::load_history(&dir)?;
+    let Some(plan) =
+        cave_llm_tracker::plan_swap(cfg, &report, &history, cli.opt_in, cli.required_days)
+    else {
+        println!("cave-llm-tracker: no upgrade candidate to apply");
+        return Ok(());
+    };
+    println!("{}", serde_json::to_string_pretty(&plan)?);
+    if plan.eligible {
+        let next = cave_llm_tracker::apply_swap(cfg, &plan)?;
+        let toml = toml::to_string_pretty(&next)?;
+        match &cli.output {
+            Some(out) => {
+                std::fs::write(out, &toml)?;
+                println!("# applied → wrote new config: {}", out.display());
+            }
+            None => {
+                println!("# --- new config (pass --output to persist) ---");
+                println!("{}", toml);
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn mode_report(cli: Cli, cfg: TrackerConfig) -> TrackerResult<()> {
@@ -96,6 +219,11 @@ async fn mode_report(cli: Cli, cfg: TrackerConfig) -> TrackerResult<()> {
     }
     let report = DailyReport::assemble(&cfg, poll, baseline_bench, candidate_benches, verdicts);
     write_report(&cli, &report, &cfg)?;
+    // Phase 0: surface the upgrade notice on stderr so the LaunchAgent
+    // wrapper can pipe it to terminal-notifier / a webhook. Never swaps.
+    if let Some(n) = cave_llm_tracker::build_notification(&report) {
+        eprintln!("{}", n.render_text());
+    }
     Ok(())
 }
 
