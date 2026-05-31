@@ -43,8 +43,27 @@ pub enum QueueError {
 /// FNV-1a 64-bit seed derived from a tenant id. Deterministic and consistent
 /// for a given tenant, mirroring `util.ShuffleShardSeed(tenantID, "")`.
 pub fn shuffle_shard_seed(tenant: &str) -> u64 {
-    let _ = tenant;
-    0 // RED stub
+    // FNV-1a 64-bit.
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let mut hash = FNV_OFFSET;
+    for b in tenant.as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
+/// splitmix64 — a deterministic, well-spread PRNG used to drive the
+/// shuffle-shard selection from a fixed seed. Replaces Go's `math/rand` source
+/// (load spreading does not require a specific PRNG, only determinism).
+#[inline]
+fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// Deterministically select `select` consumers out of `sorted` for a tenant.
@@ -57,8 +76,23 @@ pub fn shuffle_consumers_for_tenants(
     select: usize,
     sorted: &[String],
 ) -> Option<HashSet<String>> {
-    let _ = (seed, select, sorted);
-    None // RED stub
+    if select == 0 || sorted.len() <= select {
+        return None;
+    }
+
+    let mut result = HashSet::with_capacity(select);
+    let mut state = seed;
+    // Fisher-Yates partial selection: pick `select` items, swapping each chosen
+    // item to the tail so it cannot be picked again (mirrors upstream).
+    let mut scratch: Vec<String> = sorted.to_vec();
+    let mut last = scratch.len() - 1;
+    for _ in 0..select {
+        let r = (splitmix64(&mut state) % (last as u64 + 1)) as usize;
+        result.insert(scratch[r].clone());
+        scratch.swap(r, last);
+        last -= 1;
+    }
+    Some(result)
 }
 
 #[cfg(test)]
