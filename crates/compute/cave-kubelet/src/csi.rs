@@ -413,6 +413,58 @@ impl VolumeManager {
         Ok(())
     }
 
+    /// CSI NodeExpandVolume — grow a staged volume's capacity in place.
+    ///
+    /// Mirrors `pkg/volume/csi` NodeExpandVolume: the volume must already be
+    /// staged on this node, and `volume_path` must name either the staging
+    /// path or one of the per-pod published targets (the path at which the
+    /// volume is available for the resize). CSI returns `OUT_OF_RANGE` when
+    /// asked to shrink, so a `new_size_bytes` below the current capacity is
+    /// rejected and the recorded size is left untouched. Expanding to the
+    /// current size is idempotent. For block-mode volumes there is no
+    /// filesystem to grow, but the recorded device capacity still advances so
+    /// downstream stats reflect the larger backing device. Returns the
+    /// post-expansion capacity in bytes.
+    pub fn node_expand_volume(
+        &self,
+        volume_id: &str,
+        volume_path: &str,
+        new_size_bytes: u64,
+    ) -> CsiResult<u64> {
+        if volume_id.is_empty() || volume_path.is_empty() {
+            return Err(CsiError::InvalidArgument(
+                "volume_id and volume_path required".into(),
+            ));
+        }
+        let mut entry = self.staged.get_mut(volume_id).ok_or_else(|| {
+            CsiError::FailedPrecondition(format!(
+                "volume {} not staged; cannot expand",
+                volume_id
+            ))
+        })?;
+        // The resize path must be one the kubelet actually mounted this volume
+        // at — the staging target or a per-pod published target.
+        let path_known = entry.staging_target_path == volume_path
+            || entry
+                .published_targets
+                .iter()
+                .any(|p| p.target_path == volume_path);
+        if !path_known {
+            return Err(CsiError::FailedPrecondition(format!(
+                "volume_path {} is not a known mount of volume {}",
+                volume_path, volume_id
+            )));
+        }
+        if new_size_bytes < entry.size_bytes {
+            return Err(CsiError::OutOfRange(format!(
+                "cannot shrink volume {} from {} to {} bytes",
+                volume_id, entry.size_bytes, new_size_bytes
+            )));
+        }
+        entry.size_bytes = new_size_bytes;
+        Ok(new_size_bytes)
+    }
+
     pub fn stage_state(&self, volume_id: &str) -> VolumeStage {
         match self.staged.get(volume_id) {
             None => VolumeStage::NotStaged,
