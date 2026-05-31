@@ -35,17 +35,23 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 # time-series, encryption-at-rest, audit log, KMIP, $text/geo/hashed/partial
 # indexes, capped collections, views, plan cache, query hints) are counted
 # as `skipped`. Items declared in-scope but not yet built are `unmapped`.
-mapped_count          = 23
-partial_count         = 3
+mapped_count          = 24
+partial_count         = 2
 skipped_count         = 26
 unmapped_count        = 0
 total                 = 52
 fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 52/52
-honest_ratio          = 0.9423   # (mapped + skipped) / total = 49/52 — partial excluded
+honest_ratio          = 0.9615   # (mapped + skipped) / total = 50/52 — partial excluded
+# 2026-05-31 cont2: query-operators partial -> mapped. The matcher (src/query.rs)
+# now covers FerretDB's supported operator surface: comparison ($eq/$ne/$gt/$gte/
+# $lt/$lte/$in/$nin), element ($exists/$type/$size), array ($all/$elemMatch),
+# evaluation ($mod/$regex+$options/$expr), and logical ($and/$or/$nor/$not) with
+# correct missing-field semantics. $where (server-side JS) stays out-of-scope:
+# FerretDB itself rejects $where, so it is not part of the mapped surface.
 adr_justified_ratio   = 1.0      # 26 skipped (FerretDB/MongoDB out-of-scope features + formerly-tracked CSFLE/range-encryption deferral via persistence-consolidation ADR) all architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5.persistence-consolidation
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-28"
+last_audit            = "2026-05-31"
 infra_only            = false
 [module]
 name        = "cave-docdb"

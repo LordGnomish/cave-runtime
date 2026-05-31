@@ -63,8 +63,18 @@ Hand-curated against the FerretDB v2.0.0 layout
 |          |       | `findAndModify` command                                                              |
 | **Total**|  **52** | |
 
-- **fill_ratio  = (mapped + partial + skipped) / total = 48 / 52 = 0.9231**
-- **honest_ratio = (mapped + skipped) / total             = 45 / 52 = 0.8654**
+- **fill_ratio  = (mapped + partial + skipped) / total = 52 / 52 = 1.0000**
+- **honest_ratio = (mapped + skipped) / total           = 50 / 52 = 0.9615**
+
+> **cont2 (2026-05-31).** The query matcher (`src/query.rs`) — the last
+> operator-surface partial — was closed to `mapped`. It now implements the full
+> set of query operators FerretDB supports: comparison
+> (`$eq`/`$ne`/`$gt`/`$gte`/`$lt`/`$lte`/`$in`/`$nin`), element
+> (`$exists`/`$type`/`$size`), array (`$all`/`$elemMatch`), evaluation
+> (`$mod`/`$regex`+`$options`/`$expr`), and logical (`$and`/`$or`/`$nor`/`$not`),
+> with correct missing-field semantics. `$where` (server-side JS) stays
+> `skipped` — FerretDB itself rejects it. Counts: mapped 23→24, partial 3→2,
+> skipped 26 (unchanged), total 52.
 
 ## 8-gate close-out
 
