@@ -298,6 +298,52 @@ mod tests {
     }
 
     #[test]
+    fn broker_issues_and_resolves_artifact() {
+        use crate::saml::bindings::http_artifact::{
+            build_artifact_resolve, parse_artifact_response, Artifact, ARTIFACT_TYPE_0004,
+        };
+        let b = SamlBroker::new();
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [1u8; 20], [2u8; 20]);
+        let response_msg = r#"<samlp:Response ID="_x"/>"#;
+        // IdP/source role: stash the message, hand out the artifact.
+        let samlart = b.issue_artifact(&art, response_msg);
+        assert_eq!(b.pending_artifacts(), 1);
+        // SP builds the back-channel resolve from the artifact it received.
+        let resolve =
+            build_artifact_resolve("_q", "2026-05-31T00:00:00Z", "https://sp.cave", &samlart);
+        // IdP resolves it into an ArtifactResponse carrying the original message.
+        let resp_xml = b
+            .resolve_artifact(&resolve, "https://idp.cave", "_a", "2026-05-31T00:00:00Z")
+            .unwrap();
+        assert_eq!(b.pending_artifacts(), 0);
+        let resp = parse_artifact_response(&resp_xml).unwrap();
+        assert_eq!(resp.in_response_to, "_q");
+        assert_eq!(resp.payload, response_msg);
+        assert_eq!(resp.status, "urn:oasis:names:tc:SAML:2.0:status:Success");
+    }
+
+    #[test]
+    fn broker_resolve_artifact_is_single_use() {
+        use crate::saml::bindings::http_artifact::{
+            build_artifact_resolve, Artifact, ARTIFACT_TYPE_0004,
+        };
+        let b = SamlBroker::new();
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [3u8; 20], [4u8; 20]);
+        let samlart = b.issue_artifact(&art, "<msg/>");
+        let resolve =
+            build_artifact_resolve("_q", "2026-05-31T00:00:00Z", "https://sp.cave", &samlart);
+        assert!(
+            b.resolve_artifact(&resolve, "https://idp.cave", "_a", "2026-05-31T00:00:00Z")
+                .is_ok()
+        );
+        // Artifact consumed — second resolve must fail (replay defence).
+        assert!(
+            b.resolve_artifact(&resolve, "https://idp.cave", "_a2", "2026-05-31T00:00:00Z")
+                .is_err()
+        );
+    }
+
+    #[test]
     fn process_response_rejects_unknown_in_response_to() {
         let b = SamlBroker::new();
         let a = Assertion::new("https://idp.example", "alice@example.com");
