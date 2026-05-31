@@ -13,6 +13,138 @@
 //! [`crate::report::DailyReport::write_to_dir`] writes, so a directory of
 //! reports sorts chronologically by name.
 
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::TrackerResult;
+use crate::report::DailyReport;
+use crate::selection::SelectionStatus;
+
+/// One model's reading on a single day, distilled from that day's verdict.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrendPoint {
+    /// `daily-<date>.json` stamp (e.g. `2026-05-21`).
+    pub date: String,
+    /// `cand.mean_quality - baseline.mean_quality` recorded that day.
+    pub quality_delta: f32,
+    /// Fractional throughput uplift vs. that day's baseline.
+    pub throughput_uplift: f32,
+    /// The verdict status the model earned that day.
+    pub status: SelectionStatus,
+}
+
+/// A single model's chronological trend, ascending by date.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelTrend {
+    pub model_id: String,
+    pub points: Vec<TrendPoint>,
+}
+
+impl ModelTrend {
+    /// Trailing run of `UpgradeCandidate` days counting back from the
+    /// most recent point. `0` if the latest day is anything else — this
+    /// is the streak the Phase 1 opt-in apply path requires to clear a
+    /// floor before a swap becomes eligible.
+    pub fn consecutive_upgrade_days(&self) -> u32 {
+        let mut streak = 0u32;
+        for p in self.points.iter().rev() {
+            if p.status == SelectionStatus::UpgradeCandidate {
+                streak += 1;
+            } else {
+                break;
+            }
+        }
+        streak
+    }
+
+    /// Most recent point, if any.
+    pub fn latest(&self) -> Option<&TrendPoint> {
+        self.points.last()
+    }
+}
+
+/// All models seen across a directory of daily reports.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TrendHistory {
+    pub models: Vec<ModelTrend>,
+}
+
+impl TrendHistory {
+    pub fn model(&self, model_id: &str) -> Option<&ModelTrend> {
+        self.models.iter().find(|m| m.model_id == model_id)
+    }
+}
+
+/// Pull the `<date>` out of a `daily-<date>.json` file name.
+fn date_from_filename(name: &str) -> Option<String> {
+    name.strip_prefix("daily-")
+        .and_then(|s| s.strip_suffix(".json"))
+        .map(|s| s.to_string())
+}
+
+/// Read every `daily-<date>.json` in `dir` and fold its verdicts into a
+/// per-model [`TrendHistory`]. Baseline rows are excluded (they are not
+/// upgrade candidates). Unreadable / unparseable files are skipped so a
+/// single corrupt report never blocks the trender. `latest.json` and any
+/// other sibling are ignored — only the dated reports carry a date key.
+pub fn load_history(dir: &Path) -> TrackerResult<TrendHistory> {
+    // model_id -> (date -> point); BTreeMap keeps both axes sorted.
+    let mut by_model: BTreeMap<String, BTreeMap<String, TrendPoint>> = BTreeMap::new();
+
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        // A missing report dir is an empty history, not an error.
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(TrendHistory::default());
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(date) = date_from_filename(name) else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(report) = serde_json::from_str::<DailyReport>(&text) else {
+            continue;
+        };
+        for v in &report.verdicts {
+            if v.status == SelectionStatus::Baseline {
+                continue;
+            }
+            by_model
+                .entry(v.model_id.clone())
+                .or_default()
+                .insert(
+                    date.clone(),
+                    TrendPoint {
+                        date: date.clone(),
+                        quality_delta: v.quality_delta,
+                        throughput_uplift: v.throughput_uplift,
+                        status: v.status,
+                    },
+                );
+        }
+    }
+
+    let models = by_model
+        .into_iter()
+        .map(|(model_id, points)| ModelTrend {
+            model_id,
+            points: points.into_values().collect(),
+        })
+        .collect();
+    Ok(TrendHistory { models })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

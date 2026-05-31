@@ -40,6 +40,7 @@ pub use registry::{
 };
 pub use report::{shortlist, ConfigSummary, DailyReport};
 pub use selection::{baseline_verdict, evaluate, SelectionStatus, Verdict};
+pub use trend::{load_history, ModelTrend, TrendHistory, TrendPoint};
 
 /// Pinned upstream snapshot. cave-llm-tracker has no single upstream;
 /// the per-source pins live in `parity.manifest.toml [upstream] source_sha`
