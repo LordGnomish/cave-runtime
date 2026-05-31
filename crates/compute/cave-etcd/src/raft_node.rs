@@ -489,6 +489,52 @@ impl RaftNode {
     }
 }
 
+/// Outcome of a one-shot election simulation, suitable for an API/CLI
+/// status surface.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ElectionOutcome {
+    pub state: &'static str,
+    pub term: u64,
+    pub lead: u64,
+    pub commit: u64,
+    pub granted: usize,
+    pub rejected: usize,
+}
+
+/// Drive a fresh node (`id`) through a single campaign in the cluster
+/// `peers`, applying vote responses: peers in `grants` grant, peers in
+/// `rejects` reject. Returns the resulting role/term/leader. This is a
+/// deterministic, side-effect-free harness over the real state machine —
+/// the observable surface behind `/api/etcd/v3/raft/election/simulate`.
+pub fn simulate_election(
+    id: u64,
+    peers: &[u64],
+    grants: &[u64],
+    rejects: &[u64],
+    election_timeout: usize,
+) -> ElectionOutcome {
+    let mut n = RaftNode::new(id, peers, election_timeout.max(1), 1, 256);
+    n.campaign();
+    // RED placeholder: vote responses are dropped, so the node never
+    // resolves past the initial campaign state.
+    let _ = (grants, rejects);
+    let (granted, rejected) = n.tracker.tally_votes();
+    let state = match n.state {
+        RaftState::Follower => "Follower",
+        RaftState::PreCandidate => "PreCandidate",
+        RaftState::Candidate => "Candidate",
+        RaftState::Leader => "Leader",
+    };
+    ElectionOutcome {
+        state,
+        term: n.term,
+        lead: n.lead,
+        commit: n.commit,
+        granted,
+        rejected,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -832,6 +878,27 @@ mod tests {
         app.commit = 50; // leader is way ahead, but we only have index 1
         n.step(app);
         assert_eq!(n.commit, 1, "commit cannot exceed our own last index");
+    }
+
+    #[test]
+    fn simulate_election_resolves_leader_on_majority_grant() {
+        let out = simulate_election(1, &[1, 2, 3], &[2], &[], 10);
+        assert_eq!(out.state, "Leader");
+        assert_eq!(out.term, 1);
+        assert_eq!(out.lead, 1);
+        assert_eq!(out.granted, 2, "self + peer 2");
+    }
+
+    #[test]
+    fn simulate_election_steps_down_on_majority_reject() {
+        let out = simulate_election(1, &[1, 2, 3], &[], &[2, 3], 10);
+        assert_eq!(out.state, "Follower");
+    }
+
+    #[test]
+    fn simulate_election_stays_candidate_without_quorum() {
+        let out = simulate_election(1, &[1, 2, 3, 4, 5], &[2], &[], 10);
+        assert_eq!(out.state, "Candidate", "2/5 grants is not a majority");
     }
 
     #[test]
