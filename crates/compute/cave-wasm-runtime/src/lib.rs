@@ -16,6 +16,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod error;
+pub mod parser;
+pub mod types;
+
+pub use error::{Result, WasmError};
+pub use parser::parse_module;
+pub use types::{Export, ExternKind, FuncBody, FuncType, Limits, Module, ValType};
+
 /// Crate version string, surfaced by the CLI / portal.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
