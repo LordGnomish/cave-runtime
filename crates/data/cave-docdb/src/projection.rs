@@ -118,4 +118,82 @@ mod tests {
         let result = apply_projection(&doc, None);
         assert_eq!(result, doc);
     }
+
+    // ── Cycle 4: $slice / $elemMatch / dotted-path projection ──────────────────
+
+    use serde_json::json;
+
+    fn doc_of(v: Value) -> Document {
+        v.as_object().unwrap().iter().map(|(k, x)| (k.clone(), x.clone())).collect()
+    }
+
+    fn proj_of(v: Value) -> Document {
+        doc_of(v)
+    }
+
+    #[test]
+    fn test_slice_positive_takes_first_n() {
+        let doc = doc_of(json!({"_id": 1, "tags": ["a", "b", "c", "d"]}));
+        let proj = proj_of(json!({"tags": {"$slice": 2}}));
+        let r = apply_projection(&doc, Some(&proj));
+        assert_eq!(r.get("tags").unwrap(), &json!(["a", "b"]));
+        // $slice is an inclusion-style operator but does not flip to pure
+        // inclusion: other fields remain unless excluded.
+        assert!(r.contains_key("_id"));
+    }
+
+    #[test]
+    fn test_slice_negative_takes_last_n() {
+        let doc = doc_of(json!({"_id": 1, "tags": ["a", "b", "c", "d"]}));
+        let proj = proj_of(json!({"tags": {"$slice": -2}}));
+        let r = apply_projection(&doc, Some(&proj));
+        assert_eq!(r.get("tags").unwrap(), &json!(["c", "d"]));
+    }
+
+    #[test]
+    fn test_slice_skip_limit() {
+        let doc = doc_of(json!({"tags": ["a", "b", "c", "d", "e"]}));
+        let proj = proj_of(json!({"tags": {"$slice": [1, 2]}}));
+        let r = apply_projection(&doc, Some(&proj));
+        assert_eq!(r.get("tags").unwrap(), &json!(["b", "c"]));
+    }
+
+    #[test]
+    fn test_elemmatch_projection_first_match() {
+        let doc = doc_of(json!({
+            "_id": 1,
+            "items": [{"k": "x", "n": 1}, {"k": "y", "n": 2}, {"k": "y", "n": 3}]
+        }));
+        let proj = proj_of(json!({"items": {"$elemMatch": {"k": "y"}}}));
+        let r = apply_projection(&doc, Some(&proj));
+        // Only the first matching element is projected.
+        assert_eq!(r.get("items").unwrap(), &json!([{"k": "y", "n": 2}]));
+        assert!(r.contains_key("_id"));
+    }
+
+    #[test]
+    fn test_dotted_path_inclusion() {
+        let doc = doc_of(json!({
+            "_id": 1,
+            "name": "a",
+            "addr": {"city": "NYC", "zip": "10001"}
+        }));
+        let proj = proj_of(json!({"addr.city": 1}));
+        let r = apply_projection(&doc, Some(&proj));
+        // Nested inclusion keeps only addr.city, drops name and addr.zip.
+        assert_eq!(r.get("addr").unwrap(), &json!({"city": "NYC"}));
+        assert!(!r.contains_key("name"));
+        assert!(r.contains_key("_id"));
+    }
+
+    #[test]
+    fn test_dotted_path_exclusion() {
+        let doc = doc_of(json!({
+            "_id": 1,
+            "addr": {"city": "NYC", "zip": "10001"}
+        }));
+        let proj = proj_of(json!({"addr.zip": 0}));
+        let r = apply_projection(&doc, Some(&proj));
+        assert_eq!(r.get("addr").unwrap(), &json!({"city": "NYC"}));
+    }
 }
