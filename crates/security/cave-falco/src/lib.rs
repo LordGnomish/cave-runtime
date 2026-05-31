@@ -28,6 +28,7 @@ pub mod observability;
 pub mod output;
 pub mod parity_self_audit;
 pub mod plugin_sdk;
+pub mod falcoctl;
 pub mod token_bucket;
 pub mod rule;
 pub mod overrides;
