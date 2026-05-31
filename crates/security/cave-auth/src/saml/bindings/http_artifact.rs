@@ -262,4 +262,101 @@ mod tests {
         assert!(envelope.contains("<soap:Body><dummy/></soap:Body>"));
         assert!(envelope.ends_with("</soap:Envelope>"));
     }
+
+    // ---- Back-channel resolver layer (cont3 depth) ----
+
+    #[test]
+    fn artifact_resolve_parses_back() {
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [1u8; 20], [2u8; 20]);
+        let xml = build_artifact_resolve(
+            "_q1",
+            "2026-05-31T00:00:00Z",
+            "https://sp.example.com",
+            &art.to_base64(),
+        );
+        let parsed = parse_artifact_resolve(&xml).unwrap();
+        assert_eq!(parsed.id, "_q1");
+        assert_eq!(parsed.issuer, "https://sp.example.com");
+        assert_eq!(parsed.artifact, art.to_base64());
+    }
+
+    #[test]
+    fn artifact_resolve_parses_inside_soap_envelope() {
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [9u8; 20], [8u8; 20]);
+        let inner = build_artifact_resolve(
+            "_q2",
+            "2026-05-31T00:00:00Z",
+            "https://sp.example.com",
+            &art.to_base64(),
+        );
+        let soap = wrap_soap(&inner);
+        let parsed = parse_artifact_resolve(&soap).unwrap();
+        assert_eq!(parsed.id, "_q2");
+        assert_eq!(parsed.artifact, art.to_base64());
+    }
+
+    #[test]
+    fn artifact_response_round_trips_with_payload() {
+        let payload = r#"<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_r1" Version="2.0"><saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://idp.example.com</saml:Issuer></samlp:Response>"#;
+        let xml = build_artifact_response(
+            "_a1",
+            "2026-05-31T00:00:00Z",
+            "_q1",
+            "https://idp.example.com",
+            STATUS_SUCCESS,
+            payload,
+        );
+        let parsed = parse_artifact_response(&xml).unwrap();
+        assert_eq!(parsed.id, "_a1");
+        assert_eq!(parsed.in_response_to, "_q1");
+        assert_eq!(parsed.issuer, "https://idp.example.com");
+        assert_eq!(parsed.status, STATUS_SUCCESS);
+        assert_eq!(parsed.payload, payload);
+    }
+
+    #[test]
+    fn resolver_is_single_use() {
+        let mut r = ArtifactResolver::new();
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [4u8; 20], [5u8; 20]);
+        let samlart = r.store(&art, "<msg/>");
+        assert_eq!(r.pending(), 1);
+        assert_eq!(r.resolve(&samlart).unwrap(), "<msg/>");
+        assert_eq!(r.pending(), 0);
+        assert!(r.resolve(&samlart).is_err()); // consumed
+    }
+
+    #[test]
+    fn resolver_full_back_channel_flow() {
+        let mut idp = ArtifactResolver::new();
+        let response_msg = r#"<samlp:Response ID="_x"/>"#;
+        let art = Artifact::new(ARTIFACT_TYPE_0004, 0, [3u8; 20], [7u8; 20]);
+        let samlart = idp.store(&art, response_msg);
+        // SP side: build the resolve from the artifact it received.
+        let resolve_xml = build_artifact_resolve(
+            "_q",
+            "2026-05-31T00:00:00Z",
+            "https://sp.example.com",
+            &samlart,
+        );
+        // IdP side: parse, consume the stored message, build the response.
+        let req = parse_artifact_resolve(&resolve_xml).unwrap();
+        let msg = idp.resolve(&req.artifact).unwrap();
+        let resp_xml = build_artifact_response(
+            "_a",
+            "2026-05-31T00:00:00Z",
+            &req.id,
+            "https://idp.example.com",
+            STATUS_SUCCESS,
+            &msg,
+        );
+        // SP side: parse the response, recover the original payload.
+        let resp = parse_artifact_response(&resp_xml).unwrap();
+        assert_eq!(resp.in_response_to, "_q");
+        assert_eq!(resp.payload, response_msg);
+    }
+
+    #[test]
+    fn parse_artifact_resolve_rejects_non_resolve() {
+        assert!(parse_artifact_resolve("<soap:Envelope/>").is_err());
+    }
 }
