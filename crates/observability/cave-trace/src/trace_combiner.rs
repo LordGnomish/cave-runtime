@@ -66,7 +66,33 @@ pub struct CombineResult {
 /// spans by `(span_id, kind)` token. `a` wins on conflict; unique `b`-spans are
 /// appended in their original order.
 pub fn combine_traces(a: &[CombinerSpan], b: &[CombinerSpan]) -> CombineResult {
-    unimplemented!("RED")
+    use std::collections::HashSet;
+
+    let mut seen: HashSet<u32> = HashSet::with_capacity(a.len() + b.len());
+    let mut spans: Vec<CombinerSpan> = Vec::with_capacity(a.len() + b.len());
+
+    // All of `a` survives; `a` wins on any conflict.
+    for span in a {
+        seen.insert(token_for_id(&span.span_id, span.kind));
+        spans.push(span.clone());
+    }
+
+    // Unique `b`-spans are appended in order; duplicates (of `a` or of an
+    // already-kept `b`) are dropped and counted.
+    let mut spans_removed = 0;
+    for span in b {
+        let token = token_for_id(&span.span_id, span.kind);
+        if seen.insert(token) {
+            spans.push(span.clone());
+        } else {
+            spans_removed += 1;
+        }
+    }
+
+    CombineResult {
+        spans,
+        spans_removed,
+    }
 }
 
 #[cfg(test)]
