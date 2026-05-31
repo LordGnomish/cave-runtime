@@ -30,6 +30,82 @@ pub struct Blocklist {
     pub updated_at: DateTime<Utc>,
 }
 
+impl Blocklist {
+    /// Construct a rule owned by `workspace_member_id`. An empty `handle`
+    /// is stored verbatim (Twenty permits a transient empty draft) but
+    /// blocks nothing until a real handle is set.
+    pub fn new(
+        workspace_id: Uuid,
+        workspace_member_id: Uuid,
+        handle: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            workspace_id,
+            workspace_member_id,
+            handle: Some(handle.into()),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Case-folded, whitespace-trimmed handle. `None` for a null handle.
+    pub fn normalized_handle(&self) -> Option<String> {
+        self.handle
+            .as_deref()
+            .map(|h| h.trim().to_ascii_lowercase())
+    }
+
+    /// A rule is a whole-domain rule when it carries no local part — either
+    /// an `@domain.tld` form or a bare `domain.tld` (no `@` at all). A
+    /// handle with an `@` after the first character is an exact-address rule.
+    pub fn is_domain_rule(&self) -> bool {
+        match self.normalized_handle() {
+            Some(h) if h.is_empty() => false,
+            Some(h) => !h.contains('@') || h.starts_with('@'),
+            None => false,
+        }
+    }
+
+    /// The domain a rule constrains — the substring after the (only) `@`
+    /// for an exact rule, the `@`-stripped remainder for a domain rule.
+    fn rule_domain(&self) -> Option<String> {
+        let h = self.normalized_handle()?;
+        if h.is_empty() {
+            return None;
+        }
+        Some(match h.rsplit_once('@') {
+            Some((_, domain)) => domain.to_string(),
+            None => h, // bare domain rule
+        })
+    }
+
+    /// True iff `candidate` (an e-mail handle) is blocked by this rule.
+    /// Domain rules match the candidate's domain; address rules require an
+    /// exact case-insensitive match of the whole address.
+    pub fn is_blocked(&self, candidate: &str) -> bool {
+        let Some(rule) = self.normalized_handle() else {
+            return false;
+        };
+        if rule.is_empty() {
+            return false;
+        }
+        let candidate = candidate.trim().to_ascii_lowercase();
+        if self.is_domain_rule() {
+            let Some(rule_domain) = self.rule_domain() else {
+                return false;
+            };
+            candidate
+                .rsplit_once('@')
+                .map(|(_, d)| d == rule_domain)
+                .unwrap_or(false)
+        } else {
+            candidate == rule
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -29,6 +29,7 @@ pub mod workspace;
 
 pub use activity::{Activity, ActivityKind, ActivityTarget, ActivityTargetKind, Note};
 pub use api_key::ApiKey;
+pub use blocklist::Blocklist;
 pub use calendar_event::{
     AttendanceTally, CalendarEvent, CalendarEventAttendee, CalendarEventVisibility, Rsvp,
 };
