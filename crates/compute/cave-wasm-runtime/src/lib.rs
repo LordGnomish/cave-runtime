@@ -18,11 +18,13 @@
 
 pub mod error;
 pub mod exec;
+pub mod limits;
 pub mod parser;
 pub mod types;
 
 pub use error::{Result, WasmError};
 pub use exec::{Instance, Value};
+pub use limits::{ResourceLimits, Store, PAGE_SIZE};
 pub use parser::parse_module;
 pub use types::{Export, ExternKind, FuncBody, FuncType, Limits, Module, ValType};
 

@@ -69,6 +69,19 @@ impl Instance {
         self.exec_func(idx, args.to_vec(), 0)
     }
 
+    /// Invoke an exported function under explicit resource limits (fuel +
+    /// memory cap).
+    pub fn invoke_with(
+        &self,
+        name: &str,
+        args: &[Value],
+        limits: &crate::limits::ResourceLimits,
+    ) -> Result<Vec<Value>> {
+        // RED stub — fuel/memory wiring is added in the GREEN commit.
+        let _ = limits;
+        self.invoke(name, args)
+    }
+
     /// Execute a function by index, returning its result values. `depth` guards
     /// against runaway recursion.
     pub(crate) fn exec_func(&self, func_idx: u32, args: Vec<Value>, depth: u32) -> Result<Vec<Value>> {
@@ -443,5 +456,102 @@ mod tests {
         let m = module1(vec![], vec![ValType::I32], vec![0x41, 0x01, 0x0b]);
         let err = Instance::new(m).invoke("nope", &[]).unwrap_err();
         assert!(matches!(err, WasmError::ExportNotFound(_)));
+    }
+
+    // ---- cycle 3: resource limits (fuel + linear memory) ----
+
+    use crate::limits::ResourceLimits;
+    use crate::types::Limits as MemLimits;
+
+    fn module1_mem(
+        params: Vec<ValType>,
+        results: Vec<ValType>,
+        code: Vec<u8>,
+        pages: u32,
+    ) -> Module {
+        let mut m = module1(params, results, code);
+        m.memory = Some(MemLimits {
+            min: pages,
+            max: Some(pages),
+        });
+        m
+    }
+
+    #[test]
+    fn fuel_exhaustion_traps() {
+        // add(2,3) needs ~5 instrs; give it 1 unit of fuel.
+        let m = module1(
+            vec![ValType::I32, ValType::I32],
+            vec![ValType::I32],
+            vec![0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b],
+        );
+        let err = Instance::new(m)
+            .invoke_with(
+                "f",
+                &[Value::I32(2), Value::I32(3)],
+                &ResourceLimits::with_fuel(1),
+            )
+            .unwrap_err();
+        assert_eq!(err, WasmError::FuelExhausted);
+    }
+
+    #[test]
+    fn fuel_sufficient_runs() {
+        let m = module1(
+            vec![ValType::I32, ValType::I32],
+            vec![ValType::I32],
+            vec![0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b],
+        );
+        let out = Instance::new(m)
+            .invoke_with(
+                "f",
+                &[Value::I32(2), Value::I32(3)],
+                &ResourceLimits::with_fuel(100),
+            )
+            .unwrap();
+        assert_eq!(out, vec![Value::I32(5)]);
+    }
+
+    #[test]
+    fn memory_store_then_load() {
+        // i32.const 0; i32.const 42; i32.store; i32.const 0; i32.load
+        let code = vec![
+            0x41, 0x00, 0x41, 0x2a, 0x36, 0x02, 0x00, // store value 42 @ addr 0
+            0x41, 0x00, 0x28, 0x02, 0x00, // load @ addr 0
+            0x0b,
+        ];
+        let m = module1_mem(vec![], vec![ValType::I32], code, 1);
+        let out = Instance::new(m).invoke("f", &[]).unwrap();
+        assert_eq!(out, vec![Value::I32(42)]);
+    }
+
+    #[test]
+    fn memory_size_and_grow() {
+        // memory.size -> 1 ; then grow by 2 -> returns prev size 1
+        let size = module1_mem(vec![], vec![ValType::I32], vec![0x3f, 0x00, 0x0b], 1);
+        assert_eq!(
+            Instance::new(size).invoke("f", &[]).unwrap(),
+            vec![Value::I32(1)]
+        );
+        let grow = module1_mem(
+            vec![],
+            vec![ValType::I32],
+            vec![0x41, 0x02, 0x40, 0x00, 0x0b],
+            1,
+        );
+        // module max == 1 page, so growing by 2 must fail with -1.
+        assert_eq!(
+            Instance::new(grow).invoke("f", &[]).unwrap(),
+            vec![Value::I32(-1)]
+        );
+    }
+
+    #[test]
+    fn memory_out_of_bounds_traps() {
+        // store at a huge address -> trap
+        let code = vec![0x41, 0xff, 0xff, 0x7f, 0x41, 0x01, 0x36, 0x02, 0x00, 0x0b];
+        let m = module1_mem(vec![], vec![], code, 1);
+        let err = Instance::new(m).invoke("f", &[]).unwrap_err();
+        assert!(matches!(err, WasmError::MemoryOutOfBounds { .. }));
     }
 }
