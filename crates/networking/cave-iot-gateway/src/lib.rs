@@ -29,6 +29,8 @@
 
 use std::collections::BTreeMap;
 
+pub mod registry;
+
 /// A telemetry / attribute scalar value (ThingsBoard `KvEntry` data types).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
