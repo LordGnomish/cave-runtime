@@ -17,9 +17,10 @@
 //!   * comparison `< <= > >= == !=`, logical `&& || !`, ternary `?:`
 //!   * array literals `[a, b, c]` + builtins `float int abs ceil floor
 //!     round min max sum avg/mean len count(arr, {# > k})`
+//!
 //! String/map operations and arbitrary closures are out of scope —
 //! scaling-modifier formulas operate on a float map and must return a
-//! float (see the [[mapped]] note in parity.manifest.toml).
+//! float (see the `[[mapped]]` note in parity.manifest.toml).
 
 use std::collections::BTreeMap;
 
@@ -378,10 +379,16 @@ impl Parser {
     /// Precedence-climbing expression parser. `min_bp` is the minimum
     /// binding power this call will consume. Ternary `?:` has the lowest
     /// precedence and is handled only at the top (`min_bp == 0`).
+    // The peek/advance dance can't be a `while let` — the peeked borrow
+    // would outlive the `self.next()` advance inside the body.
+    #[allow(clippy::while_let_loop)]
     fn parse_expr(&mut self, min_bp: u8) -> Result<Expr, FormulaError> {
         let mut lhs = self.parse_unary()?;
         loop {
-            let Some(tok) = self.peek() else { break };
+            let tok = match self.peek() {
+                Some(t) => t.clone(),
+                None => break,
+            };
             if matches!(tok, Tok::Question) && min_bp == 0 {
                 self.next();
                 let then_branch = self.parse_expr(0)?;
@@ -390,7 +397,7 @@ impl Parser {
                 lhs = Expr::Ternary(Box::new(lhs), Box::new(then_branch), Box::new(else_branch));
                 continue;
             }
-            let Some((op, bp)) = Self::binop(tok) else {
+            let Some((op, bp)) = Self::binop(&tok) else {
                 break;
             };
             if bp < min_bp {
