@@ -432,6 +432,27 @@ async fn keda_scaledobjects_list_handler(
         .map_err(err_to_response)
 }
 
+/// Query for the ScalingModifiers formula playground — `tenant_id` plus
+/// an optional `formula` and `triggers` (`name=value,…`) to evaluate.
+#[derive(Debug, serde::Deserialize)]
+struct KedaModifierQuery {
+    #[serde(default)]
+    tenant_id: String,
+    formula: Option<String>,
+    triggers: Option<String>,
+}
+
+async fn keda_modifiers_handler(
+    Query(q): Query<KedaModifierQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id,
+    });
+    keda::modifiers::render(&ctx, q.formula.as_deref(), q.triggers.as_deref())
+        .map(Html)
+        .map_err(err_to_response)
+}
+
 async fn keda_scaledobjects_new_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<AdminQuery>,
@@ -2192,6 +2213,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
             get(keda_scalers_detail_handler),
         )
         .route("/admin/keda/metrics", get(keda_metrics_handler))
+        .route("/admin/keda/modifiers", get(keda_modifiers_handler))
         // 2026-05-14 consolidation: legacy top-level routes redirect 308
         // to the canonical /admin/k8s-dashboard/ landing tabs.
         .route("/admin/scheduler", get(legacy_scheduler_redirect))

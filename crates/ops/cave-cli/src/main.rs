@@ -1764,6 +1764,16 @@ enum KedaCmd {
     /// Tenant-wide per-scaler Prometheus stats (events/min, errors/min, p50/p99)
     #[command(name = "scaler-metrics")]
     ScalerMetrics,
+    /// Evaluate a ScalingModifiers formula against trigger values
+    /// (admin portal-backed; uses the real cave-keda expr-lang engine)
+    #[command(name = "modifier-eval")]
+    ModifierEval {
+        /// expr-lang formula, e.g. "(api + worker) / 2"
+        formula: String,
+        /// Trigger values as `name=value,name=value`
+        #[arg(long, default_value = "")]
+        triggers: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -5078,6 +5088,14 @@ source_root = "src"
                 c.get(&format!("/admin/keda/scalers/{}", urlencode(&kind))).await
             }
             KedaCmd::ScalerMetrics => c.get("/admin/keda/metrics").await,
+            KedaCmd::ModifierEval { formula, triggers } => {
+                c.get(&format!(
+                    "/admin/keda/modifiers?formula={}&triggers={}",
+                    urlencode(&formula),
+                    urlencode(&triggers)
+                ))
+                .await
+            }
         },
     }
 }

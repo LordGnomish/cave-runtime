@@ -14,6 +14,7 @@
 //! CRUD pages and the catalog.
 
 pub mod metrics;
+pub mod modifiers;
 pub mod scaled_jobs;
 pub mod scaled_objects;
 pub mod scalers;
@@ -148,9 +149,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KedaViewEr
         .collect();
 
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">ScaledObjects ({n_so})</h2>{so_tbl}</section>
+        r#"<nav class="mb-4 text-sm flex gap-3">
+<a class="underline text-blue-700" href="/admin/keda/scalers?tenant_id={tenant}">scaler catalog</a>
+<a class="underline text-blue-700" href="/admin/keda/metrics?tenant_id={tenant}">metrics</a>
+<a class="underline text-blue-700" href="/admin/keda/modifiers?tenant_id={tenant}">formula playground</a>
+</nav>
+<section><h2 class="text-lg font-semibold mb-2">ScaledObjects ({n_so})</h2>{so_tbl}</section>
 <section class="mt-6"><h2 class="text-lg font-semibold mb-2">Trigger types in use</h2>{trigger_tbl}</section>
 <section class="mt-6"><h2 class="text-lg font-semibold mb-2">Scale events ({n_ev})</h2>{event_tbl}</section>"#,
+        tenant = escape(ctx.tenant.as_str()),
         n_so = sos.len(),
         n_ev = events.len(),
         so_tbl = table(
