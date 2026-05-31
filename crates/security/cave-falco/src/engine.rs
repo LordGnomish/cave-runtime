@@ -429,4 +429,91 @@ mod tests {
         let fired: Vec<_> = e.evaluate(&ev).into_iter().map(|m| m.rule_name).collect();
         assert_eq!(fired, vec!["c".to_string()]);
     }
+
+    // ── full filter grammar (libsinsp operator set) ────────────────────────
+
+    fn fires(cond: &str, ev: &FalcoEvent) -> bool {
+        let mut e = Engine::new();
+        e.load_pack(pack(vec![rule("r", cond)])).unwrap();
+        !e.evaluate(ev).is_empty()
+    }
+
+    #[test]
+    fn double_equals_is_alias_for_eq() {
+        let ev = FalcoEvent::syscall("execve").with("proc.name", "bash");
+        assert!(fires("proc.name == bash", &ev));
+        assert!(!fires("proc.name == sh", &ev));
+    }
+
+    #[test]
+    fn numeric_comparisons() {
+        let ev = FalcoEvent::syscall("open").with("fd.num", "1024");
+        assert!(fires("fd.num > 1000", &ev));
+        assert!(fires("fd.num >= 1024", &ev));
+        assert!(fires("fd.num < 2000", &ev));
+        assert!(fires("fd.num <= 1024", &ev));
+        assert!(!fires("fd.num > 1024", &ev));
+        assert!(!fires("fd.num < 1024", &ev));
+    }
+
+    #[test]
+    fn icontains_is_case_insensitive() {
+        let ev = FalcoEvent::syscall("open").with("fd.name", "/etc/PASSWD");
+        assert!(fires("fd.name icontains passwd", &ev));
+        assert!(!fires("fd.name contains passwd", &ev));
+    }
+
+    #[test]
+    fn glob_matches_wildcards() {
+        let ev = FalcoEvent::syscall("open").with("fd.name", "/var/log/syslog");
+        assert!(fires("fd.name glob '/var/log/*'", &ev));
+        assert!(fires("fd.name glob '/var/*/sys???'", &ev));
+        assert!(!fires("fd.name glob '/etc/*'", &ev));
+    }
+
+    #[test]
+    fn regex_matches_pattern() {
+        let ev = FalcoEvent::syscall("execve").with("proc.name", "python3.11");
+        assert!(fires("proc.name regex 'python[0-9.]+'", &ev));
+        assert!(!fires("proc.name regex '^java'", &ev));
+    }
+
+    #[test]
+    fn explicit_exists_unary() {
+        let ev = FalcoEvent::syscall("execve").with("container.id", "abc");
+        assert!(fires("container.id exists", &ev));
+        assert!(!fires("container.image exists", &ev));
+    }
+
+    #[test]
+    fn pmatch_path_prefix_set() {
+        let ev = FalcoEvent::syscall("open").with("fd.name", "/etc/shadow");
+        assert!(fires("fd.name pmatch (/etc, /usr)", &ev));
+        assert!(!fires("fd.name pmatch (/var, /tmp)", &ev));
+        // exact path also matches
+        let ev2 = FalcoEvent::syscall("open").with("fd.name", "/etc");
+        assert!(fires("fd.name pmatch (/etc)", &ev2));
+    }
+
+    #[test]
+    fn intersects_multi_value_field() {
+        let ev = FalcoEvent::syscall("execve").with("proc.aname", "bash,sudo,init");
+        assert!(fires("proc.aname intersects (sudo, sshd)", &ev));
+        assert!(!fires("proc.aname intersects (nginx, sshd)", &ev));
+    }
+
+    #[test]
+    fn cidr_containment_via_eq_and_in() {
+        let ev = FalcoEvent::syscall("connect").with("fd.cip", "10.1.2.3");
+        assert!(fires("fd.cip = 10.0.0.0/8", &ev));
+        assert!(!fires("fd.cip = 192.168.0.0/16", &ev));
+        assert!(fires("fd.cip in (192.168.0.0/16, 10.0.0.0/8)", &ev));
+    }
+
+    #[test]
+    fn cidr_ipv6_containment() {
+        let ev = FalcoEvent::syscall("connect").with("fd.cip", "2001:db8::1");
+        assert!(fires("fd.cip = 2001:db8::/32", &ev));
+        assert!(!fires("fd.cip = 2001:dead::/32", &ev));
+    }
 }
