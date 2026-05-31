@@ -8,6 +8,7 @@
 pub mod acl;
 pub mod basic_auth;
 pub mod bot_detection;
+pub mod correlation_id;
 pub mod cors;
 pub mod grpc_gateway;
 pub mod hmac_auth;
@@ -179,6 +180,10 @@ impl PluginChain {
             Arc::new(prometheus::PrometheusPlugin::new()),
         );
         plugins.insert("zipkin".to_string(), Arc::new(zipkin::ZipkinPlugin));
+        plugins.insert(
+            "correlation-id".to_string(),
+            Arc::new(correlation_id::CorrelationIdPlugin::new()),
+        );
         plugins.insert(
             "grpc-gateway".to_string(),
             Arc::new(grpc_gateway::GrpcGatewayPlugin),
