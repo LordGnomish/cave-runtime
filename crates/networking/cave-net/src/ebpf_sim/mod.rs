@@ -31,6 +31,7 @@
 pub mod bpf_host_sim;
 pub mod bpf_lxc_sim;
 pub mod conntrack_sim;
+pub mod dsr_sim;
 pub mod edt_sim;
 pub mod helpers;
 pub mod lb_sim;
@@ -44,6 +45,10 @@ pub mod program;
 pub use bpf_host_sim::{HostProgram, HostVerdict};
 pub use bpf_lxc_sim::{LxcEndpointInfo, LxcMap, LxcProgram};
 pub use conntrack_sim::{ConntrackEntry, ConntrackKey, ConntrackMap, CtAction, CtDirection};
+pub use dsr_sim::{
+    dsr_extract_opt4, dsr_set_opt4, DsrDrop, DsrOptV4, DsrSetOutcome, Ipv4Hdr, DSR_IPV4_OPT_TYPE,
+    DSR_OPT_V4_LEN, IPOPT_COPY,
+};
 pub use edt_sim::{
     edt_sched_departure, EdtInfo, EdtThrottleMap, EdtVerdict, DEFAULT_DROP_HORIZON_NS, NSEC_PER_SEC,
 };
