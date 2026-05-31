@@ -508,6 +508,16 @@ impl ProgressTracker {
         self.votes.clear();
     }
 
+    /// The incoming (`C_new`) voter set.
+    pub fn voter_ids(&self) -> Vec<u64> {
+        self.incoming.iter().copied().collect()
+    }
+
+    /// The outgoing (`C_old`) voter set — empty when not in a joint change.
+    pub fn outgoing_ids(&self) -> Vec<u64> {
+        self.outgoing.iter().copied().collect()
+    }
+
     /// Count votes among voters, excluding learners. Returns
     /// `(granted, rejected)`.
     pub fn tally_votes(&self) -> (usize, usize) {

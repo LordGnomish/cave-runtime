@@ -106,6 +106,8 @@ pub struct RaftNode {
     pub last_term: u64,
     /// Highest committed index.
     pub commit: u64,
+    /// Term of each log entry, indexed by `index - 1` (index 1 = `log_terms[0]`).
+    pub log_terms: Vec<u64>,
     /// Outbound messages produced since the last drain.
     pub msgs: Vec<Message>,
     /// Deterministic PRNG state for randomized election timeout.
@@ -142,6 +144,7 @@ impl RaftNode {
             last_index: 0,
             last_term: 0,
             commit: 0,
+            log_terms: Vec::new(),
             msgs: Vec::new(),
             // Seed the PRNG off the node id so each peer randomizes
             // independently but reproducibly.
@@ -335,6 +338,7 @@ impl RaftNode {
             MsgHup => self.campaign(),
             MsgVote | MsgPreVote => self.handle_vote(m),
             MsgVoteResp => self.handle_vote_resp(m),
+            MsgAppResp => self.handle_app_resp(m),
             MsgHeartbeat => {
                 self.election_elapsed = 0;
                 self.lead = m.from;
@@ -366,6 +370,47 @@ impl RaftNode {
             resp.reject = true;
         }
         self.msgs.push(resp);
+    }
+
+    /// Term of the log entry at `idx` (0 for the empty index 0 or any
+    /// index beyond the local log).
+    pub fn term_at(&self, idx: u64) -> u64 {
+        if idx == 0 {
+            return 0;
+        }
+        self.log_terms.get((idx - 1) as usize).copied().unwrap_or(0)
+    }
+
+    /// Leader: append a new entry at the current term and return its index
+    /// (etcd `raft.appendEntry`). Updates the leader's own match progress.
+    pub fn propose(&mut self) -> u64 {
+        // RED placeholder: records the entry but never advances last_index
+        // nor the leader's own progress.
+        self.log_terms.push(self.term);
+        0
+    }
+
+    /// Leader: advance `commit` to the highest index a quorum has acked,
+    /// subject to the current-term safety rule (etcd `raft.maybeCommit`).
+    pub fn maybe_commit(&mut self) -> bool {
+        // RED placeholder: never advances commit.
+        false
+    }
+
+    /// Leader: react to a follower's append acknowledgement (etcd
+    /// `stepLeader` MsgAppResp arm). On success, advance the follower's
+    /// match and try to commit; on rejection, roll its `next` back.
+    fn handle_app_resp(&mut self, m: Message) {
+        if self.state != RaftState::Leader {
+            return;
+        }
+        if let Some(pr) = self.tracker.progress.get_mut(&m.from) {
+            if m.reject {
+                pr.maybe_decr_to(m.index, m.index);
+            } else if pr.maybe_update(m.index) {
+                self.maybe_commit();
+            }
+        }
     }
 
     /// Tally a vote response while campaigning (etcd `stepCandidate`).
@@ -531,6 +576,14 @@ mod tests {
         }
     }
 
+    impl Message {
+        /// Test helper: set the acked/referenced index.
+        fn acked(mut self, index: u64) -> Self {
+            self.index = index;
+            self
+        }
+    }
+
     #[test]
     fn candidate_wins_on_majority_vote_responses() {
         let mut n = node();
@@ -600,6 +653,72 @@ mod tests {
         n.step(v);
         assert_eq!(n.vote, NONE, "did not grant to a stale-log candidate");
         assert!(n.msgs.last().unwrap().reject);
+    }
+
+    /// Drive a fresh node to leadership at term 1 in a 3-voter cluster.
+    fn leader() -> RaftNode {
+        let mut n = node();
+        n.step(msg(MessageType::MsgHup, 1, 1, 0));
+        n.step(msg(MessageType::MsgVoteResp, 2, 1, 1));
+        assert_eq!(n.state, RaftState::Leader);
+        n.msgs.clear();
+        n
+    }
+
+    #[test]
+    fn propose_appends_entry_and_advances_leader_match() {
+        let mut n = leader();
+        let i = n.propose();
+        assert_eq!(i, 1, "first proposal lands at index 1");
+        assert_eq!(n.last_index, 1);
+        assert_eq!(n.last_term, 1, "entry carries the current term");
+        assert_eq!(n.term_at(1), 1);
+        // Leader's own progress now matches its log tail.
+        assert_eq!(n.tracker.progress.get(&1).unwrap().r#match, 1);
+    }
+
+    #[test]
+    fn leader_commits_once_a_quorum_acks_a_current_term_entry() {
+        let mut n = leader();
+        n.propose(); // index 1, term 1
+        assert_eq!(n.commit, 0, "self-ack alone is not a quorum of 3");
+        // Follower 2 acks index 1 → leader (1) + 2 = majority of {1,2,3}.
+        n.step(msg(MessageType::MsgAppResp, 2, 1, 1).acked(1));
+        assert_eq!(n.commit, 1, "quorum reached → committed");
+        // A third ack does not regress or double-advance.
+        n.step(msg(MessageType::MsgAppResp, 3, 1, 1).acked(1));
+        assert_eq!(n.commit, 1);
+    }
+
+    #[test]
+    fn leader_does_not_commit_a_prior_term_entry_on_count_alone() {
+        // Safety: a leader only commits a *current-term* entry by counting
+        // replicas (etcd Figure 8). Seed a stale-term entry at index 1.
+        let mut n = leader(); // term 1
+        n.log_terms.push(0); // index 1 carries an older term 0 (< current 1)
+        n.last_index = 1;
+        n.last_term = 0;
+        n.tracker.progress.get_mut(&1).unwrap().r#match = 1;
+        n.step(msg(MessageType::MsgAppResp, 2, 1, 1).acked(1));
+        assert_eq!(
+            n.commit, 0,
+            "must not commit a prior-term entry by replica count"
+        );
+    }
+
+    #[test]
+    fn app_rejection_rolls_back_follower_next() {
+        let mut n = leader();
+        n.propose();
+        n.propose(); // last_index = 2
+        let pr2_next_before = n.tracker.progress.get(&2).unwrap().next;
+        assert!(pr2_next_before >= 1);
+        let mut rej = msg(MessageType::MsgAppResp, 2, 1, 1);
+        rej.reject = true;
+        rej.index = 1;
+        n.step(rej);
+        // next must not have advanced past the rejection point.
+        assert!(n.tracker.progress.get(&2).unwrap().next <= 2);
     }
 
     #[test]
