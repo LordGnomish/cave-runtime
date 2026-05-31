@@ -66,7 +66,40 @@ pub fn eval_formula(formula: &str, vars: &BTreeMap<String, f64>) -> Result<f64, 
             p.pos
         )));
     }
-    eval(&expr, vars)
+    Ok(eval(&expr, vars)?.as_num())
+}
+
+/// A runtime value during formula evaluation. expr-lang is dynamically
+/// typed; we carry the numeric and boolean shapes a scaling-modifier
+/// formula can produce.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Value {
+    Num(f64),
+    Bool(bool),
+}
+
+impl Value {
+    /// Coerce to a float, exactly as upstream's `float(...)` /
+    /// `expr.AsFloat64()` do (`true → 1.0`, `false → 0.0`).
+    fn as_num(&self) -> f64 {
+        match self {
+            Value::Num(n) => *n,
+            Value::Bool(b) => {
+                if *b {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+        }
+    }
+
+    fn truthy(&self) -> bool {
+        match self {
+            Value::Bool(b) => *b,
+            Value::Num(n) => *n != 0.0,
+        }
+    }
 }
 
 // ─── lexer ───────────────────────────────────────────────────────────────────
@@ -82,6 +115,18 @@ enum Tok {
     Percent,
     LParen,
     RParen,
+    Comma,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    EqEq,
+    Ne,
+    AndAnd,
+    OrOr,
+    Bang,
+    Question,
+    Colon,
 }
 
 fn lex(src: &str) -> Result<Vec<Tok>, FormulaError> {
@@ -120,6 +165,69 @@ fn lex(src: &str) -> Result<Vec<Tok>, FormulaError> {
                 out.push(Tok::RParen);
                 i += 1;
             }
+            ',' => {
+                out.push(Tok::Comma);
+                i += 1;
+            }
+            '?' => {
+                out.push(Tok::Question);
+                i += 1;
+            }
+            ':' => {
+                out.push(Tok::Colon);
+                i += 1;
+            }
+            '<' => {
+                if chars.get(i + 1) == Some(&'=') {
+                    out.push(Tok::Le);
+                    i += 2;
+                } else {
+                    out.push(Tok::Lt);
+                    i += 1;
+                }
+            }
+            '>' => {
+                if chars.get(i + 1) == Some(&'=') {
+                    out.push(Tok::Ge);
+                    i += 2;
+                } else {
+                    out.push(Tok::Gt);
+                    i += 1;
+                }
+            }
+            '=' => {
+                if chars.get(i + 1) == Some(&'=') {
+                    out.push(Tok::EqEq);
+                    i += 2;
+                } else {
+                    return Err(FormulaError::Parse("bare '=' (use '==')".into()));
+                }
+            }
+            '!' => {
+                if chars.get(i + 1) == Some(&'=') {
+                    out.push(Tok::Ne);
+                    i += 2;
+                } else {
+                    out.push(Tok::Bang);
+                    i += 1;
+                }
+            }
+            '&' => {
+                if chars.get(i + 1) == Some(&'&') {
+                    out.push(Tok::AndAnd);
+                    i += 2;
+                } else {
+                    return Err(FormulaError::Parse("bare '&' (use '&&')".into()));
+                }
+            }
+            '|' => {
+                if chars.get(i + 1) == Some(&'|') {
+                    out.push(Tok::OrOr);
+                    i += 2;
+                } else {
+                    return Err(FormulaError::Parse("bare '|' (use '||')".into()));
+                }
+            }
             d if d.is_ascii_digit() || d == '.' => {
                 let start = i;
                 while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
@@ -137,7 +245,13 @@ fn lex(src: &str) -> Result<Vec<Tok>, FormulaError> {
                     i += 1;
                 }
                 let s: String = chars[start..i].iter().collect();
-                out.push(Tok::Ident(s));
+                // expr-lang word-operators.
+                match s.as_str() {
+                    "and" => out.push(Tok::AndAnd),
+                    "or" => out.push(Tok::OrOr),
+                    "not" => out.push(Tok::Bang),
+                    _ => out.push(Tok::Ident(s)),
+                }
             }
             other => {
                 return Err(FormulaError::Parse(format!(
@@ -157,11 +271,14 @@ enum Expr {
     Var(String),
     Unary(UnOp, Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
+    Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
+    Call(String, Vec<Expr>),
 }
 
 #[derive(Debug, Clone, Copy)]
 enum UnOp {
     Neg,
+    Not,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -171,6 +288,14 @@ enum BinOp {
     Mul,
     Div,
     Mod,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Ne,
+    And,
+    Or,
 }
 
 struct Parser {
@@ -205,6 +330,14 @@ impl Parser {
     /// Binding power for a binary operator (higher binds tighter).
     fn binop(tok: &Tok) -> Option<(BinOp, u8)> {
         Some(match tok {
+            Tok::OrOr => (BinOp::Or, 1),
+            Tok::AndAnd => (BinOp::And, 2),
+            Tok::EqEq => (BinOp::Eq, 3),
+            Tok::Ne => (BinOp::Ne, 3),
+            Tok::Lt => (BinOp::Lt, 4),
+            Tok::Le => (BinOp::Le, 4),
+            Tok::Gt => (BinOp::Gt, 4),
+            Tok::Ge => (BinOp::Ge, 4),
             Tok::Plus => (BinOp::Add, 5),
             Tok::Minus => (BinOp::Sub, 5),
             Tok::Star => (BinOp::Mul, 6),
@@ -214,10 +347,21 @@ impl Parser {
         })
     }
 
+    /// Precedence-climbing expression parser. `min_bp` is the minimum
+    /// binding power this call will consume. Ternary `?:` has the lowest
+    /// precedence and is handled only at the top (`min_bp == 0`).
     fn parse_expr(&mut self, min_bp: u8) -> Result<Expr, FormulaError> {
         let mut lhs = self.parse_unary()?;
         loop {
             let Some(tok) = self.peek() else { break };
+            if matches!(tok, Tok::Question) && min_bp == 0 {
+                self.next();
+                let then_branch = self.parse_expr(0)?;
+                self.expect(&Tok::Colon)?;
+                let else_branch = self.parse_expr(0)?;
+                lhs = Expr::Ternary(Box::new(lhs), Box::new(then_branch), Box::new(else_branch));
+                continue;
+            }
             let Some((op, bp)) = Self::binop(tok) else {
                 break;
             };
@@ -237,6 +381,10 @@ impl Parser {
                 self.next();
                 Ok(Expr::Unary(UnOp::Neg, Box::new(self.parse_unary()?)))
             }
+            Some(Tok::Bang) => {
+                self.next();
+                Ok(Expr::Unary(UnOp::Not, Box::new(self.parse_unary()?)))
+            }
             _ => self.parse_primary(),
         }
     }
@@ -249,44 +397,122 @@ impl Parser {
                 self.expect(&Tok::RParen)?;
                 Ok(e)
             }
-            Some(Tok::Ident(name)) => Ok(Expr::Var(name)),
+            Some(Tok::Ident(name)) => {
+                if self.peek() == Some(&Tok::LParen) {
+                    self.next();
+                    let args = self.parse_arg_list(&Tok::RParen)?;
+                    self.expect(&Tok::RParen)?;
+                    Ok(Expr::Call(name, args))
+                } else {
+                    Ok(Expr::Var(name))
+                }
+            }
             other => Err(FormulaError::Parse(format!("unexpected token {other:?}"))),
         }
+    }
+
+    /// Parse a comma-separated argument list up to (but not consuming)
+    /// `close`.
+    fn parse_arg_list(&mut self, close: &Tok) -> Result<Vec<Expr>, FormulaError> {
+        let mut args = Vec::new();
+        if self.peek() != Some(close) {
+            loop {
+                args.push(self.parse_expr(0)?);
+                match self.peek() {
+                    Some(Tok::Comma) => {
+                        self.next();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        Ok(args)
     }
 }
 
 // ─── evaluator ─────────────────────────────────────────────────────────────
 
-fn eval(expr: &Expr, vars: &BTreeMap<String, f64>) -> Result<f64, FormulaError> {
+fn eval(expr: &Expr, vars: &BTreeMap<String, f64>) -> Result<Value, FormulaError> {
     match expr {
-        Expr::Num(n) => Ok(*n),
+        Expr::Num(n) => Ok(Value::Num(*n)),
         Expr::Var(name) => vars
             .get(name)
-            .copied()
+            .map(|v| Value::Num(*v))
             .ok_or_else(|| FormulaError::UnknownVariable(name.clone())),
-        Expr::Unary(UnOp::Neg, inner) => Ok(-eval(inner, vars)?),
-        Expr::Binary(op, l, r) => {
-            let a = eval(l, vars)?;
-            let b = eval(r, vars)?;
-            Ok(match op {
-                BinOp::Add => a + b,
-                BinOp::Sub => a - b,
-                BinOp::Mul => a * b,
-                BinOp::Div => {
-                    if b == 0.0 {
-                        return Err(FormulaError::Eval("division by zero".into()));
-                    }
-                    a / b
-                }
-                BinOp::Mod => {
-                    if b == 0.0 {
-                        return Err(FormulaError::Eval("modulo by zero".into()));
-                    }
-                    a % b
-                }
-            })
+        Expr::Unary(op, inner) => {
+            let v = eval(inner, vars)?;
+            match op {
+                UnOp::Neg => Ok(Value::Num(-v.as_num())),
+                UnOp::Not => Ok(Value::Bool(!v.truthy())),
+            }
         }
+        Expr::Ternary(cond, a, b) => {
+            if eval(cond, vars)?.truthy() {
+                eval(a, vars)
+            } else {
+                eval(b, vars)
+            }
+        }
+        Expr::Binary(op, l, r) => eval_binary(*op, l, r, vars),
+        Expr::Call(name, args) => eval_call(name, args, vars),
     }
+}
+
+fn eval_binary(
+    op: BinOp,
+    l: &Expr,
+    r: &Expr,
+    vars: &BTreeMap<String, f64>,
+) -> Result<Value, FormulaError> {
+    // Short-circuit logical operators.
+    if op == BinOp::And {
+        return Ok(Value::Bool(eval(l, vars)?.truthy() && eval(r, vars)?.truthy()));
+    }
+    if op == BinOp::Or {
+        return Ok(Value::Bool(eval(l, vars)?.truthy() || eval(r, vars)?.truthy()));
+    }
+    let a = eval(l, vars)?.as_num();
+    let b = eval(r, vars)?.as_num();
+    Ok(match op {
+        BinOp::Add => Value::Num(a + b),
+        BinOp::Sub => Value::Num(a - b),
+        BinOp::Mul => Value::Num(a * b),
+        BinOp::Div => {
+            if b == 0.0 {
+                return Err(FormulaError::Eval("division by zero".into()));
+            }
+            Value::Num(a / b)
+        }
+        BinOp::Mod => {
+            if b == 0.0 {
+                return Err(FormulaError::Eval("modulo by zero".into()));
+            }
+            Value::Num(a % b)
+        }
+        BinOp::Lt => Value::Bool(a < b),
+        BinOp::Le => Value::Bool(a <= b),
+        BinOp::Gt => Value::Bool(a > b),
+        BinOp::Ge => Value::Bool(a >= b),
+        BinOp::Eq => Value::Bool(a == b),
+        BinOp::Ne => Value::Bool(a != b),
+        BinOp::And | BinOp::Or => unreachable!("handled above"),
+    })
+}
+
+fn eval_call(name: &str, args: &[Expr], vars: &BTreeMap<String, f64>) -> Result<Value, FormulaError> {
+    let one = |args: &[Expr]| -> Result<f64, FormulaError> {
+        if args.len() != 1 {
+            return Err(FormulaError::Eval(format!("{name}() expects 1 argument")));
+        }
+        Ok(eval(&args[0], vars)?.as_num())
+    };
+    let v = match name {
+        // expr-lang float()/int() coercions — the wrapper KEDA applies.
+        "float" => one(args)?,
+        "int" => one(args)?.trunc(),
+        other => return Err(FormulaError::Eval(format!("unknown function '{other}'"))),
+    };
+    Ok(Value::Num(v))
 }
 
 /// One trigger's metric output going into the ScalingModifiers
