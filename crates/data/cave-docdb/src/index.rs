@@ -19,6 +19,10 @@ pub struct Index {
     /// serialized state) to the BTreeMap's alphabetical iteration order.
     #[serde(default)]
     key_order: Vec<String>,
+    /// Fields covered by a text index (`{field: "text"}`). Empty for ordinary
+    /// b-tree indexes; non-empty marks this as a text index searched by `$text`.
+    #[serde(default)]
+    text_fields: Vec<String>,
 }
 
 impl Index {
@@ -29,7 +33,29 @@ impl Index {
             keys,
             unique,
             key_order,
+            text_fields: Vec::new(),
         }
+    }
+
+    /// Build a text index over the named string fields.
+    pub fn text(name: String, fields: Vec<String>) -> Self {
+        Self {
+            name,
+            keys: BTreeMap::new(),
+            unique: false,
+            key_order: Vec::new(),
+            text_fields: fields,
+        }
+    }
+
+    /// Whether this is a text index.
+    pub fn is_text(&self) -> bool {
+        !self.text_fields.is_empty()
+    }
+
+    /// The fields a text index covers (empty for non-text indexes).
+    pub fn text_fields(&self) -> &[String] {
+        &self.text_fields
     }
 
     /// Build an index preserving the declared compound-key order.
@@ -45,6 +71,7 @@ impl Index {
             keys,
             unique,
             key_order,
+            text_fields: Vec::new(),
         }
     }
 

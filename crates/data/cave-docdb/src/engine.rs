@@ -177,6 +177,34 @@ impl Collection {
         Ok(self.indexes.read().await.clone())
     }
 
+    /// Run a `$text` `$search` over the collection's text index. The union of
+    /// all text-index fields forms the searched text; an optional `filter`
+    /// further restricts the result set (AND with the text match). Returns an
+    /// error if the collection has no text index.
+    pub async fn text_search(
+        &self,
+        search: &str,
+        filter: Option<&Document>,
+    ) -> Result<Vec<Document>, String> {
+        let fields = {
+            let indexes = self.indexes.read().await;
+            let mut fields: Vec<String> = Vec::new();
+            for idx in indexes.iter().filter(|i| i.is_text()) {
+                for f in idx.text_fields() {
+                    if !fields.contains(f) {
+                        fields.push(f.clone());
+                    }
+                }
+            }
+            fields
+        };
+        if fields.is_empty() {
+            return Err("text index required for $text query".to_string());
+        }
+        let _ = (search, filter);
+        Ok(Vec::new()) // stub for RED
+    }
+
     pub async fn drop_index(&self, name: &str) -> Result<(), String> {
         let mut indexes = self.indexes.write().await;
         indexes.retain(|idx| idx.name != name);
@@ -319,6 +347,50 @@ mod tests {
 
         let found = col.find(None).await.unwrap();
         assert_eq!(found.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_text_search_requires_index() {
+        let col = Collection::new();
+        let mut d = Document::new();
+        d.insert("body".to_string(), Value::String("hello world".to_string()));
+        col.insert_one(d).await.unwrap();
+        // No text index -> error.
+        assert!(col.text_search("hello", None).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_text_search_matches_indexed_fields() {
+        let col = Collection::new();
+        for (title, body) in [
+            ("Cold Brew", "the best iced coffee"),
+            ("Hot Tea", "a warm cup of tea"),
+            ("Decaf Coffee", "coffee without the buzz"),
+        ] {
+            let mut d = Document::new();
+            d.insert("title".to_string(), Value::String(title.to_string()));
+            d.insert("body".to_string(), Value::String(body.to_string()));
+            col.insert_one(d).await.unwrap();
+        }
+        col.add_index(Index::text(
+            "txt".to_string(),
+            vec!["title".to_string(), "body".to_string()],
+        ))
+        .await
+        .unwrap();
+
+        // OR over terms: "coffee" hits the two coffee docs.
+        let hits = col.text_search("coffee", None).await.unwrap();
+        assert_eq!(hits.len(), 2);
+
+        // Negation excludes the decaf doc.
+        let hits = col.text_search("coffee -decaf", None).await.unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].get("title").and_then(|v| v.as_str()), Some("Cold Brew"));
+
+        // Phrase match.
+        let hits = col.text_search("\"iced coffee\"", None).await.unwrap();
+        assert_eq!(hits.len(), 1);
     }
 
     #[tokio::test]
