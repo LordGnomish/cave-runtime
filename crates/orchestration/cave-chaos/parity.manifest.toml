@@ -1,8 +1,8 @@
 # parity.manifest.toml — cave-chaos
 # Upstream: chaos-mesh/chaos-mesh  https://github.com/chaos-mesh/chaos-mesh
-# 2026-05-28 honest Charter v2 close — implemented real chaos engine, workflow,
-# cron scheduler, full CRUD REST API, absorbed executor + store orphan modules;
-# ADR-justified 5 sibling/out-of-scope cuts.
+# 2026-05-31 honest cont — reconciled against the real built surface: selector,
+# reconcile decision-core, daemon command planner, Prometheus exporter, admission
+# webhook now mapped; cavectl wired; 22 fault types. 4 narrowed scope-cuts remain.
 
 [upstream]
 org        = "chaos-mesh"
@@ -16,28 +16,33 @@ source_sha = "b061f3c26be3f0d3f52049044f2513c42c843c1f"
 #   * source_sha pinned to v2.7.0 tag commit (dereferenced)
 
 [parity]
-# 2026-05-28 honest close — implemented real chaos engine (execute/validate/rollback),
-# workflow (sequential/parallel DAG), cron scheduler (pure-Rust 5-field parser),
-# full CRUD REST API; absorbed executor + store orphan modules;
-# ADR-justified 5 sibling/out-of-scope cuts.
+# 2026-05-31 honest cont — reconciled the stale manifest against the real
+# surface built since the 2026-05-28 close: added the pod selector, reconcile
+# decision-core, chaos-daemon command planner, in-crate Prometheus exporter and
+# admission webhook as mapped; wired the cavectl `chaos` verb to the live REST
+# routes (cavectl skip -> mapped). The three remaining skips were *narrowed* to
+# the genuinely out-of-process residual (K8s informer/watch/leader-election,
+# Grafana dashboards + cluster scrape config, privileged daemon kernel exec) and
+# the React SPA. Also closed the open extra-faults TDD cycle (22 fault types) and
+# wired NetworkDuplicate into the daemon injection plan.
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.7222  # 13 mapped / 18 total — 5 genuine scope-cuts
+honest_ratio        = 0.8261  # 19 mapped / 23 total — 4 genuine scope-cuts
 adr_justified_ratio = 1.0
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-mapped_count        = 13
+mapped_count        = 19
 partial_count       = 0
-skipped_count       = 5
+skipped_count       = 4
 unmapped_count      = 0
-total               = 18
-last_audit          = "2026-05-28"
+total               = 23
+last_audit          = "2026-05-31"
 infra_only          = false
 
 # ── Mapped surfaces ───────────────────────────────────────────────────────────
 
 [[mapped]]
 area    = "experiment-type-model"
-what    = "Full ExperimentType enum (17 fault types: Network{Latency,PacketLoss,Corruption,Bandwidth,Partition}, CpuStress, MemoryStress, DiskFill, IoLatency, IoChaos, PodKill, ProcessKill, NodeDrain, ClockSkew, HttpFault, GrpcFault, JvmException) + serde roundtrip"
+what    = "Full ExperimentType enum (22 fault types: Network{Latency,PacketLoss,Corruption,Bandwidth,Partition,Duplicate}, CpuStress, MemoryStress, DiskFill, IoLatency, IoChaos, PodKill, ProcessKill, NodeDrain, ClockSkew, HttpFault, GrpcFault, JvmException, DnsChaos, KernelChaos, BlockChaos, PhysicalMachineChaos) + serde snake_case roundtrip"
 file    = "src/models.rs"
 note    = "Extends origin/main 6-type enum to the full Chaos Mesh v2.7.0 surface"
 
@@ -67,9 +72,9 @@ note    = "Orphan file on origin/main; wired via lib.rs pub mod executor"
 
 [[mapped]]
 area    = "fault-simulation-metrics"
-what    = "simulate_experiment(): generates realistic before/after metric degradation for all 17 fault types (p50/p99 latency, error_rate, cpu_util, memory_util); structured ExperimentEvent timeline"
+what    = "simulate_experiment(): generates realistic before/after metric degradation for all 22 fault types (p50/p99 latency, error_rate, cpu_util, memory_util); structured ExperimentEvent timeline"
 file    = "src/executor.rs"
-note    = "All 17 ExperimentType variants handled exhaustively"
+note    = "All 22 ExperimentType variants handled exhaustively"
 
 [[mapped]]
 area    = "experiment-store"
@@ -97,9 +102,9 @@ note    = "NEW module — no external cron library; pure std + chrono"
 
 [[mapped]]
 area    = "validation-engine"
-what    = "validate_experiment() (per-type parameter validation for all 17 types), is_active(), is_high_risk(), actual_duration_secs()"
+what    = "validate_experiment() (per-type parameter validation for all 22 types incl. NetworkDuplicate 0-100% bound), is_active(), is_high_risk(), actual_duration_secs()"
 file    = "src/engine.rs"
-note    = "Pre-existing on origin/main; extended to handle all 17 ExperimentType variants"
+note    = "Pre-existing on origin/main; extended to handle all 22 ExperimentType variants"
 
 [[mapped]]
 area    = "rest-api-crud"
@@ -113,32 +118,63 @@ what    = "ExperimentEvent struct (timestamp, event_type, message, target) + 5-e
 file    = "src/models.rs + src/executor.rs"
 note    = "NEW model + generates structured event history per experiment execution"
 
+[[mapped]]
+area    = "pod-target-selector"
+what    = "resolve_targets(): namespace scope + LabelSelector (matchLabels equality AND + matchExpressions In/NotIn/Exists/DoesNotExist) + SelectorMode subset-size (one/all/fixed/fixed-percent ceil/random-max-percent floor). Maps api/v1alpha1/selector.go + controllers/utils/selector"
+file    = "src/selector.rs"
+note    = "NEW module. The live random tie-break in random-max-percent/one is part of the privileged daemon path — out of scope; the exact subset *size* formula is preserved"
+
+[[mapped]]
+area    = "reconcile-decision-core"
+what    = "Pure controllers/common decision core: desired_phase() recovery enforcer (manual-stop / unbounded / elapsed>=duration), compute_conditions() (Selected/AllInjected/AllRecovered/Paused), compute_phase() (Initial/Injecting/Running/Recovering/Finished/Paused), is_terminal()"
+file    = "src/reconcile.rs"
+note    = "NEW module. The K8s informer/watch loop, leader election and RBAC that DRIVE this logic remain a narrowed scope-cut (cave-controller-manager)"
+
+[[mapped]]
+area    = "chaos-daemon-command-planning"
+what    = "Portable chaos-daemon command planner: tc_netem (delay/loss/corrupt/duplicate + jitter/correlation), tc_tbf bandwidth, iptables_partition (CHAOS-INPUT/OUTPUT ipset DROP), stress_ng_cpu/mem, dns_chaos_command, and injection_plan() mapping an experiment to its ordered command list"
+file    = "src/daemon.rs"
+note    = "NEW module. Deterministic command *planning* only; the privileged kernel/namespace execution (nsenter, cgroups, real tc syscalls) stays a narrowed scope-cut"
+
+[[mapped]]
+area    = "metrics-prometheus-exporter"
+what    = "render_prometheus(): in-crate Prometheus text exposition (chaos_experiments_total, _by_status{draft|running|completed|aborted|failed}, _active, _high_risk) served at GET /api/chaos/metrics"
+file    = "src/metrics.rs"
+note    = "NEW module. Cluster-wide scraping + Grafana dashboards remain a narrowed scope-cut (cave-metrics); this is the portable /metrics endpoint that a scraper hits"
+
+[[mapped]]
+area    = "validating-admission-webhook"
+what    = "validate_experiment_admission() (empty-name, blast-radius (0,1] bound, max_pods>0, safety-guard protected-namespace block, then per-type validation) + validate_schedule_admission() (cron validity). Maps api/v1alpha1/*_webhook.go"
+file    = "src/webhook.rs"
+note    = "NEW module — rejects dangerous experiments at admission time before they are ever stored"
+
+[[mapped]]
+area    = "cavectl-cli-integration"
+what    = "cavectl `chaos` verb: experiments(list), get/create/start/stop/delete by id, metrics — dispatched to the live /api/chaos/* REST routes"
+file    = "crates/ops/cave-cli/src/main.rs"
+note    = "Realigned from stale /templates + /run placeholders to the real route surface; cave-runtime merges cave_chaos::router and the portal catalog entry is live (healthy, ep=/api/chaos/health)"
+
 # ── Skipped surfaces (ADR-justified scope cuts) ───────────────────────────────
 
 [[skipped]]
-area   = "kubernetes-crd-reconciler"
-what   = "Chaos Mesh ChaosKind CRD controller — watch/reconcile ChaosExperiment K8s objects, leader election, RBAC webhook"
-reason = "parallel-track: cave-controller-manager owns K8s CRD reconciliation for the cave-runtime workspace"
+area   = "k8s-informer-watch-leader-election"
+what   = "ChaosKind CRD controller runtime — informer/watch loop over ChaosExperiment K8s objects, leader election, RBAC. (The reconcile DECISION core is now mapped in src/reconcile.rs.)"
+reason = "parallel-track: cave-controller-manager owns the K8s controller-runtime watch/lease machinery for the cave-runtime workspace"
 
 [[skipped]]
-area   = "portal-ui-dashboard"
-what   = "Chaos Mesh Dashboard React SPA — experiment timeline, topology graph, archive browser"
+area   = "portal-ui-react-spa"
+what   = "Chaos Mesh Dashboard React SPA — experiment timeline, topology graph, archive browser. (The cave-portal catalog leaf page for chaos is live and reachable.)"
 reason = "parallel-track: cave-portal owns all React/web UI surfaces for the cave-runtime workspace"
 
 [[skipped]]
-area   = "cavectl-cli-integration"
-what   = "cavectl chaos {create,list,get,start,stop,delete,workflow} subcommands"
-reason = "parallel-track: cave-cli/cavectl is the monorepo CLI driver; surface exists but wiring is deferred to cavectl integration sprint"
+area   = "grafana-dashboards-and-cluster-scrape"
+what   = "Grafana dashboard JSON provisioning, cluster-wide Prometheus scrape config, and per-experiment latency/error histogram aggregation. (The in-crate /metrics gauge exporter is now mapped in src/metrics.rs.)"
+reason = "parallel-track: cave-metrics owns Grafana provisioning + cluster Prometheus/OTEL aggregation across the workspace"
 
 [[skipped]]
-area   = "observability-metrics-export"
-what   = "Prometheus /metrics scrape endpoint, Grafana dashboard JSON, experiment latency/error histograms"
-reason = "parallel-track: cave-metrics owns Prometheus/OTEL scrape surfaces across the workspace"
-
-[[skipped]]
-area   = "chaos-daemon-ebpf-injection"
-what   = "ChaosDaemon daemonset — eBPF-level tc/netem kernel fault injection, cgroups-based CPU/memory stress, nsenter process kill"
-reason = "out-of-scope-subsystem: requires privileged daemonset DaemonSet running ChaosDaemon on each node; out-of-process kernel interaction outside cave-chaos scope"
+area   = "chaos-daemon-privileged-kernel-exec"
+what   = "Privileged ChaosDaemon execution — eBPF/tc syscalls, cgroups CPU/memory stress, nsenter process kill on each node. (The deterministic command PLANNING is now mapped in src/daemon.rs.)"
+reason = "out-of-scope-subsystem: requires a privileged per-node DaemonSet doing out-of-process kernel interaction, outside the in-process cave-chaos runtime"
 
 [module]
 name        = "cave-chaos"
@@ -151,5 +187,5 @@ upstream_url = "https://chaos-mesh.org/docs/"
 status       = "skipped"
 loc          = 0
 priority     = "P2"
-notes        = "React dashboard scope-cut to cave-portal (parallel-track)"
-last_audit   = "2026-05-28"
+notes        = "Full React dashboard SPA scope-cut to cave-portal; the cave-portal catalog leaf page for chaos is live (healthy, ep=/api/chaos/health)"
+last_audit   = "2026-05-31"
