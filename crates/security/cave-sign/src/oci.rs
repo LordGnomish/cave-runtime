@@ -278,4 +278,43 @@ mod tests {
         let r = img();
         assert!(r.signature_uri().starts_with("ghcr.io/cave/runtime:sha256-"));
     }
+
+    #[test]
+    fn sbom_tag_and_uri() {
+        let r = img();
+        assert!(r.sbom_tag().ends_with(".sbom"));
+        assert!(r.sbom_tag().starts_with("sha256-"));
+        assert_eq!(r.sbom_uri(), format!("ghcr.io/cave/runtime:{}", r.sbom_tag()));
+    }
+
+    #[test]
+    fn attestation_uri_format() {
+        let r = img();
+        assert_eq!(
+            r.attestation_uri(),
+            format!("ghcr.io/cave/runtime:{}", r.attestation_tag())
+        );
+    }
+
+    #[test]
+    fn triangulate_dispatches_by_type() {
+        let r = img();
+        assert_eq!(r.triangulate(CosignArtifactType::Signature), r.signature_uri());
+        assert_eq!(r.triangulate(CosignArtifactType::Attestation), r.attestation_uri());
+        assert_eq!(r.triangulate(CosignArtifactType::Sbom), r.sbom_uri());
+    }
+
+    #[test]
+    fn artifact_type_parses_cosign_flag() {
+        assert_eq!(
+            CosignArtifactType::parse("signature").unwrap(),
+            CosignArtifactType::Signature
+        );
+        assert_eq!(
+            CosignArtifactType::parse("attestation").unwrap(),
+            CosignArtifactType::Attestation
+        );
+        assert_eq!(CosignArtifactType::parse("sbom").unwrap(), CosignArtifactType::Sbom);
+        assert!(CosignArtifactType::parse("bogus").is_err());
+    }
 }
