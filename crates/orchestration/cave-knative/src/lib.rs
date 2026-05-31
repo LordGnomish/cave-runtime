@@ -29,6 +29,7 @@ pub mod autoscaler;
 pub mod broker_controller;
 pub mod cert_bridge;
 pub mod configuration;
+pub mod domain_mapping;
 pub mod eventing;
 pub mod eventing_transports;
 pub mod hpa_bridge;
@@ -58,6 +59,10 @@ pub use cert_bridge::{
     KnativeCertificateSpec, KnativeCertificateStatus, project_status_back, to_cert_manager,
 };
 pub use configuration::{Configuration, ConfigurationSpec, ConfigurationStatus};
+pub use domain_mapping::{
+    finalize_kind, reconcile_domain_claim, ClusterDomainClaim, DomainClaimRegistry, DomainMapping,
+    DomainMappingSpec, DomainMappingStatus, KReference,
+};
 pub use eventing::{Channel, EventingSink, EventingSource, Subscription, Trigger, TriggerFilter};
 pub use eventing_transports::{
     DeliveryReceipt, GitHubSource, KafkaTransport, NatsTransport, PulsarTransport,
