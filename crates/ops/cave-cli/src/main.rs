@@ -2774,6 +2774,21 @@ enum EtcdCmd {
     Version,
     /// Show parity vs upstream etcd
     Parity,
+    /// Simulate one Raft election round through the in-process state machine
+    RaftElection {
+        /// This node's id
+        #[arg(long, default_value_t = 1)]
+        id: u64,
+        /// Cluster voter ids (comma-separated); defaults to just <id>
+        #[arg(long, value_delimiter = ',')]
+        peers: Vec<u64>,
+        /// Peer ids that grant their vote (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        grant: Vec<u64>,
+        /// Peer ids that reject their vote (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        reject: Vec<u64>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4375,6 +4390,23 @@ source_root = "src"
             EtcdCmd::Status => c.get("/api/etcd/status").await,
             EtcdCmd::Version => c.get("/api/etcd/v3/version").await,
             EtcdCmd::Parity => c.get("/api/etcd/parity").await,
+            EtcdCmd::RaftElection {
+                id,
+                peers,
+                grant,
+                reject,
+            } => {
+                c.post(
+                    "/api/etcd/v3/raft/election/simulate",
+                    json!({
+                        "id": id,
+                        "peers": peers,
+                        "grants": grant,
+                        "rejects": reject,
+                    }),
+                )
+                .await
+            }
         },
 
         // ── CRI ───────────────────────────────────────────────────────────────
