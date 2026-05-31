@@ -224,6 +224,45 @@ impl RaftNode {
     pub fn past_election_timeout(&self) -> bool {
         self.election_elapsed >= self.randomized_election_timeout
     }
+
+    /// Voting peers other than self (non-learners).
+    fn other_voters(&self) -> Vec<u64> {
+        self.tracker
+            .progress
+            .iter()
+            .filter(|(id, pr)| **id != self.id && !pr.is_learner)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Drive one logical clock tick, dispatching by role (etcd `raft.tick`).
+    pub fn tick(&mut self) {
+        match self.state {
+            RaftState::Leader => self.tick_heartbeat(),
+            _ => self.tick_election(),
+        }
+    }
+
+    /// Follower/candidate election clock. On timeout, start a campaign.
+    pub fn tick_election(&mut self) {
+        // RED placeholder: counts but never campaigns.
+        self.election_elapsed += 1;
+    }
+
+    /// Leader heartbeat clock. On timeout, broadcast heartbeats.
+    pub fn tick_heartbeat(&mut self) {
+        // RED placeholder: counts but never broadcasts.
+        self.heartbeat_elapsed += 1;
+    }
+
+    /// Start an election: become candidate, vote for self, and either win
+    /// immediately (single voter) or solicit votes from peers
+    /// (etcd `raft.campaign` / `becomeCandidate`).
+    pub fn campaign(&mut self) {
+        // RED placeholder: transitions but neither self-votes via the
+        // tracker nor emits vote requests.
+        self.become_candidate();
+    }
 }
 
 #[cfg(test)]
@@ -306,6 +345,61 @@ mod tests {
                 2 * n.election_timeout,
             );
         }
+    }
+
+    #[test]
+    fn tick_election_campaigns_at_timeout_and_solicits_votes() {
+        let mut n = node();
+        n.randomized_election_timeout = 3;
+        n.tick();
+        n.tick();
+        assert_eq!(n.state, RaftState::Follower, "no campaign before timeout");
+        assert!(n.msgs.is_empty());
+        n.tick(); // election_elapsed == 3 → campaign
+        assert_eq!(n.state, RaftState::Candidate);
+        assert_eq!(n.term, 1);
+        assert_eq!(n.vote, 1, "campaign self-votes");
+        assert_eq!(n.election_elapsed, 0, "campaign restarts the clock");
+        // One MsgVote per other voter (peers 2 and 3).
+        let votes: Vec<_> = n
+            .msgs
+            .iter()
+            .filter(|m| m.msg_type == MessageType::MsgVote)
+            .collect();
+        assert_eq!(votes.len(), 2);
+        for m in &votes {
+            assert_eq!(m.term, 1);
+            assert_eq!(m.from, 1);
+        }
+        let dests: std::collections::BTreeSet<u64> = votes.iter().map(|m| m.to).collect();
+        assert_eq!(dests, [2u64, 3].into_iter().collect());
+    }
+
+    #[test]
+    fn single_voter_campaign_wins_immediately() {
+        let mut n = RaftNode::new(1, &[1], 10, 1, 256);
+        n.campaign();
+        assert_eq!(n.state, RaftState::Leader, "a lone voter self-elects");
+        assert_eq!(n.lead, 1);
+    }
+
+    #[test]
+    fn leader_tick_broadcasts_heartbeat_at_timeout_not_election() {
+        let mut n = node();
+        n.become_candidate();
+        n.become_leader();
+        n.heartbeat_timeout = 2;
+        n.tick();
+        assert!(n.msgs.is_empty(), "no heartbeat before timeout");
+        n.tick(); // heartbeat_elapsed == 2 → broadcast
+        let hbs: Vec<_> = n
+            .msgs
+            .iter()
+            .filter(|m| m.msg_type == MessageType::MsgHeartbeat)
+            .collect();
+        assert_eq!(hbs.len(), 2, "heartbeat to each follower");
+        assert_eq!(n.heartbeat_elapsed, 0, "heartbeat clock resets");
+        assert_eq!(n.state, RaftState::Leader, "leader never self-demotes via tick");
     }
 
     #[test]
