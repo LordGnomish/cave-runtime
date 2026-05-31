@@ -37,13 +37,13 @@ source_sha  = "v1.0.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 15/15
-honest_ratio        = 0.8824  # mapped / total = 15/17
-last_audit          = "2026-05-30"
+fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 16/16
+honest_ratio        = 0.9412  # mapped / total = 16/17
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 15
+mapped_count        = 16
 partial_count       = 0
-skipped_count       = 2
+skipped_count       = 1
 unmapped_count      = 0
 total               = 17
 
@@ -292,17 +292,17 @@ name = "cert-controller"
 upstream = "internal/kubeadm/certificates.go + controllers/certificate_lifecycle_controller.go"
 note = "Per-tenant PKI decision layer (src/certs.rs): kubeadm cert tree (ca→apiserver/apiserver-kubelet-client, front-proxy-ca→front-proxy-client, sa key-pair) with signer chain + ext-key-usage; kubeadm GetAPIServerAltNames SAN computation; CertificateLifecycle 1-day rotation deadline (now+1d > NotAfter) with x509/kubeconfig strategies; checksum+CA-validity regeneration-skip predicate. Real x509 signing delegated to cave-certs/cave-pki. Wave-7 close-out 2026-05-30 — promoted skipped → mapped (4 strict-TDD cycles, 18 tests). Exposed via /api/kamaji/tenants/:id/certificates + cavectl kamaji tcp-certs."
 
+[[mapped]]
+name = "leader-election-helper"
+upstream = "internal/utilities/leaderelection"
+note = "Lease acquire/renew/observe decision core (src/leaderelection.rs): client-go tryAcquireOrRenew (create / acquire-on-expiry with leader_transitions++ / renew-preserving-acquire_time / lose-on-valid-foreign-lease), renew-deadline step-down check, and NewLeaderElector config validation (leaseDuration>renewDeadline>1.2*retryPeriod, all>0). Kamaji's manager runs LeaderElection:true; Lease object I/O left to the runtime. Wave-8 close-out 2026-05-31 — promoted skipped -> mapped (strict-TDD, 6 tests)."
+
 # ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
 [[skipped]]
 name = "metrics-export"
 upstream = "internal/metrics"
 reason = "Prometheus metrics export — cave-metrics owns the workspace exporter; cave-kamaji surfaces stats via the REST API."
-
-[[skipped]]
-name = "leader-election-helper"
-upstream = "internal/utilities/leaderelection"
-reason = "Generic controller leader-election helper — duplicated by cave-controller-manager; defer."
 
 [portal_ui]
 upstream_ui  = "(CRD-only)"
@@ -311,4 +311,4 @@ status       = "phase-3"
 loc          = 164
 priority     = "P2"
 notes        = "Kamaji is CRD/CLI upstream; /admin/kamaji Phase 3 alongside multi-tenant data-plane. Cert PKI plan surfaced via /api/kamaji/tenants/:id/certificates + cavectl kamaji tcp-certs."
-last_audit   = "2026-05-30"
+last_audit   = "2026-05-31"
