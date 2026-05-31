@@ -32,16 +32,23 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 # Hand-curated 2026-05-18 against the cave-docdb in-scope MongoDB-compatible
 # surface. Out-of-scope features (replica sets, sharding, GridFS, change
 # streams, transactions, OPLog, SCRAM-SHA-256, TLS, schema validation,
-# time-series, encryption-at-rest, audit log, KMIP, $text/geo/hashed/partial
+# time-series, encryption-at-rest, audit log, KMIP, geo/hashed/partial/wildcard
 # indexes, capped collections, views, plan cache, query hints) are counted
-# as `skipped`. Items declared in-scope but not yet built are `unmapped`.
-mapped_count          = 24
+# as `skipped`. ($text index is now mapped — src/text.rs.) Items declared
+# in-scope but not yet built are `unmapped`.
+mapped_count          = 25
 partial_count         = 2
-skipped_count         = 26
+skipped_count         = 25
 unmapped_count        = 0
 total                 = 52
 fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 52/52
 honest_ratio          = 0.9615   # (mapped + skipped) / total = 50/52 — partial excluded
+# 2026-05-31 cont2: $text index moved skipped -> mapped. src/text.rs implements
+# a clean-room text index (tokenizer, $search parser with terms/-negations/
+# "phrases", OR matcher) wired through Index::text + Collection::text_search +
+# POST /collections/{col}/text + `cavectl docdb text-search`. Honest-neutral
+# (a skipped item was already in the honest numerator) but accurate. geo /
+# hashed / partial / wildcard indexes remain skipped.
 # 2026-05-31 cont2: query-operators partial -> mapped. The matcher (src/query.rs)
 # now covers FerretDB's supported operator surface: comparison ($eq/$ne/$gt/$gte/
 # $lt/$lte/$in/$nin), element ($exists/$type/$size), array ($all/$elemMatch),
@@ -116,6 +123,10 @@ local    = "src/cursor.rs"
 [[files]]
 upstream = "src/mongo/db/index/index_descriptor.cpp"
 local    = "src/index.rs"
+
+[[files]]
+upstream = "src/mongo/db/fts/fts_index_format.cpp + fts_matcher.cpp"
+local    = "src/text.rs"
 
 [[files]]
 upstream = "src/mongo/db/catalog/database_holder.cpp"

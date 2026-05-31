@@ -201,8 +201,21 @@ impl Collection {
         if fields.is_empty() {
             return Err("text index required for $text query".to_string());
         }
-        let _ = (search, filter);
-        Ok(Vec::new()) // stub for RED
+        let query = crate::text::parse_search(search);
+        let docs = self.documents.read().await;
+        let mut out = Vec::new();
+        for doc in docs.values() {
+            if let Some(f) = filter {
+                if !matches_query(doc, f) {
+                    continue;
+                }
+            }
+            let (tokens, full) = crate::text::doc_text(doc, &fields);
+            if crate::text::matches(&query, &tokens, &full) {
+                out.push(doc.clone());
+            }
+        }
+        Ok(out)
     }
 
     pub async fn drop_index(&self, name: &str) -> Result<(), String> {

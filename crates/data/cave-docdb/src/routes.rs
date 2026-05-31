@@ -66,6 +66,10 @@ pub fn create_router(state: Arc<DocDbState>) -> Router {
             post(aggregate),
         )
         .route(
+            "/api/docdb/databases/{db}/collections/{col}/text",
+            post(text_search),
+        )
+        .route(
             "/api/docdb/databases/{db}/collections/{col}/indexes",
             get(list_indexes).post(create_indexes),
         )
@@ -305,6 +309,36 @@ async fn aggregate(
     Ok(Json(results))
 }
 
+async fn text_search(
+    State(state): State<Arc<DocDbState>>,
+    Path((db, col)): Path<(String, String)>,
+    Json(req): Json<TextSearchRequest>,
+) -> ApiResult<FindResponse> {
+    let filter = req.filter.as_ref().and_then(|f| {
+        f.as_object().map(|obj| {
+            obj.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Document>()
+        })
+    });
+
+    let database = state.engine.get_or_create_database(&db).await;
+    let collection = database.get_or_create_collection(&col).await;
+
+    let docs = collection
+        .text_search(&req.search, filter.as_ref())
+        .await
+        .map_err(|e| err_bad_request(&e))?;
+
+    let count = docs.len();
+    let documents = docs
+        .into_iter()
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
+        .collect();
+
+    Ok(Json(FindResponse { documents, count }))
+}
+
 async fn list_indexes(
     State(state): State<Arc<DocDbState>>,
     Path((db, col)): Path<(String, String)>,
@@ -333,6 +367,14 @@ async fn create_indexes(
     let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
+    // A `{field: "text"}` key declares a text index; numeric keys are b-tree.
+    let text_fields: Vec<String> = req
+        .keys
+        .iter()
+        .filter(|(_, v)| v.as_str() == Some("text"))
+        .map(|(k, _)| k.clone())
+        .collect();
+
     let mut keys = std::collections::BTreeMap::new();
     for (k, v) in &req.keys {
         if let Some(n) = v.as_i64() {
@@ -340,10 +382,16 @@ async fn create_indexes(
         }
     }
 
-    let name = req.name.unwrap_or_else(|| "index".to_string());
     let unique = req.unique.unwrap_or(false);
 
-    let index = crate::index::Index::new(name.clone(), keys, unique);
+    let index = if !text_fields.is_empty() {
+        let name = req.name.unwrap_or_else(|| "text_index".to_string());
+        (name.clone(), crate::index::Index::text(name, text_fields))
+    } else {
+        let name = req.name.unwrap_or_else(|| "index".to_string());
+        (name.clone(), crate::index::Index::new(name, keys, unique))
+    };
+    let (name, index) = index;
     collection
         .add_index(index)
         .await
@@ -420,6 +468,54 @@ mod tests {
             .filter_map(|d| d.get("tags").and_then(|v| v.as_str()))
             .collect();
         assert_eq!(tags, vec!["a", "b", "c"]);
+    }
+
+    #[tokio::test]
+    async fn text_search_route_uses_text_index() {
+        let state = Arc::new(DocDbState::default());
+        seed(
+            &state,
+            "tdb",
+            "docs",
+            vec![
+                doc(serde_json::json!({"title": "Cold Brew", "body": "iced coffee"})),
+                doc(serde_json::json!({"title": "Hot Tea", "body": "warm tea"})),
+            ],
+        )
+        .await;
+
+        // Create the text index through the index route.
+        create_indexes(
+            State(state.clone()),
+            Path(("tdb".to_string(), "docs".to_string())),
+            Json(IndexCreateRequest {
+                keys: serde_json::json!({"title": "text", "body": "text"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+                unique: None,
+                name: None,
+            }),
+        )
+        .await
+        .unwrap();
+
+        let Json(resp) = text_search(
+            State(state.clone()),
+            Path(("tdb".to_string(), "docs".to_string())),
+            Json(TextSearchRequest {
+                search: "coffee".to_string(),
+                filter: None,
+            }),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(resp.count, 1);
+        assert_eq!(
+            resp.documents[0].get("title").and_then(|v| v.as_str()),
+            Some("Cold Brew")
+        );
     }
 
     #[tokio::test]

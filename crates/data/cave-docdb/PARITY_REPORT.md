@@ -76,6 +76,13 @@ Hand-curated against the FerretDB v2.0.0 layout
 > `skipped` — FerretDB itself rejects it. Counts: mapped 23→24, partial 3→2,
 > skipped 26 (unchanged), total 52.
 
+> **`$text` index → mapped.** `src/text.rs` adds a clean-room text index
+> (tokenizer, `$search` parser for terms / `-negations` / `"phrases"`, OR
+> matcher) wired via `Index::text` + `Collection::text_search` + a REST route
+> and `cavectl docdb text-search`. Moved skipped→mapped (honest-neutral). geo /
+> hashed / partial / wildcard indexes stay skipped. Counts: mapped 24→25,
+> skipped 26→25, total 52.
+
 ## 8-gate close-out
 
 | # | Gate                              | Result | Evidence                                  |

@@ -45,6 +45,14 @@ pub struct IndexCreateRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct TextSearchRequest {
+    /// The `$text` `$search` string (terms, `-negations`, `"phrases"`).
+    pub search: String,
+    /// Optional additional filter AND-ed with the text match.
+    pub filter: Option<Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FindResponse {
     pub documents: Vec<Value>,
     pub count: usize,

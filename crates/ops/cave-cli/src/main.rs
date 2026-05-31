@@ -1856,6 +1856,17 @@ enum DocdbCmd {
         #[arg(long)]
         collection: String,
     },
+    /// Run a `$text` search over a collection's text index
+    /// (mongosh `db.<col>.find({$text:{$search:"..."}})`)
+    TextSearch {
+        #[arg(long)]
+        db: String,
+        #[arg(long)]
+        collection: String,
+        /// Search string: terms, `-negations`, and `"quoted phrases"`
+        #[arg(long)]
+        search: String,
+    },
     /// Show wire-protocol server info (mongosh `db.runCommand({hello:1})`)
     Info,
 }
@@ -3668,6 +3679,13 @@ async fn run(cli: Cli) -> Result<()> {
                 c.get(&format!(
                     "/api/docdb/databases/{db}/collections/{collection}/indexes"
                 ))
+                .await
+            }
+            DocdbCmd::TextSearch { db, collection, search } => {
+                c.post(
+                    &format!("/api/docdb/databases/{db}/collections/{collection}/text"),
+                    json!({ "search": search }),
+                )
                 .await
             }
             DocdbCmd::Info => c.get("/api/docdb/server/info").await,
