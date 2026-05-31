@@ -11,8 +11,7 @@
 //! matching device was pre-provisioned (`CheckPreProvisionedDevices`), then
 //! returns freshly-minted access-token credentials.
 
-use crate::registry::{CredentialsType, DeviceCredentials, DeviceRegistry, TransportType};
-use crate::{IotError, Result};
+use crate::registry::{CredentialsType, DeviceCredentials, DeviceRegistry};
 use std::collections::HashMap;
 
 /// Provisioning strategy on a device profile (`DeviceProvisionType`).
@@ -191,7 +190,7 @@ impl ProvisionService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::DeviceProfile;
+    use crate::registry::{DeviceProfile, TransportType};
 
     fn setup() -> (DeviceRegistry, ProvisionService, String) {
         let mut reg = DeviceRegistry::new();
