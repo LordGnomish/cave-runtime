@@ -26,6 +26,9 @@ use chrono::Utc;
 use super::authn_request::AuthnRequest;
 use super::binding::{BINDING_POST, BINDING_REDIRECT, redirect_encode};
 use super::response::{Assertion, Response, StatusCode};
+use super::bindings::http_artifact::{
+    build_artifact_response, parse_artifact_resolve, Artifact, ArtifactResolver, STATUS_SUCCESS,
+};
 use super::{SamlError, SamlSubject};
 
 /// One in-flight SP-initiated login. Stashed at request-mint
@@ -52,6 +55,10 @@ pub struct SamlBroker {
     /// pruned. 5 minutes matches Keycloak's
     /// `EXPECTED_LOGIN_TIMEOUT` default.
     ttl_seconds: i64,
+    /// Source-side artifact store (HTTP-Artifact back-channel). Holds the
+    /// protocol message keyed by the `SAMLart` handed to the peer until it is
+    /// resolved (single-use) via [`SamlBroker::resolve_artifact`].
+    artifacts: Arc<RwLock<ArtifactResolver>>,
 }
 
 impl SamlBroker {
@@ -59,6 +66,7 @@ impl SamlBroker {
         Self {
             in_flight: Arc::new(RwLock::new(HashMap::new())),
             ttl_seconds: 300,
+            artifacts: Arc::new(RwLock::new(ArtifactResolver::new())),
         }
     }
 
@@ -218,6 +226,50 @@ impl SamlBroker {
     /// Matches Keycloak: both Redirect and POST in-bound.
     pub fn supported_bindings(&self) -> [&'static str; 2] {
         [BINDING_REDIRECT, BINDING_POST]
+    }
+
+    /// Source/IdP role: stash a protocol `message` under `artifact` and return
+    /// the `SAMLart` (base64) to hand to the peer. The caller builds the
+    /// [`Artifact`] (`Artifact::new(0x0004, endpoint_index, sha1(entity_id),
+    /// random_handle)`); the broker owns only the transient single-use store.
+    pub fn issue_artifact(&self, artifact: &Artifact, message: &str) -> String {
+        self.artifacts
+            .write()
+            .expect("poisoned")
+            .store(artifact, message)
+    }
+
+    /// Source/IdP role: handle an inbound `<ArtifactResolve>` (bare or
+    /// SOAP-wrapped). Parses it, consumes the stored message (single-use), and
+    /// returns the `<samlp:ArtifactResponse>` XML carrying it. Errors if the
+    /// artifact was never issued or has already been resolved — the spec's
+    /// one-time-use rule is the replay defence.
+    pub fn resolve_artifact(
+        &self,
+        resolve_xml: &str,
+        my_entity_id: &str,
+        response_id: &str,
+        issue_instant: &str,
+    ) -> Result<String, SamlError> {
+        let req = parse_artifact_resolve(resolve_xml)?;
+        let message = self
+            .artifacts
+            .write()
+            .expect("poisoned")
+            .resolve(&req.artifact)?;
+        Ok(build_artifact_response(
+            response_id,
+            issue_instant,
+            &req.id,
+            my_entity_id,
+            STATUS_SUCCESS,
+            &message,
+        ))
+    }
+
+    /// Count of artifacts awaiting resolution (source-side store).
+    pub fn pending_artifacts(&self) -> usize {
+        self.artifacts.read().expect("poisoned").pending()
     }
 }
 
