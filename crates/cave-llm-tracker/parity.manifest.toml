@@ -33,26 +33,32 @@ source_sha  = { huggingface_api = "2026-05-21:api/models", ollama_library = "202
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.6471
-last_audit          = "2026-05-21"
+honest_ratio        = 0.8421
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 11
+mapped_count        = 16
 partial_count       = 0
-skipped_count       = 6
+skipped_count       = 3
 unmapped_count      = 0
-total               = 17
+total               = 19
 
 # fill_ratio derivation (Charter v2 honest measurement, workspace formula):
 #   fill_ratio   = (mapped + partial + skipped) / total
-#                = (11 + 0 + 6) / 17 = 17/17 = 1.0000
+#                = (16 + 0 + 3) / 19 = 19/19 = 1.0000
 #   honest_ratio = mapped / total
-#                = 11 / 17 = 0.6471
+#                = 16 / 19 = 0.8421
 #
 # Every subsystem is *explicitly classified* — either ported (mapped)
 # or documented as out-of-scope (skipped). Nothing is left in the
 # "unmapped" purgatory; that is what makes fill_ratio honest at 1.0.
+#
+# 2026-05-31 honest-cont: 5 strict-TDD cycles raised honest_ratio
+# 0.6471 → 0.8421. Two NEW mapped subsystems (notification,
+# cost_quality_matrix) and three scope-cuts closed to mapped
+# (multi_day_signal_trending → benchmark_history_trend,
+# auto_swap_orchestration → phase_1_optin_swap, portal_admin_page).
 
-# === Mapped subsystems (11) ============================================
+# === Mapped subsystems (16) ============================================
 
 [[mapped]]
 name      = "huggingface_registry"
@@ -107,19 +113,34 @@ upstream  = "TOML; baseline qwen3.6:35b-a3b-coding-mxfp8; auto_swap=false hard-v
 [[mapped]]
 name      = "cli_binary"
 location  = "src/bin/cave-llm-tracker.rs"
-upstream  = "clap CLI with --mode {report,poll,bench,select}, --output, --config, --baseline, --bench-cap"
+upstream  = "clap CLI with --mode {report,poll,bench,select,notify,trend,matrix,apply}, --output, --config, --baseline, --bench-cap, --report-dir, --opt-in, --required-days; cavectl llm-tracker {report,notify,trend,matrix,apply} shells it"
 
-# === Skipped subsystems (6) — formal scope cuts ========================
+[[mapped]]
+name      = "notification"
+location  = "src/notify.rs::build_notification + Notification::render_text"
+upstream  = "daily report → upgrade notice (Upgrade severity, model list, render_text for terminal-notifier/webhook); quiet days emit nothing. Phase 0: digest only, never swaps. Wired into report mode (stderr) + `--mode notify`."
 
-[[skipped]]
-name      = "auto_swap_orchestration"
-reason    = "Phase 0 mandate: report-only. config.selection.auto_swap is hard-validated to false in TrackerConfig::validate(); Phase 1 unlocks via cavectl llm-tracker apply."
-defer_to  = "Phase 1 — cave-llm-tracker-phase-1"
+[[mapped]]
+name      = "benchmark_history_trend"
+location  = "src/trend.rs::load_history + ModelTrend::consecutive_upgrade_days"
+upstream  = "rolling per-model trend across daily-<date>.json siblings; trailing UpgradeCandidate streak feeds the Phase 1 apply gate. Wired via `--mode trend`."
 
-[[skipped]]
+[[mapped]]
+name      = "cost_quality_matrix"
+location  = "src/matrix.rs::build_matrix + Quadrant"
+upstream  = "cost (VRAM/disk/throughput) × quality (eval) matrix; SweetSpot/Premium/Budget/Laggard vs baseline anchor, efficiency = quality/VRAM. Wired via `--mode matrix` + /api/portal/llm-tracker/matrix."
+
+[[mapped]]
+name      = "phase_1_optin_swap"
+location  = "src/apply.rs::plan_swap + apply_swap"
+upstream  = "Phase 1 human-opt-in baseline swap: eligible only when opt_in && consecutive_upgrade_days >= required (default 3); apply_swap stamps a NEW config (auto_swap stays false). Daily cron never calls it. Wired via `--mode apply --opt-in`."
+
+[[mapped]]
 name      = "portal_admin_page"
-reason    = "Charter v2 4-track Portal slice deferred per PARITY_REPORT.md §7; daily-<date>.json schema_version=1 stays stable so the portal can read it later without coordination."
-defer_to  = "cave-portal phase-2 llm-tracker tile"
+location  = "crates/cave-runtime/src/portal/llm_tracker.rs::router + render_dashboard"
+upstream  = "portal dashboard at /portal/llm-tracker (Phase-0 banner + baseline + verdicts table) + /api/portal/llm-tracker/{latest,matrix}; reads the daily report cave-llm-tracker writes (CAVE_LLM_TRACKER_DIR override)."
+
+# === Skipped subsystems (3) — formal scope cuts ========================
 
 [[skipped]]
 name      = "observability_dashboard"
@@ -135,8 +156,3 @@ defer_to  = "Phase 1 — bench matrix"
 name      = "vram_disk_auto_probing"
 reason    = "VRAM/disk estimates today come from the seed catalog and the HF model card; live probing via system_profiler / nvidia-smi is out of Phase 0 scope."
 defer_to  = "Phase 1 — cave-llm-tracker-probes"
-
-[[skipped]]
-name      = "multi_day_signal_trending"
-reason    = "Each daily-<date>.json is independent; rolling 7-day / 30-day trend lines are out of Phase 0 scope (the report files already carry every input needed for a Phase 1 trender)."
-defer_to  = "Phase 1 — cave-llm-tracker-trend"
