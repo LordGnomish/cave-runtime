@@ -31,11 +31,18 @@
 //!     restored to the service VIP + port via the reverse-NAT index
 //!     (`__lb4_rev_nat`).
 //!
+//!   * **Session affinity.** When a service carries a non-zero
+//!     `affinity_timeout`, the first packet of a connection selects a
+//!     backend and records `(client_ip, rev_nat_id) -> (backend_id,
+//!     last_used)` in `cilium_lb4_affinity`. Packets within the window
+//!     reuse that backend (the window slides on each hit); the entry
+//!     drops on timeout or when the backend leaves the service
+//!     (`cilium_lb_affinity_match` miss). Mirrors
+//!     `__lb4_affinity_backend_id` / `__lb4_update_affinity`.
+//!
 //! Out of scope (kernel BPF harness owns these): packet-buffer writes,
-//! L3/L4 checksum recomputation, source-range LPM checks, and the
-//! Linux netfilter loopback-SNAT corner case. Session affinity and
-//! quarantine live in the control-plane `cilium/services.rs` /
-//! `cilium/lb.rs` ports.
+//! L3/L4 checksum recomputation, and the Linux netfilter loopback-SNAT
+//! corner case.
 
 use crate::ebpf_sim::map::{Map, UpdateFlag};
 use serde::{Deserialize, Serialize};
@@ -46,6 +53,9 @@ pub const LB_MAGLEV_LUT_SIZE: u32 = 32749;
 pub const HASH_INIT4_SEED: u32 = 0xcafe;
 /// `JHASH_INITVAL` — `bpf/lib/jhash.h`.
 const JHASH_INITVAL: u32 = 0xdead_beef;
+/// `NSEC_PER_SEC` — `bpf_sec_to_mono()` scales the service's
+/// second-granularity `affinity_timeout` to the monotonic clock.
+const NSEC_PER_SEC: u64 = 1_000_000_000;
 
 /// Backend-selection algorithm. Upstream encodes this in the upper
 /// 8 bits of the master entry's `affinity_timeout` union.
@@ -97,6 +107,28 @@ pub struct LbServiceMaster {
     pub backend_count: u16,
     pub rev_nat_index: u16,
     pub algorithm: LbAlgo,
+    /// `lb4_service.affinity_timeout` (seconds). `0` ⇒ session
+    /// affinity disabled for this service.
+    pub affinity_timeout: u32,
+}
+
+/// `struct lb4_affinity_key` — what a sticky session keys on. The
+/// `client_id` is the source IP (`client_ip`) for the by-addr path
+/// (the by-cookie path keys on the socket netns cookie instead).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct LbAffinityKey {
+    pub client_id: u32,
+    pub rev_nat_id: u16,
+    /// `netns_cookie` bit — false for the by-addr (external client)
+    /// path, true for the host-local socket path.
+    pub netns_cookie: bool,
+}
+
+/// `struct lb_affinity_val` — the pinned backend and its last touch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LbAffinityVal {
+    pub last_used: u64,
+    pub backend_id: u32,
 }
 
 /// Result of the forward DNAT path.
@@ -168,6 +200,13 @@ pub struct LbMaps {
     rev_nat: Map<u16, RevNatEntry>,
     /// rev_nat_index -> maglev LUT (each entry a backend_id).
     maglev: std::collections::BTreeMap<u16, Vec<u32>>,
+    /// `cilium_lb4_affinity` — sticky session entries.
+    affinity: Map<LbAffinityKey, LbAffinityVal>,
+    /// `cilium_lb_affinity_match` — the set of `(rev_nat_id,
+    /// backend_id)` pairs that are still valid members of a service.
+    /// A miss means the backend was removed, so the sticky entry is
+    /// stale and must be dropped.
+    affinity_match: std::collections::BTreeSet<(u16, u32)>,
 }
 
 impl LbMaps {
@@ -178,6 +217,8 @@ impl LbMaps {
             backends: Map::new_hash(),
             rev_nat: Map::new_hash(),
             maglev: std::collections::BTreeMap::new(),
+            affinity: Map::new_hash(),
+            affinity_match: std::collections::BTreeSet::new(),
         }
     }
 
@@ -185,9 +226,9 @@ impl LbMaps {
         LbKey { address: addr, dport, backend_slot: 0, proto }
     }
 
-    /// Populate a service: frontend entry, per-slot backend mapping,
-    /// backend table, reverse-NAT entry, and (for maglev) a LUT that
-    /// round-robins the configured backends across the table.
+    /// Populate a service with session affinity disabled
+    /// (`affinity_timeout == 0`). Thin wrapper over
+    /// [`add_service_with_affinity`](Self::add_service_with_affinity).
     pub fn add_service(
         &mut self,
         addr: u32,
@@ -197,11 +238,29 @@ impl LbMaps {
         algorithm: LbAlgo,
         backends: &[(u32, LbBackend)],
     ) {
+        self.add_service_with_affinity(addr, dport, proto, rev_nat_index, algorithm, backends, 0);
+    }
+
+    /// Populate a service: frontend entry, per-slot backend mapping,
+    /// backend table, reverse-NAT entry, the `affinity_match` set (one
+    /// entry per `(rev_nat_index, backend_id)`), and (for maglev) a LUT
+    /// that round-robins the configured backends across the table.
+    /// `affinity_timeout` is the sticky window in seconds (`0` ⇒ off).
+    pub fn add_service_with_affinity(
+        &mut self,
+        addr: u32,
+        dport: u16,
+        proto: u8,
+        rev_nat_index: u16,
+        algorithm: LbAlgo,
+        backends: &[(u32, LbBackend)],
+        affinity_timeout: u32,
+    ) {
         let count = backends.len() as u16;
         self.services
             .update(
                 Self::frontend_key(addr, dport, proto),
-                LbServiceMaster { backend_count: count, rev_nat_index, algorithm },
+                LbServiceMaster { backend_count: count, rev_nat_index, algorithm, affinity_timeout },
                 UpdateFlag::Any,
             )
             .expect("frontend insert");
@@ -209,6 +268,9 @@ impl LbMaps {
             let key = LbKey { address: addr, dport, backend_slot: (slot as u16) + 1, proto };
             self.slots.update(key, *backend_id, UpdateFlag::Any).expect("slot insert");
             self.backends.update(*backend_id, *backend, UpdateFlag::Any).expect("backend insert");
+            // Control plane records every active backend in the
+            // affinity-match map so the datapath can detect removals.
+            self.affinity_match.insert((rev_nat_index, *backend_id));
         }
         self.rev_nat
             .update(rev_nat_index, RevNatEntry { address: addr, port: dport }, UpdateFlag::Any)
@@ -282,6 +344,95 @@ impl LbMaps {
             new_dport: backend.port,
             rev_nat_index: svc.rev_nat_index,
         })
+    }
+
+    /// `__lb4_affinity_backend_id` — look up the sticky backend for a
+    /// client. Returns `0` (no backend) on any of: no entry, the entry
+    /// has aged past `affinity_timeout_sec`, or the recorded backend is
+    /// no longer a member of the service (`affinity_match` miss). The
+    /// two failure cases also evict the stale entry, mirroring the
+    /// `map_delete_elem` calls in `bpf/lib/lb.h`. On a hit the entry's
+    /// `last_used` is refreshed to `now_ns` and the backend returned.
+    pub fn lb_affinity_backend_id(
+        &mut self,
+        rev_nat_id: u16,
+        affinity_timeout_sec: u32,
+        client_id: u32,
+        now_ns: u64,
+    ) -> u32 {
+        let key = LbAffinityKey { client_id, rev_nat_id, netns_cookie: false };
+        let val = match self.affinity.lookup(&key) {
+            Some(v) => v,
+            None => return 0,
+        };
+        // bpf_sec_to_mono(affinity_timeout): seconds -> monotonic ns.
+        let timeout_ns = (affinity_timeout_sec as u64).saturating_mul(NSEC_PER_SEC);
+        // Sticky window is [last_used, last_used + timeout); the upper
+        // bound is excluded (`<=` ⇒ expired).
+        if val.last_used.saturating_add(timeout_ns) <= now_ns {
+            let _ = self.affinity.delete(&key);
+            return 0;
+        }
+        // Backend must still belong to the service.
+        if !self.affinity_match.contains(&(rev_nat_id, val.backend_id)) {
+            let _ = self.affinity.delete(&key);
+            return 0;
+        }
+        let refreshed = LbAffinityVal { last_used: now_ns, backend_id: val.backend_id };
+        let _ = self.affinity.update(key, refreshed, UpdateFlag::Any);
+        val.backend_id
+    }
+
+    /// `__lb4_update_affinity` — pin `client_id` to `backend_id` for
+    /// this service, stamping `last_used = now_ns`. Called on the
+    /// `CT_NEW` path after a fresh backend selection.
+    pub fn lb_update_affinity(&mut self, rev_nat_id: u16, client_id: u32, backend_id: u32, now_ns: u64) {
+        let key = LbAffinityKey { client_id, rev_nat_id, netns_cookie: false };
+        let val = LbAffinityVal { last_used: now_ns, backend_id };
+        let _ = self.affinity.update(key, val, UpdateFlag::Any);
+    }
+
+    /// Remove a `(rev_nat_id, backend_id)` pair from the affinity-match
+    /// map — the control-plane action when a backend leaves a service.
+    /// Sticky entries still pointing at it become stale on next lookup.
+    pub fn remove_affinity_match(&mut self, rev_nat_id: u16, backend_id: u32) {
+        self.affinity_match.remove(&(rev_nat_id, backend_id));
+    }
+
+    /// Forward path honoring session affinity (the `lb4_local`
+    /// `CT_NEW`/`CT_ESTABLISHED` split for an affinity-enabled
+    /// service). When the service has a non-zero `affinity_timeout`
+    /// and a live sticky entry exists, that backend is reused
+    /// regardless of `prandom`; otherwise a backend is selected at
+    /// random and recorded. `now_ns` pins the monotonic clock the way
+    /// `bpf_mono_now()` reads it. Services with `affinity_timeout == 0`
+    /// behave exactly like [`lb4_local_random`](Self::lb4_local_random).
+    pub fn lb4_local_affinity(&mut self, tuple: &LbTuple, prandom: u32, now_ns: u64) -> Option<LbXlate> {
+        let proto = tuple.nexthdr;
+        let svc = self.lb4_lookup_service(tuple.daddr, tuple.dport, proto)?;
+        if svc.backend_count == 0 {
+            return None;
+        }
+        let rev = svc.rev_nat_index;
+        if svc.affinity_timeout > 0 {
+            let bid = self.lb_affinity_backend_id(rev, svc.affinity_timeout, tuple.saddr, now_ns);
+            if bid != 0 {
+                let backend = self.lb4_lookup_backend(bid)?;
+                return Some(LbXlate {
+                    backend_id: bid,
+                    new_daddr: backend.address,
+                    new_dport: backend.port,
+                    rev_nat_index: rev,
+                });
+            }
+        }
+        // CT_NEW: select a backend, then record the affinity.
+        let slot = select_backend_id_random(svc.backend_count, prandom);
+        let xlate = self.xlate(tuple.daddr, tuple.dport, proto, slot, rev)?;
+        if svc.affinity_timeout > 0 {
+            self.lb_update_affinity(rev, tuple.saddr, xlate.backend_id, now_ns);
+        }
+        Some(xlate)
     }
 
     /// `lb4_rev_nat` — restore the service VIP + port for a reply.
