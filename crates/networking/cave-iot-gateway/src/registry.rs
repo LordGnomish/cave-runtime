@@ -94,6 +94,135 @@ impl DeviceRegistry {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Persist a device profile. Rejects a second default profile in the
+    /// same tenant (ThingsBoard allows exactly one default per tenant).
+    pub fn save_profile(&mut self, profile: DeviceProfile) -> Result<String> {
+        if profile.name.trim().is_empty() {
+            return Err(IotError::Invalid("device profile name is empty".into()));
+        }
+        if profile.is_default {
+            let clash = self.profiles.values().any(|p| {
+                p.tenant_id == profile.tenant_id && p.is_default && p.id != profile.id
+            });
+            if clash {
+                return Err(IotError::Invalid(format!(
+                    "tenant {} already has a default device profile",
+                    profile.tenant_id
+                )));
+            }
+        }
+        let id = profile.id.clone();
+        self.profiles.insert(id.clone(), profile);
+        Ok(id)
+    }
+
+    pub fn get_profile(&self, id: &str) -> Result<&DeviceProfile> {
+        self.profiles
+            .get(id)
+            .ok_or_else(|| IotError::NotFound(format!("device profile {id}")))
+    }
+
+    /// Create a device. Enforces a non-empty, per-tenant-unique name and a
+    /// valid device-profile reference. The device `id` is a fresh UUIDv4.
+    pub fn create_device(
+        &mut self,
+        tenant_id: &str,
+        name: &str,
+        device_profile_id: &str,
+        label: Option<&str>,
+    ) -> Result<Device> {
+        if name.trim().is_empty() {
+            return Err(IotError::Invalid("device name is empty".into()));
+        }
+        if !self.profiles.contains_key(device_profile_id) {
+            return Err(IotError::NotFound(format!(
+                "device profile {device_profile_id}"
+            )));
+        }
+        let dup = self
+            .devices
+            .values()
+            .any(|d| d.tenant_id == tenant_id && d.name == name);
+        if dup {
+            return Err(IotError::Invalid(format!(
+                "device name '{name}' already exists in tenant {tenant_id}"
+            )));
+        }
+        let dev = Device {
+            id: uuid::Uuid::new_v4().to_string(),
+            tenant_id: tenant_id.to_string(),
+            name: name.to_string(),
+            device_profile_id: device_profile_id.to_string(),
+            label: label.map(|s| s.to_string()),
+            device_type: self
+                .profiles
+                .get(device_profile_id)
+                .map(|p| p.name.clone())
+                .unwrap_or_default(),
+        };
+        self.devices.insert(dev.id.clone(), dev.clone());
+        Ok(dev)
+    }
+
+    pub fn get_device(&self, id: &str) -> Result<&Device> {
+        self.devices
+            .get(id)
+            .ok_or_else(|| IotError::NotFound(format!("device {id}")))
+    }
+
+    /// Delete a device and cascade-remove its credentials + reverse index.
+    pub fn delete_device(&mut self, id: &str) -> Result<()> {
+        if self.devices.remove(id).is_none() {
+            return Err(IotError::NotFound(format!("device {id}")));
+        }
+        if let Some(cred) = self.credentials.remove(id) {
+            self.cred_index.remove(&cred.credentials_id);
+        }
+        Ok(())
+    }
+
+    /// Attach (or rotate) device credentials. Rotation drops the previous
+    /// reverse-index entry so the old token stops authenticating.
+    pub fn set_credentials(&mut self, cred: DeviceCredentials) -> Result<()> {
+        if !self.devices.contains_key(&cred.device_id) {
+            return Err(IotError::NotFound(format!("device {}", cred.device_id)));
+        }
+        if cred.credentials_id.trim().is_empty() {
+            return Err(IotError::Invalid("credentials_id is empty".into()));
+        }
+        // A credentials_id is globally unique to one device.
+        if let Some(owner) = self.cred_index.get(&cred.credentials_id) {
+            if owner != &cred.device_id {
+                return Err(IotError::Invalid(format!(
+                    "credentials id '{}' already bound to another device",
+                    cred.credentials_id
+                )));
+            }
+        }
+        if let Some(prev) = self.credentials.get(&cred.device_id) {
+            self.cred_index.remove(&prev.credentials_id);
+        }
+        self.cred_index
+            .insert(cred.credentials_id.clone(), cred.device_id.clone());
+        self.credentials.insert(cred.device_id.clone(), cred);
+        Ok(())
+    }
+
+    /// Authenticate by credentials id (access token / cert hash). Returns the
+    /// owning device. This is the hot path for every transport handshake.
+    pub fn authenticate(&self, credentials_id: &str) -> Result<&Device> {
+        let device_id = self
+            .cred_index
+            .get(credentials_id)
+            .ok_or_else(|| IotError::NotFound("credentials".into()))?;
+        self.get_device(device_id)
+    }
+
+    /// All devices belonging to a tenant.
+    pub fn devices_of_tenant<'a>(&'a self, tenant_id: &'a str) -> impl Iterator<Item = &'a Device> {
+        self.devices.values().filter(move |d| d.tenant_id == tenant_id)
+    }
 }
 
 #[cfg(test)]
