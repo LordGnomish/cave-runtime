@@ -38,15 +38,15 @@ url      = "https://github.com/twentyhq/twenty"
 # Counts (mapped + partial + skipped + unmapped) sum to `total`.
 # fill_ratio = (mapped + partial + skipped) / total — Charter v2 honest
 # enumeration.
-mapped_count   = 23
+mapped_count   = 26
 partial_count  = 0
-skipped_count  = 14
+skipped_count  = 13
 unmapped_count = 0
-total          = 37
+total          = 39
 fill_ratio     = 1.0000
-honest_ratio   = 0.6216
+honest_ratio   = 0.6667
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-30"
+last_audit     = "2026-05-31"
 infra_only     = false
 
 [module]
@@ -167,7 +167,28 @@ upstream = "packages/twenty-server/src/modules/timeline/services/timeline-activi
 local    = "src/timeline.rs"
 notes    = "Per-record timeline read path — timeline_for_target() walks noteTarget/taskTarget polymorphic links + folds TimelineActivity audit rows, newest-first; merge_recent() applies Twenty's 10-minute dedup window. CrmStore::timeline_for_target bridge + timeline_activities map. Closed 2026-05-30 (was partial)."
 
-# ─── Skipped — alt-language / browser-UI / vendor scaffold (12) ──────────────
+# ─── 2026-05-31 honest-uplift cont: +3 [[mapped]] standard-objects ───────────
+# Strict-TDD ports grounded against twentyhq/twenty @ v2.6.0 source. Blocklist
+# moves skipped→mapped (it is a live twenty-server workspace-entity, not a
+# UI affordance); Attachment + ConnectedAccount were missing from the original
+# enumeration and are added as new mapped standard-objects.
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/blocklist/standard-objects/blocklist.workspace-entity.ts"
+local    = "src/models/blocklist.rs"
+notes    = "Blocklist workspace-entity — handle (TEXT nullable) + workspaceMember owner + the messaging-import match semantics: exact case-insensitive address rule vs whole-domain rule (@evil.test or bare evil.test) via is_blocked/is_domain_rule/normalized_handle. Promoted skipped→mapped 2026-05-31 (was wrongly cut as 'anti-spam-handled-elsewhere'; it is a first-class twenty-server backend entity)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/attachment/standard-objects/attachment.workspace-entity.ts"
+local    = "src/models/attachment.rs"
+notes    = "Attachment workspace-entity — name + fullPath + derived fileCategory (Image/Video/Audio/Pdf/Spreadsheet/Presentation/TextDocument/Archive/Other via extension) + author + polymorphic target fan-out (Person/Company/Opportunity/Task/Note/Workflow/Dashboard) collapsed to a single (target_kind,target_id) pair per the ActivityTarget idiom. New mapped 2026-05-31 (was absent from the v2.6.0 enumeration)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/connected-account/standard-objects/connected-account.workspace-entity.ts"
+local    = "src/models/connected_account.rs"
+notes    = "ConnectedAccount workspace-entity — accountOwner + provider (ConnectedAccountProvider: google/microsoft/imap_smtp_caldav/oidc/saml/email_group/app, exact wire casing) + handle/handleAliases/scopes/tokens + credential-health state machine (mark_auth_failed sets authFailedAt, record_refresh clears it) + owns_handle/all_handles. New mapped 2026-05-31. IMAP/Gmail sync worker that consumes these credentials stays scope-cut (messaging-sync ray)."
+
+# ─── Skipped — alt-language / browser-UI / vendor scaffold (11) ──────────────
 
 [[skipped]]
 upstream = "packages/twenty-front/"
@@ -229,17 +250,13 @@ upstream = "packages/twenty-server/src/engine/webhook/"
 local    = "src/webhook.rs"
 note     = "Webhook subscription bus — per-workspace entity-event filter (Create/Update/Delete × workspace-entity), HMAC-SHA256 body signature, in-arrival-order audit log, ready-to-POST WebhookDelivery envelope for the cave-runtime event bus. Wave-3 promotion 2026-05-19."
 
-# ─── 2026-05-19 wave-3 scope cuts: 2 [[skipped]] (favorite + blocklist) ──────
+# ─── 2026-05-19 wave-3 scope cut: 1 [[skipped]] (favorite) ───────────────────
+# (blocklist promoted skipped→mapped 2026-05-31 — see the mapped section above)
 
 [[skipped]]
 upstream = "packages/twenty-server/src/modules/favorite/standard-objects/favorite.workspace-entity.ts"
-reason   = "user-preference-surface"
-note     = "Per-user starred-record UI affordance. cave-portal can implement equivalent persistence on top of the View/User entities without a dedicated Favorite workspace-entity. Was unmapped pre-wave-3."
-
-[[skipped]]
-upstream = "packages/twenty-server/src/modules/blocklist/standard-objects/blocklist.workspace-entity.ts"
-reason   = "anti-spam-handled-elsewhere"
-note     = "Email-address / domain blocklist for inbound CRM signals. cave-runtime's inbound mail pipeline (cave-auth email_listener + cave-runtime middleware) is the right scope; duplicate state inside cave-crm is unnecessary. Was unmapped pre-wave-3."
+reason   = "removed-from-server-backend-at-v2.6.0"
+note     = "The favorite standard-object module no longer exists under packages/twenty-server at the v2.6.0 pin (verified against the source tree 2026-05-31 — only packages/twenty-front/.../favorites remains). Favorites are a front-end navigation affordance in v2.6.0; cave-portal owns the equivalent. Was unmapped pre-wave-3."
 
 # ─── Scope cuts (matches unmapped) — referenced by parity_self_audit ────────
 
@@ -275,4 +292,4 @@ status       = "partial"
 loc          = 144
 priority     = "P1"
 notes        = "Full CRM React app — cave-portal/src/admin/crm/* is a v0.2 scaffold"
-last_audit   = "2026-05-30"
+last_audit   = "2026-05-31"
