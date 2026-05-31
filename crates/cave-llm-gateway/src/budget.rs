@@ -1,136 +1,131 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Token budget tracking — per user/team/project, daily/weekly/monthly limits.
+//! Spend-budget tracking — direct port of LiteLLM `litellm/budget_manager.py`.
+//!
+//! LiteLLM's `BudgetManager` tracks per-user USD spend against an allocated
+//! `total_budget`, with an optional rolling reset window (`daily`/`weekly`/
+//! `monthly`/`yearly`). The gateway wires a [`BudgetManager`] into
+//! [`crate::router::GatewayRouter`] so the live `complete()` pipeline rejects a
+//! request with [`crate::error::GatewayError::BudgetExceeded`] once a consumer
+//! has spent past their limit (LiteLLM raises `BudgetExceededError`).
 
-use crate::models::{BudgetPeriod, BudgetScope};
-use crate::GatewayState;
-use chrono::Utc;
-use tracing::{info, warn};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
 
-/// Record token consumption against all matching budget records.
-pub fn track_usage(state: &GatewayState, scope: BudgetScope, scope_id: &str, tokens: u64) {
-    let mut budgets = state.budgets.lock().unwrap();
-    for budget in budgets.iter_mut() {
-        if budget.scope == scope && budget.scope_id == scope_id {
-            budget.current_usage += tokens;
-            let used_frac = budget.current_usage as f64 / budget.limit.max(1) as f64;
-            info!(
-                scope_id,
-                tokens,
-                total = budget.current_usage,
-                limit = budget.limit,
-                "Token usage recorded"
-            );
-            if used_frac >= budget.alert_threshold {
-                warn!(
-                    scope_id,
-                    used_pct = format!("{:.1}%", used_frac * 100.0),
-                    "Budget alert threshold reached"
-                );
-            }
-        }
-    }
-}
-
-/// Return `Err` if the scope has insufficient remaining budget.
-pub fn check_budget(
-    state: &GatewayState,
-    scope: &BudgetScope,
-    scope_id: &str,
-    tokens_requested: u64,
-) -> Result<(), String> {
-    let budgets = state.budgets.lock().unwrap();
-    for budget in budgets.iter() {
-        if budget.scope == *scope && budget.scope_id == scope_id {
-            if budget.current_usage + tokens_requested > budget.limit {
-                return Err(format!(
-                    "Budget exceeded for {scope_id}: {}/{} tokens used",
-                    budget.current_usage, budget.limit
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Forecast the date/time when the budget will be exhausted at the current usage rate.
-/// Returns `None` if there is no matching budget or usage rate is zero.
-pub fn forecast_usage(
-    state: &GatewayState,
-    scope: &BudgetScope,
-    scope_id: &str,
-) -> Option<chrono::DateTime<Utc>> {
-    let budgets = state.budgets.lock().unwrap();
-    let budget = budgets
-        .iter()
-        .find(|b| b.scope == *scope && b.scope_id == scope_id)?;
-
-    if budget.current_usage == 0 {
-        return None;
+    #[test]
+    fn create_and_query_budget() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", Some(BudgetDuration::Monthly));
+        assert_eq!(m.get_total_budget("alice"), Some(100.0));
+        assert_eq!(m.get_current_cost("alice"), 0.0);
+        assert!(m.is_valid_user("alice"));
+        assert!(!m.is_valid_user("bob"));
     }
 
-    let elapsed_secs = Utc::now()
-        .signed_duration_since(budget.period_start)
-        .num_seconds()
-        .max(1);
-
-    let usage_rate = budget.current_usage as f64 / elapsed_secs as f64; // tokens/sec
-    let remaining = budget.limit.saturating_sub(budget.current_usage) as f64;
-
-    if usage_rate <= 0.0 {
-        return None;
+    #[test]
+    fn update_cost_accumulates_aggregate_and_per_model() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", None);
+        m.update_cost("alice", "gpt-4o", 1.5);
+        m.update_cost("alice", "gpt-4o", 0.5);
+        m.update_cost("alice", "claude-sonnet-4-6", 2.0);
+        assert!((m.get_current_cost("alice") - 4.0).abs() < 1e-9);
+        assert!((m.model_cost("alice", "gpt-4o") - 2.0).abs() < 1e-9);
+        assert!((m.model_cost("alice", "claude-sonnet-4-6") - 2.0).abs() < 1e-9);
     }
 
-    let secs_until_exhaustion = (remaining / usage_rate) as i64;
-    Some(Utc::now() + chrono::Duration::seconds(secs_until_exhaustion))
-}
+    #[test]
+    fn within_budget_until_exceeded() {
+        let m = BudgetManager::new();
+        m.create_budget(5.0, "alice", None);
+        assert!(m.is_within_budget("alice"));
+        m.update_cost("alice", "gpt-4o", 4.99);
+        assert!(m.is_within_budget("alice"));
+        m.update_cost("alice", "gpt-4o", 0.02); // 5.01 > 5.0
+        assert!(!m.is_within_budget("alice"));
+    }
 
-/// Build a usage report for the given scope/scope_id filters (both optional).
-pub fn generate_report(
-    state: &GatewayState,
-    scope: Option<&BudgetScope>,
-    scope_id: Option<&str>,
-) -> serde_json::Value {
-    let budgets = state.budgets.lock().unwrap();
+    #[test]
+    fn no_budget_configured_is_unlimited() {
+        let m = BudgetManager::new();
+        assert!(m.is_within_budget("nobody"));
+        assert_eq!(m.get_total_budget("nobody"), None);
+        assert_eq!(m.remaining("nobody"), None);
+    }
 
-    let rows: Vec<serde_json::Value> = budgets
-        .iter()
-        .filter(|b| {
-            scope.map_or(true, |s| b.scope == *s) && scope_id.map_or(true, |id| b.scope_id == id)
-        })
-        .map(|b| {
-            let usage_pct = if b.limit > 0 {
-                b.current_usage as f64 / b.limit as f64 * 100.0
-            } else {
-                0.0
-            };
-            let period_label = match b.period {
-                BudgetPeriod::Daily => "daily",
-                BudgetPeriod::Weekly => "weekly",
-                BudgetPeriod::Monthly => "monthly",
-            };
-            let scope_label = match b.scope {
-                BudgetScope::Team => "team",
-                BudgetScope::Project => "project",
-                BudgetScope::User => "user",
-            };
-            serde_json::json!({
-                "id": b.id,
-                "scope": scope_label,
-                "scope_id": b.scope_id,
-                "period": period_label,
-                "limit": b.limit,
-                "current_usage": b.current_usage,
-                "usage_percent": format!("{usage_pct:.2}"),
-                "alert_threshold": b.alert_threshold,
-                "period_start": b.period_start,
-            })
-        })
-        .collect();
+    #[test]
+    fn projected_cost_adds_to_current() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", None);
+        m.update_cost("alice", "gpt-4o", 10.0);
+        assert!((m.projected_cost("alice", 2.5) - 12.5).abs() < 1e-9);
+    }
 
-    serde_json::json!({
-        "generated_at": Utc::now(),
-        "total_budgets": rows.len(),
-        "budgets": rows,
-    })
+    #[test]
+    fn reset_cost_clears_aggregate_and_model() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", None);
+        m.update_cost("alice", "gpt-4o", 10.0);
+        m.reset_cost("alice");
+        assert_eq!(m.get_current_cost("alice"), 0.0);
+        assert!(m.model_cost("alice", "gpt-4o").abs() < 1e-9);
+    }
+
+    #[test]
+    fn reset_on_duration_resets_after_elapsed_window() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", Some(BudgetDuration::Daily));
+        m.update_cost("alice", "gpt-4o", 10.0);
+        // Force created/last-updated 2 days into the past.
+        m.backdate("alice", Duration::days(2));
+        assert!(m.reset_on_duration("alice"));
+        assert_eq!(m.get_current_cost("alice"), 0.0);
+    }
+
+    #[test]
+    fn reset_on_duration_noop_within_window() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", Some(BudgetDuration::Monthly));
+        m.update_cost("alice", "gpt-4o", 10.0);
+        assert!(!m.reset_on_duration("alice"));
+        assert!((m.get_current_cost("alice") - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reset_on_duration_noop_without_duration() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", None);
+        m.update_cost("alice", "gpt-4o", 10.0);
+        m.backdate("alice", Duration::days(9999));
+        assert!(!m.reset_on_duration("alice"));
+        assert!((m.get_current_cost("alice") - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn get_users_lists_all_tracked() {
+        let m = BudgetManager::new();
+        m.create_budget(10.0, "alice", None);
+        m.create_budget(20.0, "bob", None);
+        let mut users = m.get_users();
+        users.sort();
+        assert_eq!(users, vec!["alice".to_string(), "bob".to_string()]);
+    }
+
+    #[test]
+    fn duration_maps_to_litellm_day_counts() {
+        assert_eq!(BudgetDuration::Daily.days(), 1);
+        assert_eq!(BudgetDuration::Weekly.days(), 7);
+        assert_eq!(BudgetDuration::Monthly.days(), 30);
+        assert_eq!(BudgetDuration::Yearly.days(), 365);
+    }
+
+    #[test]
+    fn remaining_budget_reported() {
+        let m = BudgetManager::new();
+        m.create_budget(100.0, "alice", None);
+        m.update_cost("alice", "gpt-4o", 30.0);
+        assert!((m.remaining("alice").unwrap() - 70.0).abs() < 1e-9);
+    }
 }

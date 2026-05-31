@@ -17,6 +17,7 @@
 pub mod alias;
 pub mod api_keys;
 pub mod bench_wire;
+pub mod budget;
 pub mod cache;
 pub mod capability;
 pub mod cost;
