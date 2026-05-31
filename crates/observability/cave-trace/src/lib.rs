@@ -36,6 +36,7 @@ pub mod multi_tenant;
 pub mod propagation;
 pub mod query;
 pub mod routes;
+pub mod adaptive_sampling;
 pub mod sampling;
 pub mod servicegraph;
 pub mod spm;
