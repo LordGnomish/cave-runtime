@@ -1,0 +1,22 @@
+cave-edge-runtime
+Copyright 2026 Cave Runtime contributors
+
+This product reimplements, in pure Rust, control-plane decision logic
+derived from the following Apache License 2.0 projects. No upstream source
+code is copied; the implementations are clean-room ports of documented
+behavior.
+
+------------------------------------------------------------------------
+K3s
+  https://github.com/k3s-io/k3s
+  Copyright The K3s Authors
+  Licensed under the Apache License, Version 2.0.
+
+KubeEdge
+  https://github.com/kubeedge/kubeedge
+  Copyright The KubeEdge Authors
+  Licensed under the Apache License, Version 2.0.
+------------------------------------------------------------------------
+
+A copy of the Apache License, Version 2.0 may be obtained at
+    http://www.apache.org/licenses/LICENSE-2.0

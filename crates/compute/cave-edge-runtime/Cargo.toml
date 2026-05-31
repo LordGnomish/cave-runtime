@@ -1,0 +1,20 @@
+[package]
+name = "cave-edge-runtime"
+description = "CAVE edge runtime — K3s edge-mode + KubeEdge parity (edge node agent, offline-first reconciliation, cloud-edge sync, device twin, local autonomy, constrained-resource mode)."
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-edge-runtime"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["edge", "kubeedge", "k3s", "iot", "kubernetes"]
+categories = ["api-bindings", "asynchronous", "embedded"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

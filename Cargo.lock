@@ -1509,6 +1509,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-edge-runtime"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+]
+
+[[package]]
 name = "cave-erp"
 version = "0.1.0"
 dependencies = [
