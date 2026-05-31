@@ -384,16 +384,36 @@ impl RaftNode {
     /// Leader: append a new entry at the current term and return its index
     /// (etcd `raft.appendEntry`). Updates the leader's own match progress.
     pub fn propose(&mut self) -> u64 {
-        // RED placeholder: records the entry but never advances last_index
-        // nor the leader's own progress.
         self.log_terms.push(self.term);
-        0
+        self.last_index = self.log_terms.len() as u64;
+        self.last_term = self.term;
+        if let Some(pr) = self.tracker.progress.get_mut(&self.id) {
+            pr.maybe_update(self.last_index);
+        }
+        self.last_index
     }
 
     /// Leader: advance `commit` to the highest index a quorum has acked,
-    /// subject to the current-term safety rule (etcd `raft.maybeCommit`).
+    /// subject to the current-term safety rule (etcd `raft.maybeCommit`):
+    /// a leader may only count replicas to commit entries from its *own*
+    /// term; older-term entries ride along once a current-term entry commits.
     pub fn maybe_commit(&mut self) -> bool {
-        // RED placeholder: never advances commit.
+        // Build the match map across all voters (self included).
+        let mut match_idx = std::collections::HashMap::new();
+        for (id, pr) in &self.tracker.progress {
+            match_idx.insert(*id, pr.r#match);
+        }
+        let voters = self.tracker.voter_ids();
+        let outgoing = self.tracker.outgoing_ids();
+        let mci = if outgoing.is_empty() {
+            crate::raft_joint_quorum::majority_committed_index(&voters, &match_idx)
+        } else {
+            crate::raft_joint_quorum::joint_committed_index(&voters, &outgoing, &match_idx)
+        };
+        if mci > self.commit && self.term_at(mci) == self.term {
+            self.commit = mci;
+            return true;
+        }
         false
     }
 
