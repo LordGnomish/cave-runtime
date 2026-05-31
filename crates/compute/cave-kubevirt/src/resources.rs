@@ -63,9 +63,30 @@ fn safe_append(list: &mut Vec<i32>, cpu_num: i32, limit: usize) -> Result<(), St
 /// id is bounds-checked against `limit` via [`safe_append`]. A non-numeric
 /// token, or overflowing the limit, returns `Err`.
 pub fn parse_cpu_set_line(cpuset_line: &str, limit: usize) -> Result<Vec<i32>, String> {
-    // RED placeholder.
-    let _ = (cpuset_line, limit);
-    Ok(Vec::new())
+    let mut cpus_list: Vec<i32> = Vec::new();
+    for item in cpuset_line.split(',') {
+        // Mirror upstream `strings.Split(item, "-")` + index access: a range
+        // uses elements [0] and [1] and ignores any further dashes.
+        let cpu_range: Vec<&str> = item.split('-').collect();
+        if cpu_range.len() > 1 {
+            // Provided a range: "1-3".
+            let start: i32 = cpu_range[0].parse().map_err(|_| invalid(cpu_range[0]))?;
+            let end: i32 = cpu_range[1].parse().map_err(|_| invalid(cpu_range[1]))?;
+            let mut n = start;
+            while n <= end {
+                safe_append(&mut cpus_list, n, limit)?;
+                n += 1;
+            }
+        } else {
+            let n: i32 = cpu_range[0].parse().map_err(|_| invalid(cpu_range[0]))?;
+            safe_append(&mut cpus_list, n, limit)?;
+        }
+    }
+    Ok(cpus_list)
+}
+
+fn invalid(token: &str) -> String {
+    format!("invalid cpuset token: {token:?}")
 }
 
 #[cfg(test)]
