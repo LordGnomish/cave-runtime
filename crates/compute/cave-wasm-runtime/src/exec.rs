@@ -82,7 +82,8 @@ impl Instance {
             .ok_or_else(|| WasmError::ExportNotFound(name.to_string()))?;
         let mut store = Store::new(self.module.memory, limits);
         let mut wasi = WasiCtx::new();
-        self.exec_func(idx, args.to_vec(), 0, &mut store, &mut wasi)
+        let caps = Capabilities::permissive();
+        self.exec_func(idx, args.to_vec(), 0, &mut store, &mut wasi, &caps)
     }
 
     /// Run a WASI command guest: invoke `entry` (typically `_start`) with the
@@ -99,7 +100,8 @@ impl Instance {
             .export_func(entry)
             .ok_or_else(|| WasmError::ExportNotFound(entry.to_string()))?;
         let mut store = Store::new(self.module.memory, limits);
-        match self.exec_func(idx, Vec::new(), 0, &mut store, &mut wasi) {
+        let caps = Capabilities::permissive();
+        match self.exec_func(idx, Vec::new(), 0, &mut store, &mut wasi, &caps) {
             Ok(_) => Ok(wasi),
             // A guest `proc_exit` unwinds via a trap; treat it as a clean exit.
             Err(WasmError::Trap(_)) if wasi.exit_code.is_some() => Ok(wasi),
@@ -114,10 +116,18 @@ impl Instance {
         &self,
         entry: &str,
         caps: &Capabilities,
-        wasi: WasiCtx,
+        mut wasi: WasiCtx,
     ) -> Result<WasiCtx> {
-        // RED stub — capability gating is wired into dispatch in the GREEN commit.
-        self.run_wasi(entry, &caps.to_limits(), wasi)
+        let idx = self
+            .module
+            .export_func(entry)
+            .ok_or_else(|| WasmError::ExportNotFound(entry.to_string()))?;
+        let mut store = Store::new(self.module.memory, &caps.to_limits());
+        match self.exec_func(idx, Vec::new(), 0, &mut store, &mut wasi, caps) {
+            Ok(_) => Ok(wasi),
+            Err(WasmError::Trap(_)) if wasi.exit_code.is_some() => Ok(wasi),
+            Err(e) => Err(e),
+        }
     }
 
     /// Execute a function by index, returning its result values. `depth` guards
@@ -129,6 +139,7 @@ impl Instance {
         depth: u32,
         store: &mut Store,
         wasi: &mut WasiCtx,
+        caps: &Capabilities,
     ) -> Result<Vec<Value>> {
         if depth > 1024 {
             return Err(WasmError::Trap("call stack exhausted".into()));
@@ -284,9 +295,9 @@ impl Instance {
                             .nth(callee as usize)
                             .map(|im| im.name.clone())
                             .ok_or(WasmError::IndexOutOfBounds(callee))?;
-                        crate::wasi::dispatch(&name, wasi, store, &call_args)?
+                        crate::wasi::dispatch(&name, wasi, store, caps, &call_args)?
                     } else {
-                        self.exec_func(callee, call_args, depth + 1, store, wasi)?
+                        self.exec_func(callee, call_args, depth + 1, store, wasi, caps)?
                     };
                     stack.extend(results);
                 }

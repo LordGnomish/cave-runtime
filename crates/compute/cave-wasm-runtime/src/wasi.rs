@@ -10,6 +10,7 @@
 use crate::error::{Result, WasmError};
 use crate::exec::Value;
 use crate::limits::Store;
+use crate::sandbox::Capabilities;
 
 /// WASI errno: success.
 pub const ERRNO_SUCCESS: i32 = 0;
@@ -80,8 +81,21 @@ pub fn dispatch(
     name: &str,
     ctx: &mut WasiCtx,
     store: &mut Store,
+    caps: &Capabilities,
     args: &[Value],
 ) -> Result<Vec<Value>> {
+    // Capability gate: `fd_write` is checked per-descriptor; everything else by
+    // name. Denied calls surface as CapabilityDenied rather than silently
+    // succeeding.
+    let fd = if name == "fd_write" {
+        args.first().and_then(|v| v.as_i32().ok())
+    } else {
+        None
+    };
+    if !caps.allows(name, fd) {
+        return Err(WasmError::CapabilityDenied(name.to_string()));
+    }
+
     match name {
         "fd_write" => fd_write(ctx, store, args),
         "fd_read" => {
