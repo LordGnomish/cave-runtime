@@ -13,6 +13,121 @@
 //! from the matching `report.poll.candidates` row; the baseline anchor
 //! comes from `report.baseline_bench` + `cfg.baseline`.
 
+use serde::{Deserialize, Serialize};
+
+use crate::config::TrackerConfig;
+use crate::report::DailyReport;
+
+/// Quadrant of a candidate relative to the baseline: quality on one
+/// axis (≥ baseline = "good"), VRAM cost on the other (≤ baseline =
+/// "cheap").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Quadrant {
+    /// At-least-as-good and at-least-as-cheap — the only promote-on-sight
+    /// quadrant.
+    SweetSpot,
+    /// Better quality but costs more VRAM than the baseline.
+    Premium,
+    /// Cheaper but worse quality.
+    Budget,
+    /// Worse on both axes — never promote.
+    Laggard,
+}
+
+/// One candidate's placement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatrixRow {
+    pub model_id: String,
+    pub quality: f32,
+    pub throughput_bps: f32,
+    pub vram_gib: f32,
+    pub disk_gib: f32,
+    /// Quality per GiB of VRAM — the headline efficiency figure.
+    pub efficiency: f32,
+    pub quadrant: Quadrant,
+}
+
+/// The full matrix for one daily run, with the baseline anchor it was
+/// scored against.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostQualityMatrix {
+    pub baseline: String,
+    pub baseline_quality: f32,
+    pub baseline_vram_gib: f32,
+    pub rows: Vec<MatrixRow>,
+}
+
+impl CostQualityMatrix {
+    pub fn row(&self, model_id: &str) -> Option<&MatrixRow> {
+        self.rows.iter().find(|r| r.model_id == model_id)
+    }
+}
+
+/// Quality per GiB of VRAM, guarding a zero/negative cost.
+fn efficiency(quality: f32, vram_gib: f32) -> f32 {
+    if vram_gib > 0.0 {
+        quality / vram_gib
+    } else {
+        0.0
+    }
+}
+
+/// Build the cost×quality matrix from a finished report. One row per
+/// `candidate_benches` entry; VRAM/disk are looked up from the matching
+/// `poll.candidates` row (0.0 if the source did not report a footprint).
+/// Rows are sorted by efficiency, highest first.
+pub fn build_matrix(report: &DailyReport, cfg: &TrackerConfig) -> CostQualityMatrix {
+    let baseline_quality = report.baseline_bench.mean_quality();
+    let baseline_vram = cfg.baseline.vram_gib;
+
+    let mut rows: Vec<MatrixRow> = report
+        .candidate_benches
+        .iter()
+        .map(|b| {
+            let cost = report
+                .poll
+                .candidates
+                .iter()
+                .find(|c| c.model_id == b.model_id);
+            let vram_gib = cost.map(|c| c.vram_gib).unwrap_or(0.0);
+            let disk_gib = cost.map(|c| c.disk_gib).unwrap_or(0.0);
+            let quality = b.mean_quality();
+            let quality_ok = quality >= baseline_quality;
+            let cheap = vram_gib <= baseline_vram;
+            let quadrant = match (quality_ok, cheap) {
+                (true, true) => Quadrant::SweetSpot,
+                (true, false) => Quadrant::Premium,
+                (false, true) => Quadrant::Budget,
+                (false, false) => Quadrant::Laggard,
+            };
+            MatrixRow {
+                model_id: b.model_id.clone(),
+                quality,
+                throughput_bps: b.throughput_bytes_per_sec(),
+                vram_gib,
+                disk_gib,
+                efficiency: efficiency(quality, vram_gib),
+                quadrant,
+            }
+        })
+        .collect();
+
+    rows.sort_by(|a, b| {
+        b.efficiency
+            .partial_cmp(&a.efficiency)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.model_id.cmp(&b.model_id))
+    });
+
+    CostQualityMatrix {
+        baseline: cfg.baseline.model.clone(),
+        baseline_quality,
+        baseline_vram_gib: baseline_vram,
+        rows,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -34,6 +34,7 @@ pub mod trend;
 pub use bench::{cave_prompts, run_bench, score_response, synth_snapshot, BenchSnapshot, EvalPrompt, EvalResult};
 pub use config::{BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig, TrackerConfig};
 pub use error::{TrackerError, TrackerResult};
+pub use matrix::{build_matrix, CostQualityMatrix, MatrixRow, Quadrant};
 pub use notify::{build_notification, NoticeSeverity, Notification};
 pub use poll::{poll_all, PollSummary};
 pub use registry::{
