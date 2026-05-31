@@ -26,8 +26,10 @@
 //! [Model Context Protocol]: https://modelcontextprotocol.io
 
 pub mod error;
+pub mod tool;
 
 pub use error::{Result, ToolError};
+pub use tool::{Content, FnTool, Tool, ToolRegistry, ToolResult, ToolSpec};
 
 /// Pinned MCP specification revision this crate targets.
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
