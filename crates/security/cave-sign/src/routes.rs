@@ -39,6 +39,7 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/sign/fulcio", get(fulcio_route))
         .route("/api/sign/rekor", get(rekor_route))
         .route("/api/sign/list", get(list_route))
+        .route("/api/sign/sigstore-bundle", post(sigstore_bundle_route))
         .with_state(state)
 }
 
@@ -229,6 +230,30 @@ async fn list_route(AxumState(state): AxumState<Arc<State>>) -> Json<Vec<SignedA
     Json(state.store.all().unwrap_or_default())
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SigstoreBundleReq {
+    /// Flat cosign bundle JSON to convert to the v0.3 protobuf-JSON envelope.
+    pub bundle_json: String,
+    /// Optional DSSE envelope — when present the result is an attestation
+    /// bundle (dsseEnvelope) instead of a messageSignature bundle.
+    #[serde(default)]
+    pub dsse_envelope: Option<serde_json::Value>,
+}
+
+/// Convert a flat cosign bundle into the modern Sigstore protobuf bundle v0.3
+/// envelope (`cosign sign --new-bundle-format`).
+async fn sigstore_bundle_route(
+    Json(req): Json<SigstoreBundleReq>,
+) -> std::result::Result<Json<serde_json::Value>, ApiError> {
+    let cosign = crate::bundle::CosignBundle::decode_json(&req.bundle_json).map_err(ApiError::from)?;
+    let v03 = match req.dsse_envelope {
+        Some(env) => crate::sigstore_bundle::SigstoreBundle::from_dsse(&cosign, env),
+        None => crate::sigstore_bundle::SigstoreBundle::from_cosign_bundle(&cosign),
+    }
+    .map_err(ApiError::from)?;
+    Ok(Json(serde_json::to_value(v03).unwrap()))
+}
+
 // ─── error helper ───────────────────────────────────────────────────────────
 
 #[derive(Debug)]
@@ -356,6 +381,40 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn sigstore_bundle_converts_cosign_bundle() {
+        let r = router();
+        let cosign = json!({
+            "kind": "keypair",
+            "signed_payload_b64": "c2ln",
+            "cert_pem": "-----BEGIN PUBLIC KEY-----\nQQ==\n-----END PUBLIC KEY-----",
+            "artifact_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        });
+        let body = serde_json::to_vec(&json!({
+            "bundle_json": serde_json::to_string(&cosign).unwrap()
+        }))
+        .unwrap();
+        let resp = r
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/sign/sigstore-bundle")
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            v["mediaType"],
+            "application/vnd.dev.sigstore.bundle.v0.3+json"
+        );
+        assert!(v["verificationMaterial"]["publicKey"].is_object());
     }
 
     #[tokio::test]

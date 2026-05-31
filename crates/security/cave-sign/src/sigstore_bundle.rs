@@ -1,6 +1,216 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //! Sigstore protobuf bundle v0.3 — the modern, self-describing envelope.
+//!
+//! Maps to:
+//!   * sigstore/protobuf-specs `dev.sigstore.bundle.v1.Bundle`
+//!   * pkg/cosign/bundle/protobuf_bundle (cosign `--new-bundle-format`)
+//!   * sigstore-go `bundle.Bundle`
+//!
+//! cosign v3 emits this envelope by default. It supersedes the flat
+//! `CosignBundle` JSON (still produced for 2.x consumers) by self-describing
+//! its `mediaType`, carrying the verification material (cert *or* public-key
+//! hint + Rekor tlog entries) and either a `messageSignature` (blob/image)
+//! or a `dsseEnvelope` (attestation). This module owns the *serialization*:
+//! protobuf-JSON (protojson) wire shape — camelCase fields, base64 bytes,
+//! and int64 fields rendered as JSON **strings** — derived from the
+//! [`crate::bundle::CosignBundle`] we already build elsewhere.
+
+use crate::bundle::CosignBundle;
+use crate::error::{Result, SignError};
+use crate::models::SigKind;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
+
+/// Media type for the v0.3 bundle (protobuf-specs `Bundle` at the JSON layer).
+pub const BUNDLE_MEDIA_TYPE_V03: &str = "application/vnd.dev.sigstore.bundle.v0.3+json";
+
+/// `dev.sigstore.bundle.v1.Bundle` rendered as protojson.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SigstoreBundle {
+    #[serde(rename = "mediaType")]
+    pub media_type: String,
+    #[serde(rename = "verificationMaterial")]
+    pub verification_material: VerificationMaterial,
+    #[serde(rename = "messageSignature", skip_serializing_if = "Option::is_none")]
+    pub message_signature: Option<MessageSignature>,
+    #[serde(rename = "dsseEnvelope", skip_serializing_if = "Option::is_none")]
+    pub dsse_envelope: Option<serde_json::Value>,
+}
+
+/// `VerificationMaterial` — exactly one of certificate / publicKey identifies
+/// the signer, plus the transparency-log entries that bind it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationMaterial {
+    #[serde(rename = "certificate", skip_serializing_if = "Option::is_none")]
+    pub certificate: Option<X509Certificate>,
+    #[serde(rename = "publicKey", skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<PublicKeyIdentifier>,
+    #[serde(rename = "tlogEntries", default, skip_serializing_if = "Vec::is_empty")]
+    pub tlog_entries: Vec<TlogEntry>,
+}
+
+/// `dev.sigstore.common.v1.X509Certificate` — DER bytes, base64 in protojson.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct X509Certificate {
+    #[serde(rename = "rawBytes")]
+    pub raw_bytes: String,
+}
+
+/// `PublicKeyIdentifier` — a hint into the trusted-root key set (keypair mode,
+/// where no Fulcio certificate exists).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PublicKeyIdentifier {
+    pub hint: String,
+}
+
+/// `dev.sigstore.common.v1.MessageSignature`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageSignature {
+    #[serde(rename = "messageDigest")]
+    pub message_digest: MessageDigest,
+    /// Base64 raw signature bytes.
+    pub signature: String,
+}
+
+/// `dev.sigstore.common.v1.HashOutput`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageDigest {
+    /// Enum name from `HashAlgorithm` — `SHA2_256` for cosign.
+    pub algorithm: String,
+    /// Base64 raw digest bytes.
+    pub digest: String,
+}
+
+/// `dev.sigstore.rekor.v1.TransparencyLogEntry` (subset cosign populates).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TlogEntry {
+    /// int64 → protojson string.
+    #[serde(rename = "logIndex")]
+    pub log_index: String,
+    #[serde(rename = "logId")]
+    pub log_id: LogId,
+    #[serde(rename = "kindVersion")]
+    pub kind_version: KindVersion,
+    /// int64 → protojson string.
+    #[serde(rename = "integratedTime")]
+    pub integrated_time: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LogId {
+    /// Base64 log public-key id (here the Rekor entry UUID stands in).
+    #[serde(rename = "keyId")]
+    pub key_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KindVersion {
+    pub kind: String,
+    pub version: String,
+}
+
+impl SigstoreBundle {
+    /// Build a message-signature bundle (blob / OCI image) from the flat
+    /// cosign bundle. Mirrors sigstore-go `bundle.NewBundle` for the
+    /// `messageSignature` case.
+    pub fn from_cosign_bundle(b: &CosignBundle) -> Result<Self> {
+        Ok(Self {
+            media_type: BUNDLE_MEDIA_TYPE_V03.into(),
+            verification_material: verification_material(b)?,
+            message_signature: Some(MessageSignature {
+                message_digest: MessageDigest {
+                    algorithm: "SHA2_256".into(),
+                    digest: digest_b64_from_artifact(&b.artifact_digest)?,
+                },
+                signature: b.signed_payload_b64.clone(),
+            }),
+            dsse_envelope: None,
+        })
+    }
+
+    /// Build an attestation bundle carrying the DSSE envelope verbatim.
+    pub fn from_dsse(b: &CosignBundle, envelope: serde_json::Value) -> Result<Self> {
+        Ok(Self {
+            media_type: BUNDLE_MEDIA_TYPE_V03.into(),
+            verification_material: verification_material(b)?,
+            message_signature: None,
+            dsse_envelope: Some(envelope),
+        })
+    }
+
+    pub fn encode_json(&self) -> Result<String> {
+        serde_json::to_string_pretty(self)
+            .map_err(|e| SignError::Bundle(format!("sigstore-bundle encode: {}", e)))
+    }
+
+    pub fn decode_json(s: &str) -> Result<Self> {
+        serde_json::from_str(s)
+            .map_err(|e| SignError::Bundle(format!("sigstore-bundle decode: {}", e)))
+    }
+}
+
+/// Keyless → X.509 certificate (rawBytes = DER); keypair → publicKey hint.
+fn verification_material(b: &CosignBundle) -> Result<VerificationMaterial> {
+    let (certificate, public_key) = match b.kind {
+        SigKind::Keyless => (
+            Some(X509Certificate {
+                raw_bytes: pem_body(&b.cert_pem)?,
+            }),
+            None,
+        ),
+        SigKind::Keypair => (
+            None,
+            Some(PublicKeyIdentifier {
+                hint: pem_body(&b.cert_pem)?,
+            }),
+        ),
+    };
+    let tlog_entries = match (b.rekor_log_index, &b.rekor_uuid, b.rekor_integrated_time) {
+        (Some(idx), Some(uuid), Some(t)) => vec![TlogEntry {
+            log_index: idx.to_string(),
+            log_id: LogId {
+                key_id: uuid.clone(),
+            },
+            kind_version: KindVersion {
+                kind: "hashedrekord".into(),
+                version: "0.0.1".into(),
+            },
+            integrated_time: t.to_string(),
+        }],
+        _ => Vec::new(),
+    };
+    Ok(VerificationMaterial {
+        certificate,
+        public_key,
+        tlog_entries,
+    })
+}
+
+/// Strip PEM armor + newlines, returning the base64 body — which for an
+/// X.509 PEM *is* the base64 of the DER (`rawBytes` in protobuf-specs).
+fn pem_body(pem: &str) -> Result<String> {
+    let body: String = pem
+        .lines()
+        .filter(|l| !l.starts_with("-----"))
+        .flat_map(|l| l.chars())
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    if body.is_empty() {
+        return Err(SignError::Bundle("empty PEM body".into()));
+    }
+    Ok(body)
+}
+
+/// `sha256:<hex>` → base64 of the raw 32 digest bytes.
+fn digest_b64_from_artifact(artifact_digest: &str) -> Result<String> {
+    let hex = artifact_digest
+        .strip_prefix("sha256:")
+        .unwrap_or(artifact_digest);
+    let raw = hex::decode(hex)
+        .map_err(|e| SignError::Bundle(format!("artifact digest hex: {}", e)))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(raw))
+}
 
 #[cfg(test)]
 mod tests {

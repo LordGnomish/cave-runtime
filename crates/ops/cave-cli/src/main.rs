@@ -2701,6 +2701,12 @@ enum SignCmd {
         #[arg(long)]
         identity: Option<String>,
     },
+    /// Convert a flat cosign bundle JSON into the Sigstore protobuf bundle v0.3 envelope
+    SigstoreBundle {
+        /// Flat cosign bundle JSON (the `.bundle` file contents)
+        #[arg(long)]
+        bundle_json: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4212,6 +4218,13 @@ source_root = "src"
                 c.post(
                     "/api/sign/verify",
                     json!({ "artifact": artifact, "identity": identity }),
+                )
+                .await
+            }
+            SignCmd::SigstoreBundle { bundle_json } => {
+                c.post(
+                    "/api/sign/sigstore-bundle",
+                    json!({ "bundle_json": bundle_json }),
                 )
                 .await
             }
