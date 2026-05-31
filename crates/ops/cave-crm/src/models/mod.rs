@@ -12,6 +12,7 @@
 
 pub mod activity;
 pub mod api_key;
+pub mod blocklist;
 pub mod calendar_event;
 pub mod company;
 pub mod custom_field;
