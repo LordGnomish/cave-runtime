@@ -16,6 +16,7 @@ pub mod attachment;
 pub mod blocklist;
 pub mod calendar_event;
 pub mod company;
+pub mod connected_account;
 pub mod custom_field;
 pub mod custom_object;
 pub mod lead;
