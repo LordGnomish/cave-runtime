@@ -72,9 +72,123 @@ impl<'a> Reader<'a> {
 
 /// Parse a WebAssembly binary module into the decoded [`Module`] model.
 pub fn parse_module(bytes: &[u8]) -> Result<Module> {
-    // RED stub — real decoder is implemented in the GREEN commit.
-    let _ = bytes;
-    Ok(Module::default())
+    let mut r = Reader::new(bytes);
+
+    // Preamble: magic + version.
+    if r.take(4)? != WASM_MAGIC {
+        return Err(WasmError::BadMagic);
+    }
+    let ver_bytes = r.take(4)?;
+    let version = u32::from_le_bytes([ver_bytes[0], ver_bytes[1], ver_bytes[2], ver_bytes[3]]);
+    if version != 1 {
+        return Err(WasmError::BadVersion(version));
+    }
+
+    let mut module = Module::default();
+
+    // Section loop.
+    while r.remaining() > 0 {
+        let id = r.byte()?;
+        let size = r.u32()? as usize;
+        let payload = r.take(size)?;
+        let mut s = Reader::new(payload);
+        match id {
+            1 => module.types = parse_type_section(&mut s)?,
+            3 => module.functions = parse_function_section(&mut s)?,
+            5 => module.memory = parse_memory_section(&mut s)?,
+            7 => module.exports = parse_export_section(&mut s)?,
+            10 => module.code = parse_code_section(&mut s)?,
+            // Custom (0) and other known-but-unmodelled sections are skipped.
+            0 | 2 | 4 | 6 | 8 | 9 | 11 | 12 | 13 => {}
+            other => return Err(WasmError::InvalidSection(other)),
+        }
+    }
+
+    Ok(module)
+}
+
+fn parse_type_section(s: &mut Reader<'_>) -> Result<Vec<FuncType>> {
+    let count = s.u32()?;
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let form = s.byte()?;
+        if form != 0x60 {
+            return Err(WasmError::InvalidValType(form));
+        }
+        let nparams = s.u32()?;
+        let mut params = Vec::with_capacity(nparams as usize);
+        for _ in 0..nparams {
+            params.push(s.valtype()?);
+        }
+        let nresults = s.u32()?;
+        let mut results = Vec::with_capacity(nresults as usize);
+        for _ in 0..nresults {
+            results.push(s.valtype()?);
+        }
+        out.push(FuncType { params, results });
+    }
+    Ok(out)
+}
+
+fn parse_function_section(s: &mut Reader<'_>) -> Result<Vec<u32>> {
+    let count = s.u32()?;
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        out.push(s.u32()?);
+    }
+    Ok(out)
+}
+
+fn parse_limits(s: &mut Reader<'_>) -> Result<Limits> {
+    let flag = s.byte()?;
+    let min = s.u32()?;
+    let max = if flag & 0x01 != 0 { Some(s.u32()?) } else { None };
+    Ok(Limits { min, max })
+}
+
+fn parse_memory_section(s: &mut Reader<'_>) -> Result<Option<Limits>> {
+    let count = s.u32()?;
+    let mut first = None;
+    for i in 0..count {
+        let lim = parse_limits(s)?;
+        if i == 0 {
+            first = Some(lim);
+        }
+    }
+    Ok(first)
+}
+
+fn parse_export_section(s: &mut Reader<'_>) -> Result<Vec<Export>> {
+    let count = s.u32()?;
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let name = s.name()?;
+        let kb = s.byte()?;
+        let kind = ExternKind::from_byte(kb).ok_or(WasmError::InvalidSection(kb))?;
+        let index = s.u32()?;
+        out.push(Export { name, kind, index });
+    }
+    Ok(out)
+}
+
+fn parse_code_section(s: &mut Reader<'_>) -> Result<Vec<FuncBody>> {
+    let count = s.u32()?;
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let body_size = s.u32()? as usize;
+        let body = s.take(body_size)?;
+        let mut b = Reader::new(body);
+        let nlocal_decls = b.u32()?;
+        let mut locals = Vec::with_capacity(nlocal_decls as usize);
+        for _ in 0..nlocal_decls {
+            let n = b.u32()?;
+            let ty = b.valtype()?;
+            locals.push((n, ty));
+        }
+        let code = body[b.pos..].to_vec();
+        out.push(FuncBody { locals, code });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
