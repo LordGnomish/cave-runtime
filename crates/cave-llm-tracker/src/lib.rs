@@ -23,6 +23,7 @@
 pub mod bench;
 pub mod config;
 pub mod error;
+pub mod matrix;
 pub mod notify;
 pub mod poll;
 pub mod registry;
