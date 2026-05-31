@@ -3100,19 +3100,27 @@
     "cave-wasm-runtime": {
       "cave_src_loc": null,
       "crate_dir": "crates/compute/cave-wasm-runtime",
-      "honest_ratio": 0.45,
-      "last_commit": "ac2bdb67cdb285392f3a405940564431293bfa52",
-      "last_commit_at": "2026-05-31T19:27:25+02:00",
-      "manifest_filled": null,
+      "fill_ratio": 0.85,
+      "honest_ratio": 0.65,
+      "last_audit": "2026-05-31",
+      "last_audit_disk": "2026-05-31",
+      "last_commit": "62c322ed6ff790ed90f2b4744b671518ca0e3737",
+      "last_commit_at": "2026-05-31T19:31:36+02:00",
+      "manifest_filled": true,
+      "mapped_count": 9,
       "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
+      "parity_ratio": 0.85,
+      "parity_ratio_source": "manifest",
+      "partial_count": 4,
+      "skipped_count": 4,
+      "source_sha": "unknown",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
+      "total_count": 20,
+      "unmapped_count": 3,
+      "upstream": "bytecodealliance/wasmtime",
       "upstream_license": "Apache-2.0",
-      "upstream_name": "cave-wasm-runtime",
-      "upstream_version": null
+      "upstream_version": "v37.0.0"
     },
     "cave-workflows": {
       "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
@@ -3147,11 +3155,11 @@
   },
   "disk_overlay_at": "2026-05-27",
   "disk_overlay_stats": {
-    "flipped": 99,
+    "flipped": 100,
     "injected": 15,
-    "new_filled": 99,
+    "new_filled": 100,
     "phantoms": 0,
-    "ratio_overrides": 90
+    "ratio_overrides": 91
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
