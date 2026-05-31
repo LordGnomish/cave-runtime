@@ -27,6 +27,11 @@ pub fn matches_query(doc: &Document, query: &Document) -> bool {
                     return false;
                 }
             }
+        } else if key == "$expr" {
+            // Aggregation-expression predicate evaluated against the document.
+            if !eval_expr(doc, query_value).as_bool().unwrap_or(false) {
+                return false;
+            }
         } else {
             // Field-level predicate — evaluate against the (possibly absent)
             // field value so operators like $ne / $nin / $not / $exists:false
@@ -59,8 +64,11 @@ fn matches_subquery(doc: &Document, cond: &Value) -> bool {
 pub fn matches_value_opt(doc_value: Option<&Value>, query_value: &Value) -> bool {
     match query_value {
         Value::Object(obj) if is_operator_object(obj) => {
+            // `$options` is a modifier of a sibling `$regex`, not a standalone
+            // predicate — read it once and pass it through.
+            let opts = obj.get("$options").and_then(|v| v.as_str());
             for (op, op_value) in obj {
-                if !eval_operator(doc_value, op, op_value) {
+                if !eval_operator(doc_value, op, op_value, opts) {
                     return false;
                 }
             }
@@ -77,7 +85,7 @@ fn is_operator_object(obj: &serde_json::Map<String, Value>) -> bool {
     !obj.is_empty() && obj.keys().all(|k| k.starts_with('$'))
 }
 
-fn eval_operator(doc_value: Option<&Value>, op: &str, op_value: &Value) -> bool {
+fn eval_operator(doc_value: Option<&Value>, op: &str, op_value: &Value, opts: Option<&str>) -> bool {
     match op {
         "$eq" => doc_value == Some(op_value),
         "$ne" => doc_value != Some(op_value),
@@ -103,7 +111,9 @@ fn eval_operator(doc_value: Option<&Value>, op: &str, op_value: &Value) -> bool 
             let want = op_value.as_bool().unwrap_or(true);
             doc_value.is_some() == want
         }
-        "$regex" => matches_regex_for(doc_value, op_value, None),
+        "$regex" => matches_regex_for(doc_value, op_value, opts),
+        "$mod" => with_present(doc_value, |dv| mod_matches(dv, op_value)),
+        "$elemMatch" => with_present(doc_value, |dv| elem_match(dv, op_value)),
         "$type" => with_present(doc_value, |dv| type_matches(dv, op_value)),
         "$size" => with_present(doc_value, |dv| {
             matches!((dv.as_array(), op_value.as_i64()), (Some(a), Some(n)) if a.len() as i64 == n)
@@ -134,6 +144,120 @@ fn with_present<F: Fn(&Value) -> bool>(doc_value: Option<&Value>, f: F) -> bool 
 
 fn value_in_match(doc_value: &Value, candidate: &Value) -> bool {
     doc_value == candidate
+}
+
+/// `$mod` — `[divisor, remainder]`; matches when `value % divisor == remainder`.
+/// A zero or missing divisor never matches (MongoDB raises; we treat as no-match).
+fn mod_matches(v: &Value, spec: &Value) -> bool {
+    let Some(arr) = spec.as_array() else { return false };
+    if arr.len() != 2 {
+        return false;
+    }
+    let (Some(divisor), Some(remainder), Some(n)) = (arr[0].as_f64(), arr[1].as_f64(), v.as_f64())
+    else {
+        return false;
+    };
+    if divisor == 0.0 {
+        return false;
+    }
+    // MongoDB truncates toward zero before applying the modulus.
+    let q = (n.trunc()) % (divisor.trunc());
+    q == remainder.trunc()
+}
+
+/// `$elemMatch` — at least one array element satisfies the criteria. When the
+/// criteria are an operator-expression they apply to each scalar element;
+/// otherwise they are a full sub-query applied to each (object) element.
+fn elem_match(v: &Value, criteria: &Value) -> bool {
+    let Some(arr) = v.as_array() else { return false };
+    match criteria.as_object() {
+        Some(obj) if is_operator_object(obj) => {
+            arr.iter().any(|e| matches_value_opt(Some(e), criteria))
+        }
+        Some(obj) => {
+            let sub: Document = obj.iter().map(|(k, val)| (k.clone(), val.clone())).collect();
+            arr.iter().any(|e| match e.as_object() {
+                Some(eo) => {
+                    let ed: Document = eo.iter().map(|(k, val)| (k.clone(), val.clone())).collect();
+                    matches_query(&ed, &sub)
+                }
+                None => false,
+            })
+        }
+        None => false,
+    }
+}
+
+/// Evaluate a MongoDB aggregation expression (`$expr` context) against a
+/// document, returning a JSON value. Supports field paths (`"$field"`),
+/// literals, comparison operators (`$eq`/`$ne`/`$gt`/`$gte`/`$lt`/`$lte`),
+/// and logical operators (`$and`/`$or`/`$not`).
+fn eval_expr(doc: &Document, expr: &Value) -> Value {
+    match expr {
+        Value::String(s) if s.starts_with('$') => {
+            // Field path; supports dotted paths into nested documents.
+            resolve_path(doc, s.trim_start_matches('$'))
+        }
+        Value::Object(obj) => {
+            if let Some((op, arg)) = obj.iter().next() {
+                if obj.len() == 1 && op.starts_with('$') {
+                    return eval_expr_op(doc, op, arg);
+                }
+            }
+            // Plain object literal.
+            expr.clone()
+        }
+        other => other.clone(),
+    }
+}
+
+fn eval_expr_op(doc: &Document, op: &str, arg: &Value) -> Value {
+    let args: Vec<Value> = match arg.as_array() {
+        Some(a) => a.iter().map(|e| eval_expr(doc, e)).collect(),
+        None => vec![eval_expr(doc, arg)],
+    };
+    let cmp = |want: fn(std::cmp::Ordering) -> bool| -> Value {
+        if args.len() == 2 {
+            Value::Bool(
+                order_values(&args[0], &args[1])
+                    .map(want)
+                    .unwrap_or(false),
+            )
+        } else {
+            Value::Bool(false)
+        }
+    };
+    match op {
+        "$eq" => Value::Bool(args.len() == 2 && args[0] == args[1]),
+        "$ne" => Value::Bool(args.len() == 2 && args[0] != args[1]),
+        "$gt" => cmp(|o| o.is_gt()),
+        "$gte" => cmp(|o| o.is_ge()),
+        "$lt" => cmp(|o| o.is_lt()),
+        "$lte" => cmp(|o| o.is_le()),
+        "$and" => Value::Bool(args.iter().all(|v| v.as_bool().unwrap_or(false))),
+        "$or" => Value::Bool(args.iter().any(|v| v.as_bool().unwrap_or(false))),
+        "$not" => Value::Bool(!args.first().and_then(|v| v.as_bool()).unwrap_or(false)),
+        _ => Value::Null,
+    }
+}
+
+/// Resolve a dotted field path against a document, returning `Null` if absent.
+fn resolve_path(doc: &Document, path: &str) -> Value {
+    let mut parts = path.split('.');
+    let Some(first) = parts.next() else {
+        return Value::Null;
+    };
+    let mut cur = match doc.get(first) {
+        Some(v) => v.clone(),
+        None => return Value::Null,
+    };
+    for p in parts {
+        cur = match cur.as_object().and_then(|o| o.get(p)) {
+            Some(v) => v.clone(),
+            None => return Value::Null,
+        };
+    }
+    cur
 }
 
 // retained for the public re-export / call sites that pass a present value.
