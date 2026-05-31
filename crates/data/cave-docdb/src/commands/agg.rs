@@ -502,6 +502,122 @@ mod tests {
         assert_eq!(idxs, vec![0, 1, 2]);
     }
 
+    fn group_result_for(batch: &[Value], id: &str) -> serde_json::Map<String, Value> {
+        batch
+            .iter()
+            .find(|d| d.get("_id").and_then(|v| v.as_str()) == Some(id))
+            .and_then(|v| v.as_object())
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn test_group_accumulators_avg_min_max() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "sales",
+            "acc_db1",
+            json!([
+                {"dept": "eng", "amount": 100},
+                {"dept": "eng", "amount": 300},
+                {"dept": "hr", "amount": 50}
+            ]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("sales".to_string()));
+        cmd.insert("$db".to_string(), Value::String("acc_db1".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$group": {
+                "_id": "$dept",
+                "avg": {"$avg": "$amount"},
+                "min": {"$min": "$amount"},
+                "max": {"$max": "$amount"}
+            }}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        let eng = group_result_for(&batch, "eng");
+        assert_eq!(eng.get("avg").and_then(|v| v.as_f64()), Some(200.0));
+        assert_eq!(eng.get("min").and_then(|v| v.as_f64()), Some(100.0));
+        assert_eq!(eng.get("max").and_then(|v| v.as_f64()), Some(300.0));
+    }
+
+    #[tokio::test]
+    async fn test_group_accumulators_first_last_push_addtoset() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "events",
+            "acc_db2",
+            json!([
+                {"g": "a", "v": 1},
+                {"g": "a", "v": 2},
+                {"g": "a", "v": 2}
+            ]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("events".to_string()));
+        cmd.insert("$db".to_string(), Value::String("acc_db2".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$group": {
+                "_id": "$g",
+                "first": {"$first": "$v"},
+                "last": {"$last": "$v"},
+                "all": {"$push": "$v"},
+                "uniq": {"$addToSet": "$v"}
+            }}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        let a = group_result_for(&batch, "a");
+        assert_eq!(a.get("first").and_then(|v| v.as_i64()), Some(1));
+        assert_eq!(a.get("last").and_then(|v| v.as_i64()), Some(2));
+        assert_eq!(
+            a.get("all").and_then(|v| v.as_array()).map(|v| v.len()),
+            Some(3)
+        );
+        // $addToSet de-dupes -> {1, 2}
+        assert_eq!(
+            a.get("uniq").and_then(|v| v.as_array()).map(|v| v.len()),
+            Some(2)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_group_id_null_aggregates_all() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "nums",
+            "acc_db3",
+            json!([{"n": 1}, {"n": 2}, {"n": 3}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("nums".to_string()));
+        cmd.insert("$db".to_string(), Value::String("acc_db3".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$group": {"_id": Value::Null, "total": {"$sum": "$n"}, "avg": {"$avg": "$n"}}}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let batch = batch_of(&resp);
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].get("total").and_then(|v| v.as_i64()), Some(6));
+        assert_eq!(batch[0].get("avg").and_then(|v| v.as_f64()), Some(2.0));
+    }
+
     #[tokio::test]
     async fn test_unwind_scalar_field_emitted_unchanged() {
         let engine = Arc::new(Engine::new());
