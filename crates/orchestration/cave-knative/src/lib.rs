@@ -60,8 +60,8 @@ pub use cert_bridge::{
 };
 pub use configuration::{Configuration, ConfigurationSpec, ConfigurationStatus};
 pub use domain_mapping::{
-    finalize_kind, reconcile_domain_claim, ClusterDomainClaim, DomainClaimRegistry, DomainMapping,
-    DomainMappingSpec, DomainMappingStatus, KReference,
+    finalize_kind, reconcile_domain_claim, resolve_ref, ClusterDomainClaim, DomainClaimRegistry,
+    DomainMapping, DomainMappingSpec, DomainMappingStatus, KReference, ResolvedUri,
 };
 pub use eventing::{Channel, EventingSink, EventingSource, Subscription, Trigger, TriggerFilter};
 pub use eventing_transports::{

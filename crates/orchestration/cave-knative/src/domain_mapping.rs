@@ -215,6 +215,79 @@ pub fn reconcile_domain_claim(
     Ok(())
 }
 
+/// A URI the cross-crate resolver produced for `spec.ref` (the Addressable
+/// contract). cave-knative does not own the resolver — that walks the
+/// Service/Route status — but it owns the *validation* of what comes back.
+#[derive(Default, Debug, Clone)]
+pub struct ResolvedUri {
+    pub scheme: String,
+    pub host: String,
+    pub path: String,
+}
+
+impl ResolvedUri {
+    /// Reconstruct the printable URL used in `MarkReferenceNotResolved`
+    /// messages, matching the `%q` of upstream's `apis.URL.String()`.
+    fn display(&self) -> String {
+        let scheme = if self.scheme.is_empty() {
+            "http"
+        } else {
+            &self.scheme
+        };
+        format!("{scheme}://{}{}", self.host, self.path)
+    }
+}
+
+/// Port of `resolveRef`.
+///
+/// Validates the resolved Addressable URI and extracts the backend service
+/// name for the KIngress. The resolved host must be the standard k8s service
+/// DNS name `{name}.{namespace}.svc.{cluster-domain}`; DomainMapping does not
+/// support path-based routing, non-service targets, or cross-namespace
+/// references. On success sets `ReferenceResolved=True` and returns
+/// `(host, backend_service)`; on failure sets `ReferenceResolved=False` with
+/// the upstream message and returns `Err`.
+pub fn resolve_ref(
+    dm: &mut DomainMapping,
+    resolved: &ResolvedUri,
+    cluster_domain: &str,
+) -> Result<(String, String), String> {
+    // No path-based routing: a lone trailing slash is tolerated (TrimSuffix).
+    if resolved.path.trim_end_matches('/') != "" {
+        let msg = format!("resolved URI {:?} contains a path", resolved.display());
+        dm.status.mark_reference_not_resolved(&msg);
+        return Err(msg);
+    }
+
+    let required_suffix = format!(".svc.{cluster_domain}");
+    let stripped = resolved.host.strip_suffix(&required_suffix);
+    let parts: Vec<&str> = match stripped {
+        Some(s) => s.split('.').collect(),
+        None => Vec::new(),
+    };
+    if stripped.is_none() || parts.len() != 2 {
+        let msg = format!(
+            "resolved URI {:?} must be of the form {{name}}.{{namespace}}{required_suffix}",
+            resolved.display()
+        );
+        dm.status.mark_reference_not_resolved(&msg);
+        return Err(msg);
+    }
+
+    // Cross-namespace KIngress is unsupported.
+    if parts[1] != dm.metadata.namespace {
+        let msg = format!(
+            "resolved URI {:?} must be in same namespace as DomainMapping",
+            resolved.display()
+        );
+        dm.status.mark_reference_not_resolved(&msg);
+        return Err(msg);
+    }
+
+    dm.status.mark_reference_resolved();
+    Ok((resolved.host.clone(), parts[0].to_string()))
+}
+
 /// Port of `FinalizeKind` — clean up an autocreated ClusterDomainClaim when
 /// the DomainMapping is deleted. No-op when autocreate is disabled (the
 /// operator owns the claim lifecycle) or when the claim is owned by another
