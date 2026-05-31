@@ -1,0 +1,198 @@
+# parity.manifest.toml — cave-edge-runtime
+# Upstreams:
+#   KubeEdge   kubeedge/kubeedge  https://github.com/kubeedge/kubeedge  pinned v1.22.0  (Apache-2.0)
+#   K3s        k3s-io/k3s         https://github.com/k3s-io/k3s         edge mode       (Apache-2.0)
+#
+# cave-edge-runtime is a pure-Rust port of the edge-orchestration control
+# logic. It is a fresh crate (no predecessor); the seven priority subsystems
+# were each landed via a strict RED→GREEN TDD cycle:
+#
+#   - edged        minimal kubelet: pod-worker add/update/delete dispatch,
+#                  kubelet getPhase machine (RestartPolicy × container states ×
+#                  terminal flag), cleanupOrphanedPodDirectories, 10s status
+#                  cadence.
+#   - metamanager  offline-first metaDB cache: local hit / online-miss
+#                  forward-to-cloud + cache-through / offline-miss NotFound,
+#                  resource-version monotonicity, list-by-type.
+#   - eventbus     MQTT v3.1.1 topic-filter matching (+ / # / $-topic guard),
+#                  KubeEdge $hw/events topic classification, cave-streams-style
+#                  per-subscription FIFO fan-out.
+#   - edgehub      reliable sync keeper: pending-until-ACK by message id,
+#                  retransmit timer + attempt counter, ObjectSync
+#                  resource-version merge (newer applied, stale/dup dropped)
+#                  for eventual consistency.
+#   - devicetwin   Expected/Actual twin state with {cloud,edge} TwinVersion,
+#                  DealVersion conflict resolution, twin delta, membership.
+#   - autonomy     heartbeat-driven Connected/Disconnected state machine,
+#                  offline keeps pods running (no eviction), one-shot
+#                  reconcile-on-reconnect, offline-duration tracking.
+#   - constrained  256 MB-class node: allocatable = capacity - reserved,
+#                  request-based admission, hard memory-pressure signal,
+#                  rankMemoryPressure eviction ordering, QoS derivation.
+#
+# Out of scope (see [[skipped]]): the live transports and runtimes those
+# subsystems sit on top of — they belong to sibling crates or to a transport
+# boundary this crate deliberately does not cross. No upstream source is
+# copied; these are clean-room ports of documented behavior. AGPL-3.0; the
+# Apache-2.0 NOTICE for both upstreams ships in NOTICE.
+
+[upstream]
+org         = "kubeedge"
+repo        = "kubeedge"
+version     = "v1.22.0"
+name        = "KubeEdge"
+license     = "Apache-2.0"
+language    = "Go"
+url         = "https://github.com/kubeedge/kubeedge"
+source_sha  = "v1.22.0"
+
+[upstream_secondary]
+org         = "k3s-io"
+repo        = "k3s"
+version     = "v1.32"
+name        = "K3s (edge mode)"
+license     = "Apache-2.0"
+language    = "Go"
+url         = "https://github.com/k3s-io/k3s"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0     # (mapped 7 + partial 0 + skipped 6) / total 13 — every in-scope subsystem is ported or ADR-skipped
+honest_ratio        = 0.5385  # mapped / total = 7/13 (strict; partials excluded, skipped excluded)
+adr_justified_ratio = 1.0     # all 6 skips are live-transport / sibling-crate boundaries
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit          = "2026-05-31"
+infra_only          = false
+mapped_count        = 7
+partial_count       = 0
+skipped_count       = 6
+unmapped_count      = 0
+total               = 13
+
+# honest_ratio derivation:
+#   mapped 7 / total 13 = 0.5385. The seven priority subsystems are each a
+#   faithful in-crate port with strict-TDD coverage (73 tests). The six skips
+#   are the live transports/runtimes and sibling-owned subsystems those ports
+#   sit on; they are intentionally not reimplemented here.
+#
+# Supplementary LOC measurement (transparency):
+#   impl_lines (src/, excl #[cfg(test)])  = ~1170
+#   tests                                 = 73
+
+[module]
+name        = "cave-edge-runtime"
+description = "Edge runtime — K3s edge-mode + KubeEdge parity (edged, metamanager, eventbus, edgehub, devicetwin, autonomy, constrained-resource mode)"
+source_root = "src"
+
+# ── File mappings (mapped) ──────────────────────────────────────────────────
+
+[[files]]
+upstream = "edge/pkg/edged + k8s pkg/kubelet/kubelet_pods.go::getPhase"
+local    = "src/edged.rs"
+
+[[files]]
+upstream = "edge/pkg/metamanager"
+local    = "src/metamanager.rs"
+
+[[files]]
+upstream = "edge/pkg/eventbus + MQTT v3.1.1 topic filters"
+local    = "src/eventbus.rs"
+
+[[files]]
+upstream = "edge/pkg/edgehub (SyncKeeper) + cloud synccontroller ObjectSync"
+local    = "src/edgehub.rs"
+
+[[files]]
+upstream = "edge/pkg/devicetwin + dtcommon DealVersion"
+local    = "src/devicetwin.rs"
+
+[[files]]
+upstream = "edge autonomy (EdgeHub keepalive + offline operation)"
+local    = "src/autonomy.rs"
+
+[[files]]
+upstream = "k8s pkg/kubelet/eviction rankMemoryPressure + node allocatable"
+local    = "src/constrained.rs"
+
+# ── Mapped subsystems ───────────────────────────────────────────────────────
+
+[[mapped]]
+name = "edged-node-agent"
+upstream = "edge/pkg/edged"
+note = "Pod-worker add/update/delete dispatch, kubelet getPhase machine, cleanupOrphanedPodDirectories, 10s status-report cadence."
+
+[[mapped]]
+name = "metamanager-offline-store"
+upstream = "edge/pkg/metamanager"
+note = "metaDB cache with offline-first query: local hit / online-miss forward-to-cloud + cache-through / offline-miss NotFound; resource-version monotonic; list-by-type."
+
+[[mapped]]
+name = "eventbus-mqtt-bridge"
+upstream = "edge/pkg/eventbus"
+note = "MQTT v3.1.1 topic-filter matcher (+, #, $-topic guard), $hw/events classifier, cave-streams-style FIFO fan-out."
+
+[[mapped]]
+name = "edgehub-reliable-sync"
+upstream = "edge/pkg/edgehub + cloud synccontroller"
+note = "SyncKeeper pending-until-ACK, retransmit timer + attempts, ObjectSync resource-version merge (newer applied, stale/dup dropped) → eventual consistency."
+
+[[mapped]]
+name = "devicetwin-delta"
+upstream = "edge/pkg/devicetwin"
+note = "Expected/Actual twin state, {cloud,edge} TwinVersion, DealVersion conflict resolution, twin delta, membership bind/unbind."
+
+[[mapped]]
+name = "edge-autonomy"
+upstream = "edge autonomy / EdgeHub keepalive"
+note = "Connected/Disconnected heartbeat state machine, offline keeps pods running (no eviction), one-shot reconcile-on-reconnect, offline duration."
+
+[[mapped]]
+name = "constrained-resource-mode"
+upstream = "k8s pkg/kubelet/eviction + node allocatable"
+note = "256 MB budget: allocatable = capacity - reserved, request-based admission, hard memory-pressure signal, rankMemoryPressure eviction ordering, QoS derivation."
+
+# ── Skipped subsystems (out-of-scope; live transport / sibling-owned) ───────
+
+[[skipped]]
+name = "containerd-cri-runtime"
+upstream = "edge/pkg/edged container runtime (containerd/CRI)"
+reason = "Real container runtime exec is owned by cave-cri / cave-kubelet; edged here is the pod-lifecycle decision layer, not the runtime shim."
+
+[[skipped]]
+name = "edgehub-wire-transport"
+upstream = "edge/pkg/edgehub/clients (WebSocket / QUIC)"
+reason = "Live cloud-edge transport framing (gorilla/websocket, quic-go) is out of scope; the reliable-delivery + version-merge logic is ported, the socket is not."
+
+[[skipped]]
+name = "mqtt-broker"
+upstream = "edge/pkg/eventbus internal MQTT broker (mochi/mosquitto)"
+reason = "The embedded MQTT broker process is out of scope; eventbus ports the topic-filter matching + classification + local fan-out, not the broker."
+
+[[skipped]]
+name = "metadb-sqlite-driver"
+upstream = "edge/pkg/metamanager/dao (SQLite/beego orm)"
+reason = "On-disk persistence engine is out of scope; metamanager ports the cache/query semantics over an in-memory store (the Ambient-only mandate keeps SQLite out of the dep tree)."
+
+[[skipped]]
+name = "device-mapper-protocols"
+upstream = "mappers-go (Modbus / Bluetooth / OPC-UA / ONVIF)"
+reason = "Physical device-protocol drivers are a separate driver surface; devicetwin ports the twin/delta logic the mappers feed, not the protocol stacks."
+
+[[skipped]]
+name = "edgemesh-service-routing"
+upstream = "kubeedge/edgemesh (L4/L7 edge service mesh)"
+reason = "Edge service routing / DNS is owned by cave-net / cave-mesh; not reimplemented in the edge runtime crate."
+
+# ── Portal / cavectl tracks ─────────────────────────────────────────────────
+
+[portal_ui]
+upstream_ui  = "KubeEdge dashboard"
+upstream_url = "https://kubeedge.io/docs/"
+status       = "mapped"
+priority     = "P1"
+notes        = "cave-runtime /api/edge/* read-only status endpoints + /admin/edge portal page (node/pods/twin/autonomy/budget snapshot)."
+last_audit   = "2026-05-31"
+
+[cavectl]
+status = "mapped"
+notes  = "`cavectl edge {status,pods,twin,budget}` shells the /api/edge/* endpoints."
