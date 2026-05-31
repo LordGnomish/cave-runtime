@@ -16,10 +16,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod digest;
 pub mod error;
 pub mod exec;
 pub mod limits;
 pub mod parser;
+pub mod registry;
 pub mod types;
 pub mod wasi;
 
@@ -27,6 +29,7 @@ pub use error::{Result, WasmError};
 pub use exec::{Instance, Value};
 pub use limits::{ResourceLimits, Store, PAGE_SIZE};
 pub use parser::parse_module;
+pub use registry::{ModuleRef, ModuleRegistry, RegistryEntry};
 pub use types::{Export, ExternKind, FuncBody, FuncType, Import, ImportKind, Limits, Module, ValType};
 pub use wasi::WasiCtx;
 
