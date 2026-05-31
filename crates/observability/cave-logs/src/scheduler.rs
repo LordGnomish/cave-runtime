@@ -417,8 +417,29 @@ impl<T> RequestQueue<T> {
         consumer_id: &str,
         max_items: usize,
     ) -> (Option<String>, Vec<T>, i64) {
-        let _ = (last_user_index, consumer_id, max_items);
-        (None, Vec::new(), START_INDEX) // RED stub
+        let (tenant, uid) = match self.next_tenant_for_consumer(last_user_index, consumer_id) {
+            (Some(t), uid) => (t, uid),
+            (None, uid) => return (None, Vec::new(), uid),
+        };
+        let mut batch = Vec::new();
+        if let Some(tq) = self.tenants.get_mut(&tenant) {
+            while batch.len() < max_items {
+                match tq.queue.pop_front() {
+                    Some(r) => batch.push(r),
+                    None => break,
+                }
+            }
+        }
+        // Delete the tenant queue once it is fully drained.
+        if self
+            .tenants
+            .get(&tenant)
+            .map(|tq| tq.queue.is_empty())
+            .unwrap_or(false)
+        {
+            self.delete_queue(&tenant);
+        }
+        (Some(tenant), batch, uid)
     }
 }
 
