@@ -33,6 +33,13 @@ pub fn choose_partition(
             }
         }
         PartitionerStrategy::RoundRobin => round_robin_counter % partition_count,
+        PartitionerStrategy::Murmur2 => {
+            if let Some(k) = key.filter(|k| !k.is_empty()) {
+                default_partition(k, partition_count)
+            } else {
+                round_robin_counter % partition_count
+            }
+        }
     }
 }
 
@@ -44,6 +51,69 @@ fn fnv1a(data: &[u8]) -> u32 {
         hash = hash.wrapping_mul(16_777_619);
     }
     hash
+}
+
+/// 32-bit MurmurHash2, byte-exact port of Apache Kafka 4.2.0
+/// `org.apache.kafka.common.utils.Utils.murmur2`.
+///
+/// Java computes this with 32-bit signed `int` wrap-around arithmetic and the
+/// unsigned right-shift `>>>`; we mirror that with `i32::wrapping_*` and
+/// `(x as u32) >> n`.  Kafka's `DefaultPartitioner` feeds the record key into
+/// this hash, so reproducing it bit-for-bit lets a Kafka client and
+/// cave-streams agree on the destination partition.
+pub fn kafka_murmur2(data: &[u8]) -> i32 {
+    let length = data.len() as i32;
+    let seed: i32 = 0x9747_b28c_u32 as i32;
+    let m: i32 = 0x5bd1_e995;
+    let r: u32 = 24;
+
+    let mut h: i32 = seed ^ length;
+    let length4 = (data.len() / 4) * 4;
+
+    let mut i = 0usize;
+    while i < length4 {
+        let mut k: i32 = (data[i] as i32 & 0xff)
+            | ((data[i + 1] as i32 & 0xff) << 8)
+            | ((data[i + 2] as i32 & 0xff) << 16)
+            | ((data[i + 3] as i32 & 0xff) << 24);
+        k = k.wrapping_mul(m);
+        k ^= ((k as u32) >> r) as i32;
+        k = k.wrapping_mul(m);
+        h = h.wrapping_mul(m);
+        h ^= k;
+        i += 4;
+    }
+
+    // Tail bytes (Java switch with fall-through).
+    let rem = data.len() & 3;
+    if rem == 3 {
+        h ^= (data[length4 + 2] as i32 & 0xff) << 16;
+    }
+    if rem >= 2 {
+        h ^= (data[length4 + 1] as i32 & 0xff) << 8;
+    }
+    if rem >= 1 {
+        h ^= data[length4] as i32 & 0xff;
+        h = h.wrapping_mul(m);
+    }
+
+    h ^= ((h as u32) >> 13) as i32;
+    h = h.wrapping_mul(m);
+    h ^= ((h as u32) >> 15) as i32;
+    h
+}
+
+/// Kafka `Utils.toPositive` — clears the sign bit so the modulo result is
+/// non-negative without the bias of `Math.abs` (which overflows on
+/// `Integer.MIN_VALUE`).
+pub fn to_positive(n: i32) -> i32 {
+    n & 0x7fff_ffff
+}
+
+/// Kafka `DefaultPartitioner` selection for a keyed record:
+/// `toPositive(murmur2(key)) % numPartitions`.
+pub fn default_partition(key: &[u8], num_partitions: u32) -> u32 {
+    (to_positive(kafka_murmur2(key)) as u32) % num_partitions
 }
 
 // ─── Producer ────────────────────────────────────────────────────────────────

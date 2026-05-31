@@ -482,6 +482,10 @@ pub enum PartitionerStrategy {
     RoundRobin,
     /// Explicit partition override.
     Manual(u32),
+    /// Kafka `DefaultPartitioner`-compatible key hashing
+    /// (`toPositive(murmur2(key)) % numPartitions`); a null/empty key falls
+    /// back to sticky round-robin, matching Apache Kafka 4.2.0.
+    Murmur2,
 }
 
 // ─── Offset commit / fetch ───────────────────────────────────────────────────
