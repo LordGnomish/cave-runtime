@@ -54,9 +54,25 @@ impl CorrelationIdPlugin {
     /// `client_ip` and `now_ms` feed the `tracker` generator; they are ignored
     /// by the uuid generators.
     pub fn generate(&self, generator: &str, client_ip: &str, now_ms: i64) -> String {
-        // STUB (RED): no generator logic yet.
-        let _ = (generator, client_ip, now_ms);
-        String::new()
+        match generator {
+            "uuid#counter" => format!("{}#{}", self.worker_uuid, self.next_counter()),
+            "tracker" => {
+                // Composite of connection/server context. nginx exposes
+                // server_addr/port/worker_pid/connection/connection_requests;
+                // we approximate with the data available to the proxy: the
+                // client ip, the worker pid, a per-worker counter and the
+                // request timestamp — still globally unique per request.
+                format!(
+                    "{}-{}-{}-{}",
+                    client_ip,
+                    std::process::id(),
+                    self.next_counter(),
+                    now_ms
+                )
+            }
+            // "uuid" and any unknown value fall back to a fresh UUID v4.
+            _ => Uuid::new_v4().to_string(),
+        }
     }
 
     fn next_counter(&self) -> u64 {
@@ -70,13 +86,42 @@ impl GatewayPlugin for CorrelationIdPlugin {
         "correlation-id"
     }
 
-    async fn access(&self, _ctx: &mut PluginCtx, _config: &Value) -> PluginResult {
-        // STUB (RED): does not set the header yet.
-        PluginResult::Continue
+    async fn access(&self, ctx: &mut PluginCtx, config: &Value) -> PluginResult {
+        let header_name = config["header_name"]
+            .as_str()
+            .unwrap_or(DEFAULT_HEADER_NAME)
+            .to_lowercase();
+        let generator = config["generator"].as_str().unwrap_or(DEFAULT_GENERATOR);
+
+        // Preserve a client-supplied correlation id; only generate when absent.
+        let id = match ctx.headers.get(&header_name) {
+            Some(existing) if !existing.is_empty() => existing.clone(),
+            _ => {
+                let now_ms = chrono::Utc::now().timestamp_millis();
+                let id = self.generate(generator, &ctx.client_ip, now_ms);
+                ctx.headers.insert(header_name.clone(), id.clone());
+                id
+            }
+        };
+        // Stash for the header_filter phase so echo uses the same value.
+        ctx.ctx.insert(
+            "correlation_id".to_string(),
+            Value::String(id),
+        );
+        PluginResult::Modified
     }
 
-    async fn header_filter(&self, _ctx: &mut PluginCtx, _config: &Value) {
-        // STUB (RED): does not echo downstream yet.
+    async fn header_filter(&self, ctx: &mut PluginCtx, config: &Value) {
+        if !config["echo_downstream"].as_bool().unwrap_or(false) {
+            return;
+        }
+        let header_name = config["header_name"]
+            .as_str()
+            .unwrap_or(DEFAULT_HEADER_NAME)
+            .to_lowercase();
+        if let Some(Value::String(id)) = ctx.ctx.get("correlation_id") {
+            ctx.response_headers.insert(header_name, id.clone());
+        }
     }
 }
 
