@@ -62,10 +62,231 @@ impl Instance {
 
     /// Invoke an exported function by name with the given arguments.
     pub fn invoke(&self, name: &str, args: &[Value]) -> Result<Vec<Value>> {
-        // RED stub — real interpreter implemented in the GREEN commit.
-        let _ = (name, args);
-        Ok(Vec::new())
+        let idx = self
+            .module
+            .export_func(name)
+            .ok_or_else(|| WasmError::ExportNotFound(name.to_string()))?;
+        self.exec_func(idx, args.to_vec(), 0)
     }
+
+    /// Execute a function by index, returning its result values. `depth` guards
+    /// against runaway recursion.
+    pub(crate) fn exec_func(&self, func_idx: u32, args: Vec<Value>, depth: u32) -> Result<Vec<Value>> {
+        if depth > 1024 {
+            return Err(WasmError::Trap("call stack exhausted".into()));
+        }
+        let body = self
+            .module
+            .code
+            .get(func_idx as usize)
+            .ok_or(WasmError::IndexOutOfBounds(func_idx))?;
+
+        // locals = params (the args) followed by zero-initialised declared locals.
+        let mut locals: Vec<Value> = args;
+        for (n, ty) in &body.locals {
+            for _ in 0..*n {
+                locals.push(Value::default_for(*ty));
+            }
+        }
+
+        let code = &body.code;
+        let mut stack: Vec<Value> = Vec::new();
+        let mut pc = 0usize;
+
+        macro_rules! pop {
+            () => {
+                stack.pop().ok_or(WasmError::StackUnderflow)?
+            };
+        }
+        macro_rules! binop_i32 {
+            ($f:expr) => {{
+                let b = pop!().as_i32()?;
+                let a = pop!().as_i32()?;
+                stack.push(Value::I32($f(a, b)));
+            }};
+        }
+        macro_rules! cmp_i32 {
+            ($f:expr) => {{
+                let b = pop!().as_i32()?;
+                let a = pop!().as_i32()?;
+                stack.push(Value::I32(if $f(a, b) { 1 } else { 0 }));
+            }};
+        }
+
+        while pc < code.len() {
+            let op = code[pc];
+            pc += 1;
+            match op {
+                0x0b => break,             // end
+                0x0f => break,             // return (straight-line)
+                0x1a => {
+                    pop!();
+                } // drop
+                0x20 => {
+                    let i = read_u32(code, &mut pc)? as usize;
+                    let v = *locals.get(i).ok_or(WasmError::IndexOutOfBounds(i as u32))?;
+                    stack.push(v);
+                } // local.get
+                0x21 => {
+                    let i = read_u32(code, &mut pc)? as usize;
+                    let v = pop!();
+                    *locals.get_mut(i).ok_or(WasmError::IndexOutOfBounds(i as u32))? = v;
+                } // local.set
+                0x22 => {
+                    let i = read_u32(code, &mut pc)? as usize;
+                    let v = *stack.last().ok_or(WasmError::StackUnderflow)?;
+                    *locals.get_mut(i).ok_or(WasmError::IndexOutOfBounds(i as u32))? = v;
+                } // local.tee
+                0x41 => {
+                    let v = read_i32(code, &mut pc)?;
+                    stack.push(Value::I32(v));
+                } // i32.const
+                0x42 => {
+                    let v = read_i64(code, &mut pc)?;
+                    stack.push(Value::I64(v));
+                } // i64.const
+                0x45 => {
+                    let a = pop!().as_i32()?;
+                    stack.push(Value::I32(if a == 0 { 1 } else { 0 }));
+                } // i32.eqz
+                0x46 => cmp_i32!(|a, b| a == b),
+                0x47 => cmp_i32!(|a, b| a != b),
+                0x48 => cmp_i32!(|a, b| a < b),
+                0x49 => cmp_i32!(|a: i32, b: i32| (a as u32) < (b as u32)),
+                0x4a => cmp_i32!(|a, b| a > b),
+                0x4b => cmp_i32!(|a: i32, b: i32| (a as u32) > (b as u32)),
+                0x4c => cmp_i32!(|a, b| a <= b),
+                0x4d => cmp_i32!(|a: i32, b: i32| (a as u32) <= (b as u32)),
+                0x4e => cmp_i32!(|a, b| a >= b),
+                0x4f => cmp_i32!(|a: i32, b: i32| (a as u32) >= (b as u32)),
+                0x6a => binop_i32!(|a: i32, b: i32| a.wrapping_add(b)),
+                0x6b => binop_i32!(|a: i32, b: i32| a.wrapping_sub(b)),
+                0x6c => binop_i32!(|a: i32, b: i32| a.wrapping_mul(b)),
+                0x6d => {
+                    let b = pop!().as_i32()?;
+                    let a = pop!().as_i32()?;
+                    if b == 0 {
+                        return Err(WasmError::Trap("integer divide by zero".into()));
+                    }
+                    if a == i32::MIN && b == -1 {
+                        return Err(WasmError::Trap("integer overflow".into()));
+                    }
+                    stack.push(Value::I32(a / b));
+                } // i32.div_s
+                0x6e => {
+                    let b = pop!().as_i32()? as u32;
+                    let a = pop!().as_i32()? as u32;
+                    if b == 0 {
+                        return Err(WasmError::Trap("integer divide by zero".into()));
+                    }
+                    stack.push(Value::I32((a / b) as i32));
+                } // i32.div_u
+                0x6f => {
+                    let b = pop!().as_i32()?;
+                    let a = pop!().as_i32()?;
+                    if b == 0 {
+                        return Err(WasmError::Trap("integer divide by zero".into()));
+                    }
+                    stack.push(Value::I32(a.wrapping_rem(b)));
+                } // i32.rem_s
+                0x70 => {
+                    let b = pop!().as_i32()? as u32;
+                    let a = pop!().as_i32()? as u32;
+                    if b == 0 {
+                        return Err(WasmError::Trap("integer divide by zero".into()));
+                    }
+                    stack.push(Value::I32((a % b) as i32));
+                } // i32.rem_u
+                0x71 => binop_i32!(|a: i32, b: i32| a & b),
+                0x72 => binop_i32!(|a: i32, b: i32| a | b),
+                0x73 => binop_i32!(|a: i32, b: i32| a ^ b),
+                0x74 => binop_i32!(|a: i32, b: i32| a.wrapping_shl(b as u32)),
+                0x75 => binop_i32!(|a: i32, b: i32| a.wrapping_shr(b as u32)),
+                0x76 => binop_i32!(|a: i32, b: i32| ((a as u32).wrapping_shr(b as u32)) as i32),
+                0x10 => {
+                    // call
+                    let callee = read_u32(code, &mut pc)?;
+                    let ftype = self
+                        .module
+                        .func_type(callee)
+                        .ok_or(WasmError::IndexOutOfBounds(callee))?;
+                    let n = ftype.params.len();
+                    if stack.len() < n {
+                        return Err(WasmError::StackUnderflow);
+                    }
+                    let call_args = stack.split_off(stack.len() - n);
+                    let results = self.exec_func(callee, call_args, depth + 1)?;
+                    stack.extend(results);
+                }
+                other => return Err(WasmError::UnsupportedOpcode(other)),
+            }
+        }
+
+        Ok(stack)
+    }
+}
+
+/// Unsigned LEB128 from a code stream at `*pc`.
+fn read_u32(code: &[u8], pc: &mut usize) -> Result<u32> {
+    let mut result: u64 = 0;
+    let mut shift = 0;
+    loop {
+        let b = *code.get(*pc).ok_or(WasmError::UnexpectedEof)?;
+        *pc += 1;
+        result |= ((b & 0x7f) as u64) << shift;
+        if b & 0x80 == 0 {
+            break;
+        }
+        shift += 7;
+        if shift >= 35 {
+            return Err(WasmError::InvalidLeb);
+        }
+    }
+    Ok(result as u32)
+}
+
+/// Signed LEB128 (32-bit) from a code stream at `*pc`.
+fn read_i32(code: &[u8], pc: &mut usize) -> Result<i32> {
+    let mut result: i64 = 0;
+    let mut shift = 0;
+    loop {
+        let b = *code.get(*pc).ok_or(WasmError::UnexpectedEof)?;
+        *pc += 1;
+        result |= ((b & 0x7f) as i64) << shift;
+        shift += 7;
+        if b & 0x80 == 0 {
+            if shift < 32 && (b & 0x40) != 0 {
+                result |= -(1i64 << shift);
+            }
+            break;
+        }
+        if shift >= 35 {
+            return Err(WasmError::InvalidLeb);
+        }
+    }
+    Ok(result as i32)
+}
+
+/// Signed LEB128 (64-bit) from a code stream at `*pc`.
+fn read_i64(code: &[u8], pc: &mut usize) -> Result<i64> {
+    let mut result: i64 = 0;
+    let mut shift = 0;
+    loop {
+        let b = *code.get(*pc).ok_or(WasmError::UnexpectedEof)?;
+        *pc += 1;
+        result |= ((b & 0x7f) as i64) << shift;
+        shift += 7;
+        if b & 0x80 == 0 {
+            if shift < 64 && (b & 0x40) != 0 {
+                result |= -(1i64 << shift);
+            }
+            break;
+        }
+        if shift >= 70 {
+            return Err(WasmError::InvalidLeb);
+        }
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
