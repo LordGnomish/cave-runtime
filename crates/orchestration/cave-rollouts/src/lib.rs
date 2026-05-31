@@ -23,6 +23,7 @@
 pub mod analysis;
 pub mod conditions;
 pub mod engine;
+pub mod ephemeral;
 pub mod experiment;
 pub mod models;
 pub mod notifications;
