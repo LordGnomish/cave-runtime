@@ -30,6 +30,7 @@ pub mod parity_self_audit;
 pub mod plugin_sdk;
 pub mod token_bucket;
 pub mod rule;
+pub mod overrides;
 pub mod rule_loader;
 pub mod engine;
 pub mod cli;
