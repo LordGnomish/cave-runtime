@@ -40,8 +40,19 @@ adr_justified_ratio = 1.0        # 9 skipped (vendor/SDK-specific scrape targets
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "a0524eeca91b19eb60d2b02f8a1c0019954e3405"  # v3.3.0 tag sha (prometheus/prometheus)
-last_audit     = "2026-05-28"
+last_audit     = "2026-05-31"
 infra_only     = false
+
+# 2026-05-31 cont3 — strict-TDD depth ports (count-neutral; honest_ratio
+# stays 0.96875 since all three land inside already-mapped subsystems):
+#   * tsdb/compact.go LeveledCompactor.plan + ExponentialBlockRanges →
+#     src/tsdb/planner.rs (overlap-first → range-aligned → tombstone-rewrite).
+#   * promql/quantile.go BucketFraction → fns::histogram_fraction +
+#     engine histogram_fraction(lower, upper, vector) dispatch.
+#   * scrape/scrape.go verifyLabelLimits + limitAppender → src/scrape/limits.rs
+#     (label_limit / label_*_length_limit / sample_limit, stale-NaN exempt),
+#     wired into ScrapeManager (ScrapeConfig gains 4 serde-default fields).
+#   * +27 tests (385 → 412).
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
 #   * 5 [[unmapped]] / [[scope_cuts]] promoted to [[mapped]] via real
@@ -83,6 +94,10 @@ local    = "src/promql/engine.rs"
 upstream = "promql/functions.go"
 local    = "src/promql/functions.rs"
 
+[[files]]
+upstream = "promql/quantile.go"
+local    = "src/promql/functions.rs"  # histogram_quantile + histogram_fraction (cont3)
+
 # TSDB
 
 [[files]]
@@ -100,6 +115,10 @@ local    = "src/tsdb/block.rs"
 [[files]]
 upstream = "tsdb/compact.go"
 local    = "src/tsdb/compaction.rs"
+
+[[files]]
+upstream = "tsdb/compact.go"
+local    = "src/tsdb/planner.rs"  # LeveledCompactor.plan + exponential_block_ranges (cont3)
 
 [[files]]
 upstream = "tsdb/db.go"
@@ -130,6 +149,10 @@ local    = "src/scrape/target.rs"
 [[files]]
 upstream = "scrape/scrape.go"
 local    = "src/scraper.rs"
+
+[[files]]
+upstream = "scrape/scrape.go"
+local    = "src/scrape/limits.rs"  # verifyLabelLimits + limitAppender sample_limit (cont3)
 
 # Rules
 
