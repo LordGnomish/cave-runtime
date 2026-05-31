@@ -386,4 +386,46 @@ mod tests {
         assert_eq!(chunk.object, "chat.completion.chunk");
         assert!(chunk.choices[0].delta.as_ref().unwrap().content.is_some());
     }
+
+    #[test]
+    fn embedding_input_single_and_batch_normalise() {
+        let single: EmbeddingInput = serde_json::from_str("\"hello\"").unwrap();
+        assert_eq!(single.as_vec(), vec!["hello".to_string()]);
+        assert_eq!(single.len(), 1);
+
+        let batch: EmbeddingInput = serde_json::from_str(r#"["a","b","c"]"#).unwrap();
+        assert_eq!(batch.as_vec(), vec!["a", "b", "c"]);
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.is_empty());
+    }
+
+    #[test]
+    fn embedding_request_deserialises_openai_shape() {
+        let req: EmbeddingRequest = serde_json::from_str(
+            r#"{"model":"text-embedding-3-small","input":"hi","dimensions":256}"#,
+        )
+        .unwrap();
+        assert_eq!(req.model, "text-embedding-3-small");
+        assert_eq!(req.input.len(), 1);
+        assert_eq!(req.dimensions, Some(256));
+    }
+
+    #[test]
+    fn embedding_response_serialises_to_openai_list() {
+        let resp = EmbeddingResponse {
+            object: "list".into(),
+            data: vec![EmbeddingData {
+                object: "embedding".into(),
+                embedding: vec![0.1, 0.2, 0.3],
+                index: 0,
+            }],
+            model: "text-embedding-3-small".into(),
+            usage: Usage::new(5, 0),
+        };
+        let v = serde_json::to_value(&resp).unwrap();
+        assert_eq!(v["object"], "list");
+        assert_eq!(v["data"][0]["object"], "embedding");
+        assert_eq!(v["data"][0]["index"], 0);
+        assert_eq!(v["data"][0]["embedding"][1], 0.2);
+    }
 }

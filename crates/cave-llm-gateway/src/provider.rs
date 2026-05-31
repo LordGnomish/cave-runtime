@@ -490,4 +490,43 @@ mod tests {
         assert!(registry.get("my-mock").is_some());
         assert!(registry.get("nonexistent").is_none());
     }
+
+    #[tokio::test]
+    async fn default_provider_embeddings_is_unsupported() {
+        // AnthropicProvider does not override embeddings(); the default trait
+        // method must report the capability as unsupported rather than panic.
+        let p = AnthropicProvider::new(ProviderConfig {
+            name: "anthropic".into(),
+            provider_type: ProviderType::Anthropic,
+            base_url: "https://api.anthropic.com".into(),
+            api_key: Some("x".into()),
+            ..Default::default()
+        });
+        let req = crate::openai::EmbeddingRequest {
+            model: "claude".into(),
+            input: crate::openai::EmbeddingInput::Single("hi".into()),
+            encoding_format: None,
+            dimensions: None,
+            user: None,
+        };
+        let err = p.embeddings(&req).await.unwrap_err();
+        assert!(matches!(err, GatewayError::InvalidRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn mock_provider_embeddings_returns_one_vector_per_input() {
+        let p = MockProvider::new("mock");
+        let req = crate::openai::EmbeddingRequest {
+            model: "mock-embed".into(),
+            input: crate::openai::EmbeddingInput::Batch(vec!["a".into(), "b".into()]),
+            encoding_format: None,
+            dimensions: Some(4),
+            user: None,
+        };
+        let resp = p.embeddings(&req).await.unwrap();
+        assert_eq!(resp.object, "list");
+        assert_eq!(resp.data.len(), 2);
+        assert_eq!(resp.data[0].embedding.len(), 4);
+        assert_eq!(resp.data[1].index, 1);
+    }
 }

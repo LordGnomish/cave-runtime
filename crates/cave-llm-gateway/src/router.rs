@@ -372,6 +372,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn embeddings_dispatch_routes_to_provider() {
+        let router = make_router();
+        let req = crate::openai::EmbeddingRequest {
+            model: "mock-model".into(),
+            input: crate::openai::EmbeddingInput::Single("vectorise me".into()),
+            encoding_format: None,
+            dimensions: Some(8),
+            user: None,
+        };
+        let resp = router.embeddings("user-1", req).await.unwrap();
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].embedding.len(), 8);
+    }
+
+    #[tokio::test]
     async fn fallback_strategy_tries_next_on_failure() {
         let registry = Arc::new(ProviderRegistry::new());
         // Register only "mock", not "broken"
