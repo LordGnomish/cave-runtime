@@ -6,6 +6,8 @@
 //! protocol. The split lets us cover all six MVP backends without bloating
 //! `provider.rs`.
 
+pub mod deepseek;
+pub mod groq;
 pub mod llama_cpp;
 pub mod mistral;
 pub mod mlx;

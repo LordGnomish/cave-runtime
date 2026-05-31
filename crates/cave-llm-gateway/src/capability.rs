@@ -287,6 +287,30 @@ pub fn seed_catalogue() -> Vec<ModelCapability> {
             cost_out_per_1k_micro_usd: 0,
             quality: 68,
         },
+        ModelCapability {
+            provider: "groq".into(),
+            model: "llama-3.3-70b-versatile".into(),
+            locality: Locality::Saas,
+            context_window: 128_000,
+            supports_tools: true,
+            supports_vision: false,
+            supports_json: true,
+            cost_in_per_1k_micro_usd: 590,
+            cost_out_per_1k_micro_usd: 790,
+            quality: 82,
+        },
+        ModelCapability {
+            provider: "deepseek".into(),
+            model: "deepseek-v4-flash".into(),
+            locality: Locality::Saas,
+            context_window: 128_000,
+            supports_tools: true,
+            supports_vision: false,
+            supports_json: true,
+            cost_in_per_1k_micro_usd: 270,
+            cost_out_per_1k_micro_usd: 1_100,
+            quality: 84,
+        },
     ]
 }
 
@@ -312,6 +336,16 @@ mod tests {
         for want in ["anthropic", "openai", "mistral", "ollama", "llamacpp", "mlx"] {
             assert!(providers.contains(want), "missing provider in seed: {}", want);
         }
+    }
+
+    #[test]
+    fn seed_catalogue_covers_groq_and_deepseek() {
+        let providers: std::collections::HashSet<_> = seed_catalogue()
+            .into_iter()
+            .map(|c| c.provider)
+            .collect();
+        assert!(providers.contains("groq"), "missing groq in seed");
+        assert!(providers.contains("deepseek"), "missing deepseek in seed");
     }
 
     #[test]
@@ -376,13 +410,23 @@ mod tests {
     }
 
     #[test]
-    fn router_rank_returns_highest_quality_first_with_no_constraints() {
+    fn router_rank_blends_quality_and_cost_with_no_constraints() {
         let r = seeded_router();
         let req = CapabilityRequest::default();
         let ranked = r.rank(&req);
         assert!(!ranked.is_empty());
-        // claude-opus-4-7 has quality 95 + Saas + low headroom contribution
-        assert_eq!(ranked[0].cap.model, "claude-opus-4-7");
+        // score() is cost-aware: a cheap frontier model (deepseek-v4-flash,
+        // quality 84 + full cost bonus + headroom) outranks the pricier
+        // claude-opus-4-7 (quality 95, zero cost bonus) when nothing constrains
+        // the request. claude-opus still places near the top on raw quality.
+        assert_eq!(ranked[0].cap.model, "deepseek-v4-flash");
+        assert!(
+            ranked
+                .iter()
+                .take(3)
+                .any(|s| s.cap.model == "claude-opus-4-7"),
+            "claude-opus-4-7 should still rank in the top 3 on quality"
+        );
     }
 
     #[test]

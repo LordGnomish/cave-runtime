@@ -220,6 +220,8 @@ impl GatewayRouter {
             } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3")
             {
                 "openai"
+            } else if model.starts_with("deepseek") {
+                "deepseek"
             } else {
                 "local"
             };

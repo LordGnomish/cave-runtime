@@ -132,6 +132,9 @@ pub fn classify_provider(name: &str) -> Option<HermesProviderKind> {
         "mistral" => Some(HermesProviderKind::Mistral),
         "llamacpp" | "llama.cpp" | "llama_cpp" => Some(HermesProviderKind::LlamaCpp),
         "mlx" | "mlx-lm" => Some(HermesProviderKind::Mlx),
+        // Groq & DeepSeek speak the OpenAI wire protocol, so the hermes bridge
+        // treats them as OpenAI-kind clients (no new wire-stable variant).
+        "groq" | "deepseek" => Some(HermesProviderKind::OpenAi),
         _ => None,
     }
 }
@@ -160,6 +163,8 @@ mod tests {
             ("mistral", HermesProviderKind::Mistral),
             ("llamacpp", HermesProviderKind::LlamaCpp),
             ("mlx", HermesProviderKind::Mlx),
+            ("groq", HermesProviderKind::OpenAi),
+            ("deepseek", HermesProviderKind::OpenAi),
         ] {
             assert_eq!(classify_provider(slug), Some(want), "slug={}", slug);
         }

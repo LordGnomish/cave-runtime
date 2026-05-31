@@ -78,6 +78,28 @@ pub fn default_pricing() -> Vec<ModelPricing> {
             input_per_million: 0.80,
             output_per_million: 4.00,
         },
+        // Groq (OpenAI-compat SaaS)
+        ModelPricing {
+            model: "llama-3.3-70b-versatile".into(),
+            input_per_million: 0.59,
+            output_per_million: 0.79,
+        },
+        ModelPricing {
+            model: "llama-3.1-8b-instant".into(),
+            input_per_million: 0.05,
+            output_per_million: 0.08,
+        },
+        // DeepSeek (OpenAI-compat SaaS)
+        ModelPricing {
+            model: "deepseek-v4-flash".into(),
+            input_per_million: 0.27,
+            output_per_million: 1.10,
+        },
+        ModelPricing {
+            model: "deepseek-chat".into(),
+            input_per_million: 0.27,
+            output_per_million: 1.10,
+        },
         // Local / mock — free
         ModelPricing {
             model: "llama3".into(),

@@ -23,14 +23,14 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5319
+honest_ratio         = 0.5532
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-31"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 25
+mapped_count         = 26
 partial_count        = 2
-skipped_count        = 20
+skipped_count        = 19
 unmapped_count       = 0
 total                = 47
 
@@ -142,6 +142,14 @@ local    = "src/bench_wire.rs"
 [[files]]
 upstream = "litellm/budget_manager.py"
 local    = "src/budget.rs"
+
+[[files]]
+upstream = "litellm/llms/groq/chat/transformation.py"
+local    = "src/providers/groq.rs"
+
+[[files]]
+upstream = "litellm/llms/deepseek/chat/transformation.py"
+local    = "src/providers/deepseek.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -275,7 +283,7 @@ kind          = "http"
 upstream_path = "/metrics"
 local_path    = "/metrics"
 
-# ── Mapped subsystems (25) ───────────────────────────────────────────────────
+# ── Mapped subsystems (26) ───────────────────────────────────────────────────
 
 [[mapped]]
 name = "provider-trait"
@@ -354,6 +362,10 @@ notes = "src/budget.rs BudgetManager (port of litellm/budget_manager.py) is wire
 name  = "endpoint-embeddings"
 notes = "POST /v1/embeddings (OpenAI-compat). EmbeddingRequest/Response in openai.rs, LlmProvider::embeddings (default 'unsupported'), OpenAI + local-OpenAI-compat overrides via openai_compat_embeddings, router.embeddings() rate-limit + dispatch. Rerank stays skipped (see endpoint-rerank)."
 
+[[mapped]]
+name  = "provider-groq-deepseek"
+notes = "Groq (src/providers/groq.rs, base https://api.groq.com/openai) + DeepSeek (src/providers/deepseek.rs, base https://api.deepseek.com), both OpenAI-compat SaaS. ProviderType::Groq/DeepSeek dispatch via from_config, seeded in capability catalogue + cost pricing, classified by hermes bridge as OpenAi-kind."
+
 # ── Partial subsystems (2) ───────────────────────────────────────────────────
 # Scaffold present but not yet wired into the live module tree. Both duplicate
 # capabilities already live behind GatewayRouter (cost.rs/cache.rs/logging.rs/
@@ -367,7 +379,7 @@ notes = "src/models.rs defines BudgetScope/RateLimit/RequestLog/CacheEntry but i
 name  = "store-in-memory"
 notes = "src/store.rs LlmGatewayStore depends on the not-yet-wired models module"
 
-# ── Skipped subsystems (20) ──────────────────────────────────────────────────
+# ── Skipped subsystems (19) ──────────────────────────────────────────────────
 # Each row documents a scope cut. Most defer to a dedicated cave-* crate;
 # the rest are MVP-out: image / audio / embeddings / batch / SCIM / SSO.
 
@@ -399,11 +411,6 @@ cut_to = "cave-llm-gateway-phase-2"
 [[skipped]]
 name   = "provider-replicate-huggingface"
 reason = "Replicate + HuggingFace Inference Endpoints — provider matrix Phase 2"
-cut_to = "cave-llm-gateway-phase-2"
-
-[[skipped]]
-name   = "provider-groq-deepseek"
-reason = "Groq + DeepSeek — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
 
 [[skipped]]
@@ -477,8 +484,8 @@ cut_to = "cave-portal-api"
 group   = "cloud-saas-matrix"
 members = ["provider-bedrock", "provider-azure-openai", "provider-vertex-google",
            "provider-cohere", "provider-together-fireworks",
-           "provider-replicate-huggingface", "provider-groq-deepseek"]
-reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plus all three local backends"
+           "provider-replicate-huggingface"]
+reason  = "Phase 2 — bespoke-wire SaaS (Bedrock/Vertex/Cohere/etc.). Groq + DeepSeek shipped (OpenAI-compat, see [[mapped]] provider-groq-deepseek)."
 
 [[scope_cuts]]
 group   = "non-text-endpoints"

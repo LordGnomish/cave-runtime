@@ -92,6 +92,10 @@ pub enum ProviderType {
     Mlx,
     /// Mistral La Plateforme SaaS (OpenAI-compatible).
     Mistral,
+    /// Groq Cloud SaaS (OpenAI-compatible).
+    Groq,
+    /// DeepSeek SaaS (OpenAI-compatible).
+    DeepSeek,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -517,6 +521,10 @@ impl ProviderRegistry {
                 ProviderType::Mlx => Arc::new(crate::providers::mlx::MlxProvider::new(cfg)),
                 ProviderType::Mistral => {
                     Arc::new(crate::providers::mistral::MistralProvider::new(cfg))
+                }
+                ProviderType::Groq => Arc::new(crate::providers::groq::GroqProvider::new(cfg)),
+                ProviderType::DeepSeek => {
+                    Arc::new(crate::providers::deepseek::DeepSeekProvider::new(cfg))
                 }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
