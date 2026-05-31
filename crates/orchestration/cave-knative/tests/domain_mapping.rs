@@ -10,8 +10,9 @@
 
 use cave_knative::broker_controller::ConditionState;
 use cave_knative::domain_mapping::{
-    finalize_kind, reconcile_domain_claim, resolve_ref, ClusterDomainClaim, DomainClaimRegistry,
-    DomainMapping, ResolvedUri,
+    finalize_kind, propagate_ingress_status, reconcile_domain_claim, reconcile_kind, resolve_ref,
+    ClusterDomainClaim, DomainClaimRegistry, DomainMapping, NetworkConfig, ResolvedUri,
+    INGRESS_CLASS_ANNOTATION,
 };
 
 fn dm(name: &str, namespace: &str) -> DomainMapping {
@@ -193,4 +194,123 @@ fn resolve_ref_rejects_cross_namespace_target() {
     let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
     assert!(r.is_err());
     assert!(r.unwrap_err().contains("same namespace"));
+}
+
+// ── Cycle 3: ReconcileKind state machine + Ingress projection + Ready ────────
+
+fn net_cfg() -> NetworkConfig {
+    NetworkConfig {
+        default_external_scheme: "http".to_string(),
+        cluster_domain: CLUSTER_DOMAIN.to_string(),
+        autocreate_cluster_domain_claims: true,
+        default_ingress_class: "istio.ingress.networking.knative.dev".to_string(),
+    }
+}
+
+#[test]
+fn reconcile_kind_sets_url_and_address_to_domain_name() {
+    let mut reg = DomainClaimRegistry::default();
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    let ing = reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg()).expect("ok");
+    assert_eq!(m.status.url.as_deref(), Some("http://example.com"));
+    assert_eq!(m.status.address.as_deref(), Some("http://example.com"));
+    assert_eq!(ing.host, "myapp.team-a.svc.cluster.local");
+    assert_eq!(ing.backend_service, "myapp");
+    assert_eq!(ing.namespace, "team-a");
+    assert_eq!(ing.ingress_class, "istio.ingress.networking.knative.dev");
+}
+
+#[test]
+fn reconcile_kind_honors_ingress_class_annotation_over_default() {
+    let mut reg = DomainClaimRegistry::default();
+    let mut m = dm("example.com", "team-a");
+    m.metadata
+        .annotations
+        .insert(INGRESS_CLASS_ANNOTATION.to_string(), "contour.ingress".to_string());
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    let ing = reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg()).expect("ok");
+    assert_eq!(ing.ingress_class, "contour.ingress");
+}
+
+#[test]
+fn reconcile_kind_leaves_ingress_unconfigured_until_propagated() {
+    let mut reg = DomainClaimRegistry::default();
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg()).expect("ok");
+    // Claim + reference resolved + cert satisfied, but ingress not yet ready.
+    assert!(!m.status.is_ready(), "must not be Ready before ingress propagates");
+    assert!(matches!(
+        m.status.conditions.get("IngressReady"),
+        Some(ConditionState::Unknown)
+    ));
+}
+
+#[test]
+fn reconcile_kind_then_ingress_ready_makes_domain_mapping_ready() {
+    let mut reg = DomainClaimRegistry::default();
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg()).expect("ok");
+    propagate_ingress_status(&mut m, true, true);
+    assert!(m.status.is_ready(), "all gating conditions True => Ready");
+    assert!(matches!(
+        m.status.conditions.get("IngressReady"),
+        Some(ConditionState::True)
+    ));
+}
+
+#[test]
+fn propagate_ingress_status_marks_not_configured_on_generation_skew() {
+    let mut m = dm("example.com", "team-a");
+    // Even if the underlying ingress reports ready, a generation mismatch
+    // means the observed status is stale — defensively not-configured.
+    propagate_ingress_status(&mut m, true, false);
+    assert!(matches!(
+        m.status.conditions.get("IngressReady"),
+        Some(ConditionState::Unknown)
+    ));
+}
+
+#[test]
+fn propagate_ingress_status_marks_not_ready_when_ingress_failed() {
+    let mut m = dm("example.com", "team-a");
+    propagate_ingress_status(&mut m, false, true);
+    assert!(matches!(
+        m.status.conditions.get("IngressReady"),
+        Some(ConditionState::False(_))
+    ));
+    assert!(!m.status.is_ready());
+}
+
+#[test]
+fn reconcile_kind_fails_closed_on_cross_namespace_claim() {
+    let mut reg = DomainClaimRegistry::default();
+    reg.create("example.com", "team-a");
+    let mut m = dm("example.com", "team-b");
+    let resolved = uri("myapp.team-b.svc.cluster.local", "");
+    let r = reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg());
+    assert!(r.is_err(), "cross-ns claim must abort reconcile");
+    // URL/Address are still published, but DomainClaimed is False and not Ready.
+    assert_eq!(m.status.url.as_deref(), Some("http://example.com"));
+    assert!(matches!(
+        m.status.conditions.get("DomainClaimed"),
+        Some(ConditionState::False(_))
+    ));
+    assert!(!m.status.is_ready());
+}
+
+#[test]
+fn reconcile_kind_byo_tls_secret_marks_certificate_satisfied() {
+    let mut reg = DomainClaimRegistry::default();
+    let mut m = dm("example.com", "team-a");
+    m.spec.tls_secret = Some("my-cert".to_string());
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    let ing = reconcile_kind(&mut m, &resolved, &mut reg, &net_cfg()).expect("ok");
+    assert!(ing.tls, "BYO secret => ingress carries TLS");
+    assert!(matches!(
+        m.status.conditions.get("CertificateProvisioned"),
+        Some(ConditionState::True)
+    ));
 }
