@@ -34,6 +34,12 @@ url           = "https://github.com/bitnami-labs/sealed-secrets"
 role          = "GitOps-safe encrypted-Secret CRD with RSA-OAEP+AES-GCM hybrid envelope"
 
 [parity]
+# 2026-05-31 cont2 honest uplift (honest_ratio 0.5625→0.5833):
+#   * +1 mapped / −1 skipped: openbao:plugins/ plugin catalog registry layer
+#     (src/plugins/mod.rs) promoted skipped→mapped via 3 strict-TDD cycles
+#     (set/get/delete+sha256+parent-ref / builtin-fallback+list / version
+#     selection+list_versions). External-process runner + go-plugin gRPC stay
+#     scope_cut (no in-crate subprocess exec). Wired sys route + cavectl.
 # 2026-05-23 Charter v2 triumvirate close:
 #   * +6 mapped: ESO SecretStore/ExternalSecret/PushSecret/providers/reconciler
 #     (src/external_secrets/) + Sealed Secrets types/crypto/controller
@@ -41,14 +47,14 @@ role          = "GitOps-safe encrypted-Secret CRD with RSA-OAEP+AES-GCM hybrid e
 #   * +4 skipped: ESO continuous-reconciler informer + helm-chart-bootstrap +
 #     kubeseal CLI + sealed-secrets prom exporter (k8s-controller-runtime &
 #     CLI ownership).
-mapped_count   = 27
+mapped_count   = 28
 partial_count  = 0
-skipped_count  = 21
+skipped_count  = 20
 unmapped_count = 0
 total          = 48
 fill_ratio     = 1.0000
-honest_ratio   = 0.5625
-last_audit     = "2026-05-23"
+honest_ratio   = 0.5833
+last_audit     = "2026-05-31"
 parity_ratio_source = "manifest"
 infra_only     = false
 
@@ -463,7 +469,8 @@ upstream_pkg = "openbao:physical/{file,inmem,raft}/"
 local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs", "src/storage/raft.rs"]
 note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, path-traversal guarded) + in-memory backend + Raft-replicated backend (append-only log w/ term + index, propose/commit/apply pipeline, vote per Raft §5.1, snapshot install + log replay, idempotent delete, configurable inner state-machine Backend). Remaining backends (s3/consul/etcd/gcs/postgresql) tracked as unmapped."
 
-# ─── Skipped (11) ───────────────────────────────────────────────────────────
+# ─── Skipped (10) ───────────────────────────────────────────────────────────
+# 2026-05-31 cont2: openbao:plugins/ promoted skipped→mapped (catalog layer).
 
 [[skipped]]
 upstream_pkg = "openbao:ui/"
@@ -474,11 +481,6 @@ note         = "Ember.js frontend; cave-portal serves the UI via admin/vault/"
 upstream_pkg = "openbao:command/"
 reason       = "CLI"
 note         = "vault CLI; cavectl exposes equivalent surface"
-
-[[skipped]]
-upstream_pkg = "openbao:plugins/"
-reason       = "go-bootstrap"
-note         = "External plugin loading — not yet in scope"
 
 [[skipped]]
 upstream_pkg = "openbao:scripts/"
@@ -527,6 +529,13 @@ note         = "Generic JWT bearer auth method — bound issuer/subject/audience
 upstream_pkg = "openbao:vault/{namespaces,quotas}/"
 local_files  = ["src/lib.rs", "src/core/quota.rs"]
 note         = "Multi-tenant namespaces (NamespaceStore in lib.rs — id/path/tenant_id, canonicalise, reserved-path validation) + quota subsystem (rate-limit token-bucket + lease-count cap, namespace-scoped). Wave-3 promotion 2026-05-19."
+
+# ─── 2026-05-31 cont2 promotion: 1 [[mapped]] (formerly [[skipped]]) ────────
+
+[[mapped]]
+upstream_pkg = "openbao:plugins/ (vault/plugin_catalog.go + sdk/helper/consts/plugin_types.go)"
+local_files  = ["src/plugins/mod.rs"]
+note         = "Plugin catalog registry/data layer — PluginType (iota-faithful auth/database/secret/unknown String() + ParsePluginType), PluginRunner, SetPluginInput, PluginCatalog set/get/delete/list/list_versions. Set guards \"..\" parent-refs (consts.ErrPathContainsParentReferences) + sha256 hex (min 8 chars/4 bytes); storage keys namespaced `<type>/<name>[/<version>]`; Get falls back to the builtin registry (external unversioned shadows builtin); list/list_versions merge+dedup+semver-sort. Wired /v1/sys/plugins/catalog/{type}[/{name}] (GET/POST/DELETE) + cavectl `vault plugin {list,info,register,deregister}`. SCOPE_CUT remainder: the external-process runner (os/exec of the plugin binary from a plugin dir) + go-plugin gRPC multiplexing stay out — cave-runtime does not exec arbitrary binaries; the catalog is what mount resolution consults, so the registry itself is in-crate. cont2 2026-05-31."
 
 # ─── 2026-05-19 wave-3 scope cuts: 6 [[skipped]] (formerly [[unmapped]]) ────
 

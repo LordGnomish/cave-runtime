@@ -4,6 +4,29 @@
 **Branch:** `claude/cave-vault-eso-sealed-2026-05-23`  
 **Status:** 1.0000 fill ratio, 8/8 Charter v2 gates GREEN.
 
+## 2026-05-31 cont2 honest uplift (honest_ratio 0.5625 → 0.5833)
+
+- Promoted **`openbao:plugins/`** skipped → mapped: ported the plugin-catalog
+  registry/data layer (`vault/plugin_catalog.go` + `sdk/helper/consts/plugin_types.go`)
+  into `src/plugins/mod.rs` via 3 strict-TDD cycles — `PluginType`
+  (iota-faithful `auth`/`database`/`secret`/`unknown` + `ParsePluginType`),
+  `PluginRunner`, `SetPluginInput`, and `PluginCatalog` (`set`/`get`/`delete`/
+  `list`/`list_versions`). `set` guards `..` parent-refs and validates sha256
+  hex; storage keys are type-namespaced `<type>/<name>[/<version>]`; `get`
+  falls back to the builtin registry (external unversioned shadows builtin);
+  `list`/`list_versions` merge+dedup+semver-sort.
+- **scope_cut remainder:** the external-process runner (os/exec of a plugin
+  binary from a plugin dir) + go-plugin gRPC multiplexing stay out of crate —
+  cave-runtime does not exec arbitrary binaries. The catalog is what mount
+  resolution consults, so the registry itself is in-crate.
+- Wired `/v1/sys/plugins/catalog/{type}[/{name}]` (GET/POST/DELETE) +
+  `cavectl vault plugin {list,info,register,deregister}`.
+- Counts: mapped 27 → 28, skipped 21 → 20, total 48 (unchanged).
+- Maintenance: brought the stale `tests/parity_self_audit.rs` back in line with
+  the live manifest (the wave-4 v2.5.3→v2.5.4 bump + placeholder→real-SHA swap
+  had left gates 1/2/5/9 literal-matching old strings; gate_7 false-positived on
+  the scanner's own macro-name literals). 9/9 gates GREEN.
+
 ## Triumvirate upstreams
 
 | Role | Upstream | Version | License | source_sha |

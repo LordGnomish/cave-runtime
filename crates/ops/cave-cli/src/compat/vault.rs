@@ -51,6 +51,11 @@ pub enum VaultCmd {
         #[command(subcommand)]
         cmd: TokenCmd,
     },
+    /// `vault plugin list|info|register|deregister`
+    Plugin {
+        #[command(subcommand)]
+        cmd: PluginCmd,
+    },
     /// `vault login -method=...`
     Login {
         #[arg(long = "method", default_value = "token")]
@@ -148,6 +153,29 @@ pub enum TokenCmd {
     },
 }
 
+#[derive(Subcommand, Debug, Clone)]
+pub enum PluginCmd {
+    /// `vault plugin list <type>`
+    List { plugin_type: String },
+    /// `vault plugin info <type> <name>`
+    Info { plugin_type: String, name: String },
+    /// `vault plugin register -sha256=.. -command=.. <type> <name>`
+    Register {
+        plugin_type: String,
+        name: String,
+        #[arg(long)]
+        command: String,
+        #[arg(long)]
+        sha256: String,
+        #[arg(long)]
+        version: Option<String>,
+    },
+    /// `vault plugin deregister <type> <name>`
+    Deregister { plugin_type: String, name: String },
+}
+
+const PLUGIN_TYPES: &[&str] = &["auth", "database", "secret"];
+
 const AUTH_KINDS: &[&str] = &["token", "userpass", "approle", "kubernetes", "ldap", "oidc"];
 const SECRETS_KINDS: &[&str] = &[
     "kv", "pki", "transit", "ssh", "totp", "database", "aws", "azure", "gcp",
@@ -171,6 +199,7 @@ pub fn prepare(cmd: &VaultCmd) -> Result<PreparedRequest> {
         VaultCmd::Secrets { cmd } => prepare_secrets(cmd),
         VaultCmd::Policy { cmd } => prepare_policy(cmd),
         VaultCmd::Token { cmd } => prepare_token(cmd),
+        VaultCmd::Plugin { cmd } => prepare_plugin(cmd),
         VaultCmd::Login { method, params } => {
             if !LOGIN_METHODS.contains(&method.as_str()) {
                 bail!(
@@ -342,6 +371,66 @@ fn prepare_policy(cmd: &PolicyCmd) -> Result<PreparedRequest> {
             HttpVerb::Delete,
             format!("/api/compat/vault/v1/sys/policy/{}", name),
         )),
+    }
+}
+
+fn check_plugin_type(t: &str) -> Result<()> {
+    if !PLUGIN_TYPES.contains(&t) {
+        bail!("unknown plugin type `{}`; want one of {:?}", t, PLUGIN_TYPES);
+    }
+    Ok(())
+}
+
+fn prepare_plugin(cmd: &PluginCmd) -> Result<PreparedRequest> {
+    match cmd {
+        PluginCmd::List { plugin_type } => {
+            check_plugin_type(plugin_type)?;
+            Ok(PreparedRequest::new(
+                HttpVerb::Get,
+                format!("/api/compat/vault/v1/sys/plugins/catalog/{}", plugin_type),
+            ))
+        }
+        PluginCmd::Info { plugin_type, name } => {
+            check_plugin_type(plugin_type)?;
+            Ok(PreparedRequest::new(
+                HttpVerb::Get,
+                format!(
+                    "/api/compat/vault/v1/sys/plugins/catalog/{}/{}",
+                    plugin_type, name
+                ),
+            ))
+        }
+        PluginCmd::Register {
+            plugin_type,
+            name,
+            command,
+            sha256,
+            version,
+        } => {
+            check_plugin_type(plugin_type)?;
+            let mut body = json!({ "command": command, "sha256": sha256 });
+            if let Some(v) = version {
+                body["version"] = json!(v);
+            }
+            Ok(PreparedRequest::new(
+                HttpVerb::Post,
+                format!(
+                    "/api/compat/vault/v1/sys/plugins/catalog/{}/{}",
+                    plugin_type, name
+                ),
+            )
+            .with_body(body))
+        }
+        PluginCmd::Deregister { plugin_type, name } => {
+            check_plugin_type(plugin_type)?;
+            Ok(PreparedRequest::new(
+                HttpVerb::Delete,
+                format!(
+                    "/api/compat/vault/v1/sys/plugins/catalog/{}/{}",
+                    plugin_type, name
+                ),
+            ))
+        }
     }
 }
 
