@@ -10,7 +10,8 @@
 
 use cave_knative::broker_controller::ConditionState;
 use cave_knative::domain_mapping::{
-    reconcile_domain_claim, finalize_kind, ClusterDomainClaim, DomainClaimRegistry, DomainMapping,
+    finalize_kind, reconcile_domain_claim, resolve_ref, ClusterDomainClaim, DomainClaimRegistry,
+    DomainMapping, ResolvedUri,
 };
 
 fn dm(name: &str, namespace: &str) -> DomainMapping {
@@ -118,4 +119,78 @@ fn finalize_does_not_delete_other_namespaces_claim() {
         reg.get("example.com").is_some(),
         "must never delete a claim owned by another namespace"
     );
+}
+
+// ── Cycle 2: resolveRef — KReference → service DNS resolution ───────────────
+
+const CLUSTER_DOMAIN: &str = "cluster.local";
+
+fn uri(host: &str, path: &str) -> ResolvedUri {
+    ResolvedUri {
+        host: host.to_string(),
+        path: path.to_string(),
+        scheme: "http".to_string(),
+    }
+}
+
+#[test]
+fn resolve_ref_extracts_backend_service_from_cluster_dns() {
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "");
+    let (host, backend) = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN).expect("should resolve");
+    assert_eq!(host, "myapp.team-a.svc.cluster.local");
+    assert_eq!(backend, "myapp", "backend service is the name component");
+    assert!(matches!(
+        m.status.conditions.get("ReferenceResolved"),
+        Some(cave_knative::broker_controller::ConditionState::True)
+    ));
+}
+
+#[test]
+fn resolve_ref_rejects_target_with_a_path() {
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "/sub");
+    let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
+    assert!(r.is_err());
+    assert!(r.unwrap_err().contains("contains a path"));
+    assert!(matches!(
+        m.status.conditions.get("ReferenceResolved"),
+        Some(cave_knative::broker_controller::ConditionState::False(_))
+    ));
+}
+
+#[test]
+fn resolve_ref_treats_bare_trailing_slash_as_no_path() {
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.svc.cluster.local", "/");
+    let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
+    assert!(r.is_ok(), "a lone trailing slash is not a path: {r:?}");
+}
+
+#[test]
+fn resolve_ref_rejects_non_service_suffix() {
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-a.example.org", "");
+    let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
+    assert!(r.is_err());
+    assert!(r.unwrap_err().contains("must be of the form"));
+}
+
+#[test]
+fn resolve_ref_rejects_host_with_extra_labels() {
+    // {name}.{namespace} must be exactly two labels before .svc.<domain>.
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("a.b.team-a.svc.cluster.local", "");
+    let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
+    assert!(r.is_err());
+    assert!(r.unwrap_err().contains("must be of the form"));
+}
+
+#[test]
+fn resolve_ref_rejects_cross_namespace_target() {
+    let mut m = dm("example.com", "team-a");
+    let resolved = uri("myapp.team-b.svc.cluster.local", "");
+    let r = resolve_ref(&mut m, &resolved, CLUSTER_DOMAIN);
+    assert!(r.is_err());
+    assert!(r.unwrap_err().contains("same namespace"));
 }
