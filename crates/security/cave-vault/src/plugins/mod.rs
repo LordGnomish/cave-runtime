@@ -184,6 +184,45 @@ impl PluginCatalog {
         None
     }
 
+    /// Register a builtin backend. Builtins carry no command/sha256 and are
+    /// only consulted as a [`get`](Self::get) fallback. Mirrors
+    /// `c.builtinRegistry.Get(name, pluginType)`.
+    pub fn register_builtin(&mut self, name: &str, plugin_type: PluginType) {
+        self.builtins.insert(
+            Self::builtin_key(plugin_type, name),
+            PluginRunner {
+                name: name.to_string(),
+                plugin_type,
+                version: String::new(),
+                command: String::new(),
+                args: vec![],
+                env: vec![],
+                sha256: vec![],
+                builtin: true,
+                oci: false,
+            },
+        );
+    }
+
+    /// Sorted, de-duplicated union of external + builtin plugin names of a
+    /// single type. Mirrors `PluginCatalog.List` (external shadows builtin, so
+    /// a name present in both appears once).
+    pub fn list(&self, plugin_type: PluginType) -> Vec<String> {
+        let prefix = format!("{}/", plugin_type.as_str());
+        let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for runner in self.builtins.values() {
+            if runner.plugin_type == plugin_type {
+                names.insert(runner.name.clone());
+            }
+        }
+        for (key, runner) in &self.external {
+            if key.starts_with(&prefix) {
+                names.insert(runner.name.clone());
+            }
+        }
+        names.into_iter().collect()
+    }
+
     /// Remove an external registration, returning it if present.
     pub fn delete(
         &mut self,
