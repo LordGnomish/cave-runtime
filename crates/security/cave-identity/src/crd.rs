@@ -2,6 +2,305 @@
 // NOTICE: upstream is spiffe/spire (Apache-2.0) — spire-controller-manager.
 // ClusterSPIFFEID + ClusterFederatedTrustDomain reconcile line-ported from
 // github.com/spiffe/spire-controller-manager pkg/spireentry + pkg/reconciler.
+//
+//! spire-controller-manager parity — the Kubernetes operator that turns
+//! `ClusterSPIFFEID` and `ClusterFederatedTrustDomain` custom resources into
+//! SPIRE registration entries and federation relationships.
+//!
+//! The CRD-watch / informer / apply loop is owned by cave-cri / cave-k8s; this
+//! module ports the **pure reconcile core**: label-selector matching
+//! (`metav1.LabelSelector` semantics), the Go-`text/template` SPIFFE-ID +
+//! DNS-name rendering subset used by the controller, and the
+//! CR → [`RegistrationEntry`] / [`FederationRelationship`] projection with the
+//! same validation the upstream `validateFederatedTrustDomain` performs.
+
+use crate::error::{IdentityError, Result};
+use crate::models::{
+    BundleEndpointProfile, FederationRelationship, RegistrationEntry, Selector, SpiffeId,
+    TrustDomain,
+};
+use std::collections::BTreeMap;
+
+/// `metav1.LabelSelectorOperator`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelSelectorOp {
+    In,
+    NotIn,
+    Exists,
+    DoesNotExist,
+}
+
+/// `metav1.LabelSelectorRequirement` — a single set-based match expression.
+#[derive(Debug, Clone)]
+pub struct LabelSelectorRequirement {
+    pub key: String,
+    pub operator: LabelSelectorOp,
+    pub values: Vec<String>,
+}
+
+impl LabelSelectorRequirement {
+    fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
+        let present = labels.get(&self.key);
+        match self.operator {
+            LabelSelectorOp::In => present.map(|v| self.values.contains(v)).unwrap_or(false),
+            // NotIn is satisfied when the key is absent OR its value is not listed.
+            LabelSelectorOp::NotIn => present.map(|v| !self.values.contains(v)).unwrap_or(true),
+            LabelSelectorOp::Exists => present.is_some(),
+            LabelSelectorOp::DoesNotExist => present.is_none(),
+        }
+    }
+}
+
+/// `metav1.LabelSelector` — `matchLabels` AND `matchExpressions`.
+///
+/// An empty selector (no labels, no expressions) matches every object, mirroring
+/// `labels.Everything()` in client-go.
+#[derive(Debug, Clone, Default)]
+pub struct LabelSelector {
+    pub match_labels: BTreeMap<String, String>,
+    pub match_expressions: Vec<LabelSelectorRequirement>,
+}
+
+impl LabelSelector {
+    /// True when every `matchLabels` pair AND every `matchExpressions`
+    /// requirement is satisfied by `labels`.
+    pub fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
+        for (k, v) in &self.match_labels {
+            if labels.get(k) != Some(v) {
+                return false;
+            }
+        }
+        self.match_expressions.iter().all(|r| r.matches(labels))
+    }
+}
+
+/// Minimal pod metadata the controller reads to render templates + bind
+/// selectors — the subset of `corev1.Pod` `ObjectMeta` + `PodSpec` used by
+/// `spire-controller-manager`.
+#[derive(Debug, Clone, Default)]
+pub struct PodMeta {
+    pub namespace: String,
+    pub name: String,
+    pub uid: String,
+    pub service_account: String,
+    pub node_name: String,
+    pub labels: BTreeMap<String, String>,
+    pub annotations: BTreeMap<String, String>,
+}
+
+/// Render context exposed to the Go-`text/template` SPIFFE-ID template — the
+/// `.TrustDomain`, `.PodMeta.*`, `.PodSpec.*` roots the controller documents.
+pub struct TemplateContext<'a> {
+    pub trust_domain: &'a TrustDomain,
+    pub pod: &'a PodMeta,
+}
+
+impl<'a> TemplateContext<'a> {
+    pub fn new(trust_domain: &'a TrustDomain, pod: &'a PodMeta) -> Self {
+        Self { trust_domain, pod }
+    }
+}
+
+/// Render a `spire-controller-manager` ID/DNS template against `ctx`.
+///
+/// Supports the documented subset of Go `text/template` the controller uses:
+/// `{{ .Field.Path }}` dotted-field access and `{{ index .Map "key" }}` map
+/// lookups (labels / annotations). An unknown field or a missing map key is an
+/// error — matching the controller's behaviour with `missingkey=error`.
+pub fn render_template(tmpl: &str, ctx: &TemplateContext) -> Result<String> {
+    let mut out = String::with_capacity(tmpl.len());
+    let mut rest = tmpl;
+    while let Some(open) = rest.find("{{") {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 2..];
+        let close = after
+            .find("}}")
+            .ok_or_else(|| IdentityError::Internal("unterminated template action".into()))?;
+        let expr = after[..close].trim();
+        out.push_str(&eval_action(expr, ctx)?);
+        rest = &after[close + 2..];
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
+fn eval_action(expr: &str, ctx: &TemplateContext) -> Result<String> {
+    if let Some(args) = expr.strip_prefix("index ") {
+        // `index .PodMeta.Labels "key"` / `index .PodMeta.Annotations "key"`
+        let args = args.trim();
+        let q1 = args
+            .find('"')
+            .ok_or_else(|| IdentityError::Internal(format!("index: missing key in {expr:?}")))?;
+        let path = args[..q1].trim();
+        let key_part = &args[q1 + 1..];
+        let q2 = key_part
+            .find('"')
+            .ok_or_else(|| IdentityError::Internal(format!("index: unterminated key in {expr:?}")))?;
+        let key = &key_part[..q2];
+        let map = match path {
+            ".PodMeta.Labels" => &ctx.pod.labels,
+            ".PodMeta.Annotations" => &ctx.pod.annotations,
+            other => {
+                return Err(IdentityError::Internal(format!(
+                    "index: unknown map {other:?}"
+                )))
+            }
+        };
+        return map
+            .get(key)
+            .cloned()
+            .ok_or_else(|| IdentityError::Internal(format!("index: key {key:?} not found")));
+    }
+    resolve_field(expr, ctx)
+}
+
+fn resolve_field(path: &str, ctx: &TemplateContext) -> Result<String> {
+    let v = match path {
+        ".TrustDomain" => ctx.trust_domain.as_str().to_string(),
+        ".PodMeta.Namespace" => ctx.pod.namespace.clone(),
+        ".PodMeta.Name" => ctx.pod.name.clone(),
+        ".PodMeta.UID" => ctx.pod.uid.clone(),
+        ".PodMeta.ServiceAccount" => ctx.pod.service_account.clone(),
+        ".PodMeta.NodeName" => ctx.pod.node_name.clone(),
+        ".PodSpec.ServiceAccountName" => ctx.pod.service_account.clone(),
+        ".PodSpec.NodeName" => ctx.pod.node_name.clone(),
+        other => {
+            return Err(IdentityError::Internal(format!(
+                "unknown template field {other:?}"
+            )))
+        }
+    };
+    Ok(v)
+}
+
+/// `ClusterSPIFFEID` custom-resource spec (the reconcile-relevant subset).
+#[derive(Debug, Clone)]
+pub struct ClusterSpiffeId {
+    pub name: String,
+    pub spiffe_id_template: String,
+    pub parent_id: SpiffeId,
+    pub pod_selector: LabelSelector,
+    pub namespace_selector: LabelSelector,
+    pub ttl_seconds: u32,
+    pub jwt_ttl_seconds: u32,
+    pub dns_name_templates: Vec<String>,
+    pub federates_with: Vec<TrustDomain>,
+    pub admin: bool,
+    pub downstream: bool,
+    pub hint: Option<String>,
+}
+
+/// Binding selectors the controller attaches so the entry resolves only for
+/// the specific pod — mirrors the `k8s` workload-attestor selector set.
+fn pod_binding_selectors(pod: &PodMeta) -> Vec<Selector> {
+    let mut v = vec![
+        Selector::new("k8s", format!("ns:{}", pod.namespace)),
+        Selector::new("k8s", format!("pod-uid:{}", pod.uid)),
+        Selector::new("k8s", format!("pod-name:{}", pod.name)),
+        Selector::new("k8s", format!("sa:{}", pod.service_account)),
+    ];
+    if !pod.node_name.is_empty() {
+        v.push(Selector::new("k8s", format!("node-name:{}", pod.node_name)));
+    }
+    v
+}
+
+/// Reconcile a `ClusterSPIFFEID` against the cluster's pods, producing one
+/// [`RegistrationEntry`] per pod that matches both the pod- and
+/// namespace-label selectors.
+///
+/// `pods` is the candidate set as `(pod, namespace_labels)` pairs — the
+/// controller pre-joins each pod with its namespace's labels so the
+/// `namespaceSelector` can be evaluated.
+pub fn reconcile_cluster_spiffe_id(
+    trust_domain: &TrustDomain,
+    cr: &ClusterSpiffeId,
+    pods: &[(PodMeta, BTreeMap<String, String>)],
+) -> Result<Vec<RegistrationEntry>> {
+    let mut entries = Vec::new();
+    for (pod, ns_labels) in pods {
+        if !cr.pod_selector.matches(&pod.labels) {
+            continue;
+        }
+        if !cr.namespace_selector.matches(ns_labels) {
+            continue;
+        }
+        let ctx = TemplateContext::new(trust_domain, pod);
+        let spiffe_id = SpiffeId::new(render_template(&cr.spiffe_id_template, &ctx)?);
+        let mut dns_names = Vec::with_capacity(cr.dns_name_templates.len());
+        for t in &cr.dns_name_templates {
+            dns_names.push(render_template(t, &ctx)?);
+        }
+        entries.push(RegistrationEntry {
+            spiffe_id,
+            parent_id: cr.parent_id.clone(),
+            selectors: pod_binding_selectors(pod),
+            ttl_seconds: cr.ttl_seconds,
+            x509_svid_ttl_seconds: cr.ttl_seconds,
+            jwt_svid_ttl_seconds: cr.jwt_ttl_seconds,
+            federates_with: cr.federates_with.clone(),
+            admin: cr.admin,
+            downstream: cr.downstream,
+            dns_names,
+            hint: cr.hint.clone(),
+            ..Default::default()
+        });
+    }
+    Ok(entries)
+}
+
+/// `ClusterFederatedTrustDomain` custom-resource spec.
+#[derive(Debug, Clone)]
+pub struct ClusterFederatedTrustDomain {
+    pub name: String,
+    pub trust_domain: TrustDomain,
+    pub bundle_endpoint_url: String,
+    pub bundle_endpoint_profile: BundleEndpointProfile,
+}
+
+/// Reconcile a `ClusterFederatedTrustDomain` into a [`FederationRelationship`].
+///
+/// Applies the same validation `spire-controller-manager`'s
+/// `ParseClusterFederatedTrustDomainSpec` does: the peer trust domain must
+/// differ from our own, the bundle endpoint URL must be HTTPS, and for the
+/// `https_spiffe` profile the endpoint SPIFFE ID must belong to the peer
+/// trust domain.
+pub fn reconcile_federated_trust_domain(
+    own: &TrustDomain,
+    cr: &ClusterFederatedTrustDomain,
+) -> Result<FederationRelationship> {
+    if cr.trust_domain.as_str() == own.as_str() {
+        return Err(IdentityError::FederationInvalid(
+            "cannot federate with own trust domain".into(),
+        ));
+    }
+    if !cr.bundle_endpoint_url.starts_with("https://") {
+        return Err(IdentityError::FederationInvalid(format!(
+            "bundle endpoint URL must be https: {}",
+            cr.bundle_endpoint_url
+        )));
+    }
+    if let BundleEndpointProfile::HttpsSpiffe { endpoint_spiffe_id } = &cr.bundle_endpoint_profile {
+        let expected = cr.trust_domain.id_string();
+        let belongs = endpoint_spiffe_id.as_str() == expected
+            || endpoint_spiffe_id
+                .as_str()
+                .starts_with(&format!("{expected}/"));
+        if !belongs {
+            return Err(IdentityError::FederationInvalid(format!(
+                "endpoint SPIFFE ID {} not in trust domain {}",
+                endpoint_spiffe_id,
+                cr.trust_domain.as_str()
+            )));
+        }
+    }
+    Ok(FederationRelationship {
+        trust_domain: cr.trust_domain.clone(),
+        bundle_endpoint_url: cr.bundle_endpoint_url.clone(),
+        bundle_endpoint_profile: cr.bundle_endpoint_profile.clone(),
+        trust_domain_bundle: None,
+    })
+}
 
 #[cfg(test)]
 mod tests {
