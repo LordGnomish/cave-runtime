@@ -8,7 +8,7 @@
 
 use crate::error::Result;
 use crate::observability;
-use crate::rule_loader;
+use crate::{engine, falcoctl, rule_loader};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FalcoSubcommand {
@@ -18,6 +18,11 @@ pub enum FalcoSubcommand {
     RulesListBuiltin,
     /// `cavectl falco observability` — print panels + alert YAML.
     Observability,
+    /// `cavectl falco operators` — list the supported filter operators.
+    Operators,
+    /// `cavectl falco artifact-resolve --index <index.yaml> --ref <name>` —
+    /// resolve a falcoctl artifact reference against an index.
+    ArtifactResolve { index: String, reference: String },
     /// `cavectl falco version` — print crate + upstream version.
     Version,
 }
@@ -43,6 +48,16 @@ pub fn dispatch(cmd: FalcoSubcommand) -> Result<String> {
             out.push_str("\n# Alert rules\n");
             out.push_str(&observability::alert_rules_yaml());
             Ok(out)
+        }
+        FalcoSubcommand::Operators => {
+            Ok(format!("supported filter operators: {}\n", engine::supported_operators().join(" ")))
+        }
+        FalcoSubcommand::ArtifactResolve { index, reference } => {
+            let body = std::fs::read_to_string(&index)
+                .map_err(|e| crate::error::FalcoError::Internal(format!("read {index}: {e}")))?;
+            let idx = falcoctl::Index::from_yaml("cli", &body)?;
+            let resolved = idx.resolve_reference(&reference)?;
+            Ok(format!("{resolved}\n"))
         }
         FalcoSubcommand::Version => Ok("cave-falco upstream falcosecurity/falco@0.43.1\n".into()),
     }
@@ -74,6 +89,36 @@ mod tests {
     #[test]
     fn rules_parse_unreadable_path_errors() {
         let r = dispatch(FalcoSubcommand::RulesParse { path: "/no/such/path-cave-falco-test".into() });
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn operators_lists_filter_ops() {
+        let out = dispatch(FalcoSubcommand::Operators).unwrap();
+        assert!(out.contains("regex"));
+        assert!(out.contains("pmatch"));
+        assert!(out.contains("intersects"));
+    }
+
+    #[test]
+    fn artifact_resolve_reads_index_and_resolves() {
+        let mut f = std::env::temp_dir();
+        f.push("cave-falco-cli-index.yaml");
+        std::fs::write(&f, "- name: cloudtrail\n  type: plugin\n  registry: ghcr.io\n  repository: falcosecurity/plugins/cloudtrail\n").unwrap();
+        let out = dispatch(FalcoSubcommand::ArtifactResolve {
+            index: f.to_string_lossy().into_owned(),
+            reference: "cloudtrail:0.5.1".into(),
+        }).unwrap();
+        assert_eq!(out.trim(), "ghcr.io/falcosecurity/plugins/cloudtrail:0.5.1");
+        let _ = std::fs::remove_file(&f);
+    }
+
+    #[test]
+    fn artifact_resolve_missing_index_errors() {
+        let r = dispatch(FalcoSubcommand::ArtifactResolve {
+            index: "/no/such/index-cave-falco.yaml".into(),
+            reference: "x".into(),
+        });
         assert!(r.is_err());
     }
 }

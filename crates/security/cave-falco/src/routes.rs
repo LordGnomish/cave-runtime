@@ -10,7 +10,7 @@
 //! - `POST /api/falco/rules/parse`                 — parse a YAML rule pack body
 
 use crate::observability;
-use crate::rule_loader;
+use crate::{engine, falcoctl, rule_loader};
 use axum::{routing::{get, post}, Json, Router};
 
 pub fn router() -> Router {
@@ -19,6 +19,8 @@ pub fn router() -> Router {
         .route("/api/falco/observability/panels", get(panels))
         .route("/api/falco/observability/alerts", get(alerts))
         .route("/api/falco/rules/parse", post(parse_rules))
+        .route("/api/falco/operators", get(operators))
+        .route("/api/falco/artifact/resolve", post(resolve_artifact))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -45,6 +47,27 @@ async fn parse_rules(body: String) -> Json<serde_json::Value> {
             "macros": pack.macros.len(),
             "lists": pack.lists.len(),
         })),
+        Err(e) => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+    }
+}
+
+async fn operators() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "operators": engine::supported_operators() }))
+}
+
+#[derive(serde::Deserialize)]
+struct ResolveBody {
+    index_yaml: String,
+    #[serde(rename = "ref")]
+    reference: String,
+}
+
+/// POST body `{ "index_yaml": "<index.yaml>", "ref": "cloudtrail:0.5.1" }`.
+async fn resolve_artifact(Json(b): Json<ResolveBody>) -> Json<serde_json::Value> {
+    let result = falcoctl::Index::from_yaml("api", &b.index_yaml)
+        .and_then(|idx| idx.resolve_reference(&b.reference));
+    match result {
+        Ok(reference) => Json(serde_json::json!({ "ok": true, "ref": reference })),
         Err(e) => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
     }
 }
@@ -91,5 +114,24 @@ mod tests {
     async fn parse_rules_rejects_bad_yaml() {
         let Json(v) = parse_rules("[not-yaml".into()).await;
         assert_eq!(v["ok"], false);
+    }
+
+    #[tokio::test]
+    async fn operators_lists_grammar() {
+        let Json(v) = operators().await;
+        let ops = v["operators"].as_array().unwrap();
+        assert!(ops.iter().any(|o| o == "regex"));
+        assert!(ops.iter().any(|o| o == "pmatch"));
+    }
+
+    #[tokio::test]
+    async fn resolve_artifact_resolves_index_ref() {
+        let body = ResolveBody {
+            index_yaml: "- name: cloudtrail\n  type: plugin\n  registry: ghcr.io\n  repository: falcosecurity/plugins/cloudtrail\n".into(),
+            reference: "cloudtrail".into(),
+        };
+        let Json(v) = resolve_artifact(Json(body)).await;
+        assert_eq!(v["ok"], true);
+        assert_eq!(v["ref"], "ghcr.io/falcosecurity/plugins/cloudtrail:latest");
     }
 }

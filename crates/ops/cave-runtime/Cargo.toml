@@ -75,6 +75,7 @@ cave-uptime = { path = "../../observability/cave-uptime" }
 cave-cost = { path = "../cave-cost" }
 cave-sign = { path = "../../security/cave-sign" }
 cave-forensics = { path = "../../security/cave-forensics" }
+cave-falco = { path = "../../security/cave-falco" }
 # Phase 3 modules
 cave-devlake = { path = "../cave-devlake" }
 cave-ai-obs = { path = "../../observability/cave-ai-obs" }

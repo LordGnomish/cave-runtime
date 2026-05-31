@@ -927,6 +927,17 @@ enum FalcoCmd {
     RulesListBuiltin,
     /// Print observability dashboards + alert YAML.
     Observability,
+    /// List the supported libsinsp filter operators.
+    Operators,
+    /// Resolve a falcoctl artifact reference against an index.yaml.
+    ArtifactResolve {
+        /// Path to a falcoctl index.yaml.
+        #[arg(long)]
+        index: String,
+        /// Artifact reference (e.g. `cloudtrail:0.5.1` or a full OCI ref).
+        #[arg(long = "ref")]
+        reference: String,
+    },
     /// Print cave-falco upstream version.
     Version,
 }
@@ -4988,6 +4999,10 @@ source_root = "src"
                 FalcoCmd::RulesParse { path } => FalcoSubcommand::RulesParse { path },
                 FalcoCmd::RulesListBuiltin => FalcoSubcommand::RulesListBuiltin,
                 FalcoCmd::Observability => FalcoSubcommand::Observability,
+                FalcoCmd::Operators => FalcoSubcommand::Operators,
+                FalcoCmd::ArtifactResolve { index, reference } => {
+                    FalcoSubcommand::ArtifactResolve { index, reference }
+                }
                 FalcoCmd::Version => FalcoSubcommand::Version,
             };
             let out = falco_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-falco: {e}"))?;

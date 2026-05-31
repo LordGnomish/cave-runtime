@@ -297,6 +297,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_cost::router(cost_state))
         .merge(cave_sign::router(sign_state))
         .merge(cave_forensics::router(forensics_state))
+        .merge(cave_falco::router())
         // Phase 3
         .merge(cave_devlake::router(devlake_state))
         .merge(cave_ai_obs::router(ai_obs_state))

@@ -109,6 +109,17 @@ fn rule_has_any_tag(r: &Rule, tags: &[&str]) -> bool {
     r.tags.iter().any(|t| tags.contains(&t.as_str()))
 }
 
+/// The libsinsp filter comparison/boolean operators this engine evaluates.
+/// Mirrors `parser.cpp`'s unary/num/str/list operator tables.
+pub fn supported_operators() -> &'static [&'static str] {
+    &[
+        "=", "==", "!=", "<", "<=", ">", ">=",
+        "in", "intersects", "pmatch",
+        "contains", "icontains", "glob", "iglob", "regex", "startswith", "endswith",
+        "exists", "and", "or", "not",
+    ]
+}
+
 // ── expression eval (subset) ────────────────────────────────────────────────
 
 fn eval_expr(expr: &str, ev: &FalcoEvent, macros: &[MacroDef], lists: &[ListDef]) -> bool {
