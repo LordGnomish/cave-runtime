@@ -45,6 +45,86 @@ impl RuleUpdate {
     }
 }
 
+/// `collector::append` — merge `info` into `prev`.
+pub fn append(prev: &mut Rule, info: &RuleUpdate) -> Result<()> {
+    if let Some(c) = info.condition.as_ref().filter(|c| !c.is_empty()) {
+        prev.condition.push(' ');
+        prev.condition.push_str(c);
+    }
+    if let Some(o) = info.output.as_ref().filter(|o| !o.is_empty()) {
+        prev.output.push(' ');
+        prev.output.push_str(o);
+    }
+    if let Some(d) = info.desc.as_ref().filter(|d| !d.is_empty()) {
+        prev.desc.push(' ');
+        prev.desc.push_str(d);
+    }
+    for tag in &info.tags {
+        if !prev.tags.contains(tag) {
+            prev.tags.push(tag.clone());
+        }
+    }
+    for ex in &info.exceptions {
+        match prev.exceptions.iter_mut().find(|e| e.name == ex.name) {
+            None => {
+                if ex.fields.is_empty() {
+                    return Err(FalcoError::RuleParse(format!(
+                        "rule exception '{}' must have a fields property", ex.name
+                    )));
+                }
+                if ex.values.is_empty() {
+                    return Err(FalcoError::RuleParse(format!(
+                        "rule exception '{}' must have a values property", ex.name
+                    )));
+                }
+                prev.exceptions.push(ex.clone());
+            }
+            Some(prev_ex) => {
+                if !ex.fields.is_empty() {
+                    return Err(FalcoError::RuleParse(format!(
+                        "can not append exception fields to existing exception '{}', only values",
+                        ex.name
+                    )));
+                }
+                prev_ex.values.extend(ex.values.iter().cloned());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `collector::selective_replace` — overwrite the named fields of `prev`.
+pub fn replace(prev: &mut Rule, info: &RuleUpdate) -> Result<()> {
+    if let Some(c) = &info.condition {
+        prev.condition = c.clone();
+    }
+    if let Some(o) = &info.output {
+        prev.output = o.clone();
+    }
+    if let Some(d) = &info.desc {
+        prev.desc = d.clone();
+    }
+    if !info.tags.is_empty() {
+        prev.tags = info.tags.clone();
+    }
+    if !info.exceptions.is_empty() {
+        prev.exceptions = info.exceptions.clone();
+    }
+    Ok(())
+}
+
+/// Locate the rule named `info.name` in `rules` and apply `append`. Errors
+/// (`ERROR_NO_PREVIOUS_RULE_APPEND`) if no such rule exists.
+pub fn append_in(rules: &mut [Rule], info: &RuleUpdate) -> Result<()> {
+    let prev = rules
+        .iter_mut()
+        .find(|r| r.name == info.name)
+        .ok_or_else(|| FalcoError::RuleParse(format!(
+            "appended rule '{}' has no previous definition", info.name
+        )))?;
+    append(prev, info)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
