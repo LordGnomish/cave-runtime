@@ -284,6 +284,24 @@ impl RaftNode {
             self.msgs.push(m);
         }
     }
+
+    /// Whether a candidate's (index, term) log summary is at least as
+    /// up-to-date as ours (etcd `raftLog.isUpToDate`).
+    pub fn is_up_to_date(&self, last_index: u64, last_term: u64) -> bool {
+        last_term > self.last_term
+            || (last_term == self.last_term && last_index >= self.last_index)
+    }
+
+    /// Feed one inbound message through the state machine
+    /// (etcd `raft.Step`). Term reconciliation happens first, then the
+    /// per-role dispatch. Responses are pushed onto `msgs`.
+    pub fn step(&mut self, m: Message) {
+        // RED placeholder: only the local election trigger is honored; all
+        // term reconciliation and vote handling is missing.
+        if m.msg_type == MessageType::MsgHup {
+            self.campaign();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -421,6 +439,89 @@ mod tests {
         assert_eq!(hbs.len(), 2, "heartbeat to each follower");
         assert_eq!(n.heartbeat_elapsed, 0, "heartbeat clock resets");
         assert_eq!(n.state, RaftState::Leader, "leader never self-demotes via tick");
+    }
+
+    fn msg(t: MessageType, from: u64, to: u64, term: u64) -> Message {
+        Message {
+            msg_type: t,
+            from,
+            to,
+            term,
+            index: 0,
+            log_term: 0,
+            reject: false,
+        }
+    }
+
+    #[test]
+    fn candidate_wins_on_majority_vote_responses() {
+        let mut n = node();
+        n.step(msg(MessageType::MsgHup, 1, 1, 0));
+        assert_eq!(n.state, RaftState::Candidate);
+        n.msgs.clear();
+        // One grant (peer 2) → with self that's 2/3 → Won.
+        n.step(msg(MessageType::MsgVoteResp, 2, 1, 1));
+        assert_eq!(n.state, RaftState::Leader);
+        assert_eq!(n.lead, 1);
+    }
+
+    #[test]
+    fn candidate_steps_down_on_majority_rejection() {
+        let mut n = node();
+        n.step(msg(MessageType::MsgHup, 1, 1, 0));
+        let mut r2 = msg(MessageType::MsgVoteResp, 2, 1, 1);
+        r2.reject = true;
+        let mut r3 = msg(MessageType::MsgVoteResp, 3, 1, 1);
+        r3.reject = true;
+        n.step(r2);
+        n.step(r3);
+        assert_eq!(n.state, RaftState::Follower, "lost the election");
+    }
+
+    #[test]
+    fn higher_term_message_forces_follower_at_that_term() {
+        let mut n = node();
+        n.become_candidate(); // term 1
+        n.step(msg(MessageType::MsgHeartbeat, 2, 1, 5));
+        assert_eq!(n.state, RaftState::Follower);
+        assert_eq!(n.term, 5);
+        assert_eq!(n.lead, 2, "heartbeat reveals the leader");
+    }
+
+    #[test]
+    fn grants_vote_to_up_to_date_candidate_once() {
+        let mut n = node();
+        n.term = 2;
+        // Candidate at term 3, empty log (up-to-date vs our empty log).
+        let mut v = msg(MessageType::MsgVote, 2, 1, 3);
+        v.index = 0;
+        v.log_term = 0;
+        n.step(v);
+        assert_eq!(n.term, 3);
+        assert_eq!(n.vote, 2);
+        let resp = n.msgs.last().unwrap();
+        assert_eq!(resp.msg_type, MessageType::MsgVoteResp);
+        assert!(!resp.reject, "granted");
+        // A second candidate (peer 3) at the same term is denied.
+        n.msgs.clear();
+        let v3 = msg(MessageType::MsgVote, 3, 1, 3);
+        n.step(v3);
+        assert_eq!(n.vote, 2, "already voted for 2");
+        assert!(n.msgs.last().unwrap().reject, "denied — already voted");
+    }
+
+    #[test]
+    fn denies_vote_to_candidate_with_stale_log() {
+        let mut n = node();
+        n.last_index = 9;
+        n.last_term = 4;
+        // Candidate's log is behind (term 3 < our 4).
+        let mut v = msg(MessageType::MsgVote, 2, 1, 5);
+        v.index = 100;
+        v.log_term = 3;
+        n.step(v);
+        assert_eq!(n.vote, NONE, "did not grant to a stale-log candidate");
+        assert!(n.msgs.last().unwrap().reject);
     }
 
     #[test]
