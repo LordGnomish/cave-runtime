@@ -8,5 +8,6 @@
 //! server, LoRaWAN network server) are runtime data-plane components and are
 //! out of scope (see `parity.manifest.toml`).
 
+pub mod coap;
 pub mod http;
 pub mod mqtt;
