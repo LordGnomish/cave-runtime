@@ -43,6 +43,9 @@ pub mod projection;
 /// Query parsing and execution.
 pub mod query;
 
+/// Text index + `$text` search.
+pub mod text;
+
 /// HTTP route handlers.
 pub mod routes;
 
