@@ -3,6 +3,7 @@
 //! In-memory storage backend.
 
 pub mod catalog;
+pub mod extension;
 pub mod heap;
 pub mod index;
 pub mod mvcc;
@@ -12,6 +13,7 @@ pub mod transaction;
 pub mod wal;
 
 pub use catalog::SystemCatalog;
+pub use extension::{ExtensionControl, ExtensionRegistry};
 pub use heap::{HeapPage, ItemId, ItemPointer};
 pub use index::{BTreeIndex, HashIndex};
 pub use replication::{ReorderBuffer, ReplicationSlots, SlotKind, StandbyFeedback};
