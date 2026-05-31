@@ -54,17 +54,25 @@ url      = "https://github.com/apache/datafusion"
 #   CSE is pure in-crate AST analysis (occurrence counting over LogicalExpr + leaf-exclusion);
 #   it carried no persistence/IO dependency, so the prior "optimizer-subsystem-deferred" skip was
 #   convertible. mapped 16→17, skipped 13→12, honest_ratio 0.4848→0.5152.
-mapped_count   = 17
+# 2026-05-31 cont2 honest uplift: newline-delimited JSON reader promoted skipped→mapped via
+#   strict TDD (RED tests/json_reader_tdd.rs → GREEN JsonSource in src/data_source.rs, port of
+#   datafusion/src/datasource/json.rs JsonFormat/JsonOpener). Dependency-free hand parser: one
+#   object per line, bind-by-name to schema columns, absent/un-coercible → NULL, schema-driven
+#   coercion, JSON string-escape decoding. The prior "rolled-up-with-arrow-readers" skip assumed
+#   the reader needed the Arrow batch IO stack; the line-delimited reader is pure in-crate string
+#   parsing (mirrors the already-mapped CsvSource), so the skip was convertible without persistence.
+#   mapped 17→18, skipped 12→11, honest_ratio 0.5152→0.5455.
+mapped_count   = 18
 partial_count  = 4
-skipped_count  = 12
+skipped_count  = 11
 unmapped_count = 0
 total          = 33
 fill_ratio     = 1.0000
-honest_ratio   = 0.5152
-adr_justified_ratio = 1.0      # 12 skipped (ffi/proto/substrait/cli/python/ballista/wasm/physical-optimizer/json-reader/runtime-env/parquet-writer) all deferred to lakehouse-ray-2 per ADR-147; CSE promoted to mapped 2026-05-30
+honest_ratio   = 0.5455
+adr_justified_ratio = 1.0      # 11 skipped (ffi/proto/substrait/cli/python/ballista/wasm/physical-optimizer/runtime-env/parquet-writer) all deferred to lakehouse-ray-2 per ADR-147; CSE promoted to mapped 2026-05-30, JSON reader promoted to mapped 2026-05-31
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147"
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-30"
+last_audit     = "2026-05-31"
 infra_only     = false
 
 [module]
@@ -219,10 +227,10 @@ upstream = "crates/datafusion-physical-optimizer/"
 reason   = "depends-on-parquet-reader"
 note     = "Physical optimizer passes (sort enforcement, parquet predicate pushdown, repartition insertion) only fire meaningfully once the Parquet/Arrow reader lands — semantic state machines already enforce the basic invariants. Defer to lakehouse-ray-2. Was unmapped pre-wave-3."
 
-[[skipped]]
+[[mapped]]
 upstream = "crates/datafusion/src/datasource/json.rs"
-reason   = "rolled-up-with-arrow-readers"
-note     = "JSON line-delimited reader — small surface that lands alongside the Parquet/Arrow batch readers in lakehouse-ray-2. Was unmapped pre-wave-3."
+local    = "src/data_source.rs"
+note     = "JsonSource — newline-delimited JSON TableProvider (port of JsonFormat/JsonOpener line-delimited reader). One JSON object per line; fields bind to schema columns by name (key order irrelevant); absent fields + un-coercible scalars → NULL; schema-driven coercion (JSON number → Int64/Float64 per column type); full JSON string-escape decoding incl. \\uXXXX; nested object/array values consumed and coerced to NULL (out of scope). Dependency-free hand parser mirroring CsvSource. 2026-05-31 cont2 honest promotion skipped→mapped (RED tests/json_reader_tdd.rs → GREEN src/data_source.rs)."
 
 [[mapped]]
 upstream = "crates/datafusion-common/src/cse.rs"

@@ -143,6 +143,310 @@ impl TableProvider for CsvSource {
     }
 }
 
+/// Newline-delimited JSON data source — one JSON object per line.
+///
+/// Upstream: `crates/datafusion/src/datasource/json.rs`
+/// (`JsonFormat`/`JsonOpener`, the line-delimited reader). Each line is
+/// a flat JSON object; its fields bind to schema columns *by name*
+/// (object key order is irrelevant); absent fields and un-coercible
+/// values become NULL; scalar values are coerced to the declared
+/// schema type — exactly mirroring how `CsvSource` handles a row.
+/// Dependency-free hand parser, in keeping with the rest of the MVP;
+/// nested objects/arrays as column values are out of scope and coerce
+/// to NULL.
+#[derive(Debug, Clone)]
+pub struct JsonSource {
+    schema: SchemaRef,
+    rows: Vec<Row>,
+}
+
+/// A parsed JSON scalar, kept type-tagged so coercion can honor the
+/// declared schema type (a JSON `3` lands as `Float64(3.0)` in a float
+/// column but `Int64(3)` in an int column).
+#[derive(Debug, Clone)]
+enum JScalar {
+    Null,
+    Bool(bool),
+    /// Number kept as its raw lexeme so int/float coercion is exact.
+    Num(String),
+    /// String with escapes already decoded.
+    Str(String),
+}
+
+impl JsonSource {
+    /// Parse newline-delimited JSON from a string. Blank lines are
+    /// skipped. Each non-blank line must be a JSON object.
+    pub fn from_str(schema: SchemaRef, json: &str) -> Result<Self> {
+        let mut rows = Vec::new();
+        for (line_no, line) in json.lines().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let obj = parse_json_object(line)
+                .map_err(|e| Error::Io(format!("json line {}: {e}", line_no + 1)))?;
+            let mut vals = Vec::with_capacity(schema.fields.len());
+            for field in &schema.fields {
+                let v = obj
+                    .iter()
+                    .find(|(k, _)| k == &field.name)
+                    .map(|(_, s)| coerce_json(s, field))
+                    .unwrap_or(Value::Null);
+                vals.push(v);
+            }
+            rows.push(Row::new(vals));
+        }
+        Ok(Self { schema, rows })
+    }
+}
+
+/// Coerce a parsed JSON scalar to a column's declared type. A JSON
+/// `null`, an absent field, or any value that cannot be represented as
+/// the target type becomes `Value::Null` (mirrors `CsvSource`'s
+/// bad-cell → NULL rule).
+fn coerce_json(s: &JScalar, field: &Field) -> Value {
+    if let JScalar::Null = s {
+        return Value::Null;
+    }
+    match field.data_type {
+        DataType::Boolean => match s {
+            JScalar::Bool(b) => Value::Bool(*b),
+            _ => Value::Null,
+        },
+        DataType::Int32 => num_text(s)
+            .and_then(|t| t.parse::<i32>().ok())
+            .map(Value::Int32)
+            .unwrap_or(Value::Null),
+        DataType::Int64 => num_text(s)
+            .and_then(|t| t.parse::<i64>().ok())
+            .map(Value::Int64)
+            .unwrap_or(Value::Null),
+        DataType::Float32 | DataType::Float64 => num_text(s)
+            .and_then(|t| t.parse::<f64>().ok())
+            .map(Value::Float64)
+            .unwrap_or(Value::Null),
+        DataType::Utf8 => match s {
+            JScalar::Str(t) => Value::Utf8(t.clone()),
+            JScalar::Num(t) => Value::Utf8(t.clone()),
+            JScalar::Bool(b) => Value::Utf8(b.to_string()),
+            JScalar::Null => Value::Null,
+        },
+        _ => Value::Null,
+    }
+}
+
+/// The lexeme to feed numeric parsing for a scalar — the raw number
+/// text, or a string's contents (so a quoted `"5"` still coerces).
+fn num_text(s: &JScalar) -> Option<&str> {
+    match s {
+        JScalar::Num(t) | JScalar::Str(t) => Some(t),
+        _ => None,
+    }
+}
+
+/// Parse a single flat JSON object line into `(key, scalar)` pairs.
+/// Nested object/array values are consumed but yield `JScalar::Null`.
+fn parse_json_object(line: &str) -> std::result::Result<Vec<(String, JScalar)>, String> {
+    let b = line.as_bytes();
+    let mut p = JParser { b, i: 0 };
+    p.skip_ws();
+    p.expect(b'{')?;
+    let mut out = Vec::new();
+    p.skip_ws();
+    if p.peek() == Some(b'}') {
+        p.i += 1;
+        return Ok(out);
+    }
+    loop {
+        p.skip_ws();
+        let key = p.parse_string()?;
+        p.skip_ws();
+        p.expect(b':')?;
+        p.skip_ws();
+        let val = p.parse_value()?;
+        out.push((key, val));
+        p.skip_ws();
+        match p.peek() {
+            Some(b',') => {
+                p.i += 1;
+                continue;
+            }
+            Some(b'}') => {
+                p.i += 1;
+                break;
+            }
+            _ => return Err("expected ',' or '}'".into()),
+        }
+    }
+    Ok(out)
+}
+
+struct JParser<'a> {
+    b: &'a [u8],
+    i: usize,
+}
+
+impl<'a> JParser<'a> {
+    fn peek(&self) -> Option<u8> {
+        self.b.get(self.i).copied()
+    }
+
+    fn skip_ws(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\t' | b'\r' | b'\n')) {
+            self.i += 1;
+        }
+    }
+
+    fn expect(&mut self, c: u8) -> std::result::Result<(), String> {
+        if self.peek() == Some(c) {
+            self.i += 1;
+            Ok(())
+        } else {
+            Err(format!("expected '{}'", c as char))
+        }
+    }
+
+    fn parse_value(&mut self) -> std::result::Result<JScalar, String> {
+        match self.peek() {
+            Some(b'"') => Ok(JScalar::Str(self.parse_string()?)),
+            Some(b'{') => {
+                self.skip_structure(b'{', b'}')?;
+                Ok(JScalar::Null)
+            }
+            Some(b'[') => {
+                self.skip_structure(b'[', b']')?;
+                Ok(JScalar::Null)
+            }
+            Some(b't') => {
+                self.expect_word("true")?;
+                Ok(JScalar::Bool(true))
+            }
+            Some(b'f') => {
+                self.expect_word("false")?;
+                Ok(JScalar::Bool(false))
+            }
+            Some(b'n') => {
+                self.expect_word("null")?;
+                Ok(JScalar::Null)
+            }
+            Some(c) if c == b'-' || c.is_ascii_digit() => self.parse_number(),
+            _ => Err("unexpected value".into()),
+        }
+    }
+
+    fn expect_word(&mut self, w: &str) -> std::result::Result<(), String> {
+        for &c in w.as_bytes() {
+            if self.peek() != Some(c) {
+                return Err(format!("expected '{w}'"));
+            }
+            self.i += 1;
+        }
+        Ok(())
+    }
+
+    fn parse_number(&mut self) -> std::result::Result<JScalar, String> {
+        let start = self.i;
+        while let Some(c) = self.peek() {
+            if c.is_ascii_digit()
+                || c == b'-'
+                || c == b'+'
+                || c == b'.'
+                || c == b'e'
+                || c == b'E'
+            {
+                self.i += 1;
+            } else {
+                break;
+            }
+        }
+        let raw = std::str::from_utf8(&self.b[start..self.i])
+            .map_err(|_| "invalid number".to_string())?;
+        Ok(JScalar::Num(raw.to_string()))
+    }
+
+    /// Consume a balanced `{..}` or `[..]` (string-aware) and discard it.
+    fn skip_structure(&mut self, open: u8, close: u8) -> std::result::Result<(), String> {
+        self.expect(open)?;
+        let mut depth = 1usize;
+        while depth > 0 {
+            match self.peek() {
+                Some(b'"') => {
+                    self.parse_string()?;
+                }
+                Some(c) if c == open => {
+                    depth += 1;
+                    self.i += 1;
+                }
+                Some(c) if c == close => {
+                    depth -= 1;
+                    self.i += 1;
+                }
+                Some(_) => self.i += 1,
+                None => return Err("unterminated structure".into()),
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_string(&mut self) -> std::result::Result<String, String> {
+        self.expect(b'"')?;
+        let mut out = String::new();
+        loop {
+            match self.peek() {
+                None => return Err("unterminated string".into()),
+                Some(b'"') => {
+                    self.i += 1;
+                    return Ok(out);
+                }
+                Some(b'\\') => {
+                    self.i += 1;
+                    match self.peek() {
+                        Some(b'"') => out.push('"'),
+                        Some(b'\\') => out.push('\\'),
+                        Some(b'/') => out.push('/'),
+                        Some(b'b') => out.push('\u{0008}'),
+                        Some(b'f') => out.push('\u{000C}'),
+                        Some(b'n') => out.push('\n'),
+                        Some(b'r') => out.push('\r'),
+                        Some(b't') => out.push('\t'),
+                        Some(b'u') => {
+                            let mut cp = 0u32;
+                            for _ in 0..4 {
+                                self.i += 1;
+                                let h = self.peek().ok_or("bad \\u escape")?;
+                                let d =
+                                    (h as char).to_digit(16).ok_or("bad \\u hex digit")?;
+                                cp = cp * 16 + d;
+                            }
+                            out.push(char::from_u32(cp).unwrap_or('\u{FFFD}'));
+                        }
+                        _ => return Err("bad escape".into()),
+                    }
+                    self.i += 1;
+                }
+                Some(_) => {
+                    // Copy one UTF-8 char starting at self.i.
+                    let rest = std::str::from_utf8(&self.b[self.i..])
+                        .map_err(|_| "invalid utf-8".to_string())?;
+                    let ch = rest.chars().next().unwrap();
+                    out.push(ch);
+                    self.i += ch.len_utf8();
+                }
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl TableProvider for JsonSource {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+
+    async fn scan(&self) -> Result<Vec<Row>> {
+        Ok(self.rows.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

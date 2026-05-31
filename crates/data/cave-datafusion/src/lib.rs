@@ -37,7 +37,7 @@ pub mod window;
 pub use catalog::SessionCatalog;
 pub use context::SessionContext;
 pub use cse::CommonSubexprAnalysis;
-pub use data_source::{CsvSource, MemTable, TableProvider};
+pub use data_source::{CsvSource, JsonSource, MemTable, TableProvider};
 pub use dataframe::DataFrame;
 pub use error::{Error, Result};
 pub use functions::FunctionRegistry;
