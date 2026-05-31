@@ -192,6 +192,24 @@ impl<T> RequestQueue<T> {
         }
     }
 
+    /// Release one connection for a consumer (mirrors
+    /// `removeConsumerConnection`). The consumer stays eligible while it has
+    /// remaining connections; on the last release it is fully removed and
+    /// tenant shard assignments are recomputed. Returns `true` if the consumer
+    /// was fully removed.
+    pub fn unregister_consumer(&mut self, consumer_id: &str) -> bool {
+        let _ = consumer_id;
+        false // RED stub
+    }
+
+    /// Number of active connections held by a consumer (0 if unknown).
+    pub fn consumer_connections(&self, consumer_id: &str) -> u32 {
+        self.consumers
+            .get(consumer_id)
+            .map(|i| i.connections)
+            .unwrap_or(0)
+    }
+
     /// Fully remove a consumer and recompute tenant assignments
     /// (mirrors `removeConsumer`).
     pub fn remove_consumer(&mut self, consumer_id: &str) {
@@ -510,5 +528,76 @@ mod tests {
         let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
         q.register_consumer("c1");
         assert!(q.dequeue(START_INDEX, "c1").0.is_none());
+    }
+
+    // ── Cycle 3: consumer connection lifecycle + shard eligibility ──────────
+
+    #[test]
+    fn connection_count_tracks_register_and_unregister() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        q.register_consumer("c1"); // two connections
+        assert_eq!(q.consumer_connections("c1"), 2);
+
+        // First release keeps the consumer eligible.
+        assert!(!q.unregister_consumer("c1"));
+        assert_eq!(q.consumer_connections("c1"), 1);
+        q.enqueue("t", 1).unwrap();
+        assert!(q.dequeue(START_INDEX, "c1").0.is_some());
+
+        // Final release fully removes it.
+        q.enqueue("t", 2).unwrap();
+        assert!(q.unregister_consumer("c1"));
+        assert_eq!(q.consumer_connections("c1"), 0);
+        // An unknown consumer is served nothing.
+        assert!(q.dequeue(START_INDEX, "c1").0.is_none());
+    }
+
+    #[test]
+    fn shutting_down_consumer_is_skipped() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        q.enqueue("t", 1).unwrap();
+        q.notify_shutdown("c1");
+        assert!(q.dequeue(START_INDEX, "c1").0.is_none());
+    }
+
+    #[test]
+    fn unknown_consumer_is_skipped() {
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 0);
+        q.register_consumer("c1");
+        q.enqueue("t", 1).unwrap();
+        assert!(q.dequeue(START_INDEX, "ghost").0.is_none());
+    }
+
+    #[test]
+    fn shuffle_sharding_restricts_tenant_to_assigned_consumers() {
+        // 4 consumers, each tenant pinned to exactly 1 (max_consumers = 1).
+        let mut q: RequestQueue<u32> = RequestQueue::new(10, 1);
+        let all: Vec<String> = ["c0", "c1", "c2", "c3"].iter().map(|s| s.to_string()).collect();
+        for c in &all {
+            q.register_consumer(c);
+        }
+        q.enqueue("tenant-a", 42).unwrap();
+
+        // Determine the single eligible consumer deterministically.
+        let eligible = shuffle_consumers_for_tenants(shuffle_shard_seed("tenant-a"), 1, &all)
+            .expect("one consumer pinned");
+        let eligible_id = eligible.iter().next().unwrap().clone();
+
+        // Every other consumer is skipped for this tenant.
+        for c in &all {
+            if c != &eligible_id {
+                assert!(
+                    q.dequeue(START_INDEX, c).0.is_none(),
+                    "{c} is not sharded onto tenant-a and must be skipped"
+                );
+            }
+        }
+        // The pinned consumer gets the request.
+        assert_eq!(
+            q.dequeue(START_INDEX, &eligible_id).0,
+            Some(("tenant-a".to_string(), 42))
+        );
     }
 }
