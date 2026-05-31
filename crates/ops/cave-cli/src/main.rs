@@ -295,6 +295,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: KedaCmd,
     },
+    /// LLM tool-calling framework — MCP tools, schema, audit, search
+    Tools {
+        #[command(subcommand)]
+        cmd: ToolsCmd,
+    },
     /// HashiCorp Vault parity — secret backends + audit
     Vault {
         #[command(subcommand)]
@@ -1666,6 +1671,41 @@ enum TracingCmd {
 }
 
 #[derive(Subcommand)]
+enum ToolsCmd {
+    /// List registered tools (MCP tools/list)
+    List,
+    /// Semantically search the tool registry
+    Search {
+        /// Natural-language query
+        query: String,
+        /// Maximum number of hits
+        #[arg(long, default_value = "5")]
+        limit: u32,
+    },
+    /// Show a tool's JSON Schema (inputSchema)
+    Schema {
+        /// Tool name
+        name: String,
+    },
+    /// Invoke a tool (MCP tools/call) with JSON arguments
+    Call {
+        /// Tool name
+        name: String,
+        /// JSON-encoded arguments object
+        #[arg(long, default_value = "{}")]
+        args: String,
+    },
+    /// Show the recent invocation audit log
+    Audit {
+        /// Maximum records to return
+        #[arg(long, default_value = "50")]
+        limit: u32,
+    },
+    /// List the sandboxed built-in tools
+    Builtins,
+}
+
+#[derive(clap::Subcommand)]
 enum KedaCmd {
     /// List ScaledObjects in the active tenant
     #[command(name = "scaledobjects")]
@@ -4995,6 +5035,29 @@ source_root = "src"
             Ok(())
         }
 
+        Commands::Tools { cmd } => match cmd {
+            ToolsCmd::List => c.get("/api/tools").await,
+            ToolsCmd::Search { query, limit } => {
+                c.get(&format!(
+                    "/api/tools/search?q={}&limit={limit}",
+                    urlencode(&query)
+                ))
+                .await
+            }
+            ToolsCmd::Schema { name } => {
+                c.get(&format!("/api/tools/{}/schema", urlencode(&name))).await
+            }
+            ToolsCmd::Call { name, args } => {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&args).unwrap_or_else(|_| json!({}));
+                c.post(&format!("/api/tools/{}/call", urlencode(&name)), parsed)
+                    .await
+            }
+            ToolsCmd::Audit { limit } => {
+                c.get(&format!("/api/tools/audit?limit={limit}")).await
+            }
+            ToolsCmd::Builtins => c.get("/api/tools/builtins").await,
+        },
         Commands::Keda { cmd } => match cmd {
             KedaCmd::ScaledObjects => c.get("/api/keda/scaledobjects").await,
             KedaCmd::Get { name } => {
