@@ -47,6 +47,7 @@ pub fn create_router(state: Arc<RdbmsState>) -> Router {
         .route("/api/rdbms/server/port", get(server_port))
         .route("/api/rdbms/server/info", get(server_info))
         .route("/api/rdbms/explain", post(explain))
+        .route("/api/rdbms/cost/estimate", post(cost_estimate))
         .with_state(state)
 }
 
@@ -194,6 +195,22 @@ async fn explain(
 ) -> impl IntoResponse {
     Json(ExplainResponse {
         plan: format!("PLAN: {}", req.sql),
+    })
+}
+
+async fn cost_estimate(
+    State(_state): State<Arc<RdbmsState>>,
+    Json(req): Json<CostEstimateRequest>,
+) -> impl IntoResponse {
+    use crate::sql::costsize::{clamp_row_est, cost_seqscan, eq_sel, CostConstants};
+    let c = CostConstants::default();
+    let cost = cost_seqscan(&c, req.pages, req.tuples, 0.0);
+    let sel = eq_sel(req.ndistinct);
+    Json(CostEstimateResponse {
+        startup_cost: cost.startup,
+        total_cost: cost.total,
+        eq_selectivity: sel,
+        estimated_rows: clamp_row_est(req.tuples * sel),
     })
 }
 

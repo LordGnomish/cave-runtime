@@ -50,3 +50,23 @@ pub struct ColumnInfo {
 pub struct ExplainResponse {
     pub plan: String,
 }
+
+/// Request for a cost-based seqscan estimate against `costsize.c`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostEstimateRequest {
+    pub pages: u64,
+    pub tuples: f64,
+    /// Number of distinct values of the qualified column, if known
+    /// (drives `eq_sel = 1/ndistinct`).
+    pub ndistinct: Option<f64>,
+}
+
+/// A `costsize.c`-flavoured seqscan cost estimate plus the selectivity the
+/// optimizer would assign an equality qual on the column.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostEstimateResponse {
+    pub startup_cost: f64,
+    pub total_cost: f64,
+    pub eq_selectivity: f64,
+    pub estimated_rows: f64,
+}

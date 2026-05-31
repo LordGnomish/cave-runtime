@@ -744,6 +744,15 @@ enum RdbmsEngineCmd {
     Query,
     Stats,
     Schemas,
+    /// Cost-based seqscan estimate (costsize.c) for a table of given size
+    Cost {
+        #[arg(long, default_value_t = 100)]
+        pages: u64,
+        #[arg(long, default_value_t = 10000.0)]
+        tuples: f64,
+        #[arg(long)]
+        ndistinct: Option<f64>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4833,6 +4842,17 @@ source_root = "src"
             RdbmsEngineCmd::Query => c.get("/api/rdbms/query").await,
             RdbmsEngineCmd::Stats => c.get("/api/rdbms/stats").await,
             RdbmsEngineCmd::Schemas => c.get("/api/rdbms/schemas").await,
+            RdbmsEngineCmd::Cost {
+                pages,
+                tuples,
+                ndistinct,
+            } => {
+                c.post(
+                    "/api/rdbms/cost/estimate",
+                    json!({ "pages": pages, "tuples": tuples, "ndistinct": ndistinct }),
+                )
+                .await
+            }
         },
         Commands::Rollouts { cmd } => match cmd {
             RolloutsCmd::Status => c.get("/api/rollouts/status").await,
