@@ -115,3 +115,52 @@ fn delete_removes_external_entry() {
     // Deleting again is a no-op.
     assert!(cat.delete("temp", PluginType::Secrets, "").is_none());
 }
+
+// ── Cycle 2: builtin registry fallback + list merge/dedup/sort + shadowing ──
+
+#[test]
+fn get_falls_back_to_builtin_when_not_external() {
+    let mut cat = PluginCatalog::new();
+    cat.register_builtin("kubernetes", PluginType::Credential);
+    let got = cat
+        .get("kubernetes", PluginType::Credential, "")
+        .expect("builtin must resolve");
+    assert!(got.builtin);
+    assert_eq!(got.name, "kubernetes");
+    assert!(got.command.is_empty(), "builtins have no exec command");
+}
+
+#[test]
+fn external_unversioned_shadows_builtin() {
+    // An external registration of the same name+type takes precedence over the
+    // builtin (upstream: "Unversioned external plugins shadow builtins").
+    let mut cat = PluginCatalog::new();
+    cat.register_builtin("postgresql", PluginType::Database);
+    cat.set(valid_input("postgresql", PluginType::Database))
+        .unwrap();
+    let got = cat.get("postgresql", PluginType::Database, "").unwrap();
+    assert!(!got.builtin, "external registration shadows the builtin");
+    assert_eq!(got.command, "postgresql-plugin");
+}
+
+#[test]
+fn list_merges_builtin_and_external_sorted_deduped() {
+    let mut cat = PluginCatalog::new();
+    cat.register_builtin("aws", PluginType::Secrets);
+    cat.register_builtin("kv", PluginType::Secrets);
+    cat.set(valid_input("kv", PluginType::Secrets)).unwrap(); // dup name
+    cat.set(valid_input("transit", PluginType::Secrets)).unwrap();
+    let names = cat.list(PluginType::Secrets);
+    // Sorted, de-duplicated union of builtin + external names.
+    assert_eq!(names, vec!["aws", "kv", "transit"]);
+}
+
+#[test]
+fn list_scopes_by_type() {
+    let mut cat = PluginCatalog::new();
+    cat.set(valid_input("mysql", PluginType::Database)).unwrap();
+    cat.set(valid_input("ldap", PluginType::Credential)).unwrap();
+    assert_eq!(cat.list(PluginType::Database), vec!["mysql"]);
+    assert_eq!(cat.list(PluginType::Credential), vec!["ldap"]);
+    assert!(cat.list(PluginType::Secrets).is_empty());
+}
