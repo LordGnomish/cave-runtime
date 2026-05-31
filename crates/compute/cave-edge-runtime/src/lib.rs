@@ -17,13 +17,16 @@
 //!   metamanager  — offline-first local metadata store (cache-through + serve-from-cache)
 //!   eventbus     — MQTT-topic ↔ internal message bridge over a cave-streams local queue
 //!   edgehub      — reliable cloud-edge sync keeper (msg IDs + ACK + retransmit + RV merge)
+//!   devicetwin   — Expected/Actual twin state + version gating + delta computation
 
+pub mod devicetwin;
 pub mod edged;
 pub mod edgehub;
 pub mod error;
 pub mod eventbus;
 pub mod metamanager;
 
+pub use devicetwin::{DeviceTwin, TwinDelta, TwinVersion};
 pub use edged::{Edged, Pod, PodPhase};
 pub use edgehub::{EdgeHub, RecvOutcome, SyncMessage};
 pub use error::{EdgeError, Result};
