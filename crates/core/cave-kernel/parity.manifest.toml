@@ -1,9 +1,21 @@
 # parity.manifest.toml — cave-kernel
-# First-party primitives crate. No external upstream — these are the
-# shared infrastructure types (event bus, scheduler hooks, supervisor
-# trees) consumed by every cave-* module.
+# First-party primitives crate. There is NO external upstream — these are
+# the shared infrastructure primitives consumed by every cave-* module.
 #
-# Stubbed 2026-05-02.
+# Parity axis (2026-05-31): rather than an external repo, cave-kernel is
+# measured against the CAVE *shared-primitive consolidation charter* — the
+# canonical list of infrastructure primitives that should be homed here so
+# the rest of the workspace stops re-implementing them. Each entry below is
+# one charter primitive; `local` is the module that homes it.
+#
+#   honest_ratio = (mapped + skipped) / total   — partials EXCLUDED
+#   fill_ratio   = (mapped + partial + skipped) / total
+#
+# Honest classification notes:
+#   - consensus = PARTIAL: trait shell only; the Raft state machine is
+#     implemented in cave-ha, not here.
+#   - informer-cache = UNMAPPED: a k8s-style SharedInformer/watch-cache
+#     primitive is not yet homed; controllers still roll their own.
 
 [upstream]
 org     = "cave-runtime"
@@ -16,8 +28,73 @@ description = "Shared kernel primitives — first-party infrastructure"
 source_root = "src"
 first_party = true
 
-[parity]
-infra_only = true
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+# ── Charter primitive mappings ───────────────────────────────────────────────
+[[files]]
+upstream = "charter:retry-backoff"
+local    = "src/backoff.rs"
+[[files]]
+upstream = "charter:retry-policy"
+local    = "src/retrypolicy.rs"
+[[files]]
+upstream = "charter:rate-limiting"
+local    = "src/ratelimiter.rs"
+[[files]]
+upstream = "charter:circuit-breaker"
+local    = "src/circuitbreaker.rs"
+[[files]]
+upstream = "charter:bounded-semaphore"
+local    = "src/semaphore.rs"
+[[files]]
+upstream = "charter:wire-codec"
+local    = "src/codec/mod.rs"
+[[files]]
+upstream = "charter:event-bus"
+local    = "src/eventbus.rs"
+[[files]]
+upstream = "charter:reconcile-loop"
+local    = "src/reconcile.rs"
+[[files]]
+upstream = "charter:lease-leader-election"
+local    = "src/lease.rs"
+[[files]]
+upstream = "charter:observability-hooks"
+local    = "src/observability.rs"
+[[files]]
+upstream = "charter:http-client-builder"
+local    = "src/http.rs"
+[[files]]
+upstream = "charter:spiffe-identity"
+local    = "src/identity.rs"
+[[files]]
+upstream = "charter:tenant-scope"
+local    = "src/ns.rs"
+[[files]]
+upstream = "charter:parity-tracking"
+local    = "src/parity/mod.rs"
+[[files]]
+upstream = "charter:secret-resolver"
+local    = "src/secrets.rs"
+[[files]]
+upstream = "charter:async-pool"
+local    = "src/pool.rs"
+[[files]]
+upstream = "charter:workflow-state-machine"
+local    = "src/statemachine.rs"
+[[files]]
+upstream = "charter:kube-resource-plumbing"
+local    = "src/resource.rs"
+# PARTIAL — trait shell; Raft impl lives in cave-ha.
+[[files]]
+upstream = "charter:consensus-raft"
+local    = "src/consensus.rs"
 
+[parity]
+infra_only     = false
+fill_ratio     = 0.95     # (18 mapped + 1 partial + 0 skipped) / 20
+honest_ratio   = 0.90     # (18 mapped + 0 skipped) / 20
+mapped_count   = 18
+partial_count  = 1        # consensus (trait-only)
+skipped_count  = 0
+unmapped_count = 1        # informer-cache (not yet homed)
+total          = 20
+last_audit     = "2026-05-31"
