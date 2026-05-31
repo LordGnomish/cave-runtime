@@ -25,6 +25,7 @@
 //!
 //! [Model Context Protocol]: https://modelcontextprotocol.io
 
+pub mod adapters;
 pub mod audit;
 pub mod batch;
 pub mod builtin;
@@ -42,5 +43,23 @@ pub use tool::{Content, FnTool, Tool, ToolRegistry, ToolResult, ToolSpec};
 /// Pinned MCP specification revision this crate targets.
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 
+/// Alias matching the manifest's `[upstream] version` (the pinned MCP spec
+/// revision). The self-audit asserts these agree.
+pub const UPSTREAM_VERSION: &str = MCP_PROTOCOL_VERSION;
+
 /// Crate version surfaced over the wire (server `serverInfo.version`).
 pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The canonical names of the eight sandboxed built-in tools shipped by
+/// [`builtin::register_builtins`]. Surfaced for the self-audit and for
+/// callers building permission policies.
+pub const BUILTIN_TOOL_NAMES: [&str; 8] = [
+    "file_read",
+    "file_write",
+    "file_list",
+    "web_search",
+    "code_exec",
+    "calendar_add",
+    "calendar_list",
+    "email_send",
+];

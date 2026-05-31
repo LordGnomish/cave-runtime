@@ -136,6 +136,9 @@ impl ToolSpec {
     }
 }
 
+/// Type of a closure-backed tool handler.
+pub type ToolHandler = Arc<dyn Fn(&Value) -> Result<ToolResult> + Send + Sync>;
+
 /// A [`Tool`] built from a plain closure — the workhorse adapter used by
 /// built-ins and tests. Mirrors LangChain's `StructuredTool.from_function`.
 pub struct FnTool {
@@ -143,7 +146,7 @@ pub struct FnTool {
     description: String,
     schema: Value,
     toolset: String,
-    handler: Arc<dyn Fn(&Value) -> Result<ToolResult> + Send + Sync>,
+    handler: ToolHandler,
 }
 
 impl FnTool {
