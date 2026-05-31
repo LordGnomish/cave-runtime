@@ -6,7 +6,23 @@
 **fill_ratio:** 1.0000 (34/34)
 **honest_ratio:** 1.0000 (34/34)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-21
+**last_audit:** 2026-05-31
+
+## Depth ports (count-neutral, 2026-05-31)
+
+`src/resources.rs` ports the schedulable-resource accounting the
+virt-controller performs before handing a pod spec to the kubelet — all
+pure-logic, no host/FFI dependency:
+
+* `number_of_vcpus` / `calc_vcpus` — `hardware.GetNumberOfVCPUs` zero-fallback
+  semantics + `calcVCPUs` single-vCPU default.
+* `parse_cpu_set_line` — `hardware.ParseCPUSetLine` cpuset expander with the
+  upstream `safeAppend` pre-append limit guard (faithful off-by-one).
+* `resolve_memory_limits_ratio` — `getMemoryLimitsRatio` validation core,
+  `DefaultMemoryLimitOverheadRatio = 2.0`, rejecting sub-unity / unparseable.
+
+Counts unchanged (still 34/34); these extend the already-mapped
+`pkg/virt-controller` subsystem. +16 lib tests (166 → 182).
 
 ## Headline
 
@@ -125,10 +141,10 @@ host-preflight):
 
 ## Test footprint after deep port
 
-* Lib tests: 140 across `libvirt` (17), `virt_handler` (16),
+* Lib tests: 182 across `libvirt` (17), `virt_handler` (16),
   `virt_launcher` (15), `virt_controller` (13), `migration` (12),
-  `cdi` (13), `instancetype` (11), `snapshot` (12), plus the original
-  scaffold (~30) + new `lib.rs` tests.
+  `cdi` (13), `instancetype` (11), `snapshot` (12), `resources` (16),
+  plus the original scaffold (~30) + new `lib.rs` tests.
 * `tests/parity_self_audit.rs`: 9 assertions PASS.
 * `tests/kubevirt_parity.rs` + `tests/qwen_drafted.rs`: pre-existing.
 
@@ -136,7 +152,7 @@ host-preflight):
 
 | Track    | Status   | Notes                                              |
 |----------|----------|----------------------------------------------------|
-| Backend  | deep     | This crate (12 mapped subsystems, 140 lib tests)    |
+| Backend  | deep     | This crate (12 mapped subsystems, 182 lib tests)    |
 | Portal   | 0/4      | admin page not yet wired                           |
 | cavectl  | 0/4      | `cavectl kubevirt` not yet wired                   |
 | Observ.  | 0/4      | alerts + dashboard not yet authored                 |

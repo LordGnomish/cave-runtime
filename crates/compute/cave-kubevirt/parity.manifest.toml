@@ -40,7 +40,7 @@ honest_ratio          = 1.0000  # (mapped + skipped) / total            = 34/34
 adr_justified_ratio   = 1.0000  # all 22 scope_cuts cite an ADR-justified category: host-preflight (4) / go-bootstrap (4) / stdlib-analog (2) / kernel (2, ADR-RUNTIME-SANDBOX-NO-FFI-001) / hardware-passthrough (2, out-of-launch-scope) / deprecated-upstream (3, out-of-scope-subsystem) / parallel-track sibling-delegated (3) / Phase-2-deferred (2, out-of-launch-scope).
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-30"
+last_audit            = "2026-05-31"
 infra_only            = false
 
 [module]
@@ -112,6 +112,14 @@ local    = "src/snapshot.rs"
 upstream = "pkg/virt-api/rest/subresource.go"
 local    = "src/virt_api.rs"
 
+[[files]]
+upstream = "pkg/virt-controller/services/renderresources.go"
+local    = "src/resources.rs"
+
+[[files]]
+upstream = "pkg/util/hardware/hw_utils.go"
+local    = "src/resources.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 [[functions]]
 upstream_name = "VMController.Reconcile"
@@ -168,6 +176,28 @@ file          = "src/virt_controller.rs"
 upstream_name = "startFailureBackoffTimeLeft"
 local_name    = "virt_controller::start_failure_backoff_time_left"
 file          = "src/virt_controller.rs"
+
+# 2026-05-31 depth ports (count-neutral): schedulable-resource accounting from
+# renderresources.go + hw_utils.go — vCPU math, cpuset expansion, mem-limit ratio.
+[[functions]]
+upstream_name = "hardware.GetNumberOfVCPUs"
+local_name    = "resources::number_of_vcpus"
+file          = "src/resources.rs"
+
+[[functions]]
+upstream_name = "calcVCPUs"
+local_name    = "resources::calc_vcpus"
+file          = "src/resources.rs"
+
+[[functions]]
+upstream_name = "hardware.ParseCPUSetLine"
+local_name    = "resources::parse_cpu_set_line"
+file          = "src/resources.rs"
+
+[[functions]]
+upstream_name = "getMemoryLimitsRatio"
+local_name    = "resources::resolve_memory_limits_ratio"
+file          = "src/resources.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 [[tests]]
@@ -226,8 +256,8 @@ note         = "Per-pod runner: LauncherState DomainManager state machine, Notif
 
 [[mapped]]
 upstream_pkg = "kubevirt:pkg/virt-controller/watch/{vm,vmi}.go"
-local_files  = ["src/virt_controller.rs", "src/lifecycle.rs"]
-note         = "VM ⇄ VMI reconciler: reconcile_vm action enum (Noop/CreateVMI/DeleteVMI/UpdateStatus), vmi_from_vm template materialisation, printable_status for the user-facing status field, drive() against Store. lifecycle::reconcile is the stable entry point."
+local_files  = ["src/virt_controller.rs", "src/lifecycle.rs", "src/resources.rs"]
+note         = "VM ⇄ VMI reconciler: reconcile_vm action enum (Noop/CreateVMI/DeleteVMI/UpdateStatus), vmi_from_vm template materialisation, printable_status for the user-facing status field, drive() against Store. lifecycle::reconcile is the stable entry point. resources.rs ports the schedulable-resource accounting from services/renderresources.go + util/hardware: number_of_vcpus (GetNumberOfVCPUs zero-fallback), calc_vcpus, parse_cpu_set_line (cpuset expander + safeAppend limit guard), resolve_memory_limits_ratio (DefaultMemoryLimitOverheadRatio = 2.0)."
 
 [[mapped]]
 upstream_pkg = "kubevirt:pkg/virt-controller/watch/migration.go"
