@@ -1,0 +1,233 @@
+# parity.manifest.toml — cave-iot-gateway
+# Upstream: thingsboard/thingsboard  pinned v4.3.1.2  (Apache-2.0)
+#   https://github.com/thingsboard/thingsboard
+# Compat layer: Eclipse Kura telemetry codecs (EPL-1.0) — Cayenne LPP /
+#   Modbus framing are industry-standard and shared with the Kura device
+#   abstraction; cave-iot-gateway implements them in pure Rust.
+#
+# cave-iot-gateway ports the *control-plane domain logic* of an IoT
+# device-management platform in pure Rust with no live sockets/radios:
+#
+#   DEVICE PLANE:
+#     - Device / DeviceProfile / DeviceCredentials registry with the
+#       ThingsBoard invariants (per-tenant unique names, profile FK,
+#       O(1) access-token → device auth index).
+#     - Device provisioning (Disabled / AllowCreateNewDevices /
+#       CheckPreProvisionedDevices) + bulk provisioning.
+#     - Device claiming (secret + bounded window → customer binding).
+#
+#   TELEMETRY INGESTION (the 5 transports named in the charter):
+#     - MQTT device-API topic grammar + 3.1.1 fixed-header / PUBLISH codec.
+#     - HTTP device-API path router (/api/v1/{token}/{endpoint}).
+#     - CoAP RFC 7252 message codec (option delta/length, extended nibbles).
+#     - LoRaWAN MAC header (MType / FHDR) + Cayenne LPP payload decode.
+#     - Modbus PDU + Modbus/TCP MBAP framing.
+#
+#   PROCESSING / STATE:
+#     - Rule engine (filter / transform / action node graph + routing).
+#     - Device twin (desired/reported attributes + delta) + attribute store
+#       (CLIENT / SERVER / SHARED scopes).
+#     - Alarms (severity, active/cleared × ack/unack lifecycle, dedup).
+#     - OTA campaigns (package + per-device update state machine + progress).
+#     - Time-series ts_kv storage + window aggregation (AVG/MIN/MAX/COUNT/SUM).
+#     - Dashboards (widget model + latest/series data resolution over TSDB).
+#     - Multi-tenancy (device quotas + cross-tenant ownership + rate limit).
+#
+# Charter scope note: the charter enumerates exactly MQTT/HTTP/CoAP/LoRaWAN/
+# Modbus as the ingestion transports. ThingsBoard's LwM2M, SNMP and Edge
+# (gRPC) transports are out of this crate's charter (a separate scope, the
+# way Knative's Argo-Events moved to cave-workflows) and are NOT counted in
+# the total below. The five [[skipped]] entries are the *live data-plane /
+# radio / UI* counterparts of delivered features — genuinely out of a
+# pure-Rust domain crate, not deferrals.
+
+[upstream]
+org         = "thingsboard"
+repo        = "thingsboard"
+version     = "v4.3.1.2"
+name        = "ThingsBoard IoT Platform"
+license     = "Apache-2.0"
+language    = "Java"
+url         = "https://github.com/thingsboard/thingsboard"
+source_sha  = "v4.3.1.2"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0
+honest_ratio        = 0.75
+last_audit          = "2026-05-31"
+infra_only          = false
+mapped_count        = 15
+partial_count       = 0
+skipped_count       = 5
+unmapped_count      = 0
+total               = 20
+# fill_ratio   = (mapped + partial + skipped) / total = (15 + 0 + 5) / 20 = 1.0
+# honest_ratio = (mapped + partial) / total           = (15 + 0)     / 20 = 0.75
+
+# ─── files ──────────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java"
+local    = "src/registry.rs"
+
+[[files]]
+upstream = "application/.../device/provision/DeviceProvisionServiceImpl.java"
+local    = "src/provisioning.rs"
+
+[[files]]
+upstream = "dao/.../device/claim/DeviceClaimServiceImpl.java"
+local    = "src/claiming.rs"
+
+[[files]]
+upstream = "transport/mqtt/.../MqttTransportHandler.java"
+local    = "src/transport/mqtt.rs"
+
+[[files]]
+upstream = "transport/http/.../DeviceApiController.java"
+local    = "src/transport/http.rs"
+
+[[files]]
+upstream = "transport/coap/.../CoapTransportResource.java"
+local    = "src/transport/coap.rs"
+
+[[files]]
+upstream = "transport/lwm2m + common/transport (Cayenne LPP codec)"
+local    = "src/transport/lorawan.rs"
+
+[[files]]
+upstream = "common/transport (Modbus integration codec)"
+local    = "src/transport/modbus.rs"
+
+[[files]]
+upstream = "rule-engine/.../ruleengine + filter/transform/action nodes"
+local    = "src/rule_engine.rs"
+
+[[files]]
+upstream = "dao/.../attributes/AttributesServiceImpl.java"
+local    = "src/twin.rs"
+
+[[files]]
+upstream = "dao/.../alarm/AlarmServiceImpl.java"
+local    = "src/alarm.rs"
+
+[[files]]
+upstream = "dao/.../ota/OtaPackageServiceImpl.java + OtaPackageUpdateStatus"
+local    = "src/ota.rs"
+
+[[files]]
+upstream = "dao/.../timeseries/TimeseriesServiceImpl.java (ts_kv + aggregation)"
+local    = "src/timeseries.rs"
+
+[[files]]
+upstream = "dao/.../dashboard/DashboardServiceImpl.java + widget data resolution"
+local    = "src/dashboard.rs"
+
+[[files]]
+upstream = "dao/.../tenant + DefaultTenantProfileConfiguration + TbRateLimits"
+local    = "src/tenant.rs"
+
+# ─── mapped ─────────────────────────────────────────────────────────────────
+
+[[mapped]]
+name = "device-registry"
+upstream = "dao/device DeviceServiceImpl + DeviceCredentialsServiceImpl"
+note = "Device/DeviceProfile/DeviceCredentials store; per-tenant unique names, profile FK, O(1) token→device auth, credential rotation, cascade delete."
+
+[[mapped]]
+name = "device-provisioning"
+upstream = "DeviceProvisionServiceImpl + DeviceProfileProvisionConfiguration"
+note = "3 strategies (Disabled/AllowCreateNewDevices/CheckPreProvisionedDevices), key+secret match, access-token minting, existing-device reuse, bulk provisioning."
+
+[[mapped]]
+name = "device-claiming"
+upstream = "DeviceClaimServiceImpl"
+note = "Claim secret + bounded (inclusive) window → customer binding; reclaim releases binding and claim info."
+
+[[mapped]]
+name = "mqtt-transport-codec"
+upstream = "transport/mqtt MqttTransportHandler"
+note = "ThingsBoard device-API topic grammar (telemetry/attributes/rpc request+response), MQTT 3.1.1 remaining-length varint, PUBLISH encode/decode (QoS packet-id skip), telemetry JSON→KvMap (flat + ts/values)."
+
+[[mapped]]
+name = "http-device-api"
+upstream = "transport/http DeviceApiController"
+note = "Path router for /api/v1/{token}/{telemetry,attributes,rpc,claim} + tokenless /api/v1/provision; clientKeys/sharedKeys query parse."
+
+[[mapped]]
+name = "coap-transport-codec"
+upstream = "transport/coap CoapTransportResource"
+note = "RFC 7252 message format: 4-byte header (ver/type/TKL/code/mid), token, option delta/length with 13/14 extended nibbles, 0xFF payload marker."
+
+[[mapped]]
+name = "lorawan-cayenne-lpp"
+upstream = "LoRaWAN integration + Cayenne LPP codec"
+note = "MHDR MType decode, uplink FHDR parse (DevAddr LE, FCnt, FPort, MIC-stripped FRMPayload), Cayenne LPP decode (10 data types, signed 16/24-bit scaling for temp/analog/GPS)."
+
+[[mapped]]
+name = "modbus-codec"
+upstream = "Modbus integration codec"
+note = "Function-code PDUs (read coils/discrete/holding/input registers, write single register), exception responses (FC|0x80), Modbus/TCP MBAP header (proto-id=0, length validation)."
+
+[[mapped]]
+name = "rule-engine"
+upstream = "rule-engine filter/transform/action nodes + rule chain"
+note = "Directed node graph (filter Predicate eval, transform in-place ops, action side effects) with labelled relations (True/False/Success) and MAX_DEPTH cycle guard."
+
+[[mapped]]
+name = "device-twin-attributes"
+upstream = "AttributesServiceImpl (CLIENT/SERVER/SHARED scopes)"
+note = "Scope-isolated attribute store + DeviceTwin desired/reported with version bump on change and delta() = pending shared-attribute push set."
+
+[[mapped]]
+name = "alarms"
+upstream = "AlarmServiceImpl + AlarmSeverity + AlarmStatus"
+note = "Severity rank/escalate, active/cleared × ack/unack status, dedup-while-active create_or_update with escalation, clear preserving ack bit, active-alarm query."
+
+[[mapped]]
+name = "ota-campaign"
+upstream = "OtaPackageServiceImpl + OtaPackageUpdateStatus"
+note = "OtaPackage (checksum verify), update-status state machine (legal transition graph, any→Failed, Updated/Failed terminal), per-device campaign progress roll-up + is_complete."
+
+[[mapped]]
+name = "timeseries-tsdb"
+upstream = "TimeseriesServiceImpl (ts_kv / ts_kv_latest + aggregation)"
+note = "Sorted-insert ts_kv store, ts_kv_latest, half-open range query, start-anchored window aggregation (AVG/MIN/MAX/COUNT/SUM, non-numeric skipped) — the cave-rdbms TSDB extension model."
+
+[[mapped]]
+name = "dashboards"
+upstream = "DashboardServiceImpl + widget data resolution"
+note = "Widget/WidgetType (Latest/TimeSeries/Alarm) + Dashboard; resolve_latest (current values from TSDB) and resolve_series (aggregated windows per data key)."
+
+[[mapped]]
+name = "multi-tenant"
+upstream = "tenant + DefaultTenantProfileConfiguration + TbRateLimits"
+note = "Per-tenant device quotas (can_add/incr/decr), strict cross-tenant ownership denial, fixed-window per-tenant rate limiter (injected clock)."
+
+# ─── skipped (live data-plane / radio / UI counterparts — out of a pure
+#     domain crate; NOT deferrals of in-charter logic) ─────────────────────────
+
+[[skipped]]
+name = "mqtt-broker-listener"
+upstream = "transport/mqtt MqttTransportService (Netty server)"
+reason = "Live TCP/TLS broker socket, connection/session state, keep-alive + QoS retransmit — runtime data-plane component (cave-runtime transport mesh feeds decoded bytes to the codec)."
+
+[[skipped]]
+name = "coap-dtls-listener"
+upstream = "transport/coap CoapTransportService (Californium server)"
+reason = "Live UDP/DTLS socket + Californium endpoint lifecycle — runtime data-plane; the RFC 7252 codec is mapped."
+
+[[skipped]]
+name = "lorawan-network-server"
+upstream = "LoRaWAN network-server / radio gateway bridge"
+reason = "Radio gateway bridge + OTAA join procedure (AES-128 MIC verification + AppSKey/NwkSKey derivation) + duty-cycle scheduling — RF/crypto data-plane; the MAC header + Cayenne LPP payload codec is mapped."
+
+[[skipped]]
+name = "widget-ui-rendering"
+upstream = "ui-ngx Angular widget bundles + dashboard renderer"
+reason = "Browser widget rendering / dashboard editor — owned by cave-portal (100% SSR). cave-iot-gateway provides the widget data contract (resolve_latest/resolve_series), not the UI."
+
+[[skipped]]
+name = "notification-channels"
+upstream = "application notification (email/SMS/Slack delivery)"
+reason = "Outbound alarm-notification delivery channels — cave-oncall / cave-notify domain. The alarm lifecycle that triggers notifications is mapped."
