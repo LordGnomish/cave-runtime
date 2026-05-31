@@ -89,9 +89,56 @@ async fn api_matrix() -> Json<serde_json::Value> {
 }
 
 /// Pure HTML renderer for the dashboard. `None` → an empty-state page.
-pub fn render_dashboard(_report: Option<&DailyReport>) -> String {
-    // RED stub — filled in the GREEN commit.
-    String::new()
+pub fn render_dashboard(report: Option<&DailyReport>) -> String {
+    let mut body = String::new();
+    body.push_str("<!doctype html><html><head><meta charset=\"utf-8\">");
+    body.push_str("<title>cave-runtime — LLM Tracker</title></head><body>");
+    body.push_str("<h1>LLM Tracker</h1>");
+    body.push_str(
+        "<p class=\"phase-banner\"><strong>Phase 0</strong> — report only. \
+         No baseline is ever swapped automatically.</p>",
+    );
+
+    let Some(r) = report else {
+        body.push_str(
+            "<p class=\"empty-state\">No report yet — run \
+             <code>cavectl llm-tracker report</code> to generate one.</p>",
+        );
+        body.push_str("</body></html>");
+        return body;
+    };
+
+    body.push_str(&format!(
+        "<p>Baseline: <code>{}</code> · generated {} · {} candidate(s) polled</p>",
+        escape(&r.baseline),
+        escape(&r.generated_at_utc),
+        r.poll.candidates.len(),
+    ));
+
+    body.push_str("<h2>Verdicts</h2><table><thead><tr>");
+    body.push_str(
+        "<th>Model</th><th>Status</th><th>Δ quality</th><th>Δ throughput</th></tr></thead><tbody>",
+    );
+    for v in &r.verdicts {
+        body.push_str(&format!(
+            "<tr><td><code>{}</code></td><td>{:?}</td><td>{:+.3}</td><td>{:+.1}%</td></tr>",
+            escape(&v.model_id),
+            v.status,
+            v.quality_delta,
+            v.throughput_uplift * 100.0,
+        ));
+    }
+    body.push_str("</tbody></table>");
+    body.push_str("</body></html>");
+    body
+}
+
+/// Minimal HTML-escape for the few model-id / timestamp strings rendered
+/// into the page.
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]
