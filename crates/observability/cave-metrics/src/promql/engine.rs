@@ -479,6 +479,64 @@ impl Engine {
                 Ok(QueryResult::InstantVector(iv))
             }
 
+            "histogram_fraction" => {
+                let lower = match call.args.first() {
+                    Some(Expr::NumberLiteral(v)) => *v,
+                    _ => {
+                        return Err(MetricsError::Eval(
+                            "histogram_fraction: first arg must be a number".into(),
+                        ));
+                    }
+                };
+                let upper = match call.args.get(1) {
+                    Some(Expr::NumberLiteral(v)) => *v,
+                    _ => {
+                        return Err(MetricsError::Eval(
+                            "histogram_fraction: second arg must be a number".into(),
+                        ));
+                    }
+                };
+                // Evaluate the third arg (instant vector of _bucket series).
+                let buckets_iv = match self.eval_instant(
+                    call.args.get(2).ok_or_else(|| {
+                        MetricsError::Eval("histogram_fraction: missing arg".into())
+                    })?,
+                    ts_ms,
+                )? {
+                    QueryResult::InstantVector(iv) => iv,
+                    _ => {
+                        return Err(MetricsError::Eval(
+                            "histogram_fraction: arg must be an instant vector".into(),
+                        ));
+                    }
+                };
+
+                // Group by all labels except "le".
+                let mut groups: HashMap<Labels, Vec<(f64, f64)>> = HashMap::new();
+                for (labels, val) in buckets_iv {
+                    let le: f64 = labels
+                        .get("le")
+                        .and_then(|v| {
+                            if v == "+Inf" {
+                                Some(f64::INFINITY)
+                            } else {
+                                v.parse().ok()
+                            }
+                        })
+                        .unwrap_or(f64::INFINITY);
+                    let key = labels.without(&["le"]);
+                    groups.entry(key).or_default().push((le, val));
+                }
+
+                let iv: Vec<(Labels, f64)> = groups
+                    .into_iter()
+                    .map(|(labels, buckets)| {
+                        (labels, fns::histogram_fraction(lower, upper, buckets))
+                    })
+                    .collect();
+                Ok(QueryResult::InstantVector(iv))
+            }
+
             // ── Instant vector → instant vector ───────────────────────────
             "abs" => self.map_iv(call, ts_ms, |v| v.abs()),
             "ceil" => self.map_iv(call, ts_ms, |v| v.ceil()),

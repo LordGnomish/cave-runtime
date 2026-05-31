@@ -255,6 +255,91 @@ pub fn histogram_quantile(q: f64, mut buckets: Vec<(f64, f64)>) -> f64 {
     f64::INFINITY
 }
 
+/// histogram_fraction(): estimate the fraction of observations between
+/// `lower` and `upper` from classic le-buckets.
+///
+/// Port of prometheus/prometheus `promql/quantile.go::BucketFraction`.
+/// `buckets`: Vec<(le_value, cumulative_count)>. Top bucket must be `+Inf`.
+pub fn histogram_fraction(lower: f64, upper: f64, mut buckets: Vec<(f64, f64)>) -> f64 {
+    if buckets.is_empty() {
+        return f64::NAN;
+    }
+    buckets.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Highest bucket must be +Inf.
+    if buckets.last().map(|b| b.0) != Some(f64::INFINITY) {
+        return f64::NAN;
+    }
+
+    let count = buckets.last().map(|b| b.1).unwrap_or(0.0);
+    if count == 0.0 || lower.is_nan() || upper.is_nan() {
+        return f64::NAN;
+    }
+    if lower >= upper {
+        return 0.0;
+    }
+
+    let mut rank = 0.0_f64;
+    let (mut lower_rank, mut upper_rank) = (0.0_f64, 0.0_f64);
+    let (mut lower_set, mut upper_set) = (false, false);
+
+    // Assume a lower bound of 0 for positive buckets; -Inf otherwise.
+    let mut lower_bound = if buckets[0].0 <= 0.0 {
+        f64::NEG_INFINITY
+    } else {
+        0.0
+    };
+
+    for (i, &(upper_bound, bcount)) in buckets.iter().enumerate() {
+        if i > 0 {
+            lower_bound = buckets[i - 1].0;
+        }
+
+        // Linear interpolation within the current bucket.
+        let interpolate = |v: f64| -> f64 {
+            if lower_bound == f64::NEG_INFINITY {
+                return bcount;
+            }
+            rank + (bcount - rank) * (v - lower_bound) / (upper_bound - lower_bound)
+        };
+
+        if !lower_set && lower_bound >= lower {
+            lower_rank = rank;
+            lower_set = true;
+        }
+        if !upper_set && lower_bound >= upper {
+            upper_rank = rank;
+            upper_set = true;
+        }
+        if lower_set && upper_set {
+            break;
+        }
+
+        if !lower_set && lower_bound < lower && upper_bound > lower {
+            lower_rank = interpolate(lower);
+            lower_set = true;
+        }
+        if !upper_set && lower_bound < upper && upper_bound > upper {
+            upper_rank = interpolate(upper);
+            upper_set = true;
+        }
+        if lower_set && upper_set {
+            break;
+        }
+
+        rank = bcount;
+    }
+
+    if !lower_set || lower_rank > count {
+        lower_rank = count;
+    }
+    if !upper_set || upper_rank > count {
+        upper_rank = count;
+    }
+
+    (upper_rank - lower_rank) / count
+}
+
 // ─── Label manipulation ──────────────────────────────────────────────────────
 
 pub fn label_replace(
