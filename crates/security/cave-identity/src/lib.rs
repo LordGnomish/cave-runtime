@@ -23,6 +23,7 @@ pub mod registration;
 pub mod routes;
 pub mod server_ca;
 pub mod spiffe_id;
+pub mod sshpop;
 pub mod store;
 pub mod workload_api;
 pub mod x509_svid;
