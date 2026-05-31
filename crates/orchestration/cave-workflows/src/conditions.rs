@@ -15,23 +15,232 @@
 //! recursive-descent evaluator over `||` / `&&` / comparison operators
 //! (`== != =~ !~ < <= > >=`) with numeric-aware equality and regex matching.
 
+use regex::Regex;
 use std::collections::HashMap;
 
 /// Substitute `{{ key }}` placeholders in `expr` from `ctx`. Whitespace inside
 /// the braces is trimmed. An unresolved placeholder is an error — mirroring
 /// Argo, which fails the node rather than silently treating it as empty.
 pub fn substitute(expr: &str, ctx: &HashMap<String, String>) -> Result<String, String> {
-    // PLACEHOLDER (RED): returns the expression unchanged.
-    let _ = ctx;
-    Ok(expr.to_string())
+    let mut out = String::with_capacity(expr.len());
+    let mut rest = expr;
+    while let Some(open) = rest.find("{{") {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 2..];
+        let close = after
+            .find("}}")
+            .ok_or_else(|| format!("unterminated placeholder in `{}`", expr))?;
+        let key = after[..close].trim();
+        let value = ctx
+            .get(key)
+            .ok_or_else(|| format!("unresolved placeholder `{{{{{}}}}}`", key))?;
+        out.push_str(value);
+        rest = &after[close + 2..];
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 /// Evaluate a `when` expression after `{{...}}` substitution. Returns the
 /// boolean the controller uses to decide whether to execute the node.
 pub fn evaluate_when(expr: &str, ctx: &HashMap<String, String>) -> Result<bool, String> {
-    // PLACEHOLDER (RED): always true.
-    let _ = (expr, ctx);
-    Ok(true)
+    let resolved = substitute(expr, ctx)?;
+    let tokens = tokenize(&resolved)?;
+    let mut p = Parser { tokens: &tokens, pos: 0 };
+    let v = p.parse_or()?;
+    if p.pos != p.tokens.len() {
+        return Err(format!("trailing tokens in `{}`", resolved));
+    }
+    Ok(v)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Token {
+    /// A string operand (quoted-stripped or a bare word/number).
+    Val(String),
+    Op(String),
+    LParen,
+    RParen,
+}
+
+fn tokenize(s: &str) -> Result<Vec<Token>, String> {
+    let bytes: Vec<char> = s.chars().collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c.is_whitespace() {
+            i += 1;
+            continue;
+        }
+        match c {
+            '(' => {
+                out.push(Token::LParen);
+                i += 1;
+            }
+            ')' => {
+                out.push(Token::RParen);
+                i += 1;
+            }
+            '\'' | '"' => {
+                let quote = c;
+                let mut val = String::new();
+                i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    val.push(bytes[i]);
+                    i += 1;
+                }
+                if i >= bytes.len() {
+                    return Err(format!("unterminated string literal in `{}`", s));
+                }
+                i += 1; // consume closing quote
+                out.push(Token::Val(val));
+            }
+            _ => {
+                // Two-char operators first.
+                let two: String = bytes[i..(i + 2).min(bytes.len())].iter().collect();
+                if matches!(two.as_str(), "==" | "!=" | "=~" | "!~" | "<=" | ">=" | "&&" | "||") {
+                    out.push(Token::Op(two));
+                    i += 2;
+                    continue;
+                }
+                if matches!(c, '<' | '>') {
+                    out.push(Token::Op(c.to_string()));
+                    i += 1;
+                    continue;
+                }
+                // Bare word / number — read until whitespace or a delimiter.
+                let mut val = String::new();
+                while i < bytes.len() {
+                    let d = bytes[i];
+                    if d.is_whitespace() || matches!(d, '(' | ')') {
+                        break;
+                    }
+                    // Stop before an operator start so `a==b` (no spaces) splits.
+                    let two: String = bytes[i..(i + 2).min(bytes.len())].iter().collect();
+                    if matches!(two.as_str(), "==" | "!=" | "=~" | "!~" | "<=" | ">=" | "&&" | "||")
+                        || matches!(d, '<' | '>')
+                    {
+                        break;
+                    }
+                    val.push(d);
+                    i += 1;
+                }
+                if val.is_empty() {
+                    return Err(format!("unexpected char `{}` in `{}`", c, s));
+                }
+                out.push(Token::Val(val));
+            }
+        }
+    }
+    Ok(out)
+}
+
+struct Parser<'a> {
+    tokens: &'a [Token],
+    pos: usize,
+}
+
+impl<'a> Parser<'a> {
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.pos)
+    }
+
+    fn parse_or(&mut self) -> Result<bool, String> {
+        let mut acc = self.parse_and()?;
+        while matches!(self.peek(), Some(Token::Op(o)) if o == "||") {
+            self.pos += 1;
+            let rhs = self.parse_and()?;
+            acc = acc || rhs;
+        }
+        Ok(acc)
+    }
+
+    fn parse_and(&mut self) -> Result<bool, String> {
+        let mut acc = self.parse_cmp()?;
+        while matches!(self.peek(), Some(Token::Op(o)) if o == "&&") {
+            self.pos += 1;
+            let rhs = self.parse_cmp()?;
+            acc = acc && rhs;
+        }
+        Ok(acc)
+    }
+
+    fn parse_cmp(&mut self) -> Result<bool, String> {
+        // A parenthesised boolean sub-expression.
+        if matches!(self.peek(), Some(Token::LParen)) {
+            self.pos += 1;
+            let v = self.parse_or()?;
+            if !matches!(self.peek(), Some(Token::RParen)) {
+                return Err("missing closing paren".into());
+            }
+            self.pos += 1;
+            return Ok(v);
+        }
+        let lhs = match self.peek() {
+            Some(Token::Val(v)) => v.clone(),
+            other => return Err(format!("expected operand, got {:?}", other)),
+        };
+        self.pos += 1;
+        // Bare boolean (no operator follows, or the next token ends the clause).
+        let op = match self.peek() {
+            Some(Token::Op(o)) if o != "&&" && o != "||" => o.clone(),
+            _ => return parse_bool_literal(&lhs),
+        };
+        self.pos += 1;
+        let rhs = match self.peek() {
+            Some(Token::Val(v)) => v.clone(),
+            other => return Err(format!("expected right operand, got {:?}", other)),
+        };
+        self.pos += 1;
+        compare(&lhs, &op, &rhs)
+    }
+}
+
+fn parse_bool_literal(v: &str) -> Result<bool, String> {
+    match v {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        other => Err(format!("expected boolean, got `{}`", other)),
+    }
+}
+
+fn compare(lhs: &str, op: &str, rhs: &str) -> Result<bool, String> {
+    match op {
+        "==" => Ok(eq(lhs, rhs)),
+        "!=" => Ok(!eq(lhs, rhs)),
+        "=~" => regex_match(lhs, rhs),
+        "!~" => regex_match(lhs, rhs).map(|m| !m),
+        "<" | "<=" | ">" | ">=" => {
+            let a: f64 = lhs
+                .parse()
+                .map_err(|_| format!("`{}` is not numeric for `{}`", lhs, op))?;
+            let b: f64 = rhs
+                .parse()
+                .map_err(|_| format!("`{}` is not numeric for `{}`", rhs, op))?;
+            Ok(match op {
+                "<" => a < b,
+                "<=" => a <= b,
+                ">" => a > b,
+                _ => a >= b,
+            })
+        }
+        other => Err(format!("unknown operator `{}`", other)),
+    }
+}
+
+/// Numeric-aware equality: if both sides parse as numbers compare numerically,
+/// else compare as strings.
+fn eq(a: &str, b: &str) -> bool {
+    match (a.parse::<f64>(), b.parse::<f64>()) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => a == b,
+    }
+}
+
+fn regex_match(value: &str, pattern: &str) -> Result<bool, String> {
+    let re = Regex::new(pattern).map_err(|e| format!("bad regex `{}`: {}", pattern, e))?;
+    Ok(re.is_match(value))
 }
 
 #[cfg(test)]
