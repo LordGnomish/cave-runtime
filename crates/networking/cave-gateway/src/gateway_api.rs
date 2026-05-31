@@ -143,14 +143,22 @@ pub struct PrecedenceKey {
 }
 
 /// Compute the precedence key for a single match.
-pub fn precedence_key(_m: &HttpRouteMatch) -> PrecedenceKey {
-    // STUB (RED)
+pub fn precedence_key(m: &HttpRouteMatch) -> PrecedenceKey {
+    let (path_rank, path_len) = match &m.path {
+        Some(p) => match p.match_type {
+            // Exact wins outright; RegularExpression is below PathPrefix.
+            PathMatchType::Exact => (3, p.value.len()),
+            PathMatchType::PathPrefix => (2, p.value.len()),
+            PathMatchType::RegularExpression => (1, p.value.len()),
+        },
+        None => (0, 0),
+    };
     PrecedenceKey {
-        path_rank: 0,
-        path_len: 0,
-        method: 0,
-        header_count: 0,
-        query_count: 0,
+        path_rank,
+        path_len,
+        method: if m.method.is_some() { 1 } else { 0 },
+        header_count: m.headers.len(),
+        query_count: m.query_params.len(),
     }
 }
 
@@ -166,21 +174,70 @@ pub struct TranslatedRoute {
 }
 
 /// Translate one match into an internal [`Route`] (no backends attached).
-pub fn translate_match(_m: &HttpRouteMatch, _hostnames: &[String]) -> Route {
-    // STUB (RED)
-    Route::new(uuid::Uuid::nil())
+pub fn translate_match(m: &HttpRouteMatch, hostnames: &[String]) -> Route {
+    let mut route = Route::new(uuid::Uuid::nil());
+
+    if let Some(p) = &m.path {
+        route.paths = Some(vec![p.value.clone()]);
+        // Regex matches drive the matcher's regex engine; flag with a positive
+        // priority so they are evaluated as regexes (not literal prefixes).
+        if p.match_type == PathMatchType::RegularExpression {
+            route.regex_priority = 1;
+        }
+    }
+    if let Some(method) = &m.method {
+        route.methods = Some(vec![method.clone()]);
+    }
+    if !hostnames.is_empty() {
+        route.hosts = Some(hostnames.to_vec());
+    }
+    if !m.headers.is_empty() {
+        let mut hdrs = std::collections::HashMap::new();
+        for h in &m.headers {
+            hdrs.entry(h.name.clone())
+                .or_insert_with(Vec::new)
+                .push(h.value.clone());
+        }
+        route.headers = Some(hdrs);
+    }
+    route
 }
 
 /// Translate a backend ref into an internal [`Service`].
-pub fn translate_backend(_b: &BackendRef) -> Service {
-    // STUB (RED)
-    Service::new(String::new(), 0, Protocol::Http)
+pub fn translate_backend(b: &BackendRef) -> Service {
+    // Gateway API backendRefs default to port 80 for HTTP when unspecified.
+    let mut svc = Service::new(b.name.clone(), b.port.unwrap_or(80), Protocol::Http);
+    svc.name = Some(b.name.clone());
+    svc
 }
 
 /// Translate an entire HTTPRoute into precedence-ordered internal routes.
-pub fn translate(_route: &HttpRoute) -> Vec<TranslatedRoute> {
-    // STUB (RED)
-    Vec::new()
+///
+/// One [`TranslatedRoute`] is produced per `(rule × match)`; rules with no
+/// explicit match default to a catch-all `PathPrefix /`. The result is sorted
+/// most-specific-first per the Gateway API conflict-resolution rules.
+pub fn translate(route: &HttpRoute) -> Vec<TranslatedRoute> {
+    let mut out = Vec::new();
+    for rule in &route.rules {
+        let services: Vec<Service> = rule.backend_refs.iter().map(translate_backend).collect();
+        // A rule with no matches is a catch-all (PathPrefix "/").
+        let matches: Vec<HttpRouteMatch> = if rule.matches.is_empty() {
+            vec![HttpRouteMatch::default()]
+        } else {
+            rule.matches.clone()
+        };
+        for m in &matches {
+            out.push(TranslatedRoute {
+                route: translate_match(m, &route.hostnames),
+                services: services.clone(),
+                precedence: precedence_key(m),
+            });
+        }
+    }
+    // Most specific first (descending precedence). Stable sort preserves
+    // list order for ties, matching "first matching rule in list order".
+    out.sort_by(|a, b| b.precedence.cmp(&a.precedence));
+    out
 }
 
 #[cfg(test)]
