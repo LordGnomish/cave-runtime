@@ -263,6 +263,17 @@ fn exec_aggregate(
         }
     }
 
+    // Implicit (no GROUP BY) aggregation always yields exactly one row,
+    // even over an empty input: `SELECT count(a) FROM t` on an empty
+    // table returns a single 0 (DataFusion's single-group semantics).
+    if group_by.is_empty() && groups.is_empty() {
+        let vals = aggr
+            .iter()
+            .map(|(k, _)| Accumulator::new(*k).finalize())
+            .collect();
+        return Ok(vec![Row::new(vals)]);
+    }
+
     // Emit one row per group.
     let mut out = Vec::with_capacity(groups.len());
     for (_, (key_vals, accs)) in groups {

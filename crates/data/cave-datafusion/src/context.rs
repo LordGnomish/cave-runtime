@@ -116,7 +116,12 @@ impl SessionContext {
             })
             .collect();
 
-        if !stmt.group_by.is_empty() {
+        // A query aggregates when it has a GROUP BY *or* the projection
+        // contains an aggregate function with no GROUP BY (implicit
+        // whole-table aggregation → a single group over all rows).
+        let is_aggregate = !stmt.group_by.is_empty() || self.select_has_aggregate(&stmt);
+
+        if is_aggregate {
             // Aggregates in the select list are detected by name lookup
             // against the function registry. ORDER BY for a grouped query
             // sorts the *aggregated* output, so the Sort sits above the
@@ -164,6 +169,17 @@ impl SessionContext {
             };
         }
         Ok(plan)
+    }
+
+    /// True when any top-level select expression is an aggregate
+    /// function (`count`, `sum`, `min`, `max`, …). Used to route a
+    /// GROUP-BY-less query through the Aggregate plan node instead of a
+    /// scalar projection.
+    fn select_has_aggregate(&self, stmt: &SelectStatement) -> bool {
+        stmt.select_list.iter().any(|e| {
+            matches!(e, LogicalExpr::Function { name, .. }
+                if self.functions.lookup_aggregate(name).is_some())
+        })
     }
 
     fn partition_select_list_for_aggregate(
