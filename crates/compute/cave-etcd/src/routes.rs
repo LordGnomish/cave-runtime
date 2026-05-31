@@ -110,6 +110,11 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
             "/api/etcd/v3/maintenance/snapshot/stream",
             post(maintenance_snapshot_stream),
         )
+        // Raft consensus state machine (in-process; election preview)
+        .route(
+            "/api/etcd/v3/raft/election/simulate",
+            post(raft_election_simulate),
+        )
         // Version
         .route("/api/etcd/v3/version", get(version))
         // Parity
@@ -762,6 +767,44 @@ async fn maintenance_snapshot_stream(
 
 async fn version(State(store): State<Arc<KvStore>>) -> Json<VersionResponse> {
     Json(store.version())
+}
+
+// ── Raft consensus state machine ────────────────────────────────────────────
+
+/// Run the in-process Raft state machine through a single election round
+/// and report the resolved role/term/leader. Read-only preview surface for
+/// the ported `raft_node` consensus core (cluster bring-up uses the live
+/// state machine driven by the cave-runtime transport).
+async fn raft_election_simulate(Json(req): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    let as_ids = |k: &str| -> Vec<u64> {
+        req.get(k)
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_u64()).collect())
+            .unwrap_or_default()
+    };
+    let id = req.get("id").and_then(|v| v.as_u64()).unwrap_or(1);
+    let mut peers = as_ids("peers");
+    if peers.is_empty() {
+        peers = vec![id];
+    }
+    let grants = as_ids("grants");
+    let rejects = as_ids("rejects");
+    let timeout = req
+        .get("election_timeout")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(10) as usize;
+
+    let out = crate::raft_node::simulate_election(id, &peers, &grants, &rejects, timeout);
+    Json(serde_json::json!({
+        "id": id,
+        "peers": peers,
+        "state": out.state,
+        "term": out.term,
+        "lead": out.lead,
+        "commit": out.commit,
+        "granted": out.granted,
+        "rejected": out.rejected,
+    }))
 }
 
 #[cfg(test)]

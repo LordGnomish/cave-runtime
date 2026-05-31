@@ -515,9 +515,15 @@ pub fn simulate_election(
 ) -> ElectionOutcome {
     let mut n = RaftNode::new(id, peers, election_timeout.max(1), 1, 256);
     n.campaign();
-    // RED placeholder: vote responses are dropped, so the node never
-    // resolves past the initial campaign state.
-    let _ = (grants, rejects);
+    for &g in grants {
+        let m = Message::new(MessageType::MsgVoteResp, g, id, n.term);
+        n.step(m);
+    }
+    for &r in rejects {
+        let mut m = Message::new(MessageType::MsgVoteResp, r, id, n.term);
+        m.reject = true;
+        n.step(m);
+    }
     let (granted, rejected) = n.tracker.tally_votes();
     let state = match n.state {
         RaftState::Follower => "Follower",
