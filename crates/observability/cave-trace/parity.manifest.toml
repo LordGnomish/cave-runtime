@@ -48,16 +48,16 @@ source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0
-honest_ratio        = 0.7692
+honest_ratio        = 0.7857
 adr_justified_ratio = 1.0      # 9 skipped (3 operational storage backends grpc-remote/scylladb/blackhole → cave-store/cave-streams Phase 3 / 3 standalone CLIs (ingester/remote-storage) + jaeger-v2-otel binary out-of-launch / sampling-leader-election → cave-ha Phase 3 / agent-grpc-forwarder → split-host deployment Phase 3 / storage-archival → cave-store Phase 3) + 4 scope_cuts (operational-storage-backends + standalone-cli-binaries + split-host-agent-collector + archival-second-writer — Phase 3 cave-store/cave-search/cave-streams integration) all categorical. The cassandra/elasticsearch/badger/kafka *codecs* + the esmapping-generator render logic are now mapped in-crate (live network drivers + transport + CLI binaries stay scope_cut). The Tempo service-graph metrics processor is a mapped Tempo-compat subsystem.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-30"
+last_audit          = "2026-05-31"
 infra_only          = false
-mapped_count        = 28
+mapped_count        = 31
 partial_count       = 2
 skipped_count       = 9
 unmapped_count      = 0
-total               = 39
+total               = 42
 
 # 2026-05-21 Charter v2 deep-port close — claude/cave-trace-deep-port-2026-05-21:
 #   * Existing 9 742 LOC scaffold (27 src/.rs files, 106 unit tests) measured
@@ -143,13 +143,52 @@ total               = 39
 #   grpc-remote/scylladb/blackhole transport + CLI binaries +
 #   sampling-leader-election + jaeger-v2 + agent-grpc-forwarder +
 #   storage-archival stay honestly cut.
+#
+# 2026-05-31 honest-uplift (Wave 7 strict-TDD, claude/cave-trace-honest-cont3):
+#   three more line-portable algorithms added as NEW mapped subsystems, each
+#   RED test commit → GREEN impl commit (never together):
+#     * NEW mapped 'adaptive-sampling-probability-calculator' (jaeger
+#       plugin/sampling/strategystore/adaptive {calculator,processor}.go) →
+#       src/adaptive_sampling.rs: PercentageIncreaseCappedCalculator.Calculate
+#       (factor = targetQPS/curQPS, growth capped at old*(1+cap), cap default
+#       0.5, decreases unrestricted, zero-curQPS no-op) + AdaptiveSamplingProcessor
+#       (count→qps over window, per-(service,operation) probability table seeded
+#       at initial 0.001, [1e-5,1.0] clamp, rare-operation floor below
+#       minSamplesPerSecond=1/60). This is the post-aggregation *probability
+#       calculation*, distinct from the already-mapped sampling-strategy-adaptive
+#       (aggregator.go online window adjuster in src/sampling.rs). Wired POST
+#       /api/sampling/calculate (src/adaptive_sampling_routes.rs).
+#       11 cases. The plugin/sampling/leaderelection cross-replica coordination
+#       stays scope_cut (sampling-leader-election skip).
+#     * NEW mapped 'tempo-spanmetrics-processor' (grafana/tempo
+#       modules/generator/processor/spanmetrics) → src/spanmetrics.rs:
+#       traces_spanmetrics_calls_total + traces_spanmetrics_latency histogram
+#       (Tempo default ExponentialBuckets(0.002,2,14) seconds) +
+#       traces_spanmetrics_size_total (opt-in), keyed by
+#       service/span_name/span_kind/status_code, error rate carried through the
+#       status_code=STATUS_CODE_ERROR dimension (no separate error counter, as in
+#       Tempo), Prometheus text exposition with cumulative buckets + +Inf. Distinct
+#       from the Jaeger-side SPM (src/spm.rs / service-performance-monitoring) that
+#       serves the Jaeger /api/metrics surface. Wired POST
+#       /tempo/api/metrics/spanmetrics (src/spanmetrics_routes.rs). 8 cases.
+#     * NEW mapped 'tempo-trace-combiner' (grafana/tempo pkg/model/trace/combine.go
+#       CombineTraceProtos + tokenForID) → src/trace_combiner.rs: read-path merge
+#       of N partial trace copies (one per ingester replica + per block) deduping
+#       spans by an FNV-1/32 token over (span_id ++ kind) so a B3 client/server
+#       pair sharing one span id but differing in kind both survive; a-priority,
+#       unique-b appended in order, spans_removed counted for over-read accounting.
+#       7 cases. The live querier block/ingester fan-out + bloom/WAL read path
+#       stay in cave-store / Phase 3.
+#   mapped 28→31, total 39→42, honest_ratio 0.7692→0.7857. All operational
+#   transports/drivers/CLIs + leader-election + jaeger-v2 + agent-grpc-forwarder +
+#   storage-archival remain honestly cut.
 
 [module]
 name        = "cave-trace"
 description = "Distributed tracing — Jaeger reimplementation + OTLP/Zipkin/OpenCensus ingestion + Tempo TraceQL search + SPM"
 source_root = "src"
 
-# ─── Mapped subsystems (28) ──────────────────────────────────────────────────
+# ─── Mapped subsystems (31) ──────────────────────────────────────────────────
 
 [[mapped]]
 name = "span-model"
@@ -298,6 +337,24 @@ upstream = "plugin/storage/kafka/{marshaller,unmarshaller,writer}.go"
 local = "src/storage_kafka.rs"
 note = "Kafka span codec line-port: KafkaSpanCodec marshals/unmarshals the jsonpb model.Span representation a writer serialises before handing bytes to the transport — hex traceID/spanID (model.TraceID/SpanID.String), CHILD_OF reference synthesised from parent_span_id + FOLLOWS_FROM from links, vType-discriminated tags (STRING->vStr / BOOL->vBool / INT64->vInt64 string / FLOAT64->vFloat64 / BINARY->vBinary base64), RFC3339-nanos startTime, google.protobuf.Duration fractional-seconds string with 3/6/9-digit grouping (format_proto_duration/parse_proto_duration) — plus the writer.go partition key span.TraceID.String() that keeps a trace's spans on one partition. 2026-05-30 TDD RED->GREEN (tests/kafka_marshaller_tdd.rs, 8 cases). The live sarama AsyncProducer + the ingester consumer group + the protobuf binary marshaller stay scope_cut (operational-storage-backends)."
 
+[[mapped]]
+name = "adaptive-sampling-probability-calculator"
+upstream = "plugin/sampling/strategystore/adaptive/calculator/calculator.go + processor.go"
+local = "src/adaptive_sampling.rs"
+note = "Jaeger adaptive sampling post-aggregation probability calculation line-port (distinct from the aggregator.go online adjuster already mapped as sampling-strategy-adaptive). PercentageIncreaseCappedCalculator.Calculate: factor = targetQPS/curQPS, new = old*factor, growth capped so new ≤ old*(1+cap) (defaultPercentageIncreaseCap 0.5), decreases unrestricted, zero curQPS leaves probability unchanged. AdaptiveSamplingProcessor: span count → QPS over the calculation window, per-(service,operation) probability table seeded at defaultInitialSamplingProbability 0.001, every probability clamped to [minSamplingProbability 1e-5, 1.0], and operations below defaultMinSamplesPerSecond (1/60) never lowered below their old probability. 2026-05-31 TDD RED->GREEN (11 cases). Wired POST /api/sampling/calculate (src/adaptive_sampling_routes.rs). The plugin/sampling/leaderelection cross-replica strategy coordination stays scope_cut (sampling-leader-election skip)."
+
+[[mapped]]
+name = "tempo-spanmetrics-processor"
+upstream = "grafana/tempo modules/generator/processor/spanmetrics (spanmetrics.go + config.go)"
+local = "src/spanmetrics.rs"
+note = "Tempo metrics-generator span-metrics (RED) processor line-port: every span aggregates into traces_spanmetrics_calls_total (request rate), traces_spanmetrics_latency histogram on the Tempo default ExponentialBuckets(0.002, 2, 14) second boundaries, and the opt-in traces_spanmetrics_size_total counter, all keyed by the service/span_name/span_kind/status_code dimensions. Error rate is carried through the status_code=STATUS_CODE_ERROR dimension exactly as Tempo does (no separate error counter). Prometheus text exposition emits cumulative _bucket series + the le=\"+Inf\" overflow + _sum/_count. Distinct from the Jaeger-side service-performance-monitoring (src/spm.rs) which serves the Jaeger /api/metrics SPM surface. 2026-05-31 TDD RED->GREEN (8 cases). Wired POST /tempo/api/metrics/spanmetrics (src/spanmetrics_routes.rs). The live Prometheus remote-write exporter + generator WAL stay in cave-metrics / Phase 3. Tempo-compat subsystem (Apache-2.0)."
+
+[[mapped]]
+name = "tempo-trace-combiner"
+upstream = "grafana/tempo pkg/model/trace/combine.go (CombineTraceProtos + tokenForID)"
+local = "src/trace_combiner.rs"
+note = "Tempo read-path trace combiner line-port: when a querier reads a trace it receives several partial copies (one per ingester replica + one per touched block); combine_traces merges two copies into one, deduping spans by tokenForID — an FNV-1/32 hash over the span-ID bytes followed by the span kind as 4 little-endian bytes — so a B3-propagated client/server pair that shares one span ID but differs in kind keeps both halves. All of a survives (a wins on conflict), unique b-spans append in original order, and the number of b-spans dropped as duplicates (of a or of an already-kept b) is returned for over-read accounting. 2026-05-31 TDD RED->GREEN (7 cases). The live querier block/ingester fan-out + bloom/WAL read path stay in cave-store / Phase 3. Tempo-compat subsystem (Apache-2.0)."
+
 # ─── Partial subsystems (2) ──────────────────────────────────────────────────
 
 [[partial]]
@@ -441,6 +498,18 @@ local    = "src/servicegraph.rs"
 [[files]]
 upstream = "internal/sampling/strategystore/static/strategy_store.go"
 local    = "src/sampling.rs"
+
+[[files]]
+upstream = "plugin/sampling/strategystore/adaptive/calculator/calculator.go"
+local    = "src/adaptive_sampling.rs"
+
+[[files]]
+upstream = "grafana/tempo modules/generator/processor/spanmetrics/spanmetrics.go"
+local    = "src/spanmetrics.rs"
+
+[[files]]
+upstream = "grafana/tempo pkg/model/trace/combine.go"
+local    = "src/trace_combiner.rs"
 
 [[files]]
 upstream = "internal/storage/integration/spanstore_test.go"
@@ -780,6 +849,16 @@ local_path    = "/oc/v1/traces"
 kind          = "http"
 upstream_path = "tempo /api/metrics/servicegraph (metrics-generator service graph)"
 local_path    = "/tempo/api/metrics/servicegraph"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "adaptive sampling probability calculation (post-aggregation)"
+local_path    = "/api/sampling/calculate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "tempo /api/metrics/spanmetrics (metrics-generator RED metrics)"
+local_path    = "/tempo/api/metrics/spanmetrics"
 
 [portal_ui]
 upstream_ui  = "Jaeger UI"

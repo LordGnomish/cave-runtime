@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Jaeger adaptive sampling — post-aggregation per-operation probability calculation.
 //!
 //! Ports jaeger `plugin/sampling/strategystore/adaptive`:
