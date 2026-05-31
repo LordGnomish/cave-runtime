@@ -32,6 +32,7 @@ pub mod selection;
 pub use bench::{cave_prompts, run_bench, score_response, synth_snapshot, BenchSnapshot, EvalPrompt, EvalResult};
 pub use config::{BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig, TrackerConfig};
 pub use error::{TrackerError, TrackerResult};
+pub use notify::{build_notification, NoticeSeverity, Notification};
 pub use poll::{poll_all, PollSummary};
 pub use registry::{
     default_backend_repos, seed_catalog, Candidate, LiveFetcher, RegistryEndpoints, SourceKind,

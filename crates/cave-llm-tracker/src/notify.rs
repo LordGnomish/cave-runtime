@@ -10,6 +10,89 @@
 //! clears a floor, [`build_notification`] returns `None` so a silent
 //! day produces no noise.
 
+use serde::{Deserialize, Serialize};
+
+use crate::report::DailyReport;
+use crate::selection::SelectionStatus;
+
+/// Severity of a daily notice. Phase 0 only ever emits [`Upgrade`]
+/// (the silent path is `None`), but the enum is future-proofed for a
+/// Phase 1 `Info`/`Warn` digest.
+///
+/// [`Upgrade`]: NoticeSeverity::Upgrade
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoticeSeverity {
+    /// A routine digest with nothing actionable.
+    Info,
+    /// At least one candidate cleared a floor and is flagged for review.
+    Upgrade,
+}
+
+/// A renderable notice produced from one daily run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Notification {
+    pub severity: NoticeSeverity,
+    pub title: String,
+    pub body: String,
+    /// Model ids of every `UpgradeCandidate` verdict, in report order.
+    pub candidate_models: Vec<String>,
+}
+
+impl Notification {
+    /// Single-string form for `terminal-notifier -message` / webhook
+    /// bodies: the title, a blank line, then the body.
+    pub fn render_text(&self) -> String {
+        format!("{}\n\n{}", self.title, self.body)
+    }
+}
+
+/// Build a notice from a finished report, or `None` when the day had no
+/// upgrade candidate. Phase 0 mandate: this never swaps anything — it is
+/// purely a digest of what selection already flagged.
+pub fn build_notification(report: &DailyReport) -> Option<Notification> {
+    let upgrades: Vec<&crate::selection::Verdict> = report
+        .verdicts
+        .iter()
+        .filter(|v| v.status == SelectionStatus::UpgradeCandidate)
+        .collect();
+    if upgrades.is_empty() {
+        return None;
+    }
+
+    let candidate_models: Vec<String> =
+        upgrades.iter().map(|v| v.model_id.clone()).collect();
+    let n = upgrades.len();
+    let title = format!(
+        "cave-llm-tracker: {} upgrade candidate{} for `{}`",
+        n,
+        if n == 1 { "" } else { "s" },
+        report.baseline
+    );
+
+    let mut body = format!(
+        "Baseline `{}` was beaten by {} candidate{} today (Phase 0 — review only, no swap):\n",
+        report.baseline,
+        n,
+        if n == 1 { "" } else { "s" },
+    );
+    for v in &upgrades {
+        body.push_str(&format!(
+            "  • `{}` — quality {:+.3}, throughput {:+.1}%\n",
+            v.model_id,
+            v.quality_delta,
+            v.throughput_uplift * 100.0,
+        ));
+    }
+
+    Some(Notification {
+        severity: NoticeSeverity::Upgrade,
+        title,
+        body,
+        candidate_models,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
