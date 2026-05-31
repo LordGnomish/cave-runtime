@@ -49,6 +49,7 @@ pub mod logql;
 pub mod models;
 pub mod multitenant;
 pub mod routes;
+pub mod scheduler;
 pub mod shipper;
 pub mod store;
 pub mod tail;
