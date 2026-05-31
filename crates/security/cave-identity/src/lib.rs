@@ -24,6 +24,7 @@ pub mod routes;
 pub mod server_ca;
 pub mod spiffe_id;
 pub mod store;
+pub mod workload_api;
 pub mod x509_svid;
 
 pub use error::{IdentityError, Result};
