@@ -2429,17 +2429,49 @@ enum WorkflowsCmd {
 enum ChaosCmd {
     /// List chaos experiments
     Experiments,
-    /// List chaos experiment templates
-    Templates,
-    /// Run a chaos experiment
-    Run {
-        /// Template name or ID
-        #[arg(long)]
-        template: String,
-        /// Target namespace
-        #[arg(long)]
-        namespace: Option<String>,
+    /// Show a single experiment by id
+    Get {
+        /// Experiment UUID
+        id: String,
     },
+    /// Create a chaos experiment
+    Create {
+        /// Experiment name
+        #[arg(long)]
+        name: String,
+        /// Fault type, e.g. network_latency, pod_kill, cpu_stress, dns_chaos
+        #[arg(long = "type")]
+        experiment_type: String,
+        /// Target namespace
+        #[arg(long, default_value = "default")]
+        namespace: String,
+        /// Duration in seconds
+        #[arg(long, default_value_t = 60)]
+        duration_secs: u32,
+        /// Optional injected latency (ms)
+        #[arg(long)]
+        latency_ms: Option<u64>,
+        /// Optional packet loss / corruption / duplicate percent
+        #[arg(long)]
+        packet_loss_percent: Option<f64>,
+    },
+    /// Start (inject) an experiment by id
+    Start {
+        /// Experiment UUID
+        id: String,
+    },
+    /// Stop (roll back) a running experiment by id
+    Stop {
+        /// Experiment UUID
+        id: String,
+    },
+    /// Delete an experiment by id
+    Delete {
+        /// Experiment UUID
+        id: String,
+    },
+    /// Scrape the Prometheus metrics exposition
+    Metrics,
 }
 
 #[derive(Subcommand)]
@@ -3988,14 +4020,40 @@ async fn run(cli: Cli) -> Result<()> {
         // ── Chaos ─────────────────────────────────────────────────────────────
         Commands::Chaos { cmd } => match cmd {
             ChaosCmd::Experiments => c.get("/api/chaos/experiments").await,
-            ChaosCmd::Templates => c.get("/api/chaos/templates").await,
-            ChaosCmd::Run { template, namespace } => {
+            ChaosCmd::Get { id } => c.get(&format!("/api/chaos/experiments/{id}")).await,
+            ChaosCmd::Create {
+                name,
+                experiment_type,
+                namespace,
+                duration_secs,
+                latency_ms,
+                packet_loss_percent,
+            } => {
                 c.post(
-                    "/api/chaos/run",
-                    json!({ "template": template, "namespace": namespace }),
+                    "/api/chaos/experiments",
+                    json!({
+                        "name": name,
+                        "experiment_type": experiment_type,
+                        "target": { "namespace": namespace, "selector": {}, "pod_count": null },
+                        "parameters": {
+                            "latency_ms": latency_ms,
+                            "packet_loss_percent": packet_loss_percent,
+                            "cpu_load_percent": null,
+                            "memory_mb": null
+                        },
+                        "duration_secs": duration_secs
+                    }),
                 )
                 .await
             }
+            ChaosCmd::Start { id } => {
+                c.post(&format!("/api/chaos/experiments/{id}/start"), json!({})).await
+            }
+            ChaosCmd::Stop { id } => {
+                c.post(&format!("/api/chaos/experiments/{id}/stop"), json!({})).await
+            }
+            ChaosCmd::Delete { id } => c.delete(&format!("/api/chaos/experiments/{id}")).await,
+            ChaosCmd::Metrics => c.get("/api/chaos/metrics").await,
         },
 
         // ── Policy ────────────────────────────────────────────────────────────
