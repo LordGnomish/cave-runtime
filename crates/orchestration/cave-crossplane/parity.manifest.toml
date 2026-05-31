@@ -52,16 +52,16 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.7500
-adr_justified_ratio = 1.0     # 10 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway grpc-runtime+go-template / cave-cli crank / cave-cloud real providers / cave-sign cosign). All partials closed. (2026-05-31 honest-cont2: usage-tracking skipped→mapped — full in-crate Usage protection policy (admit_deletion decision + in-use label + replayDeletion planning); only the live-apiserver finalizer write-back remains a cave-apiserver adapter, so the Crossplane-specific intelligence is fully ported. Mirrors the 2026-05-30 composition-revision-garbage-collect reversal. Prior 2026-05-30 honest-cont: condition-propagation-healthy partial→mapped + composition-revision-garbage-collect skipped→mapped; environment-configs skipped→mapped.)
+honest_ratio        = 0.7561
+adr_justified_ratio = 1.0     # 10 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway grpc-runtime+go-template / cave-cli crank / cave-cloud real providers / cave-sign cosign). All partials closed. (2026-05-31 honest-cont2: usage-tracking skipped→mapped — full in-crate Usage protection policy (admit_deletion decision + in-use label + replayDeletion planning); only the live-apiserver finalizer write-back remains a cave-apiserver adapter. PLUS composition-selection NEW mapped (matchLabels resolver + enforced/default selectors + compositionUpdatePolicy — pure in-crate). Mirrors the 2026-05-30 composition-revision-garbage-collect reversal. Prior 2026-05-30 honest-cont: condition-propagation-healthy partial→mapped + composition-revision-garbage-collect skipped→mapped; environment-configs skipped→mapped.)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 30
+mapped_count        = 31
 partial_count       = 0
 skipped_count       = 10
 unmapped_count      = 0
-total               = 40
+total               = 41
 
 # 2026-05-23 Charter v2 deep-port — claude/cave-crossplane-close-2026-05-23:
 #   * Pre-port scaffold was 10 src/ files / 2352 LOC / `parity.ratio = 0.0`
@@ -268,6 +268,12 @@ name = "composition-revision-garbage-collect"
 upstream_files = ["internal/controller/pkg/manager/reconciler.go (GC block)", "apis/pkg/v1::RevisionHistoryLimit"]
 local_files = ["src/composition/revision_gc.rs", "src/composition/store.rs"]
 note = "revisionHistoryLimit garbage collection: configurable limit (nil→default 1, 0→keep all / GC disabled, n→keep current + n historical), always preserves the current (highest-numbered) revision, collects the OLDEST (lowest-numbered) when len > limit+1. RevisionGarbageCollector::{plan,plan_one} + CompositionStore::gc_revisions; push_revision is now append-only (retention is an explicit reconcile concern, mirroring upstream). Wired POST /compositions/{name}/revisions/gc + cavectl infra composition gc. (2026-05-30 strict-TDD RED→GREEN: was [[skipped]] scope_cut to internal-ring-bound — reversed since revisionHistoryLimit is a pure in-crate policy, not a sibling-crate concern; the prior hardcoded MAX_REVISIONS=10 drain ring was an oversimplification. tests/revision_gc_tdd.rs, 8 cases.)"
+
+[[mapped]]
+name = "composition-selection"
+upstream_files = ["internal/controller/apiextensions/composite/api.go::{APILabelSelectorResolver.SelectComposition,EnforcedCompositionSelector,APIDefaultCompositionSelector}", "apis/apiextensions/v1/composition_types.go::{CompositionSelector,CompositionUpdatePolicy}"]
+local_files = ["src/composition/selector.rs"]
+note = "Composition selection: how a composite resource (XR) binds to a Composition. LabelSelectorResolver::select — no-op when spec.compositionRef is set; else filters candidates by spec.compositionSelector.matchLabels (label-superset) AND compositeTypeRef compatibility (apiVersion+kind), erroring NoCompatibleComposition when none match (upstream errNoCompatiblecomposition). EnforcedCompositionSelector (XRD enforcedCompositionRef overrides any ref) + DefaultCompositionSelector (XRD defaultCompositionRef, applied only when neither ref nor selector is set). CompositionUpdatePolicy Automatic|Manual → effective_revision (Automatic=latest, Manual=pinned||latest). Pure in-crate policy, no apiserver coupling. Upstream picks a random match; we pick the lowest-named for deterministic/testable selection (documented divergence). Wired POST /api/crossplane/compositions/select (dry-run preview). (2026-05-31 NEW strict-TDD RED→GREEN; tests/composition_selector_tdd.rs, 10 cases.)"
 
 [[mapped]]
 name = "usage-tracking"

@@ -12,8 +12,13 @@ pub mod legacy;
 pub mod patch_transform;
 pub mod pipeline;
 pub mod revision_gc;
+pub mod selector;
 pub mod step;
 pub mod store;
 
 pub use revision_gc::RevisionGarbageCollector;
+pub use selector::{
+    CompositionUpdatePolicy, DefaultCompositionSelector, EnforcedCompositionSelector,
+    LabelSelectorResolver,
+};
 pub use store::CompositionStore;

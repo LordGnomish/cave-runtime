@@ -51,6 +51,10 @@ pub fn create_router(state: Arc<CrossplaneState>) -> Router {
             "/api/crossplane/compositions/{name}/revisions/gc",
             post(gc_composition_revisions),
         )
+        .route(
+            "/api/crossplane/compositions/select",
+            post(select_composition),
+        )
         // Claims (namespaced)
         .route(
             "/api/crossplane/namespaces/{ns}/claims/{kind}",
@@ -318,6 +322,71 @@ async fn gc_composition_revisions(
         }))
         .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+// ── Composition selection (matchLabels resolver) ───────────────────────────────
+
+#[derive(Deserialize)]
+struct CandidateBody {
+    name: String,
+    #[serde(default)]
+    labels: std::collections::BTreeMap<String, String>,
+    api_version: String,
+    kind: String,
+}
+
+#[derive(Deserialize)]
+struct SelectBody {
+    xr_api_version: String,
+    xr_kind: String,
+    #[serde(default)]
+    composition_ref: Option<String>,
+    #[serde(default)]
+    match_labels: Option<std::collections::BTreeMap<String, String>>,
+    #[serde(default)]
+    candidates: Vec<CandidateBody>,
+}
+
+/// Dry-run the `compositionSelector.matchLabels` resolver against a supplied
+/// candidate set (preview — pure in-crate policy, no apiserver round-trip).
+async fn select_composition(Json(body): Json<SelectBody>) -> impl IntoResponse {
+    use crate::composition::selector::{
+        CompositionCandidate, LabelSelectorResolver, SelectError, SelectionOutcome,
+    };
+    let candidates: Vec<CompositionCandidate> = body
+        .candidates
+        .into_iter()
+        .map(|c| CompositionCandidate {
+            name: c.name,
+            labels: c.labels,
+            api_version: c.api_version,
+            kind: c.kind,
+        })
+        .collect();
+    match LabelSelectorResolver::select(
+        &body.xr_api_version,
+        &body.xr_kind,
+        body.composition_ref.as_deref(),
+        body.match_labels.as_ref(),
+        &candidates,
+    ) {
+        Ok(SelectionOutcome::AlreadySet(name)) => {
+            Json(json!({"resolved": name, "mode": "alreadySet"})).into_response()
+        }
+        Ok(SelectionOutcome::Selected(name)) => {
+            Json(json!({"resolved": name, "mode": "selected"})).into_response()
+        }
+        Err(SelectError::NoSelector) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "neither compositionRef nor compositionSelector provided"})),
+        )
+            .into_response(),
+        Err(SelectError::NoCompatibleComposition) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "no compatible composition matched the selector"})),
+        )
+            .into_response(),
     }
 }
 
