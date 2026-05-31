@@ -50,6 +50,37 @@ impl Engine {
     pub fn macro_count(&self) -> usize { self.macros.len() }
     pub fn list_count(&self) -> usize { self.lists.len() }
 
+    /// Falco `-T <tags>`: disable every rule carrying at least one of the
+    /// given tags (`falco_engine::enable_rule_by_tag(tags, false)`).
+    /// Additive — repeated calls accumulate. Returns the number of rules
+    /// newly disabled by this call.
+    pub fn disable_by_tags(&mut self, tags: &[&str]) -> usize {
+        let mut n = 0;
+        for r in &mut self.rules {
+            if r.enabled && rule_has_any_tag(r, tags) {
+                r.enabled = false;
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Falco `-t <tags>`: run **only** rules carrying at least one of the
+    /// given tags; every other rule is disabled. Returns the number of
+    /// rules kept enabled.
+    pub fn run_only_tags(&mut self, tags: &[&str]) -> usize {
+        let mut kept = 0;
+        for r in &mut self.rules {
+            if rule_has_any_tag(r, tags) {
+                r.enabled = true;
+                kept += 1;
+            } else {
+                r.enabled = false;
+            }
+        }
+        kept
+    }
+
     /// Evaluate all enabled rules against an event; return a list of
     /// matches (one per rule that fires).
     pub fn evaluate(&self, event: &FalcoEvent) -> Vec<EngineMatch> {
@@ -69,6 +100,11 @@ impl Engine {
         }
         out
     }
+}
+
+/// True if `r` carries at least one of `tags` (Falco tag intersection).
+fn rule_has_any_tag(r: &Rule, tags: &[&str]) -> bool {
+    r.tags.iter().any(|t| tags.contains(&t.as_str()))
 }
 
 // ── expression eval (subset) ────────────────────────────────────────────────
