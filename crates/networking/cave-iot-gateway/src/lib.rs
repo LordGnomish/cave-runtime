@@ -33,6 +33,7 @@ pub mod ota;
 pub mod provisioning;
 pub mod registry;
 pub mod rule_engine;
+pub mod tenant;
 pub mod timeseries;
 pub mod transport;
 pub mod twin;
