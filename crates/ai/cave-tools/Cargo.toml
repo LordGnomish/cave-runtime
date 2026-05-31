@@ -26,3 +26,4 @@ hex = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]
+tempfile = "3"
