@@ -56,39 +56,55 @@ impl ModuleRegistry {
     }
 
     /// Store `bytes` and bind `reference` to its digest. Returns the
-    /// `sha256:<hex>` digest. RED stub: computes the digest but does not store.
+    /// `sha256:<hex>` digest. Content-addressed: identical bytes collapse to a
+    /// single blob shared by every reference.
     pub fn push(&mut self, reference: &str, bytes: Vec<u8>) -> String {
-        let _ = reference;
-        format!("sha256:{}", sha256_hex(&bytes))
+        let digest = format!("sha256:{}", sha256_hex(&bytes));
+        self.blobs.entry(digest.clone()).or_insert(bytes);
+        self.tags
+            .insert(ModuleRef::parse(reference).canonical(), digest.clone());
+        digest
     }
 
     /// Fetch the bytes bound to a reference.
     pub fn pull(&self, reference: &str) -> Option<&[u8]> {
-        let _ = reference;
-        None
+        let digest = self.tags.get(&ModuleRef::parse(reference).canonical())?;
+        self.blobs.get(digest).map(|b| b.as_slice())
     }
 
     /// Fetch bytes by digest directly.
     pub fn get_by_digest(&self, digest: &str) -> Option<&[u8]> {
-        let _ = digest;
-        None
+        self.blobs.get(digest).map(|b| b.as_slice())
     }
 
     /// Resolve a reference to its digest.
     pub fn resolve(&self, reference: &str) -> Option<String> {
-        let _ = reference;
-        None
+        self.tags
+            .get(&ModuleRef::parse(reference).canonical())
+            .cloned()
     }
 
     /// All catalogue entries, sorted by reference.
     pub fn list(&self) -> Vec<RegistryEntry> {
-        Vec::new()
+        let mut out: Vec<RegistryEntry> = self
+            .tags
+            .iter()
+            .map(|(reference, digest)| RegistryEntry {
+                reference: reference.clone(),
+                digest: digest.clone(),
+                size: self.blobs.get(digest).map(|b| b.len()).unwrap_or(0),
+            })
+            .collect();
+        out.sort_by(|a, b| a.reference.cmp(&b.reference));
+        out
     }
 
-    /// Remove a tag binding. Returns whether it existed.
+    /// Remove a tag binding. Returns whether it existed. The underlying blob is
+    /// retained (it may be shared by other references).
     pub fn remove(&mut self, reference: &str) -> bool {
-        let _ = reference;
-        false
+        self.tags
+            .remove(&ModuleRef::parse(reference).canonical())
+            .is_some()
     }
 
     /// Number of distinct stored blobs.
