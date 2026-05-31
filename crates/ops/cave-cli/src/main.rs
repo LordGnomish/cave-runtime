@@ -295,6 +295,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: KedaCmd,
     },
+    /// IoT device gateway (ThingsBoard parity) — registry, telemetry, OTA
+    Iot {
+        #[command(subcommand)]
+        cmd: IotCmd,
+    },
     /// HashiCorp Vault parity — secret backends + audit
     Vault {
         #[command(subcommand)]
@@ -1764,6 +1769,33 @@ enum KedaCmd {
     /// Tenant-wide per-scaler Prometheus stats (events/min, errors/min, p50/p99)
     #[command(name = "scaler-metrics")]
     ScalerMetrics,
+}
+
+#[derive(Subcommand)]
+enum IotCmd {
+    /// List devices in the active tenant
+    Devices,
+    /// Inspect one device (profile, credentials type, label)
+    Device {
+        /// Device id
+        id: String,
+    },
+    /// Show the latest telemetry values for a device
+    Telemetry {
+        /// Device id
+        id: String,
+    },
+    /// List active alarms for a device
+    Alarms {
+        /// Device id
+        id: String,
+    },
+    /// List OTA campaigns and their rollout progress
+    Ota,
+    /// List dashboards in the active tenant
+    Dashboards,
+    /// Show per-tenant quota usage + rate-limit budget
+    Tenants,
 }
 
 #[derive(Subcommand)]
@@ -5078,6 +5110,22 @@ source_root = "src"
                 c.get(&format!("/admin/keda/scalers/{}", urlencode(&kind))).await
             }
             KedaCmd::ScalerMetrics => c.get("/admin/keda/metrics").await,
+        },
+        Commands::Iot { cmd } => match cmd {
+            IotCmd::Devices => c.get("/api/iot/devices").await,
+            IotCmd::Device { id } => {
+                c.get(&format!("/api/iot/devices/{}", urlencode(&id))).await
+            }
+            IotCmd::Telemetry { id } => {
+                c.get(&format!("/api/iot/devices/{}/telemetry/latest", urlencode(&id)))
+                    .await
+            }
+            IotCmd::Alarms { id } => {
+                c.get(&format!("/api/iot/devices/{}/alarms", urlencode(&id))).await
+            }
+            IotCmd::Ota => c.get("/api/iot/ota/campaigns").await,
+            IotCmd::Dashboards => c.get("/api/iot/dashboards").await,
+            IotCmd::Tenants => c.get("/api/iot/tenants").await,
         },
     }
 }
