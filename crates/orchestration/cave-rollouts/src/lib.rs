@@ -25,6 +25,7 @@ pub mod engine;
 pub mod experiment;
 pub mod models;
 pub mod notifications;
+pub mod replicaset;
 pub mod routes;
 pub mod store;
 pub mod traffic_router;
