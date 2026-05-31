@@ -52,14 +52,14 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.7250
-adr_justified_ratio = 1.0     # 11 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+usage-finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway grpc-runtime+go-template / cave-cli crank / cave-cloud real providers / cave-sign cosign). All partials closed. (2026-05-30 honest-cont: condition-propagation-healthy partial→mapped — real crossplane-runtime ConditionedStatus.SetConditions / Condition.Equal / observed-generation gating; AND composition-revision-garbage-collect skipped→mapped — real revisionHistoryLimit GC (RevisionGarbageCollector), reversing the prior "in-memory ring bound" scope_cut since the policy is fully in-crate ownable. Prior 2026-05-30: environment-configs skipped→mapped.)
+honest_ratio        = 0.7500
+adr_justified_ratio = 1.0     # 10 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway grpc-runtime+go-template / cave-cli crank / cave-cloud real providers / cave-sign cosign). All partials closed. (2026-05-31 honest-cont2: usage-tracking skipped→mapped — full in-crate Usage protection policy (admit_deletion decision + in-use label + replayDeletion planning); only the live-apiserver finalizer write-back remains a cave-apiserver adapter, so the Crossplane-specific intelligence is fully ported. Mirrors the 2026-05-30 composition-revision-garbage-collect reversal. Prior 2026-05-30 honest-cont: condition-propagation-healthy partial→mapped + composition-revision-garbage-collect skipped→mapped; environment-configs skipped→mapped.)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 29
+mapped_count        = 30
 partial_count       = 0
-skipped_count       = 11
+skipped_count       = 10
 unmapped_count      = 0
 total               = 40
 
@@ -269,7 +269,13 @@ upstream_files = ["internal/controller/pkg/manager/reconciler.go (GC block)", "a
 local_files = ["src/composition/revision_gc.rs", "src/composition/store.rs"]
 note = "revisionHistoryLimit garbage collection: configurable limit (nil→default 1, 0→keep all / GC disabled, n→keep current + n historical), always preserves the current (highest-numbered) revision, collects the OLDEST (lowest-numbered) when len > limit+1. RevisionGarbageCollector::{plan,plan_one} + CompositionStore::gc_revisions; push_revision is now append-only (retention is an explicit reconcile concern, mirroring upstream). Wired POST /compositions/{name}/revisions/gc + cavectl infra composition gc. (2026-05-30 strict-TDD RED→GREEN: was [[skipped]] scope_cut to internal-ring-bound — reversed since revisionHistoryLimit is a pure in-crate policy, not a sibling-crate concern; the prior hardcoded MAX_REVISIONS=10 drain ring was an oversimplification. tests/revision_gc_tdd.rs, 8 cases.)"
 
-# ─── Skipped subsystems (11 — formalised scope cuts) ────────────────────────
+[[mapped]]
+name = "usage-tracking"
+upstream_files = ["apis/protection/v1beta1/usage_types.go", "internal/controller/protection/usage/reconciler.go"]
+local_files = ["src/usage.rs"]
+note = "Usage protection: spec.of (used) ↔ spec.by (using) dependency that gates deletion of the `of` resource. Full in-crate port of the protection *policy*: UsageStore + usages_of + admit_deletion (denies DELETE while any Usage references the target, listing the blocking usages + reason), the crossplane.io/in-use label map + usage.apiextensions.crossplane.io finalizer constants, the deletion-attempt ledger (mirrors the crossplane.io/deletion-attempt annotation stamped by the webhook), and replayDeletion planning (replay the delete on `of` iff replayDeletion && a deletion attempt was recorded). Wired POST/GET/DELETE /usages + POST /usages/admit-deletion + cavectl infra usage. (2026-05-31 strict-TDD RED→GREEN: was [[skipped]] scope_cut to cave-apiserver finalizers — reversed because the admission *decision* + in-use policy + replay planning are pure in-crate policy, not a sibling concern; only the live-apiserver finalizer write-back + webhook *registration* remain a thin cave-apiserver adapter. Mirrors the composition-revision-garbage-collect reversal. tests/usage_tdd.rs, 9 cases.)"
+
+# ─── Skipped subsystems (10 — formalised scope cuts) ────────────────────────
 
 [[skipped]]
 name = "oci-registry-http-pull"
@@ -326,12 +332,6 @@ reason = "Real cloud provider managed resources (AWS S3 / Azure Blob / GCP Stora
 scope_cut_target = "cave-cloud"
 
 [[skipped]]
-name = "usage-tracking"
-upstream_files = ["apis/apiextensions/v1beta1/usage_types.go"]
-reason = "Usage resource (declares dependency between two resources to gate deletion) — Phase 2 covered by cave-apiserver finalizers."
-scope_cut_target = "cave-apiserver"
-
-[[skipped]]
 name = "package-signature-verify"
 upstream_files = ["internal/xpkg/sign/sign.go"]
 reason = "XPKG signature verification (cosign) — Phase 2 routed through cave-sign which owns artifact-signing."
@@ -347,7 +347,7 @@ members = ["oci-registry-http-pull", "helm-v3-oci-registry"]
 [[scope_cuts]]
 group = "kube-apiserver-integration"
 target_crate = "cave-apiserver"
-members = ["kube-apiserver-apply", "usage-tracking"]
+members = ["kube-apiserver-apply"]
 
 [[scope_cuts]]
 group = "certificate-management"

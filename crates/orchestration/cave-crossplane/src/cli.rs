@@ -21,6 +21,7 @@ pub enum InfraSubcommand {
     Function,
     Package,
     Claim,
+    Usage,
 }
 
 impl InfraSubcommand {
@@ -33,6 +34,7 @@ impl InfraSubcommand {
             "function" => Some(Self::Function),
             "package" | "pkg" => Some(Self::Package),
             "claim" => Some(Self::Claim),
+            "usage" => Some(Self::Usage),
             _ => None,
         }
     }
@@ -155,6 +157,28 @@ pub fn dispatch(
         (InfraSubcommand::Claim, InfraAction::Get(_)) => Err(CrossplaneError::Internal(
             "claim get requires ns/name/kind; use HTTP API for now".into(),
         )),
+        (InfraSubcommand::Usage, InfraAction::List) => Ok(json!({
+            "items": state.usage_store.list().iter().map(|u| json!({
+                "name": u.name,
+                "of": format!("{} {}", u.of.kind, u.of.name),
+                "by": u.by.as_ref().map(|b| format!("{} {}", b.kind, b.name)),
+                "replayDeletion": u.replay_deletion,
+            })).collect::<Vec<_>>(),
+            "inUseLabel": crate::usage::IN_USE_LABEL,
+        })),
+        (InfraSubcommand::Usage, InfraAction::Get(name)) => {
+            let u = state
+                .usage_store
+                .get(&name)
+                .ok_or_else(|| CrossplaneError::Internal(format!("usage not found: {}", name)))?;
+            Ok(json!({
+                "name": u.name,
+                "of": {"apiVersion": u.of.api_version, "kind": u.of.kind, "name": u.of.name, "namespace": u.of.namespace},
+                "by": u.by.as_ref().map(|b| json!({"apiVersion": b.api_version, "kind": b.kind, "name": b.name})),
+                "reason": u.reason,
+                "replayDeletion": u.replay_deletion,
+            }))
+        }
         (InfraSubcommand::Package, InfraAction::List) => Ok(json!({
             "note": "Package list is in-memory; use install_package to register",
         })),
@@ -313,5 +337,31 @@ mod tests {
     #[test]
     fn run_cli_unknown_subcommand_errors() {
         assert!(run_cli(&s(), &["bogus".into()]).is_err());
+    }
+
+    #[test]
+    fn dispatch_usage_list_reflects_store() {
+        let st = s();
+        st.usage_store.register(crate::usage::Usage::new(
+            "u1",
+            crate::usage::ResourceTarget::new("nop/v1", "Bucket", "b"),
+        ));
+        let v = dispatch(&st, InfraSubcommand::Usage, InfraAction::List).unwrap();
+        assert_eq!(v["items"].as_array().unwrap().len(), 1);
+        assert_eq!(v["items"][0]["name"], json!("u1"));
+        assert_eq!(v["inUseLabel"], json!("crossplane.io/in-use"));
+    }
+
+    #[test]
+    fn dispatch_usage_get_missing_errors() {
+        assert!(dispatch(&s(), InfraSubcommand::Usage, InfraAction::Get("nope".into())).is_err());
+    }
+
+    #[test]
+    fn usage_subcommand_parses() {
+        assert_eq!(
+            InfraSubcommand::from_str("usage").unwrap(),
+            InfraSubcommand::Usage
+        );
     }
 }

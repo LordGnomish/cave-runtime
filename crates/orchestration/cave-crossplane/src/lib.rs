@@ -24,6 +24,7 @@ pub mod provider;
 pub mod providers_builtin;
 pub mod reconciler;
 pub mod routes;
+pub mod usage;
 pub mod xpkg;
 pub mod xr;
 pub mod xrd;
@@ -38,6 +39,7 @@ pub use error::{CrossplaneError, CrossplaneResult};
 pub use function::FunctionStore;
 pub use provider::ProviderStore;
 pub use reconciler::ReconcileQueue;
+pub use usage::UsageStore;
 pub use xrd::XrdStore;
 
 pub const MODULE_NAME: &str = "crossplane";
@@ -50,6 +52,7 @@ pub struct CrossplaneState {
     pub reconcile_queue: Arc<ReconcileQueue>,
     pub engine: Arc<CompositionEngine>,
     pub function_store: Arc<FunctionStore>,
+    pub usage_store: Arc<UsageStore>,
 }
 
 impl Default for CrossplaneState {
@@ -62,6 +65,7 @@ impl Default for CrossplaneState {
             reconcile_queue: Arc::new(ReconcileQueue::new()),
             engine: Arc::new(CompositionEngine::new()),
             function_store: Arc::new(FunctionStore::new()),
+            usage_store: Arc::new(UsageStore::new()),
         }
     }
 }
