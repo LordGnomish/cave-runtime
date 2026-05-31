@@ -104,39 +104,57 @@ impl SessionContext {
                 input: Box::new(plan),
             };
         }
+        let sort_keys: Vec<SortKey> = stmt
+            .order_by
+            .iter()
+            .map(|(e, asc)| {
+                if *asc {
+                    SortKey::asc(e.clone())
+                } else {
+                    SortKey::desc(e.clone())
+                }
+            })
+            .collect();
+
         if !stmt.group_by.is_empty() {
             // Aggregates in the select list are detected by name lookup
-            // against the function registry.
+            // against the function registry. ORDER BY for a grouped query
+            // sorts the *aggregated* output, so the Sort sits above the
+            // Aggregate node.
             let (group_by, aggr) = self.partition_select_list_for_aggregate(&stmt);
             plan = LogicalPlan::Aggregate {
                 group_by,
                 aggr,
                 input: Box::new(plan),
             };
-        } else if !stmt.select_list.is_empty()
-            && !matches!(&stmt.select_list[0], LogicalExpr::Column { name } if name == "*")
-        {
-            plan = LogicalPlan::Projection {
-                expressions: stmt.select_list.clone(),
-                input: Box::new(plan),
-            };
-        }
-        if !stmt.order_by.is_empty() {
-            let keys: Vec<SortKey> = stmt
-                .order_by
-                .iter()
-                .map(|(e, asc)| {
-                    if *asc {
-                        SortKey::asc(e.clone())
-                    } else {
-                        SortKey::desc(e.clone())
-                    }
-                })
-                .collect();
-            plan = LogicalPlan::Sort {
-                keys,
-                input: Box::new(plan),
-            };
+            if !sort_keys.is_empty() {
+                plan = LogicalPlan::Sort {
+                    keys: sort_keys,
+                    input: Box::new(plan),
+                };
+            }
+        } else {
+            // Non-aggregate: ORDER BY expressions are resolved against the
+            // *input* to the projection (port of DataFusion's
+            // LogicalPlanBuilder, which sorts before the final projection).
+            // This lets a sort key reference a scalar function of a column
+            // or a column that is not in the SELECT list, and keeps the
+            // sort-key column indices aligned with the rows the SortExec
+            // actually sees. The Sort therefore sits *below* the Projection.
+            if !sort_keys.is_empty() {
+                plan = LogicalPlan::Sort {
+                    keys: sort_keys,
+                    input: Box::new(plan),
+                };
+            }
+            if !stmt.select_list.is_empty()
+                && !matches!(&stmt.select_list[0], LogicalExpr::Column { name } if name == "*")
+            {
+                plan = LogicalPlan::Projection {
+                    expressions: stmt.select_list.clone(),
+                    input: Box::new(plan),
+                };
+            }
         }
         if stmt.limit.is_some() || stmt.offset.is_some() {
             plan = LogicalPlan::Limit {
