@@ -201,12 +201,14 @@ impl RaftNode {
         self.election_elapsed = 0;
         self.reset_randomized_election_timeout();
         self.lead = NONE;
+        self.tracker.reset_votes();
         self.state = RaftState::PreCandidate;
     }
 
     pub fn become_candidate(&mut self) {
         let next_term = self.term + 1;
         self.reset(next_term);
+        self.tracker.reset_votes();
         self.vote = self.id;
         self.state = RaftState::Candidate;
     }
@@ -245,23 +247,42 @@ impl RaftNode {
 
     /// Follower/candidate election clock. On timeout, start a campaign.
     pub fn tick_election(&mut self) {
-        // RED placeholder: counts but never campaigns.
         self.election_elapsed += 1;
+        if self.past_election_timeout() {
+            self.campaign();
+        }
     }
 
     /// Leader heartbeat clock. On timeout, broadcast heartbeats.
     pub fn tick_heartbeat(&mut self) {
-        // RED placeholder: counts but never broadcasts.
         self.heartbeat_elapsed += 1;
+        self.election_elapsed += 1;
+        if self.heartbeat_elapsed >= self.heartbeat_timeout {
+            self.heartbeat_elapsed = 0;
+            for to in self.other_voters() {
+                let m = Message::new(MessageType::MsgHeartbeat, self.id, to, self.term);
+                self.msgs.push(m);
+            }
+        }
     }
 
-    /// Start an election: become candidate, vote for self, and either win
-    /// immediately (single voter) or solicit votes from peers
+    /// Start an election: become candidate, vote for self via the tracker,
+    /// and either win immediately (single voter) or solicit votes from peers
     /// (etcd `raft.campaign` / `becomeCandidate`).
     pub fn campaign(&mut self) {
-        // RED placeholder: transitions but neither self-votes via the
-        // tracker nor emits vote requests.
         self.become_candidate();
+        // Record our own vote and check whether that alone settles it.
+        self.tracker.record_vote(self.id, true);
+        if self.tracker.vote_result() == VoteResult::Won {
+            self.become_leader();
+            return;
+        }
+        for to in self.other_voters() {
+            let mut m = Message::new(MessageType::MsgVote, self.id, to, self.term);
+            m.index = self.last_index;
+            m.log_term = self.last_term;
+            self.msgs.push(m);
+        }
     }
 }
 

@@ -501,6 +501,13 @@ impl ProgressTracker {
         self.votes.entry(id).or_insert(granted);
     }
 
+    /// Clear all recorded votes (etcd `ProgressTracker.ResetVotes`), called
+    /// when a fresh campaign begins so stale grants from a prior term do not
+    /// leak into the new tally.
+    pub fn reset_votes(&mut self) {
+        self.votes.clear();
+    }
+
     /// Count votes among voters, excluding learners. Returns
     /// `(granted, rejected)`.
     pub fn tally_votes(&self) -> (usize, usize) {
