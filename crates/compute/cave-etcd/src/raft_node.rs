@@ -296,10 +296,88 @@ impl RaftNode {
     /// (etcd `raft.Step`). Term reconciliation happens first, then the
     /// per-role dispatch. Responses are pushed onto `msgs`.
     pub fn step(&mut self, m: Message) {
-        // RED placeholder: only the local election trigger is honored; all
-        // term reconciliation and vote handling is missing.
-        if m.msg_type == MessageType::MsgHup {
-            self.campaign();
+        use MessageType::*;
+        // ── 1. Term reconciliation ────────────────────────────────────
+        if m.term == 0 {
+            // Local message (e.g. MsgHup) — no term to reconcile.
+        } else if m.term > self.term {
+            match m.msg_type {
+                MsgVote | MsgPreVote => {
+                    // A higher-term vote request: adopt the term with no
+                    // known leader yet, then decide whether to grant.
+                    if m.msg_type == MsgVote {
+                        self.become_follower(m.term, NONE);
+                    }
+                }
+                _ => {
+                    // Heartbeat/append from a newer leader reveals it.
+                    self.become_follower(m.term, m.from);
+                }
+            }
+        } else if m.term < self.term {
+            // Stale term: reject vote requests so the sender steps down,
+            // and drop everything else.
+            if matches!(m.msg_type, MsgVote | MsgPreVote) {
+                let resp_type = if m.msg_type == MsgVote {
+                    MsgVoteResp
+                } else {
+                    MsgPreVoteResp
+                };
+                let mut resp = Message::new(resp_type, self.id, m.from, self.term);
+                resp.reject = true;
+                self.msgs.push(resp);
+            }
+            return;
+        }
+
+        // ── 2. Per-message dispatch ───────────────────────────────────
+        match m.msg_type {
+            MsgHup => self.campaign(),
+            MsgVote | MsgPreVote => self.handle_vote(m),
+            MsgVoteResp => self.handle_vote_resp(m),
+            MsgHeartbeat => {
+                self.election_elapsed = 0;
+                self.lead = m.from;
+                let resp = Message::new(MsgHeartbeatResp, self.id, m.from, self.term);
+                self.msgs.push(resp);
+            }
+            _ => {}
+        }
+    }
+
+    /// Decide a vote request and emit the response (etcd vote-grant logic).
+    fn handle_vote(&mut self, m: Message) {
+        let resp_type = if m.msg_type == MessageType::MsgPreVote {
+            MessageType::MsgPreVoteResp
+        } else {
+            MessageType::MsgVoteResp
+        };
+        // We may grant if we have not yet voted this term (or already voted
+        // for this same candidate) AND the candidate's log is current.
+        let can_vote = self.vote == m.from || self.vote == NONE;
+        let grant = can_vote && self.is_up_to_date(m.index, m.log_term);
+        let mut resp = Message::new(resp_type, self.id, m.from, self.term);
+        if grant {
+            if m.msg_type == MessageType::MsgVote {
+                self.vote = m.from;
+                self.election_elapsed = 0;
+            }
+        } else {
+            resp.reject = true;
+        }
+        self.msgs.push(resp);
+    }
+
+    /// Tally a vote response while campaigning (etcd `stepCandidate`).
+    fn handle_vote_resp(&mut self, m: Message) {
+        if self.state != RaftState::Candidate && self.state != RaftState::PreCandidate {
+            return;
+        }
+        self.tracker.record_vote(m.from, !m.reject);
+        match self.tracker.vote_result() {
+            VoteResult::Won => self.become_leader(),
+            VoteResult::Lost => self.become_follower(self.term, NONE),
+            VoteResult::Pending => {}
         }
     }
 }
