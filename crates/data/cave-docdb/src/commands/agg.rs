@@ -226,30 +226,40 @@ fn unwind_stage(input: Vec<Document>, spec: &Value) -> Vec<Document> {
 fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>) -> Vec<Document> {
     use std::collections::HashMap;
 
-    let mut groups: HashMap<String, Vec<Document>> = HashMap::new();
+    // Map a stable bucket key (canonical JSON string) -> (real _id value, docs).
+    // Insertion order of first-seen buckets is preserved via `order`.
+    let mut groups: HashMap<String, (Value, Vec<Document>)> = HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+
+    let id_spec = group_spec.get("_id").cloned().unwrap_or(Value::Null);
 
     for doc in results {
-        let group_key = group_spec
-            .get("_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("all");
-
-        let key = if let Some(key_field) = group_key.strip_prefix('$') {
-            doc.get(key_field)
-                .map(|v| format!("{:?}", v))
-                .unwrap_or_else(|| "null".to_string())
-        } else {
-            "all".to_string()
+        // The grouping value: a `$field` path resolves against the doc; any
+        // other scalar/null is the literal grouping key (e.g. `_id: null`).
+        let id_value = match id_spec.as_str() {
+            Some(p) if p.starts_with('$') => {
+                doc.get(p.trim_start_matches('$')).cloned().unwrap_or(Value::Null)
+            }
+            _ => id_spec.clone(),
         };
-
-        groups.entry(key).or_insert_with(Vec::new).push(doc.clone());
+        let bucket = id_value.to_string();
+        groups
+            .entry(bucket.clone())
+            .or_insert_with(|| {
+                order.push(bucket.clone());
+                (id_value.clone(), Vec::new())
+            })
+            .1
+            .push(doc.clone());
     }
 
     let mut grouped_results = Vec::new();
 
-    for (key, docs) in groups {
+    for bucket in &order {
+        let (id_value, docs) = &groups[bucket];
+        let docs = docs.clone();
         let mut result = Document::new();
-        result.insert("_id".to_string(), Value::String(key));
+        result.insert("_id".to_string(), id_value.clone());
 
         for (field, spec) in group_spec {
             if field == "_id" {
@@ -258,26 +268,8 @@ fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>
 
             if let Some(spec_obj) = spec.as_object() {
                 if let Some((op, op_field)) = spec_obj.iter().next() {
-                    match op.as_str() {
-                        "$sum" => {
-                            if let Some(field_name) = op_field.as_str() {
-                                let field_name = field_name.trim_start_matches('$');
-                                let sum: i64 = docs
-                                    .iter()
-                                    .filter_map(|d| d.get(field_name).and_then(|v| v.as_i64()))
-                                    .sum();
-                                result.insert(field.clone(), Value::Number(sum.into()));
-                            } else if op_field.as_i64() == Some(1) {
-                                result.insert(
-                                    field.clone(),
-                                    Value::Number((docs.len() as i64).into()),
-                                );
-                            }
-                        }
-                        "$count" => {
-                            result.insert(field.clone(), Value::Number((docs.len() as i64).into()));
-                        }
-                        _ => {}
+                    if let Some(v) = apply_accumulator(op.as_str(), op_field, &docs) {
+                        result.insert(field.clone(), v);
                     }
                 }
             }
@@ -287,6 +279,84 @@ fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>
     }
 
     grouped_results
+}
+
+/// Resolve an accumulator field reference (`"$amount"`) to a per-document
+/// numeric value, or the raw value for value-preserving accumulators.
+fn acc_values<'a>(op_field: &Value, docs: &'a [Document]) -> Vec<&'a Value> {
+    match op_field.as_str() {
+        Some(path) => {
+            let name = path.trim_start_matches('$');
+            docs.iter().filter_map(|d| d.get(name)).collect()
+        }
+        None => Vec::new(),
+    }
+}
+
+fn as_num(v: &Value) -> Option<f64> {
+    v.as_f64()
+}
+
+/// Apply a `$group` accumulator. Returns `None` for an unrecognised operator so
+/// the field is omitted (matching the prior lenient behaviour).
+fn apply_accumulator(op: &str, op_field: &Value, docs: &[Document]) -> Option<Value> {
+    match op {
+        "$sum" => {
+            // `{$sum: 1}` counts; `{$sum: "$field"}` sums the field numerically.
+            if op_field.as_i64() == Some(1) {
+                return Some(Value::Number((docs.len() as i64).into()));
+            }
+            let nums: Vec<f64> = acc_values(op_field, docs).iter().filter_map(|v| as_num(v)).collect();
+            Some(num_value(nums.iter().sum()))
+        }
+        "$count" => Some(Value::Number((docs.len() as i64).into())),
+        "$avg" => {
+            let nums: Vec<f64> = acc_values(op_field, docs).iter().filter_map(|v| as_num(v)).collect();
+            if nums.is_empty() {
+                Some(Value::Null)
+            } else {
+                Some(num_value(nums.iter().sum::<f64>() / nums.len() as f64))
+            }
+        }
+        "$min" => acc_values(op_field, docs)
+            .iter()
+            .filter_map(|v| as_num(v))
+            .fold(None, |acc: Option<f64>, n| Some(acc.map_or(n, |a| a.min(n))))
+            .map(num_value)
+            .or(Some(Value::Null)),
+        "$max" => acc_values(op_field, docs)
+            .iter()
+            .filter_map(|v| as_num(v))
+            .fold(None, |acc: Option<f64>, n| Some(acc.map_or(n, |a| a.max(n))))
+            .map(num_value)
+            .or(Some(Value::Null)),
+        "$first" => Some(acc_values(op_field, docs).first().map(|v| (*v).clone()).unwrap_or(Value::Null)),
+        "$last" => Some(acc_values(op_field, docs).last().map(|v| (*v).clone()).unwrap_or(Value::Null)),
+        "$push" => Some(Value::Array(
+            acc_values(op_field, docs).into_iter().cloned().collect(),
+        )),
+        "$addToSet" => {
+            let mut seen: Vec<Value> = Vec::new();
+            for v in acc_values(op_field, docs) {
+                if !seen.contains(v) {
+                    seen.push(v.clone());
+                }
+            }
+            Some(Value::Array(seen))
+        }
+        _ => None,
+    }
+}
+
+/// Emit an integer JSON number when the value is integral, else a float.
+fn num_value(n: f64) -> Value {
+    if n.fract() == 0.0 && n.abs() < i64::MAX as f64 {
+        Value::Number((n as i64).into())
+    } else {
+        serde_json::Number::from_f64(n)
+            .map(Value::Number)
+            .unwrap_or(Value::Null)
+    }
 }
 
 #[cfg(test)]
