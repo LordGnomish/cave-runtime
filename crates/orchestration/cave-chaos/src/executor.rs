@@ -238,6 +238,26 @@ fn simulate_experiment(
             *metrics_after.get_mut("error_rate").unwrap() += 0.25;
             *metrics_after.get_mut("p99_latency_ms").unwrap() += 80.0;
         }
+        ExperimentType::NetworkDuplicate => {
+            *metrics_after.get_mut("error_rate").unwrap() += 0.04;
+            *metrics_after.get_mut("p99_latency_ms").unwrap() += 100.0;
+        }
+        ExperimentType::DnsChaos => {
+            *metrics_after.get_mut("error_rate").unwrap() += 0.12;
+            *metrics_after.get_mut("p99_latency_ms").unwrap() += 150.0;
+        }
+        ExperimentType::KernelChaos => {
+            *metrics_after.get_mut("error_rate").unwrap() += 0.10;
+            *metrics_after.get_mut("cpu_util").unwrap() += 0.10;
+        }
+        ExperimentType::BlockChaos => {
+            *metrics_after.get_mut("p50_latency_ms").unwrap() += 60.0;
+            *metrics_after.get_mut("p99_latency_ms").unwrap() += 300.0;
+        }
+        ExperimentType::PhysicalMachineChaos => {
+            *metrics_after.get_mut("error_rate").unwrap() += 0.06;
+            *metrics_after.get_mut("cpu_util").unwrap() += 0.20;
+        }
     }
 
     let experiment_label = format!("{:?}", exp.experiment_type);

@@ -106,6 +106,16 @@ pub enum ExperimentType {
     HttpFault,
     GrpcFault,
     JvmException,
+    // Network (additional)
+    NetworkDuplicate,
+    // DNS resolution fault
+    DnsChaos,
+    // Kernel syscall fault injection
+    KernelChaos,
+    // Block device I/O fault
+    BlockChaos,
+    // Bare-metal / physical machine fault
+    PhysicalMachineChaos,
 }
 
 /// Selector for the pods/nodes to target.

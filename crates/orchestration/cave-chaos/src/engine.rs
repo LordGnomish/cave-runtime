@@ -79,6 +79,27 @@ pub fn validate_experiment(experiment: &ChaosExperiment) -> Vec<String> {
         ExperimentType::JvmException => {
             // JVM exception injection — no strict required params beyond duration
         }
+        ExperimentType::NetworkDuplicate => {
+            if let Some(dup) = experiment.parameters.packet_loss_percent {
+                if dup > 100.0 {
+                    errors.push("packet_loss_percent must be 0-100 for NetworkDuplicate".to_string());
+                }
+            } else {
+                errors.push("packet_loss_percent required for NetworkDuplicate".to_string());
+            }
+        }
+        ExperimentType::DnsChaos => {
+            // DNS fault — selector + action only; no numeric params required
+        }
+        ExperimentType::KernelChaos => {
+            // kernel syscall fault — no strict required params beyond duration
+        }
+        ExperimentType::BlockChaos => {
+            // block device fault — no strict required params beyond duration
+        }
+        ExperimentType::PhysicalMachineChaos => {
+            // physical machine fault — no strict required params beyond duration
+        }
     }
     if experiment.duration_secs == 0 {
         errors.push("duration_secs must be > 0".to_string());
