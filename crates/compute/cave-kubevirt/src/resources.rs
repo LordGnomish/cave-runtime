@@ -89,6 +89,24 @@ fn invalid(token: &str) -> String {
     format!("invalid cpuset token: {token:?}")
 }
 
+/// `DefaultMemoryLimitOverheadRatio` — when auto memory limits are enabled and
+/// no per-namespace override is set, `limits.memory = 2 × requests.memory`.
+pub const DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO: f64 = 2.0;
+
+/// Deterministic core of `getMemoryLimitsRatio` — resolve the effective
+/// memory-limit overhead ratio from the namespace's
+/// `alpha.kubevirt.io/auto-memory-limits-ratio` label value.
+///
+/// The label (when present) must parse as a float `>= 1.0`; a missing,
+/// unparseable, or sub-unity value falls back to
+/// [`DEFAULT_MEMORY_LIMIT_OVERHEAD_RATIO`]. The namespace-informer lookup that
+/// surfaces the label is cave-runtime's concern; this is the pure validation.
+pub fn resolve_memory_limits_ratio(label_value: Option<&str>) -> f64 {
+    // RED placeholder.
+    let _ = label_value;
+    0.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,5 +187,32 @@ mod tests {
         assert_eq!(parse_cpu_set_line("0-2", 2).unwrap(), vec![0, 1, 2]);
         // ... but a 4th id (len already 3 > 2 at the next check) is rejected.
         assert!(parse_cpu_set_line("0-3", 2).is_err());
+    }
+
+    #[test]
+    fn mem_ratio_defaults_when_unset() {
+        assert_eq!(resolve_memory_limits_ratio(None), 2.0);
+    }
+
+    #[test]
+    fn mem_ratio_honours_valid_override() {
+        assert_eq!(resolve_memory_limits_ratio(Some("3.0")), 3.0);
+        assert_eq!(resolve_memory_limits_ratio(Some("1.5")), 1.5);
+    }
+
+    #[test]
+    fn mem_ratio_accepts_unity_boundary() {
+        assert_eq!(resolve_memory_limits_ratio(Some("1.0")), 1.0);
+    }
+
+    #[test]
+    fn mem_ratio_rejects_sub_unity_and_falls_back() {
+        assert_eq!(resolve_memory_limits_ratio(Some("0.5")), 2.0);
+    }
+
+    #[test]
+    fn mem_ratio_rejects_unparseable_and_falls_back() {
+        assert_eq!(resolve_memory_limits_ratio(Some("abc")), 2.0);
+        assert_eq!(resolve_memory_limits_ratio(Some("")), 2.0);
     }
 }
