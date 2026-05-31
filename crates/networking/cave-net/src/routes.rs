@@ -4,6 +4,8 @@
 
 use crate::dataplane::NetState;
 use crate::ebpf_sim::bpf_host_sim::{Direction, HostVerdict};
+use crate::ebpf_sim::dsr_sim::{dsr_extract_opt4, dsr_set_opt4, DsrDrop, DsrSetOutcome, Ipv4Hdr};
+use crate::ebpf_sim::lb_sim::{LbAlgo, LbBackend, LbMaps, LbTuple};
 use crate::ebpf_sim::policy_lpm::RangePolicyMap;
 use crate::ebpf_sim::port_range::port_range_to_masked_ports;
 use crate::ebpf_sim::program::{Ipv4, L4Proto};
@@ -40,6 +42,9 @@ pub fn create_router(state: Arc<NetState>) -> Router {
         .route("/api/net/policy/port-range/check", post(port_range_check))
         .route("/api/net/bandwidth/schedule", post(bandwidth_schedule))
         .route("/api/net/nat64/translate", get(nat64_translate))
+        .route("/api/net/dsr/encode", get(dsr_encode))
+        .route("/api/net/lb/affinity/simulate", post(lb_affinity_simulate))
+        .route("/api/net/lb/source-range/check", post(lb_source_range_check))
         .with_state(state)
 }
 
@@ -301,6 +306,226 @@ async fn port_range_check(Json(req): Json<PortRangeCheckReq>) -> Json<serde_json
         &req.direction,
         req.probe_port,
     ))
+}
+
+/// Parse a dotted-quad into the numeric (network-order) `u32` the
+/// datapath sims key on. Returns `None` on a malformed address.
+fn parse_ipv4(s: &str) -> Option<u32> {
+    let a: std::net::Ipv4Addr = s.parse().ok()?;
+    Some(u32::from(a))
+}
+
+/// Build the JSON view of a DSR IPv4-option encode + round-trip decode.
+/// Mirrors Cilium's `dsr_set_opt4` / `dsr_extract_opt4`
+/// (`bpf/lib/nodeport.h`): embed the service VIP+port in the 8-byte
+/// option, grow the header, then recover it on the backend node.
+pub fn dsr_encode_json(
+    svc_addr: &str,
+    svc_port: u16,
+    proto: &str,
+    ihl: u8,
+    tot_len: u16,
+    tcp_syn: bool,
+    mtu: Option<u16>,
+) -> serde_json::Value {
+    let addr = match parse_ipv4(svc_addr) {
+        Some(a) => a,
+        None => return serde_json::json!({"error": "invalid svc_addr"}),
+    };
+    let protocol = match proto.to_ascii_lowercase().as_str() {
+        "tcp" => 6,
+        _ => 17, // default UDP
+    };
+    let mut ip4 = Ipv4Hdr { ihl, tot_len, protocol };
+    let outcome = dsr_set_opt4(&mut ip4, addr, svc_port, tcp_syn, mtu);
+    match outcome {
+        DsrSetOutcome::Set { opt } => {
+            let recovered = dsr_extract_opt4(&ip4, &opt.to_bytes());
+            serde_json::json!({
+                "result": "set",
+                "option_bytes": opt.to_bytes().iter().map(|b| format!("0x{b:02x}")).collect::<Vec<_>>(),
+                "new_ihl": ip4.ihl,
+                "new_tot_len": ip4.tot_len,
+                "svc_addr": svc_addr,
+                "svc_port": svc_port,
+                "recovered": recovered.map(|(a, p)| serde_json::json!({
+                    "svc_addr": std::net::Ipv4Addr::from(a).to_string(),
+                    "svc_port": p,
+                })),
+            })
+        }
+        DsrSetOutcome::SkipNonSyn => serde_json::json!({"result": "skip_non_syn"}),
+        DsrSetOutcome::Drop(DsrDrop::CtInvalidHdr) => {
+            serde_json::json!({"result": "drop", "reason": "ct_invalid_hdr"})
+        }
+        DsrSetOutcome::Drop(DsrDrop::FragNeeded) => {
+            serde_json::json!({"result": "drop", "reason": "frag_needed"})
+        }
+    }
+}
+
+/// Build the JSON view of a session-affinity walk: a 3-backend service
+/// receives a sequence of probes from one client, and we report which
+/// backend each probe lands on plus whether it was a sticky reuse.
+/// Mirrors `lb4_local_affinity` (`bpf/lib/lb.h`).
+pub fn lb_affinity_simulate_json(
+    client: &str,
+    affinity_timeout: u32,
+    probes: &[(u32, u64)],
+) -> serde_json::Value {
+    let saddr = match parse_ipv4(client) {
+        Some(a) => a,
+        None => return serde_json::json!({"error": "invalid client"}),
+    };
+    let vip = u32::from_be_bytes([172, 20, 0, 1]);
+    let mut maps = LbMaps::new();
+    maps.add_service_with_affinity(
+        vip,
+        80,
+        L4Proto::Tcp.proto_num(),
+        9,
+        LbAlgo::Random,
+        &[
+            (1, LbBackend { address: u32::from_be_bytes([10, 1, 0, 1]), port: 8080 }),
+            (2, LbBackend { address: u32::from_be_bytes([10, 1, 0, 2]), port: 8080 }),
+            (3, LbBackend { address: u32::from_be_bytes([10, 1, 0, 3]), port: 8080 }),
+        ],
+        affinity_timeout,
+    );
+    let mut last_backend = 0u32;
+    let steps: Vec<serde_json::Value> = probes
+        .iter()
+        .map(|&(prandom, now_ns)| {
+            let tuple = LbTuple {
+                saddr,
+                daddr: vip,
+                sport: 5000,
+                dport: 80,
+                nexthdr: L4Proto::Tcp.proto_num(),
+            };
+            let xlate = maps.lb4_local_affinity(&tuple, prandom, now_ns);
+            let backend_id = xlate.map(|x| x.backend_id).unwrap_or(0);
+            let sticky = backend_id != 0 && backend_id == last_backend;
+            last_backend = backend_id;
+            serde_json::json!({
+                "prandom": prandom,
+                "now_ns": now_ns,
+                "backend_id": backend_id,
+                "sticky_reuse": sticky,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "client": client,
+        "affinity_timeout_sec": affinity_timeout,
+        "probes": steps,
+    })
+}
+
+/// Build the JSON verdict for a client address against a service's
+/// source ranges. Mirrors `lb4_src_range_ok` (`bpf/lib/lb.h`): LPM
+/// membership, XOR'd with the deny flag. CIDRs are `"a.b.c.d/len"`.
+pub fn lb_source_range_json(ranges: &[String], deny: bool, client: &str) -> serde_json::Value {
+    let saddr = match parse_ipv4(client) {
+        Some(a) => a,
+        None => return serde_json::json!({"error": "invalid client"}),
+    };
+    let mut maps = LbMaps::new();
+    let rev = 9u16;
+    for cidr in ranges {
+        let (net_s, len_s) = match cidr.split_once('/') {
+            Some(parts) => parts,
+            None => return serde_json::json!({"error": format!("invalid cidr: {cidr}")}),
+        };
+        let net = match parse_ipv4(net_s) {
+            Some(a) => a,
+            None => return serde_json::json!({"error": format!("invalid cidr: {cidr}")}),
+        };
+        let prefix_len: u8 = match len_s.parse() {
+            Ok(p) if p <= 32 => p,
+            _ => return serde_json::json!({"error": format!("invalid prefix: {cidr}")}),
+        };
+        maps.add_source_range(rev, net, prefix_len);
+    }
+    maps.set_source_range_deny(rev, deny);
+    let ok = maps.lb4_src_range_ok(rev, saddr);
+    serde_json::json!({
+        "client": client,
+        "ranges": ranges,
+        "deny": deny,
+        "verdict": if ok { "allow" } else { "deny" },
+    })
+}
+
+#[derive(Deserialize)]
+struct DsrEncodeQuery {
+    svc_addr: String,
+    svc_port: u16,
+    #[serde(default = "default_udp")]
+    proto: String,
+    #[serde(default = "default_ihl")]
+    ihl: u8,
+    #[serde(default = "default_tot_len")]
+    tot_len: u16,
+    #[serde(default)]
+    tcp_syn: bool,
+    #[serde(default)]
+    mtu: Option<u16>,
+}
+
+fn default_udp() -> String {
+    "udp".to_string()
+}
+fn default_ihl() -> u8 {
+    5
+}
+fn default_tot_len() -> u16 {
+    40
+}
+
+async fn dsr_encode(Query(q): Query<DsrEncodeQuery>) -> Json<serde_json::Value> {
+    Json(dsr_encode_json(
+        &q.svc_addr,
+        q.svc_port,
+        &q.proto,
+        q.ihl,
+        q.tot_len,
+        q.tcp_syn,
+        q.mtu,
+    ))
+}
+
+#[derive(Deserialize)]
+struct AffinityProbe {
+    #[serde(default)]
+    prandom: u32,
+    #[serde(default)]
+    now_ns: u64,
+}
+
+#[derive(Deserialize)]
+struct AffinitySimReq {
+    client: String,
+    affinity_timeout: u32,
+    probes: Vec<AffinityProbe>,
+}
+
+async fn lb_affinity_simulate(Json(req): Json<AffinitySimReq>) -> Json<serde_json::Value> {
+    let probes: Vec<(u32, u64)> = req.probes.iter().map(|p| (p.prandom, p.now_ns)).collect();
+    Json(lb_affinity_simulate_json(&req.client, req.affinity_timeout, &probes))
+}
+
+#[derive(Deserialize)]
+struct SourceRangeReq {
+    client: String,
+    #[serde(default)]
+    ranges: Vec<String>,
+    #[serde(default)]
+    deny: bool,
+}
+
+async fn lb_source_range_check(Json(req): Json<SourceRangeReq>) -> Json<serde_json::Value> {
+    Json(lb_source_range_json(&req.ranges, req.deny, &req.client))
 }
 
 async fn health() -> Json<serde_json::Value> {

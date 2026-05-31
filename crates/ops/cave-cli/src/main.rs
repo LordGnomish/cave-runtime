@@ -3143,6 +3143,60 @@ enum NetCmd {
         #[arg(long, default_value = "mapped")]
         encoding: String,
     },
+    /// Encode a service VIP+port into a DSR IPv4 option (Cilium
+    /// bpf/lib/nodeport.h dsr_set_opt4) and recover it (dsr_extract_opt4).
+    /// Reports the option bytes plus the grown ihl/tot_len.
+    Dsr {
+        /// Service address (dotted-quad).
+        #[arg(long)]
+        svc_addr: String,
+        /// Service port.
+        #[arg(long)]
+        svc_port: u16,
+        /// L4 protocol: `tcp` or `udp`.
+        #[arg(long, default_value = "udp")]
+        proto: String,
+        /// Internet header length in 32-bit words (5 = no options).
+        #[arg(long, default_value_t = 5)]
+        ihl: u8,
+        /// IPv4 total length (bytes).
+        #[arg(long, default_value_t = 40)]
+        tot_len: u16,
+        /// For TCP, mark this as the SYN (the option is set only on SYN).
+        #[arg(long, default_value_t = false)]
+        tcp_syn: bool,
+        /// Optional egress MTU (triggers frag-needed if exceeded).
+        #[arg(long)]
+        mtu: Option<u16>,
+    },
+    /// Walk LB session affinity (Cilium bpf/lib/lb.h lb4_local_affinity)
+    /// for one client across a sequence of `prandom@now_ns` probes; shows
+    /// which backend each lands on and whether it was a sticky reuse.
+    LbAffinity {
+        /// Client source address (dotted-quad).
+        #[arg(long)]
+        client: String,
+        /// Sticky window in seconds (0 = affinity disabled).
+        #[arg(long)]
+        timeout: u32,
+        /// Probes as `prandom:now_ns`, repeatable.
+        #[arg(long = "probe", value_name = "PRANDOM:NOW_NS")]
+        probes: Vec<String>,
+    },
+    /// Check a client address against a service's source-range ACL
+    /// (Cilium bpf/lib/lb.h lb4_src_range_ok). `--deny` flips the ranges
+    /// from an allow-list to a block-list.
+    LbSourceRange {
+        /// Client source address (dotted-quad).
+        #[arg(long)]
+        client: String,
+        /// CIDR range `a.b.c.d/len`, repeatable.
+        #[arg(long = "range", value_name = "CIDR")]
+        ranges: Vec<String>,
+        /// Treat the ranges as a block-list (SVC_FLAG_SOURCE_RANGE_DENY).
+        #[arg(long, default_value_t = false)]
+        deny: bool,
+    },
     /// Liveness probe (/api/net/health)
     Health,
 }
@@ -4609,6 +4663,45 @@ source_root = "src"
                     urlencode(&v4),
                     urlencode(&encoding)
                 ))
+                .await
+            }
+            NetCmd::Dsr { svc_addr, svc_port, proto, ihl, tot_len, tcp_syn, mtu } => {
+                let mut url = format!(
+                    "/api/net/dsr/encode?svc_addr={}&svc_port={}&proto={}&ihl={}&tot_len={}&tcp_syn={}",
+                    urlencode(&svc_addr),
+                    svc_port,
+                    urlencode(&proto),
+                    ihl,
+                    tot_len,
+                    tcp_syn,
+                );
+                if let Some(m) = mtu {
+                    url.push_str(&format!("&mtu={m}"));
+                }
+                c.get(&url).await
+            }
+            NetCmd::LbAffinity { client, timeout, probes } => {
+                let parsed: Vec<serde_json::Value> = probes
+                    .iter()
+                    .map(|p| {
+                        let (pr, now) = p.split_once(':').unwrap_or((p.as_str(), "0"));
+                        json!({
+                            "prandom": pr.parse::<u32>().unwrap_or(0),
+                            "now_ns": now.parse::<u64>().unwrap_or(0),
+                        })
+                    })
+                    .collect();
+                c.post(
+                    "/api/net/lb/affinity/simulate",
+                    json!({ "client": client, "affinity_timeout": timeout, "probes": parsed }),
+                )
+                .await
+            }
+            NetCmd::LbSourceRange { client, ranges, deny } => {
+                c.post(
+                    "/api/net/lb/source-range/check",
+                    json!({ "client": client, "ranges": ranges, "deny": deny }),
+                )
                 .await
             }
             NetCmd::Health => c.get("/api/net/health").await,

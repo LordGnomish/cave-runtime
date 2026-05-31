@@ -21,6 +21,7 @@ use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
+pub mod datapath;
 pub mod flows;
 pub mod identities;
 pub mod nodes;
@@ -51,6 +52,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewErr
     let services_html = services::render_section(state, ctx)?;
     let nodes_html = nodes::render_section(state, ctx)?;
     let identities_html = identities::render_section(state, ctx)?;
+    let datapath_html = datapath::render_section(state, ctx)?;
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
   Cilium Hubble Web UI parity (cave-net).
@@ -62,17 +64,20 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewErr
   <a href="#net-services">Services</a>
   <a href="#net-nodes">Nodes</a>
   <a href="#net-identities">Identities</a>
+  <a href="#net-datapath">Datapath</a>
 </nav>
 {flows}
 {policies}
 {services}
 {nodes}
-{identities}"##,
+{identities}
+{datapath}"##,
         flows = flows_html,
         policies = policies_html,
         services = services_html,
         nodes = nodes_html,
         identities = identities_html,
+        datapath = datapath_html,
     );
     Ok(page_shell_full(
         ctx,
@@ -103,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn render_includes_all_five_tabs() {
+    fn render_includes_all_tabs() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::NetRead])).unwrap();
         for anchor in [
             "#net-flows",
@@ -111,6 +116,7 @@ mod tests {
             "#net-services",
             "#net-nodes",
             "#net-identities",
+            "#net-datapath",
         ] {
             assert!(html.contains(anchor));
         }
