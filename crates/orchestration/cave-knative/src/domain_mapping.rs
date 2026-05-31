@@ -115,6 +115,16 @@ impl DomainMappingStatus {
         );
     }
 
+    /// Port of `InitializeConditions` — every gating condition starts `Unknown`
+    /// until a reconcile pass settles it. Existing values are preserved.
+    pub fn initialize_conditions(&mut self) {
+        for c in READY_DEPENDENCIES {
+            self.conditions
+                .entry(c.to_string())
+                .or_insert(ConditionState::Unknown);
+        }
+    }
+
     /// Aggregate `Ready` — all gating conditions must be `True`.
     pub fn is_ready(&self) -> bool {
         READY_DEPENDENCIES
@@ -138,6 +148,36 @@ impl DomainMapping {
         m.metadata.namespace = namespace.to_string();
         m
     }
+}
+
+/// Annotation selecting the ingress implementation, mirroring upstream
+/// `networking.knative.dev/ingress.class`.
+pub const INGRESS_CLASS_ANNOTATION: &str = "networking.knative.dev/ingress.class";
+
+/// Subset of the Knative `config-network` ConfigMap the DomainMapping
+/// reconciler reads.
+#[derive(Default, Debug, Clone)]
+pub struct NetworkConfig {
+    /// Scheme for the published external URL (`http` or `https`).
+    pub default_external_scheme: String,
+    /// Cluster DNS domain, e.g. `cluster.local`.
+    pub cluster_domain: String,
+    /// Whether the reconciler may autocreate ClusterDomainClaims.
+    pub autocreate_cluster_domain_claims: bool,
+    /// Ingress class used when the DomainMapping carries no annotation.
+    pub default_ingress_class: String,
+}
+
+/// The desired KIngress the reconciler emits for a DomainMapping. The actual
+/// Ingress object + DNS records are reconciled by the networking stack
+/// (cave-net / cave-dns); this is the projection Knative hands them.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct IngressProjection {
+    pub host: String,
+    pub backend_service: String,
+    pub namespace: String,
+    pub ingress_class: String,
+    pub tls: bool,
 }
 
 /// A cluster-scoped record that namespace `namespace` owns domain `domain`.
@@ -306,5 +346,97 @@ pub fn finalize_kind(
             registry.delete(domain);
         }
         _ => {}
+    }
+}
+
+/// Port of `ReconcileKind`.
+///
+/// Drives a DomainMapping through one reconcile pass and returns the desired
+/// [`IngressProjection`]. The ordering mirrors upstream exactly:
+///
+///   1. If the spec generation has moved past the last-observed generation,
+///      defensively mark the ingress not-configured (so a fresh
+///      ObservedGeneration never carries a stale `IngressReady=True`).
+///   2. Publish `status.url` / `status.address` from the mapped domain
+///      (`metadata.name`) under the configured external scheme.
+///   3. Reconcile the ClusterDomainClaim (ownership gate).
+///   4. Settle the certificate condition (BYO secret or none required; live
+///      issuance flows through [`crate::cert_bridge`]).
+///   5. Resolve `spec.ref` to the backend service.
+///   6. Project the desired KIngress.
+///
+/// On a claim/reference failure the relevant condition is left `False`/`Unknown`
+/// and `Err` is returned — the URL/Address are still published, matching
+/// upstream's fail-closed behaviour. The `IngressReady` condition stays
+/// `Unknown` until the caller invokes [`propagate_ingress_status`] once the
+/// underlying ingress reports.
+pub fn reconcile_kind(
+    dm: &mut DomainMapping,
+    resolved: &ResolvedUri,
+    registry: &mut DomainClaimRegistry,
+    cfg: &NetworkConfig,
+) -> Result<IngressProjection, String> {
+    // 0. Initialize the condition set (all gating conditions Unknown).
+    dm.status.initialize_conditions();
+
+    // 1. Defensive ingress reset on generation skew.
+    if dm.metadata.generation != dm.status.observed_generation {
+        dm.status.mark_ingress_not_configured();
+    }
+
+    // 2. Publish the mapped URL (host is the DomainMapping's own name).
+    let scheme = if cfg.default_external_scheme.is_empty() {
+        "http"
+    } else {
+        &cfg.default_external_scheme
+    };
+    let url = format!("{scheme}://{}", dm.metadata.name);
+    dm.status.url = Some(url.clone());
+    dm.status.address = Some(url);
+
+    // 3. Ingress class: annotation wins over the config-map default.
+    let ingress_class = dm
+        .metadata
+        .annotations
+        .get(INGRESS_CLASS_ANNOTATION)
+        .cloned()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| cfg.default_ingress_class.clone());
+
+    // 4. Claim the domain (must succeed before anything else is meaningful).
+    reconcile_domain_claim(dm, registry, cfg.autocreate_cluster_domain_claims)?;
+
+    // 5. Certificate: BYO secret => provided externally; otherwise nothing to
+    //    issue at this layer (cert-manager flow lives in cert_bridge).
+    let tls = dm.spec.tls_secret.is_some();
+    dm.status.mark_certificate_not_required();
+
+    // 6. Resolve the reference to a backend service.
+    let (host, backend_service) = resolve_ref(dm, resolved, &cfg.cluster_domain)?;
+
+    Ok(IngressProjection {
+        host,
+        backend_service,
+        namespace: dm.metadata.namespace.clone(),
+        ingress_class,
+        tls,
+    })
+}
+
+/// Port of `PropagateIngressStatus` — fold the underlying KIngress status back
+/// onto the DomainMapping. `observed_gen_matches` is whether the ingress has
+/// reconciled the latest applied generation; if not, the status is stale and
+/// we report not-configured regardless of `ingress_ready`.
+pub fn propagate_ingress_status(
+    dm: &mut DomainMapping,
+    ingress_ready: bool,
+    observed_gen_matches: bool,
+) {
+    if !observed_gen_matches {
+        dm.status.mark_ingress_not_configured();
+    } else if ingress_ready {
+        dm.status.mark_ingress_ready();
+    } else {
+        dm.status.mark_ingress_not_ready("underlying KIngress is not ready");
     }
 }
