@@ -889,6 +889,12 @@ enum IdentityCmd {
     Federation,
     /// OIDC JWKS keys (for JWT-SVID verifiers).
     OidcKeys,
+    /// spire-controller-manager CRD reconcile capability (ClusterSPIFFEID / ClusterFederatedTrustDomain).
+    Crd,
+    /// SPIFFE Workload API trust-bundle map (own + federated trust domains).
+    Workload,
+    /// sshpop node-attestor capability (ed25519 proof-of-possession).
+    Sshpop,
 }
 
 #[derive(Subcommand)]
@@ -4960,6 +4966,9 @@ source_root = "src"
             IdentityCmd::Bundle     => c.get("/api/identity/bundle").await,
             IdentityCmd::Federation => c.get("/api/identity/federation").await,
             IdentityCmd::OidcKeys   => c.get("/api/identity/oidc/keys").await,
+            IdentityCmd::Crd        => c.get("/api/identity/crd").await,
+            IdentityCmd::Workload   => c.get("/api/identity/workload/bundles").await,
+            IdentityCmd::Sshpop     => c.get("/api/identity/sshpop").await,
         },
         Commands::Bench { cmd } => {
             use cave_bench::cli::{BenchSubcommand, dispatch as bench_dispatch};

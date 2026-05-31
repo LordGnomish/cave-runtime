@@ -61,6 +61,9 @@ pub fn create_router(state: Arc<IdentityState>) -> Router {
             get(oidc_discovery),
         )
         .route("/api/identity/oidc/keys", get(oidc_keys))
+        .route("/api/identity/crd", get(crd_info))
+        .route("/api/identity/workload/bundles", get(workload_bundles))
+        .route("/api/identity/sshpop", get(sshpop_info))
         .with_state(state)
 }
 
@@ -157,6 +160,88 @@ async fn oidc_discovery(State(state): State<Arc<IdentityState>>) -> Json<oidc::O
 
 async fn oidc_keys(State(state): State<Arc<IdentityState>>) -> Json<oidc::JwkSet> {
     Json(oidc::jwks_for_bundle(&state.ca.trust_bundle()))
+}
+
+// ── spire-controller-manager CRD reconcile surface (cont2) ──────────────────
+
+/// `GET /api/identity/crd` — report the CRD reconcile capability and prove the
+/// template engine is live by rendering a sample SPIFFE-ID against the server's
+/// own trust domain.
+async fn crd_info(State(state): State<Arc<IdentityState>>) -> Json<serde_json::Value> {
+    use crate::crd::{render_template, PodMeta, TemplateContext};
+    let td = state.ca.trust_domain();
+    let pod = PodMeta {
+        namespace: "default".into(),
+        name: "sample".into(),
+        uid: "sample-uid".into(),
+        service_account: "svc".into(),
+        node_name: "node".into(),
+        ..Default::default()
+    };
+    let ctx = TemplateContext::new(&td, &pod);
+    let rendered = render_template(
+        "spiffe://{{ .TrustDomain }}/ns/{{ .PodMeta.Namespace }}/sa/{{ .PodSpec.ServiceAccountName }}",
+        &ctx,
+    )
+    .unwrap_or_default();
+    Json(serde_json::json!({
+        "kinds": ["ClusterSPIFFEID", "ClusterFederatedTrustDomain"],
+        "label_selector_operators": ["In", "NotIn", "Exists", "DoesNotExist"],
+        "template_fields": [
+            ".TrustDomain",
+            ".PodMeta.Namespace",
+            ".PodMeta.Name",
+            ".PodMeta.UID",
+            ".PodMeta.ServiceAccount",
+            ".PodMeta.NodeName",
+            ".PodSpec.ServiceAccountName",
+            ".PodSpec.NodeName",
+            "index .PodMeta.Labels \"<key>\"",
+            "index .PodMeta.Annotations \"<key>\""
+        ],
+        "sample_render": rendered,
+        "upstream": "spiffe/spire-controller-manager"
+    }))
+}
+
+/// `GET /api/identity/workload/bundles` — the SPIFFE Workload API trust-bundle
+/// map (own trust domain + federated peers) the in-process handler would
+/// return to a workload with no extra entitlements.
+async fn workload_bundles(State(state): State<Arc<IdentityState>>) -> Json<serde_json::Value> {
+    use crate::registration::InMemoryEntryStore;
+    use crate::workload_api::WorkloadApiHandler;
+    // Rebuild an entry store snapshot so the handler runs the real
+    // authorization + bundle-assembly path.
+    let snapshot = Arc::new(InMemoryEntryStore::new());
+    for e in state.store.entries.list() {
+        let _ = snapshot.create(e);
+    }
+    let handler = WorkloadApiHandler::new(state.ca.clone(), snapshot);
+    let bundles = handler.fetch_x509_bundles(&[]);
+    let trust_domains: Vec<String> = bundles.keys().cloned().collect();
+    Json(serde_json::json!({
+        "trust_domains": trust_domains,
+        "operations": ["FetchX509SVID", "FetchX509Bundles", "FetchJWTSVID", "ValidateJWTSVID"],
+        "transport_note": "in-process; gRPC + SPIFFE_ENDPOINT_SOCKET UDS owned by cave-mesh",
+        "upstream": "spiffe/spire pkg/agent/endpoints/workload"
+    }))
+}
+
+/// `GET /api/identity/sshpop` — report the sshpop node-attestor capability and
+/// the canonical agent-SPIFFE-ID scheme.
+async fn sshpop_info(State(state): State<Arc<IdentityState>>) -> Json<serde_json::Value> {
+    use crate::sshpop::fingerprint_hex;
+    let td = state.ca.trust_domain();
+    let sample_fp = fingerprint_hex(&[0u8; 32]);
+    Json(serde_json::json!({
+        "attestor": "sshpop",
+        "algorithm": "ed25519",
+        "agent_id_scheme": format!("spiffe://{}/spire/agent/sshpop/<sha256-fingerprint>", td.as_str()),
+        "selectors": ["sshpop:fingerprint:<hex>", "sshpop:hostname:<principal>"],
+        "sample_fingerprint": sample_fp,
+        "tpm_devid_note": "tpm_devid sibling is a hardware scope_cut (no TPM)",
+        "upstream": "spiffe/spire pkg/server/plugin/nodeattestor/sshpop"
+    }))
 }
 
 fn to_http(e: IdentityError) -> (StatusCode, String) {

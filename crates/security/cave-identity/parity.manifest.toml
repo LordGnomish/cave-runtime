@@ -34,20 +34,27 @@ source_sha = "b7db9650aa98598ee7af21d7a75fbab8f6b70d42"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.00
-honest_ratio        = 0.72
-last_audit          = "2026-05-24"
+honest_ratio        = 0.78
+last_audit          = "2026-05-31"
 infra_only          = false
 mapped_count        = 32
-partial_count       = 4
-skipped_count       = 14
+partial_count       = 7
+skipped_count       = 11
 unmapped_count      = 0
 total               = 50
 
 # 2026-05-24 Charter v2 close-out (eksik-sweep absorb):
 #   * 15 src/ modules (~5 400 LOC), 106 lib tests + 9 self-audit = 115 PASS.
+#
+# 2026-05-31 honest-cont2 (strict-TDD skipped→partial, +28 lib tests → 133):
+#   * 3 in-crate reconcile/handler/crypto cores ported, each leaving a single
+#     genuinely-delegated residual → classified partial (not mapped) for honesty:
+#       - crd-reconcile-core      (src/crd.rs)         informer/apply loop → cave-cri
+#       - workload-api-handler    (src/workload_api.rs) gRPC/UDS transport → cave-mesh
+#       - sshpop-node-attestor    (src/sshpop.rs)       tpm_devid hardware → scope_cut
 #   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
-#                              = (32 + 4 + 14) / 50 = 50 / 50 = 1.00.
-#   * honest_ratio = (mapped + partial) / total = 36 / 50 = 0.72.
+#                              = (32 + 7 + 11) / 50 = 50 / 50 = 1.00.
+#   * honest_ratio = (mapped + partial) / total = 39 / 50 = 0.78  (was 36/50 = 0.72).
 #   * source_sha pinned to v1.15.0 commit
 #     b7db9650aa98598ee7af21d7a75fbab8f6b70d42.
 
@@ -242,10 +249,11 @@ name = "spire-agent-cli"
 reason = "spire-agent CLI commands are folded into `cavectl identity agent {run,attest}` — wired post-merge by the orchestrator."
 upstream = "cmd/spire-agent"
 
-[[skipped]]
-name = "spire-controller-manager"
-reason = "Kubernetes operator (ClusterSPIFFEID / ClusterFederatedTrustDomain CRDs) belongs in cave-cri / cave-k8s plug-in dispatch — outside MVP."
-upstream = "spire/support/k8s/k8s-workload-registrar"
+[[partial]]
+name = "crd-reconcile-core"
+upstream = "spiffe/spire-controller-manager pkg/spireentry + pkg/reconciler"
+local_files = ["src/crd.rs"]
+note = "honest-cont2 2026-05-31 skipped→partial: src/crd.rs ports the pure reconcile core — metav1.LabelSelector matching (matchLabels + In/NotIn/Exists/DoesNotExist), the Go text/template SPIFFE-ID + DNS rendering subset (missingkey=error), ClusterSPIFFEID→RegistrationEntry projection (per-matching-pod, k8s binding selectors, ttl/jwt-ttl/federates_with/admin/downstream/hint) and ClusterFederatedTrustDomain→FederationRelationship with validateFederatedTrustDomain checks. The controller-runtime informer/watch/apply loop (k8s API client) stays delegated to cave-cri / cave-k8s — hence partial, not mapped. 12 tests."
 
 [[skipped]]
 name = "sqlite-postgres-backends"
@@ -257,10 +265,11 @@ name = "grpc-sds-v3-wire"
 reason = "envoy.extensions.transport_sockets.tls.v3 SDS streaming is owned by cave-mesh; cave-identity exposes the PEM payload (SdsSecret) Envoy consumes."
 upstream = "pkg/agent/endpoints/sdsv3"
 
-[[skipped]]
-name = "workload-api-socket"
-reason = "Unix-domain socket Workload-API surface is OS-specific and belongs in cave-mesh's data-plane wrapper; cave-identity ships the in-process API."
-upstream = "pkg/agent/endpoints/workloadapi"
+[[partial]]
+name = "workload-api-handler"
+upstream = "pkg/agent/endpoints/workload/handler.go"
+local_files = ["src/workload_api.rs"]
+note = "honest-cont2 2026-05-31 skipped→partial: src/workload_api.rs ports the in-process Workload API request handler — MATCH_SUBSET authorization (an entry applies only when all its selectors are in the caller's attested set), FetchX509SVID + FetchX509Bundles (own + federated trust-bundle map), FetchJWTSVID / per-SPIFFE-ID restriction, ValidateJWTSVID. The gRPC service + SPIFFE_ENDPOINT_SOCKET Unix-domain-socket transport stay delegated to cave-mesh's data plane — hence partial, not mapped. 7 tests."
 
 [[skipped]]
 name = "aws-iid-node-attestor"
@@ -277,10 +286,11 @@ name = "gcp-iit-node-attestor"
 reason = "GCP instance-identity-token attestor needs google-sdk; deferred to Phase 2 cave-cloud."
 upstream = "pkg/agent/plugin/nodeattestor/gcp_iit"
 
-[[skipped]]
-name = "tpm-sshpop-node-attestors"
-reason = "tpm_devid + sshpop_pop attestors need TPM/SSH hardware integrations; deferred to Phase 2 cave-hwsign."
-upstream = "pkg/agent/plugin/nodeattestor/{tpm_devid,sshpop}"
+[[partial]]
+name = "sshpop-node-attestor"
+upstream = "pkg/server/plugin/nodeattestor/sshpop + pkg/common/plugin/sshpop"
+local_files = ["src/sshpop.rs"]
+note = "honest-cont2 2026-05-31 skipped→partial: src/sshpop.rs ports the sshpop proof-of-possession flow with REAL ed25519 (ed25519-dalek 2.x, no placeholder) — CA-signature verification of the SSH host certificate, server challenge nonce, host-key PoP verification, canonical agent SPIFFE ID spiffe://<td>/spire/agent/sshpop/<sha256-fp>, and sshpop:fingerprint/hostname selectors. The tpm_devid sibling needs a hardware TPM and stays a scope_cut (see hardware-attestors) — hence partial, not mapped. 8 tests."
 
 [[skipped]]
 name = "upstream-authority-vault"
@@ -324,9 +334,9 @@ items = ["spire-server-cli", "spire-agent-cli"]
 rationale = "Replaced by `cavectl identity` subcommand wired by the orchestrator post-merge — not a runtime gap."
 
 [[scope_cuts]]
-group = "k8s-operator-elsewhere"
-items = ["spire-controller-manager"]
-rationale = "Operator CRDs (ClusterSPIFFEID / ClusterFederatedTrustDomain) belong in cave-cri / cave-k8s admission plug-ins."
+group = "k8s-operator-informer-loop"
+items = ["spire-controller-manager-informer"]
+rationale = "honest-cont2: the ClusterSPIFFEID/ClusterFederatedTrustDomain reconcile core is now ported (see partial crd-reconcile-core, src/crd.rs); only the controller-runtime informer/watch/apply loop that drives it from the live k8s API remains delegated to cave-cri / cave-k8s."
 
 [[scope_cuts]]
 group = "datastore-delegation"
@@ -335,8 +345,8 @@ rationale = "Persistence layer fanned out to cave-db (CavePool); SqliteStoreFaca
 
 [[scope_cuts]]
 group = "wire-format-elsewhere"
-items = ["grpc-sds-v3-wire", "workload-api-socket"]
-rationale = "gRPC SDS-v3 stream + UDS Workload-API socket are owned by cave-mesh / cave-cri; cave-identity ships the in-process payload."
+items = ["grpc-sds-v3-wire", "workload-api-uds-transport"]
+rationale = "honest-cont2: the in-process Workload API handler is now ported (see partial workload-api-handler, src/workload_api.rs); only the gRPC SDS-v3 stream + the SPIFFE_ENDPOINT_SOCKET Unix-domain-socket transport that carry it remain owned by cave-mesh / cave-cri."
 
 [[scope_cuts]]
 group = "cloud-attestors"
@@ -345,8 +355,8 @@ rationale = "All three need cloud SDKs (AWS / Azure / GCP); deferred to Phase 2 
 
 [[scope_cuts]]
 group = "hardware-attestors"
-items = ["tpm-sshpop-node-attestors"]
-rationale = "TPM + SSH-pop attestors require hardware integrations; deferred to Phase 2 cave-hwsign."
+items = ["tpm-devid-node-attestor"]
+rationale = "honest-cont2: the sshpop attestor is now ported with real ed25519 crypto (see partial sshpop-node-attestor, src/sshpop.rs); only the tpm_devid sibling remains a scope_cut because it requires a hardware TPM the runtime cannot exercise. Deferred to Phase 2 cave-hwsign."
 
 [[scope_cuts]]
 group = "upstream-pki"
