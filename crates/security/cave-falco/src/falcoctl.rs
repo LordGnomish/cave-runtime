@@ -14,6 +14,160 @@
 //! (oras registry I/O) is a network side-effect handled out-of-process per
 //! ADR-RUNTIME-SANDBOX-NO-FFI-001.
 
+use crate::error::{FalcoError, Result};
+use serde::{Deserialize, Serialize};
+
+/// `oci.DefaultTag` — the tag appended when an artifact reference omits one.
+pub const DEFAULT_TAG: &str = "latest";
+
+/// One catalogue entry in a falcoctl `index.yaml` (`index.Entry`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndexEntry {
+    pub name: String,
+    #[serde(rename = "type", default)]
+    pub artifact_type: String,
+    pub registry: String,
+    pub repository: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub home: String,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    #[serde(default)]
+    pub license: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+}
+
+/// A falcoctl artifact index (`index.Index`). Entry order is preserved on
+/// insert; `entry_by_name` is the catalogue lookup.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Index {
+    name: String,
+    entries: Vec<IndexEntry>,
+}
+
+impl Index {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), entries: Vec::new() }
+    }
+
+    /// Parse an `index.yaml` document (a YAML sequence of entries).
+    pub fn from_yaml(name: impl Into<String>, yaml: &str) -> Result<Self> {
+        let entries: Vec<IndexEntry> = serde_yaml::from_str(yaml)?;
+        Ok(Self { name: name.into(), entries })
+    }
+
+    pub fn name(&self) -> &str { &self.name }
+    pub fn entries(&self) -> &[IndexEntry] { &self.entries }
+
+    /// `Index.Upsert` — update the entry with the same name in place, or
+    /// append it if new.
+    pub fn upsert(&mut self, entry: IndexEntry) {
+        if let Some(slot) = self.entries.iter_mut().find(|e| e.name == entry.name) {
+            *slot = entry;
+        } else {
+            self.entries.push(entry);
+        }
+    }
+
+    /// `Index.Remove` — remove the named entry; error if it is not present.
+    pub fn remove(&mut self, name: &str) -> Result<()> {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.name != name);
+        if self.entries.len() == before {
+            return Err(FalcoError::NotFound(format!("cannot remove {name}: not found")));
+        }
+        Ok(())
+    }
+
+    /// `Index.EntryByName`.
+    pub fn entry_by_name(&self, name: &str) -> Option<&IndexEntry> {
+        self.entries.iter().find(|e| e.name == name)
+    }
+
+    /// `Index.Normalize` — canonical form: entries sorted by name ascending.
+    pub fn normalize(&mut self) {
+        self.entries.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+
+    /// `MergedIndexes.ResolveReference` — resolve `name` into a full OCI
+    /// reference:
+    ///
+    /// 1. A bare artifact name (`cloudtrail`, `cloudtrail:0.5.1`,
+    ///    `cloudtrail@sha256:...`) is looked up in the index and expanded to
+    ///    `{registry}/{repository}` with `:latest` / `:tag` / `@digest`.
+    /// 2. A full reference without tag or digest gets `:latest` appended.
+    /// 3. A complete reference is returned as-is.
+    pub fn resolve_reference(&self, name: &str) -> Result<String> {
+        if looks_like_full_reference(name) {
+            if full_ref_has_tag_or_digest(name) {
+                Ok(name.to_string())
+            } else {
+                Ok(format!("{name}:{DEFAULT_TAG}"))
+            }
+        } else {
+            let (entry_name, tag, digest) = parse_index_ref(name)?;
+            let entry = self.entry_by_name(&entry_name).ok_or_else(|| {
+                FalcoError::NotFound(format!(
+                    "cannot find {name} among the configured indexes, skipping"
+                ))
+            })?;
+            let mut reference = format!("{}/{}", entry.registry, entry.repository);
+            if !tag.is_empty() {
+                reference.push(':');
+                reference.push_str(&tag);
+            } else if !digest.is_empty() {
+                reference.push('@');
+                reference.push_str(&digest);
+            } else {
+                reference.push(':');
+                reference.push_str(DEFAULT_TAG);
+            }
+            Ok(reference)
+        }
+    }
+}
+
+/// Heuristic for oras `registry.ParseReference` success: the string has a
+/// `/` and its first segment is a registry host (contains `.`/`:`, or is
+/// `localhost`). A bare `cloudtrail` or `cloudtrail:0.5.1` has no host and is
+/// treated as an index name.
+fn looks_like_full_reference(name: &str) -> bool {
+    match name.split_once('/') {
+        Some((registry, _)) => {
+            registry == "localhost" || registry.contains('.') || registry.contains(':')
+        }
+        None => false,
+    }
+}
+
+/// A full reference carries a tag/digest if it contains `@`, or the final
+/// path component (after the last `/`) contains `:` (a registry port colon
+/// lives in the first segment, never the last).
+fn full_ref_has_tag_or_digest(name: &str) -> bool {
+    if name.contains('@') {
+        return true;
+    }
+    name.rsplit('/').next().map(|last| last.contains(':')).unwrap_or(false)
+}
+
+/// `parseIndexRef` — split a bare artifact name into (name, tag, digest).
+fn parse_index_ref(name: &str) -> Result<(String, String, String)> {
+    if !name.contains(':') && !name.contains('@') {
+        Ok((name.to_string(), String::new(), String::new()))
+    } else if name.contains(':') && !name.contains('@') {
+        let (n, tag) = name.split_once(':').unwrap();
+        Ok((n.to_string(), tag.to_string(), String::new()))
+    } else if name.contains('@') {
+        let (n, digest) = name.split_once('@').unwrap();
+        Ok((n.to_string(), String::new(), digest.to_string()))
+    } else {
+        Err(FalcoError::RuleParse(format!("cannot parse {name:?}")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
