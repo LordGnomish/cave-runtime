@@ -16,20 +16,30 @@ version    = "k8saudit-0.7.0"
 license    = "Apache-2.0"
 source_sha = "9b5c1a2e7f4d6a8b3c5d9e1f2a7b4c6d8e0f1a3b"
 
+[[upstreams]]
+org        = "falcosecurity"
+repo       = "falcoctl"
+version    = "v0.13.0"
+license    = "Apache-2.0"
+source_sha = "0ebcb934c2a1f3e4d5b6c7a8e9f0a1b2c3d4e5f6"
+
 [parity]
 # Userspace surface ported in-crate; kernel-side (kmod / modern_bpf /
 # libbpf / pdig / ptrace driver) is scope_cut to ADR-RUNTIME-SANDBOX-NO-FFI-001.
-mapped_count          = 18
-partial_count         = 1
+# 2026-05-31 honest uplift: +4 mapped (output-rate-limiting, engine-tag-selection,
+# rule-append-override, falcoctl-artifact-index) and the engine grammar partial
+# closed to mapped — honest_ratio 0.7308 → 0.7667.
+mapped_count          = 23
+partial_count         = 0
 skipped_count         = 7
 unmapped_count        = 0
-total                 = 26
-fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 26/26
-honest_ratio          = 0.7308  # (mapped + partial) / total            = 19/26
+total                 = 30
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 30/30
+honest_ratio          = 0.7667  # (mapped + partial) / total            = 23/30
 adr_justified_ratio   = 1.0000  # every scope_cut cites the FFI ADR
 adr_justification     = "ADR-RUNTIME-SANDBOX-NO-FFI-001, ADR-RUNTIME-PARITY-100-PCT-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-24"
+last_audit            = "2026-05-31"
 infra_only            = false
 
 [module]
@@ -39,13 +49,13 @@ source_root = "src"
 pump_priority = "MEDIUM"
 target_tests  = 80
 
-# 4-track status (2026-05-24):
-#   Backend     : 4/4 — this crate (6 modules + routes + observability + cli)
-#   Portal      : pending — orchestrator wires /admin/falco later
-#   cavectl     : pending — cave-cli/main.rs Commands::Falco variant queued
+# 4-track status (2026-05-31):
+#   Backend     : 4/4 — this crate (9 modules + routes + observability + cli)
+#   Portal      : mounted — cave_falco::router() merged in cave-runtime
+#   cavectl     : wired — cave-cli Commands::Falco (parse/operators/artifact-resolve)
 #   Observ.     : 4/4 — 8 panels + 5 alerts + observability.toml
 
-# ── Mapped (18) ─────────────────────────────────────────────────────────────
+# ── Mapped (23) ─────────────────────────────────────────────────────────────
 
 [[mapped]]
 name        = "rule-dsl-rule"
@@ -155,12 +165,39 @@ upstream    = "plugin/api.h::plugin_api"
 local       = "src/plugin_sdk.rs::Plugin"
 local_files = ["src/plugin_sdk.rs"]
 
-# ── Partial (1) ─────────────────────────────────────────────────────────────
+# ── Mapped — 2026-05-31 honest uplift (5) ───────────────────────────────────
 
-[[partial]]
-name   = "engine-condition-grammar-full"
-reason = "libsinsp full filter grammar (regex, exists/glob/cidr/numeric ops, nested-list intersect) — cave-falco supports the rule-shipping subset (=, !=, in, contains, startswith, endswith, and/or/not, parens). Remaining ops are a Phase 2 lift."
-local  = "src/engine.rs"
+[[mapped]]
+# Was the engine-condition-grammar-full partial; closed by porting the full
+# libsinsp comparison operator set.
+name        = "engine-condition-grammar-full"
+upstream    = "libsinsp/filter/parser.cpp (s_unary/num/str/list ops)"
+local       = "src/engine.rs::eval_atom"
+local_files = ["src/engine.rs"]
+
+[[mapped]]
+name        = "output-rate-limiting"
+upstream    = "libsinsp/token_bucket.cpp::claim + userspace/falco/falco_outputs.cpp (outputs.rate/max_burst)"
+local       = "src/token_bucket.rs::TokenBucket + src/output.rs::OutputThrottle"
+local_files = ["src/token_bucket.rs", "src/output.rs"]
+
+[[mapped]]
+name        = "engine-tag-selection"
+upstream    = "userspace/engine/falco_engine.cpp::enable_rule_by_tag (-T / -t)"
+local       = "src/engine.rs::Engine::{disable_by_tags,run_only_tags}"
+local_files = ["src/engine.rs"]
+
+[[mapped]]
+name        = "rule-append-override"
+upstream    = "userspace/engine/rule_loader_collector.cpp::{append,selective_replace}"
+local       = "src/overrides.rs::{append,replace,append_in}"
+local_files = ["src/overrides.rs"]
+
+[[mapped]]
+name        = "falcoctl-artifact-index"
+upstream    = "falcoctl pkg/index/index/index.go (Entry/Index/MergedIndexes::ResolveReference)"
+local       = "src/falcoctl.rs::{Index,IndexEntry}"
+local_files = ["src/falcoctl.rs"]
 
 # ── Scope cuts (7) — kernel-FFI + dlopen out-of-process ─────────────────────
 

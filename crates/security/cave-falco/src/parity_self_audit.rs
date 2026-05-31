@@ -11,7 +11,7 @@ pub const FALCO_VERSION: &str = "0.43.1";
 pub const FALCO_SHA: &str = "2c5f1ee9a4f3b5d6c7e8f9a0b1c2d3e4f5a6b7c8";
 pub const FLOOR_FILL_RATIO: f64 = 0.95;
 pub const FLOOR_HONEST_RATIO: f64 = 0.50;
-pub const TODAY: &str = "2026-05-24";
+pub const TODAY: &str = "2026-05-31";
 
 pub fn manifest_path() -> PathBuf {
     [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"].iter().collect()
