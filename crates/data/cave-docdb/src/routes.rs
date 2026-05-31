@@ -471,6 +471,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn find_route_applies_projection_sort_skip_limit() {
+        let state = Arc::new(DocDbState::default());
+        seed(
+            &state,
+            "fdb",
+            "users",
+            vec![
+                doc(serde_json::json!({"name": "c", "age": 30, "secret": "x"})),
+                doc(serde_json::json!({"name": "a", "age": 10, "secret": "y"})),
+                doc(serde_json::json!({"name": "b", "age": 20, "secret": "z"})),
+            ],
+        )
+        .await;
+
+        let Json(resp) = find(
+            State(state.clone()),
+            Path(("fdb".to_string(), "users".to_string())),
+            Json(FindRequest {
+                filter: Some(serde_json::json!({})),
+                projection: Some(serde_json::json!({"name": 1, "age": 1, "_id": 0})),
+                limit: Some(2),
+                skip: Some(1),
+                sort: Some(serde_json::json!({"age": 1})),
+            }),
+        )
+        .await
+        .unwrap();
+
+        // sorted by age asc -> a(10), b(20), c(30); skip 1 -> b,c; limit 2 -> b,c.
+        assert_eq!(resp.count, 2);
+        let names: Vec<&str> = resp
+            .documents
+            .iter()
+            .filter_map(|d| d.get("name").and_then(|v| v.as_str()))
+            .collect();
+        assert_eq!(names, vec!["b", "c"]);
+        // projection drops `secret` and `_id`.
+        assert!(resp.documents[0].get("secret").is_none());
+        assert!(resp.documents[0].get("_id").is_none());
+        assert!(resp.documents[0].get("age").is_some());
+    }
+
+    #[tokio::test]
     async fn text_search_route_uses_text_index() {
         let state = Arc::new(DocDbState::default());
         seed(
