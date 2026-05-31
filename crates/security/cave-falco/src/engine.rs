@@ -15,6 +15,8 @@
 use crate::error::{FalcoError, Result};
 use crate::event::FalcoEvent;
 use crate::rule::{ListDef, MacroDef, Rule};
+use std::cmp::Ordering;
+use std::net::IpAddr;
 
 #[derive(Debug, Clone)]
 pub struct EngineMatch {
@@ -186,40 +188,165 @@ fn eval_atom(expr: &str, ev: &FalcoEvent, lists: &[ListDef]) -> bool {
     }
     if e == "true" || e == "1=1" { return true; }
     if e == "false" { return false; }
+
+    // Unary: `field exists` (libsinsp s_unary_ops).
+    if let Some(field) = e.strip_suffix(" exists") {
+        return ev.fields.contains_key(field.trim());
+    }
+
+    let field_val = |field: &str| ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
+
+    // List operators (s_binary_list_ops): in, intersects, pmatch.
     if let Some((field, rest)) = e.split_once(" in ") {
-        let key = field.trim();
-        let actual = ev.fields.get(key).map(|s| s.as_str()).unwrap_or("");
-        let inner = rest.trim().trim_start_matches('(').trim_end_matches(')');
-        // List reference (`in (shell_binaries)`) or literal list.
-        let items: Vec<String> = if let Some(l) = lists.iter().find(|l| l.name == inner) {
-            l.items.clone()
-        } else {
-            inner.split(',').map(|s| s.trim().trim_matches('\'').trim_matches('"').to_string()).collect()
-        };
-        return items.iter().any(|i| i == actual);
+        let actual = field_val(field);
+        return resolve_list(rest, lists).iter().any(|i| matches_value(actual, i));
+    }
+    if let Some((field, rest)) = e.split_once(" intersects ") {
+        let actual_set: Vec<&str> = field_val(field).split(',').map(|s| s.trim()).collect();
+        let items = resolve_list(rest, lists);
+        return items.iter().any(|i| actual_set.contains(&i.as_str()));
+    }
+    if let Some((field, rest)) = e.split_once(" pmatch ") {
+        let actual = field_val(field);
+        return resolve_list(rest, lists).iter().any(|p| path_prefix_match(p, actual));
+    }
+
+    // String operators (s_binary_str_ops). `icontains`/`iglob` checked before
+    // their case-sensitive counterparts.
+    if let Some((field, val)) = e.split_once(" icontains ") {
+        return field_val(field).to_lowercase().contains(&unquote(val).to_lowercase());
     }
     if let Some((field, val)) = e.split_once(" contains ") {
-        let actual = ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
-        return actual.contains(val.trim().trim_matches('\'').trim_matches('"'));
+        return field_val(field).contains(unquote(val));
+    }
+    if let Some((field, val)) = e.split_once(" iglob ") {
+        return glob_match(unquote(val).to_lowercase().as_bytes(), field_val(field).to_lowercase().as_bytes());
+    }
+    if let Some((field, val)) = e.split_once(" glob ") {
+        return glob_match(unquote(val).as_bytes(), field_val(field).as_bytes());
+    }
+    if let Some((field, val)) = e.split_once(" regex ") {
+        return regex::Regex::new(unquote(val)).map(|re| re.is_match(field_val(field))).unwrap_or(false);
     }
     if let Some((field, val)) = e.split_once(" startswith ") {
-        let actual = ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
-        return actual.starts_with(val.trim().trim_matches('\'').trim_matches('"'));
+        return field_val(field).starts_with(unquote(val));
     }
     if let Some((field, val)) = e.split_once(" endswith ") {
-        let actual = ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
-        return actual.ends_with(val.trim().trim_matches('\'').trim_matches('"'));
+        return field_val(field).ends_with(unquote(val));
     }
+
+    // Numeric comparisons (s_binary_num_ops). Two-char ops first.
+    for (op, cmp) in [(" >= ", Ordering::Greater), (" <= ", Ordering::Less)] {
+        if let Some((field, val)) = e.split_once(op) {
+            return numeric_cmp(field_val(field), unquote(val))
+                .map(|o| o == cmp || o == Ordering::Equal).unwrap_or(false);
+        }
+    }
+    for (op, cmp) in [(" > ", Ordering::Greater), (" < ", Ordering::Less)] {
+        if let Some((field, val)) = e.split_once(op) {
+            return numeric_cmp(field_val(field), unquote(val)).map(|o| o == cmp).unwrap_or(false);
+        }
+    }
+
+    // Equality (`!=`, `==`, `=`) with CIDR-aware comparison.
     if let Some((field, val)) = e.split_once("!=") {
-        let actual = ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
-        return actual != val.trim().trim_matches('\'').trim_matches('"');
+        return !matches_value(field_val(field), unquote(val));
+    }
+    if let Some((field, val)) = e.split_once("==") {
+        return matches_value(field_val(field), unquote(val));
     }
     if let Some((field, val)) = e.split_once('=') {
-        let actual = ev.fields.get(field.trim()).map(|s| s.as_str()).unwrap_or("");
-        return actual == val.trim().trim_matches('\'').trim_matches('"');
+        return matches_value(field_val(field), unquote(val));
     }
     // Bare field reference treated as "field exists".
     ev.fields.contains_key(e)
+}
+
+/// Strip surrounding quotes/whitespace from an RHS literal.
+fn unquote(s: &str) -> &str {
+    s.trim().trim_matches('\'').trim_matches('"')
+}
+
+/// Resolve `(name)` / `(a, b, c)` into the literal item set, expanding a
+/// named list reference if one matches.
+fn resolve_list(rest: &str, lists: &[ListDef]) -> Vec<String> {
+    let inner = rest.trim().trim_start_matches('(').trim_end_matches(')');
+    if let Some(l) = lists.iter().find(|l| l.name == inner.trim()) {
+        return l.items.clone();
+    }
+    inner.split(',').map(|s| unquote(s).to_string()).filter(|s| !s.is_empty()).collect()
+}
+
+/// Equality with `net_compare` semantics: when the RHS is a CIDR and the LHS
+/// is an IP, test containment; otherwise plain string equality.
+fn matches_value(actual: &str, val: &str) -> bool {
+    if val.contains('/') {
+        if let Some(hit) = cidr_contains(val, actual) {
+            return hit;
+        }
+    }
+    actual == val
+}
+
+/// `pmatch`: true if `path` equals `prefix` or sits beneath it.
+fn path_prefix_match(prefix: &str, path: &str) -> bool {
+    let prefix = unquote(prefix);
+    path == prefix || path.starts_with(&format!("{}/", prefix.trim_end_matches('/')))
+}
+
+/// Parse both operands as f64 and order them.
+fn numeric_cmp(a: &str, b: &str) -> Option<Ordering> {
+    let a: f64 = a.trim().parse().ok()?;
+    let b: f64 = b.trim().parse().ok()?;
+    a.partial_cmp(&b)
+}
+
+/// CIDR containment for v4/v6. `None` if `cidr` is not a valid CIDR or `ip`
+/// is not a valid address (caller falls back to string equality).
+fn cidr_contains(cidr: &str, ip: &str) -> Option<bool> {
+    let (net, prefix) = cidr.split_once('/')?;
+    let prefix: u32 = prefix.parse().ok()?;
+    let net: IpAddr = net.parse().ok()?;
+    let ip: IpAddr = ip.parse().ok()?;
+    match (net, ip) {
+        (IpAddr::V4(n), IpAddr::V4(a)) => {
+            if prefix > 32 { return Some(false); }
+            let mask = if prefix == 0 { 0 } else { u32::MAX << (32 - prefix) };
+            Some(u32::from(n) & mask == u32::from(a) & mask)
+        }
+        (IpAddr::V6(n), IpAddr::V6(a)) => {
+            if prefix > 128 { return Some(false); }
+            let mask = if prefix == 0 { 0 } else { u128::MAX << (128 - prefix) };
+            Some(u128::from(n) & mask == u128::from(a) & mask)
+        }
+        _ => Some(false),
+    }
+}
+
+/// Classic wildcard glob (`*` any-run, `?` single-char), iterative backtrack.
+fn glob_match(pat: &[u8], text: &[u8]) -> bool {
+    let (mut p, mut t) = (0usize, 0usize);
+    let (mut star, mut mark) = (None, 0usize);
+    while t < text.len() {
+        if p < pat.len() && (pat[p] == b'?' || pat[p] == text[t]) {
+            p += 1;
+            t += 1;
+        } else if p < pat.len() && pat[p] == b'*' {
+            star = Some(p);
+            mark = t;
+            p += 1;
+        } else if let Some(sp) = star {
+            p = sp + 1;
+            mark += 1;
+            t = mark;
+        } else {
+            return false;
+        }
+    }
+    while p < pat.len() && pat[p] == b'*' {
+        p += 1;
+    }
+    p == pat.len()
 }
 
 #[cfg(test)]
