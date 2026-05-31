@@ -85,13 +85,27 @@ impl Histogram {
         }
     }
 
-    fn observe(&mut self, _value: f64) {
-        unimplemented!("RED")
+    fn observe(&mut self, value: f64) {
+        self.sum += value;
+        self.count += 1;
+        // First bucket whose upper bound ≥ value; overflow into the +Inf slot.
+        let idx = self
+            .buckets
+            .iter()
+            .position(|&b| value <= b)
+            .unwrap_or(self.buckets.len());
+        self.counts[idx] += 1;
     }
 
     /// Cumulative count of observations ≤ `le`.
-    fn cumulative_le(&self, _le: f64) -> u64 {
-        unimplemented!("RED")
+    fn cumulative_le(&self, le: f64) -> u64 {
+        let mut total = 0;
+        for (i, &b) in self.buckets.iter().enumerate() {
+            if b <= le {
+                total += self.counts[i];
+            }
+        }
+        total
     }
 }
 
@@ -125,14 +139,31 @@ impl SpanMetricsProcessor {
     /// enabled) the size counter.
     pub fn record_span(
         &mut self,
-        _service: &str,
-        _span_name: &str,
-        _span_kind: &str,
-        _status_code: &str,
-        _duration_secs: f64,
-        _size_bytes: u64,
+        service: &str,
+        span_name: &str,
+        span_kind: &str,
+        status_code: &str,
+        duration_secs: f64,
+        size_bytes: u64,
     ) {
-        unimplemented!("RED")
+        let key = SeriesKey {
+            service: service.to_string(),
+            span_name: span_name.to_string(),
+            span_kind: span_kind.to_string(),
+            status_code: status_code.to_string(),
+        };
+        let buckets = self.config.buckets.clone();
+        let enable_size = self.config.enable_size;
+        let series = self.series.entry(key).or_insert_with(|| Series {
+            calls: 0,
+            size_total: 0,
+            hist: Histogram::new(buckets),
+        });
+        series.calls += 1;
+        series.hist.observe(duration_secs);
+        if enable_size {
+            series.size_total += size_bytes;
+        }
     }
 
     pub fn calls_total(&self, key: &SeriesKey) -> u64 {
@@ -165,7 +196,44 @@ impl SpanMetricsProcessor {
 
     /// Prometheus text exposition of all series.
     pub fn expose_prometheus(&self) -> String {
-        unimplemented!("RED")
+        let mut out = String::new();
+        out.push_str(&format!("# TYPE {} counter\n", METRIC_CALLS));
+        out.push_str(&format!("# TYPE {} histogram\n", METRIC_LATENCY));
+        if self.config.enable_size {
+            out.push_str(&format!("# TYPE {} counter\n", METRIC_SIZE));
+        }
+        for (k, s) in &self.series {
+            let labels = format!(
+                "service=\"{}\",span_name=\"{}\",span_kind=\"{}\",status_code=\"{}\"",
+                k.service, k.span_name, k.span_kind, k.status_code
+            );
+            out.push_str(&format!("{}{{{}}} {}\n", METRIC_CALLS, labels, s.calls));
+            // Cumulative histogram buckets.
+            let mut cumulative = 0u64;
+            for (i, &b) in s.hist.buckets.iter().enumerate() {
+                cumulative += s.hist.counts[i];
+                out.push_str(&format!(
+                    "{}_bucket{{{},le=\"{}\"}} {}\n",
+                    METRIC_LATENCY, labels, b, cumulative
+                ));
+            }
+            out.push_str(&format!(
+                "{}_bucket{{{},le=\"+Inf\"}} {}\n",
+                METRIC_LATENCY, labels, s.hist.count
+            ));
+            out.push_str(&format!(
+                "{}_sum{{{}}} {}\n",
+                METRIC_LATENCY, labels, s.hist.sum
+            ));
+            out.push_str(&format!(
+                "{}_count{{{}}} {}\n",
+                METRIC_LATENCY, labels, s.hist.count
+            ));
+            if self.config.enable_size {
+                out.push_str(&format!("{}{{{}}} {}\n", METRIC_SIZE, labels, s.size_total));
+            }
+        }
+        out
     }
 }
 
