@@ -767,6 +767,21 @@ enum RolloutsCmd {
         #[arg(long, default_value = "canary")]
         canary_service: String,
     },
+    /// Preview canary/stable ReplicaSet replica counts for a desired weight (no cluster access)
+    ReplicasPreview {
+        /// Total desired replicas (spec.replicas)
+        #[arg(long, default_value_t = 10)]
+        replicas: i32,
+        /// Desired canary weight 0-100
+        #[arg(long, default_value_t = 25)]
+        weight: i32,
+        /// Max weight (denominator), usually 100
+        #[arg(long, default_value_t = 100)]
+        max_weight: i32,
+        /// Shrink the stable ReplicaSet inversely to the canary weight
+        #[arg(long, default_value_t = false)]
+        dynamic_stable_scale: bool,
+    },
 }
 
 #[derive(Subcommand)]
