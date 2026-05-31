@@ -36,7 +36,7 @@ fn passing_test_rule_passes() {
         package example
 
         test_addition_is_correct {
-            1 + 1 == 2
+            plus(1, 1) == 2
         }
         "#,
     );

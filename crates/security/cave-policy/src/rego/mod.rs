@@ -10,6 +10,7 @@ pub mod builtins;
 pub mod eval;
 pub mod lexer;
 pub mod parser;
+pub mod tester;
 pub mod value;
 
 use std::collections::HashMap;
@@ -147,6 +148,12 @@ impl PolicyEngine {
 
     pub fn module_ids(&self) -> Vec<&str> {
         self.modules.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Borrow the loaded module set (id → parsed module). Used by the test
+    /// runner (`tester::Runner`) to enumerate `test_*` rules per package.
+    pub fn modules(&self) -> &HashMap<String, Module> {
+        &self.modules
     }
 
     pub fn module_ast(&self, id: &str) -> Option<serde_json::Value> {
