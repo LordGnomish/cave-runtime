@@ -33,6 +33,7 @@ pub mod provisioning;
 pub mod registry;
 pub mod rule_engine;
 pub mod transport;
+pub mod twin;
 
 /// A telemetry / attribute scalar value (ThingsBoard `KvEntry` data types).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
