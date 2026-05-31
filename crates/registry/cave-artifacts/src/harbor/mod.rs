@@ -25,6 +25,7 @@ pub mod proxy;
 pub mod quota;
 pub mod rbac;
 pub mod replication_reconciler;
+pub mod retention;
 pub mod routes;
 pub mod storage;
 pub mod store;
