@@ -461,6 +461,71 @@ mod tests {
         }
     }
 
+    // ── minimum-reclaim over-eviction gating (helpers.go thresholdsMet) ───────
+
+    #[test]
+    fn with_min_reclaim_builder_sets_field() {
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))
+            .with_min_reclaim(ThresholdValue::Quantity(50));
+        assert_eq!(t.min_reclaim, Some(ThresholdValue::Quantity(50)));
+    }
+
+    #[test]
+    fn min_reclaim_extends_effective_threshold() {
+        // value=100, minReclaim=50 → effective threshold 150. available=120 is
+        // above the bare threshold but still inside the min-reclaim band.
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))
+            .with_min_reclaim(ThresholdValue::Quantity(50));
+        let o = obs(Signal::MemoryAvailable, 120, 1000, Utc::now());
+        assert!(!signal_crosses(&t, &o), "bare threshold not crossed at 120");
+        assert!(
+            signal_crosses_with_min_reclaim(&t, &o),
+            "min-reclaim band keeps eviction active at 120"
+        );
+    }
+
+    #[test]
+    fn min_reclaim_none_behaves_like_plain_threshold() {
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100));
+        let crossing = obs(Signal::MemoryAvailable, 80, 1000, Utc::now());
+        let clear = obs(Signal::MemoryAvailable, 120, 1000, Utc::now());
+        assert!(signal_crosses_with_min_reclaim(&t, &crossing));
+        assert!(!signal_crosses_with_min_reclaim(&t, &clear));
+    }
+
+    #[test]
+    fn reclaim_target_accounts_for_min_reclaim() {
+        // effective = value(100) + minReclaim(50) = 150; available 120 → 30 to go.
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))
+            .with_min_reclaim(ThresholdValue::Quantity(50));
+        let o = obs(Signal::MemoryAvailable, 120, 1000, Utc::now());
+        assert_eq!(reclaim_target(&t, &o), 30);
+    }
+
+    #[test]
+    fn reclaim_target_without_min_reclaim_is_gap_to_value() {
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100));
+        let o = obs(Signal::MemoryAvailable, 70, 1000, Utc::now());
+        assert_eq!(reclaim_target(&t, &o), 30);
+    }
+
+    #[test]
+    fn reclaim_target_zero_when_clear_of_band() {
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))
+            .with_min_reclaim(ThresholdValue::Quantity(50));
+        let o = obs(Signal::MemoryAvailable, 200, 1000, Utc::now());
+        assert_eq!(reclaim_target(&t, &o), 0);
+    }
+
+    #[test]
+    fn reclaim_target_resolves_percent_min_reclaim_against_capacity() {
+        // value 10% of 1000 = 100; minReclaim 5% of 1000 = 50 → effective 150.
+        let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Percent(10.0))
+            .with_min_reclaim(ThresholdValue::Percent(5.0));
+        let o = obs(Signal::MemoryAvailable, 90, 1000, Utc::now());
+        assert_eq!(reclaim_target(&t, &o), 60);
+    }
+
     #[test]
     fn signal_classification() {
         assert!(Signal::MemoryAvailable.is_memory());
