@@ -435,10 +435,27 @@ impl RaftNode {
         let prev_term = m.log_term;
         let mut resp = Message::new(MessageType::MsgAppResp, self.id, m.from, self.term);
 
-        // RED placeholder: blindly acks at the prev index with no match
-        // check and no append — neither safe nor correct.
-        resp.index = prev_index;
-        let _ = prev_term;
+        // Match check: the entry preceding the new ones must agree on term.
+        if prev_index > self.last_index || self.term_at(prev_index) != prev_term {
+            resp.reject = true;
+            // Hint: the furthest index we could plausibly match.
+            resp.index = self.last_index.min(prev_index);
+            self.msgs.push(resp);
+            return;
+        }
+
+        // Append, truncating any conflicting suffix beyond prev_index.
+        self.log_terms.truncate(prev_index as usize);
+        self.log_terms.extend_from_slice(&m.entries);
+        self.last_index = self.log_terms.len() as u64;
+        self.last_term = self.term_at(self.last_index);
+
+        // Advance commit toward the leader's, never past our own log tail.
+        if m.commit > self.commit {
+            self.commit = m.commit.min(self.last_index);
+        }
+
+        resp.index = self.last_index;
         self.msgs.push(resp);
     }
 
