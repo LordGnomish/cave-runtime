@@ -1,0 +1,19 @@
+[package]
+name = "cave-iot-gateway"
+description = "CAVE IoT Gateway — device registry, multi-protocol telemetry ingestion, rule engine, device twins, OTA, multi-tenant TSDB (ThingsBoard-compatible, pure Rust)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
