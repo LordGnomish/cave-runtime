@@ -62,6 +62,10 @@ pub struct Message {
     pub index: u64,
     /// Log term referenced by the message (last-log-term for votes).
     pub log_term: u64,
+    /// Leader commit index advertised on `MsgApp`.
+    pub commit: u64,
+    /// New entry terms carried by a `MsgApp` (index = prev_index + position).
+    pub entries: Vec<u64>,
     /// Rejection flag for `*Resp` messages.
     pub reject: bool,
 }
@@ -75,6 +79,8 @@ impl Message {
             term,
             index: 0,
             log_term: 0,
+            commit: 0,
+            entries: Vec::new(),
             reject: false,
         }
     }
@@ -338,6 +344,7 @@ impl RaftNode {
             MsgHup => self.campaign(),
             MsgVote | MsgPreVote => self.handle_vote(m),
             MsgVoteResp => self.handle_vote_resp(m),
+            MsgApp => self.handle_app(m),
             MsgAppResp => self.handle_app_resp(m),
             MsgHeartbeat => {
                 self.election_elapsed = 0;
@@ -415,6 +422,24 @@ impl RaftNode {
             return true;
         }
         false
+    }
+
+    /// Follower: handle a leader's `MsgApp` (etcd `raft.handleAppendEntries`
+    /// / `raftLog.maybeAppend`). On a matching prev-entry, append the new
+    /// entries (truncating any conflict), advance commit toward the leader's,
+    /// and ack the new last index. On mismatch, reject with a hint.
+    fn handle_app(&mut self, m: Message) {
+        self.election_elapsed = 0;
+        self.lead = m.from;
+        let prev_index = m.index;
+        let prev_term = m.log_term;
+        let mut resp = Message::new(MessageType::MsgAppResp, self.id, m.from, self.term);
+
+        // RED placeholder: blindly acks at the prev index with no match
+        // check and no append — neither safe nor correct.
+        resp.index = prev_index;
+        let _ = prev_term;
+        self.msgs.push(resp);
     }
 
     /// Leader: react to a follower's append acknowledgement (etcd
@@ -592,6 +617,8 @@ mod tests {
             term,
             index: 0,
             log_term: 0,
+            commit: 0,
+            entries: Vec::new(),
             reject: false,
         }
     }
@@ -739,6 +766,55 @@ mod tests {
         n.step(rej);
         // next must not have advanced past the rejection point.
         assert!(n.tracker.progress.get(&2).unwrap().next <= 2);
+    }
+
+    #[test]
+    fn follower_appends_entries_from_matching_leader_and_acks() {
+        let mut n = node(); // empty log, term 0
+        let mut app = msg(MessageType::MsgApp, 2, 1, 1);
+        app.index = 0; // prev_log_index
+        app.log_term = 0; // prev_log_term (matches empty log)
+        app.entries = vec![1, 1]; // two new term-1 entries at index 1,2
+        app.commit = 1;
+        n.step(app);
+        assert_eq!(n.last_index, 2, "appended two entries");
+        assert_eq!(n.term_at(2), 1);
+        assert_eq!(n.commit, 1, "commit follows leader, capped at last_index");
+        let resp = n.msgs.last().unwrap();
+        assert_eq!(resp.msg_type, MessageType::MsgAppResp);
+        assert!(!resp.reject);
+        assert_eq!(resp.index, 2, "acks the new last index");
+    }
+
+    #[test]
+    fn follower_rejects_append_on_prev_term_mismatch() {
+        let mut n = node();
+        // Local log: index 1 at term 1.
+        n.log_terms = vec![1];
+        n.last_index = 1;
+        n.last_term = 1;
+        n.term = 2;
+        // Leader claims prev index 1 had term 2 — conflicts with our term 1.
+        let mut app = msg(MessageType::MsgApp, 2, 1, 2);
+        app.index = 1;
+        app.log_term = 2;
+        app.entries = vec![2];
+        n.step(app);
+        assert_eq!(n.last_index, 1, "rejected append did not mutate the log");
+        let resp = n.msgs.last().unwrap();
+        assert!(resp.reject, "prev-term mismatch is rejected");
+    }
+
+    #[test]
+    fn follower_append_commit_is_capped_at_local_last_index() {
+        let mut n = node();
+        let mut app = msg(MessageType::MsgApp, 2, 1, 1);
+        app.index = 0;
+        app.log_term = 0;
+        app.entries = vec![1];
+        app.commit = 50; // leader is way ahead, but we only have index 1
+        n.step(app);
+        assert_eq!(n.commit, 1, "commit cannot exceed our own last index");
     }
 
     #[test]
