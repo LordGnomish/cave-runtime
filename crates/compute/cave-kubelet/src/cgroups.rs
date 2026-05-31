@@ -538,6 +538,98 @@ mod tests {
         ));
     }
 
+    // ── cpu.weight conversion (helpers_linux.go + libcontainer fs2) ───────────
+
+    #[test]
+    fn milli_cpu_to_shares_scales_by_1024_per_cpu() {
+        // 1 full CPU → 1024 shares.
+        assert_eq!(milli_cpu_to_shares(1000), 1024);
+        // 2 CPUs → 2048.
+        assert_eq!(milli_cpu_to_shares(2000), 2048);
+        // 500m → 512.
+        assert_eq!(milli_cpu_to_shares(500), 512);
+    }
+
+    #[test]
+    fn milli_cpu_to_shares_floors_at_two() {
+        // Zero request defaults to the cgroup minimum of 2 shares.
+        assert_eq!(milli_cpu_to_shares(0), 2);
+        // 1m → (1*1024)/1000 = 1 → clamped up to the minimum 2.
+        assert_eq!(milli_cpu_to_shares(1), 2);
+    }
+
+    #[test]
+    fn cpu_shares_to_weight_maps_full_range() {
+        // libcontainer ConvertCPUSharesToCgroupV2Value:
+        //   0 shares → 0 (unset), 2 → 1, 262144 → 10000.
+        assert_eq!(cpu_shares_to_weight(0), 0);
+        assert_eq!(cpu_shares_to_weight(2), 1);
+        assert_eq!(cpu_shares_to_weight(1024), 39);
+        assert_eq!(cpu_shares_to_weight(262144), 10000);
+    }
+
+    #[test]
+    fn milli_cpu_to_weight_composes_shares_then_weight() {
+        // 1 CPU → 1024 shares → weight 39.
+        assert_eq!(milli_cpu_to_weight(1000), 39);
+        // Zero request → minimum 2 shares → weight 1.
+        assert_eq!(milli_cpu_to_weight(0), 1);
+    }
+
+    #[test]
+    fn milli_cpu_to_quota_scales_by_period() {
+        // 1 CPU over the default 100ms period → 100000us quota.
+        assert_eq!(milli_cpu_to_quota(1000, 100_000), Some(100_000));
+        // 500m over 100ms → 50000us.
+        assert_eq!(milli_cpu_to_quota(500, 100_000), Some(50_000));
+    }
+
+    #[test]
+    fn milli_cpu_to_quota_zero_is_unlimited() {
+        assert_eq!(milli_cpu_to_quota(0, 100_000), None);
+    }
+
+    #[test]
+    fn milli_cpu_to_quota_floors_at_min_period() {
+        // A tiny request still gets at least the 1ms (1000us) minimum quota.
+        assert_eq!(milli_cpu_to_quota(1, 100_000), Some(1_000));
+    }
+
+    #[test]
+    fn serialize_cpu_weight_is_decimal() {
+        let (cf, content) = serialize_value(&CgroupValue::CpuWeight(39));
+        assert_eq!(cf, "cpu.weight");
+        assert_eq!(content, "39");
+    }
+
+    #[test]
+    fn parse_cpu_weight_roundtrips() {
+        let v = parse_value("cpu.weight", "39\n").unwrap();
+        assert_eq!(v, CgroupValue::CpuWeight(39));
+    }
+
+    #[test]
+    fn write_then_read_cpu_weight() {
+        let b = InMemoryCgroups::new();
+        let p = pod_cgroup_path(QosTier::Burstable, "u");
+        b.write(&p, CgroupValue::CpuWeight(100)).unwrap();
+        assert_eq!(
+            b.read(&p, "cpu.weight").unwrap(),
+            Some(CgroupValue::CpuWeight(100))
+        );
+    }
+
+    #[test]
+    fn write_rejects_cpu_weight_out_of_range() {
+        let b = InMemoryCgroups::new();
+        let p = pod_cgroup_path(QosTier::Guaranteed, "u");
+        // cgroup v2 cpu.weight is constrained to 1..=10000.
+        assert!(b.write(&p, CgroupValue::CpuWeight(0)).is_err());
+        assert!(b.write(&p, CgroupValue::CpuWeight(10_001)).is_err());
+        b.write(&p, CgroupValue::CpuWeight(1)).unwrap();
+        b.write(&p, CgroupValue::CpuWeight(10_000)).unwrap();
+    }
+
     // ── Cgroupv2FsBackend — real filesystem writer rooted at a test dir ──────
 
     fn temp_root(tag: &str) -> std::path::PathBuf {
