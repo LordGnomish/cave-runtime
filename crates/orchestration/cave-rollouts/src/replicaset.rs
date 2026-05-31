@@ -9,6 +9,82 @@
 //! actions belong to cave-controller-manager; this module ships the arithmetic
 //! the controller drives.
 
+/// `trafficWeightToReplicas` — `ceil(weight / maxWeight * specReplicas)`.
+///
+/// The number of replicas a ReplicaSet needs to *approximately* serve
+/// `weight`/`maxWeight` of traffic when no traffic router is splitting requests
+/// by header/weight (i.e. traffic follows pod count).
+pub fn traffic_weight_to_replicas(spec_replicas: i32, weight: i32, max_weight: i32) -> i32 {
+    if max_weight <= 0 || spec_replicas <= 0 || weight <= 0 {
+        return 0;
+    }
+    ((weight as f64) / (max_weight as f64) * (spec_replicas as f64)).ceil() as i32
+}
+
+/// `CheckMinPodsPerReplicaSet` — raise a *non-zero* count up to the HA floor.
+///
+/// A zero count is left untouched (a ReplicaSet that should be fully scaled
+/// down is not forced back up), matching upstream behaviour.
+pub fn check_min_pods_per_replica_set(count: i32, min_pods: Option<i32>) -> i32 {
+    match min_pods {
+        Some(min) if count != 0 && count < min => min,
+        _ => count,
+    }
+}
+
+/// `CalculateReplicaCountsForTrafficRoutedCanary` — weighted form.
+///
+/// With a traffic router in play the canary ReplicaSet only needs enough pods to
+/// back the weighted slice. When `dynamic_stable_scale` is set the stable
+/// ReplicaSet is shrunk inversely (`maxWeight - desiredWeight`); otherwise it
+/// stays at full `spec_replicas`. Returns `(canary_count, stable_count)`.
+pub fn calculate_replica_counts_for_traffic_routed_canary(
+    spec_replicas: i32,
+    desired_weight: i32,
+    max_weight: i32,
+    min_pods: Option<i32>,
+    dynamic_stable_scale: bool,
+) -> (i32, i32) {
+    let canary = check_min_pods_per_replica_set(
+        traffic_weight_to_replicas(spec_replicas, desired_weight, max_weight),
+        min_pods,
+    );
+    if !dynamic_stable_scale {
+        return (canary, spec_replicas);
+    }
+    let stable = check_min_pods_per_replica_set(
+        traffic_weight_to_replicas(spec_replicas, max_weight - desired_weight, max_weight),
+        min_pods,
+    );
+    (canary, stable)
+}
+
+/// Basic (non-traffic-routed) canary split.
+///
+/// Without a traffic router, request share *is* pod share, so the canary count
+/// is the ceil-weighted replica count (capped at spec) and the stable count is
+/// the remainder. Returns `(canary_count, stable_count)`.
+pub fn calculate_replica_counts_for_basic_canary(
+    spec_replicas: i32,
+    desired_weight: i32,
+    max_weight: i32,
+) -> (i32, i32) {
+    let canary =
+        traffic_weight_to_replicas(spec_replicas, desired_weight, max_weight).min(spec_replicas);
+    let stable = (spec_replicas - canary).max(0);
+    (canary, stable)
+}
+
+/// `maxReplicaCountAllowed` fencepost: `specReplicas + maxSurge`.
+pub fn max_replica_count_allowed(spec_replicas: i32, max_surge: i32) -> i32 {
+    spec_replicas + max_surge
+}
+
+/// `minAvailableReplicaCount` fencepost: `max(0, specReplicas - maxUnavailable)`.
+pub fn min_available_replica_count(spec_replicas: i32, max_unavailable: i32) -> i32 {
+    (spec_replicas - max_unavailable).max(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
