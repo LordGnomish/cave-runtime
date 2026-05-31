@@ -12,6 +12,7 @@
 pub mod config;
 pub mod error;
 pub mod labels;
+pub mod layered;
 pub mod profile;
 pub mod rbac;
 pub mod tenant;
