@@ -170,19 +170,44 @@ impl<T> RequestQueue<T> {
     /// keeping `sorted_consumers` sorted and refreshing every tenant's
     /// shuffle-shard assignment.
     pub fn register_consumer(&mut self, consumer_id: &str) {
-        let _ = consumer_id; // RED stub
+        let info = self.consumers.entry(consumer_id.to_string()).or_default();
+        if info.connections == 0 {
+            // Newly active consumer — insert into the sorted list.
+            let pos = self
+                .sorted_consumers
+                .binary_search(&consumer_id.to_string())
+                .unwrap_or_else(|p| p);
+            self.sorted_consumers.insert(pos, consumer_id.to_string());
+        }
+        info.connections += 1;
+        info.shutting_down = false;
+        self.recompute_all_consumers();
     }
 
     /// Mark a consumer as shutting down so it is skipped by the scheduler
     /// (mirrors `notifyQuerierShutdown`).
     pub fn notify_shutdown(&mut self, consumer_id: &str) {
-        let _ = consumer_id; // RED stub
+        if let Some(info) = self.consumers.get_mut(consumer_id) {
+            info.shutting_down = true;
+        }
     }
 
     /// Fully remove a consumer and recompute tenant assignments
     /// (mirrors `removeConsumer`).
     pub fn remove_consumer(&mut self, consumer_id: &str) {
-        let _ = consumer_id; // RED stub
+        if self.consumers.remove(consumer_id).is_some() {
+            self.sorted_consumers.retain(|c| c != consumer_id);
+            self.recompute_all_consumers();
+        }
+    }
+
+    /// Refresh every tenant's shuffle-shard assignment after the consumer set
+    /// changes (mirrors `recomputeUserConsumers`).
+    fn recompute_all_consumers(&mut self) {
+        let tenants: Vec<String> = self.tenants.keys().cloned().collect();
+        for t in tenants {
+            self.recompute_tenant_consumers(&t);
+        }
     }
 
     /// Recompute the shuffle-shard consumer subset for `tenant`.
@@ -267,15 +292,58 @@ impl<T> RequestQueue<T> {
         last_user_index: i64,
         consumer_id: &str,
     ) -> (Option<String>, i64) {
-        let _ = (last_user_index, consumer_id);
-        (None, START_INDEX) // RED stub
+        let mut uid = last_user_index;
+        // No local queue at the RequestQueue level: -2 collapses to -1.
+        if uid == START_INDEX_WITH_LOCAL_QUEUE {
+            uid = START_INDEX;
+        }
+        // A shutting-down or unknown consumer receives no work.
+        match self.consumers.get(consumer_id) {
+            Some(info) if !info.shutting_down => {}
+            _ => return (None, uid),
+        }
+
+        let max_iters = self.keys.len() + 1;
+        for _ in 0..max_iters {
+            match self.get_next(uid) {
+                None => {
+                    // Out of bounds — wrap to the start and retry.
+                    if uid == START_INDEX {
+                        break;
+                    }
+                    uid = START_INDEX;
+                    continue;
+                }
+                Some((name, pos)) => {
+                    uid = pos;
+                    if let Some(tq) = self.tenants.get(&name) {
+                        if let Some(allowed) = &tq.consumers {
+                            if !allowed.contains(consumer_id) {
+                                // This consumer is not sharded onto this tenant.
+                                continue;
+                            }
+                        }
+                    }
+                    return (Some(name), uid);
+                }
+            }
+        }
+        (None, uid)
     }
 
     /// Enqueue a request for `tenant`. Errors if stopped or the tenant queue is
     /// full.
     pub fn enqueue(&mut self, tenant: &str, req: T) -> Result<(), QueueError> {
-        let _ = (tenant, req);
-        Err(QueueError::Stopped) // RED stub
+        if self.stopped {
+            return Err(QueueError::Stopped);
+        }
+        self.get_or_add_queue(tenant)?;
+        let tq = self.tenants.get_mut(tenant).expect("just created");
+        if tq.queue.len() >= self.max_user_queue_size {
+            return Err(QueueError::TooManyRequests);
+        }
+        tq.queue.push_back(req);
+        Ok(())
     }
 
     /// Dequeue the next request fairly for `consumer_id`, resuming round-robin
@@ -286,8 +354,28 @@ impl<T> RequestQueue<T> {
         last_user_index: i64,
         consumer_id: &str,
     ) -> (Option<(String, T)>, i64) {
-        let _ = (last_user_index, consumer_id);
-        (None, START_INDEX) // RED stub
+        let (tenant, uid) = match self.next_tenant_for_consumer(last_user_index, consumer_id) {
+            (Some(t), uid) => (t, uid),
+            (None, uid) => return (None, uid),
+        };
+        let req = self
+            .tenants
+            .get_mut(&tenant)
+            .and_then(|tq| tq.queue.pop_front());
+        // Drop the tenant queue once drained so it stops consuming a round-robin
+        // slot (mirrors upstream deleteQueue on empty).
+        if self
+            .tenants
+            .get(&tenant)
+            .map(|tq| tq.queue.is_empty())
+            .unwrap_or(false)
+        {
+            self.delete_queue(&tenant);
+        }
+        match req {
+            Some(r) => (Some((tenant, r)), uid),
+            None => (None, uid),
+        }
     }
 }
 
