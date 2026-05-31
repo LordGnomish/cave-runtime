@@ -11,6 +11,7 @@ cave-auth = { path = "../../security/cave-auth" }
 cave-db = { path = "../../data/cave-db" }
 cave-upstream-watchd = { path = "../cave-upstream-watchd" }
 cave-upstream = { path = "../cave-upstream" }
+cave-edge-runtime = { path = "../../compute/cave-edge-runtime" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

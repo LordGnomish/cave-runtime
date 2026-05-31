@@ -33,6 +33,8 @@ pub enum Permission {
     CriRead,
     CriExec,
 
+    EdgeRead,
+
     ApiserverRead,
 
     IamRead,
@@ -224,6 +226,7 @@ impl Permission {
             Permission::EtcdWatch => "etcd.kv.watch",
             Permission::CriRead => "cri.sandbox.read",
             Permission::CriExec => "cri.container.exec",
+            Permission::EdgeRead => "edge.node.read",
             Permission::ApiserverRead => "apiserver.resource.read",
             Permission::IamRead => "auth.user.read",
             Permission::IamWrite => "auth.role.write",

@@ -55,6 +55,7 @@ pub mod dast;
 pub mod deploy;
 pub mod devlake;
 pub mod dns;
+pub mod edge;
 pub mod docdb;
 pub mod erp;
 pub mod etcd;
@@ -1111,6 +1112,13 @@ async fn dns_handler(
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
     dns::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn edge_handler(
+    AxumState(_s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    edge::render(&(), &ctx).map(Html).map_err(err_to_response)
 }
 async fn logs_handler(
     AxumState(s): AxumState<Arc<AdminState>>,
@@ -2252,6 +2260,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/auth-sessions", get(auth_sessions_handler))
         .route("/admin/dashboard-catalog", get(dashboard_handler))
         .route("/admin/dns", get(dns_handler))
+        .route("/admin/edge", get(edge_handler))
         .route("/admin/logs", get(logs_handler))
         .route("/admin/security", get(security_handler))
         .route("/admin/ha", get(ha_handler))

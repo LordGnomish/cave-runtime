@@ -2198,6 +2198,7 @@ dependencies = [
  "base64 0.22.1",
  "cave-auth",
  "cave-db",
+ "cave-edge-runtime",
  "cave-kernel",
  "cave-upstream",
  "cave-upstream-watchd",

@@ -295,6 +295,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: KedaCmd,
     },
+    /// Edge runtime — K3s edge-mode + KubeEdge (node agent, twin, autonomy)
+    Edge {
+        #[command(subcommand)]
+        cmd: EdgeCmd,
+    },
     /// HashiCorp Vault parity — secret backends + audit
     Vault {
         #[command(subcommand)]
@@ -1764,6 +1769,21 @@ enum KedaCmd {
     /// Tenant-wide per-scaler Prometheus stats (events/min, errors/min, p50/p99)
     #[command(name = "scaler-metrics")]
     ScalerMetrics,
+}
+
+#[derive(Subcommand)]
+enum EdgeCmd {
+    /// Edge node runtime status (connection, pods, budget)
+    Status,
+    /// List pods on the edge node with their kubelet phase
+    Pods,
+    /// Show a device's twin delta (expected vs actual)
+    Twin {
+        /// Device id
+        device: String,
+    },
+    /// Show the constrained-resource budget + eviction ranking
+    Budget,
 }
 
 #[derive(Subcommand)]
@@ -5078,6 +5098,16 @@ source_root = "src"
                 c.get(&format!("/admin/keda/scalers/{}", urlencode(&kind))).await
             }
             KedaCmd::ScalerMetrics => c.get("/admin/keda/metrics").await,
+        },
+
+        // ── edge (K3s edge-mode + KubeEdge runtime) ───────────────────────────
+        Commands::Edge { cmd } => match cmd {
+            EdgeCmd::Status => c.get("/api/edge/status").await,
+            EdgeCmd::Pods => c.get("/api/edge/pods").await,
+            EdgeCmd::Twin { device } => {
+                c.get(&format!("/api/edge/devices/{}/twin", urlencode(&device))).await
+            }
+            EdgeCmd::Budget => c.get("/api/edge/budget").await,
         },
     }
 }

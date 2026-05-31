@@ -199,6 +199,7 @@ const SECTIONS: &[NavSection] = &[
             item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),
             item("etcd", "/admin/etcd", "🗄", PLATFORM_ONLY),
             item("Kamaji", "/admin/kamaji", "👶", PLATFORM_ONLY),
+            item("Edge", "/admin/edge", "📟", PLATFORM_ONLY),
         ],
     },
     // ── Data — stateful tenant-facing services ────────────────────────
