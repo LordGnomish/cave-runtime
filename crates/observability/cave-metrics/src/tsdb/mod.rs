@@ -5,6 +5,7 @@
 
 pub mod block;
 pub mod compaction;
+pub mod planner;
 pub mod wal;
 
 use parking_lot::RwLock;
