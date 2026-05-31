@@ -32,3 +32,4 @@ pub mod reconcile;
 pub mod retrypolicy;
 pub mod secrets;
 pub mod semaphore;
+pub mod statemachine;
