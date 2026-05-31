@@ -19,8 +19,10 @@
 //!   edgehub      — reliable cloud-edge sync keeper (msg IDs + ACK + retransmit + RV merge)
 //!   devicetwin   — Expected/Actual twin state + version gating + delta computation
 //!   autonomy     — online/offline connection state machine + reconcile-on-reconnect
+//!   constrained  — 256 MB resource budget: admission + memory-pressure eviction ranking
 
 pub mod autonomy;
+pub mod constrained;
 pub mod devicetwin;
 pub mod edged;
 pub mod edgehub;
@@ -29,6 +31,7 @@ pub mod eventbus;
 pub mod metamanager;
 
 pub use autonomy::{ConnectionState, EdgeAutonomy};
+pub use constrained::{ConstrainedMode, EvictionCandidate, PodResource, QosClass, ResourceBudget};
 pub use devicetwin::{DeviceTwin, TwinDelta, TwinVersion};
 pub use edged::{Edged, Pod, PodPhase};
 pub use edgehub::{EdgeHub, RecvOutcome, SyncMessage};
