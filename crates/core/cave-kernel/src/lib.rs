@@ -30,4 +30,5 @@ pub mod parity;
 pub mod ratelimiter;
 pub mod reconcile;
 pub mod retrypolicy;
+pub mod secrets;
 pub mod semaphore;
