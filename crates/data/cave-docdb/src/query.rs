@@ -511,4 +511,100 @@ mod tests {
             &q("status", "$nin", json!(["active", "pending"]))
         ));
     }
+
+    // ── Cycle 1b: $mod / $elemMatch / $regex $options / $expr ──────────────────
+
+    #[test]
+    fn test_mod_operator() {
+        assert!(matches_query(&d("n", json!(10)), &q("n", "$mod", json!([5, 0]))));
+        assert!(matches_query(&d("n", json!(12)), &q("n", "$mod", json!([5, 2]))));
+        assert!(!matches_query(&d("n", json!(11)), &q("n", "$mod", json!([5, 0]))));
+        // non-numeric / bad divisor never matches.
+        assert!(!matches_query(&d("n", json!("x")), &q("n", "$mod", json!([5, 0]))));
+        assert!(!matches_query(&d("n", json!(10)), &q("n", "$mod", json!([0, 0]))));
+    }
+
+    #[test]
+    fn test_elemmatch_operator_query_objects() {
+        // Array of sub-documents; element must satisfy the whole sub-query.
+        let doc = d(
+            "results",
+            json!([{"score": 8, "ok": false}, {"score": 4, "ok": true}]),
+        );
+        assert!(matches_query(
+            &doc,
+            &q("results", "$elemMatch", json!({"score": {"$gte": 8}, "ok": false}))
+        ));
+        // No single element satisfies *both* conditions.
+        assert!(!matches_query(
+            &doc,
+            &q("results", "$elemMatch", json!({"score": {"$gte": 8}, "ok": true}))
+        ));
+    }
+
+    #[test]
+    fn test_elemmatch_operator_scalars() {
+        // Array of scalars; operator-expression applied to each element.
+        let doc = d("nums", json!([1, 5, 12]));
+        assert!(matches_query(
+            &doc,
+            &q("nums", "$elemMatch", json!({"$gt": 10, "$lt": 20}))
+        ));
+        assert!(!matches_query(
+            &doc,
+            &q("nums", "$elemMatch", json!({"$gt": 100}))
+        ));
+    }
+
+    #[test]
+    fn test_regex_options_case_insensitive() {
+        let doc = d("name", json!("Alice"));
+        let mut m = serde_json::Map::new();
+        m.insert("$regex".to_string(), json!("^alice$"));
+        m.insert("$options".to_string(), json!("i"));
+        let mut query = Document::new();
+        query.insert("name".to_string(), Value::Object(m));
+        assert!(matches_query(&doc, &query));
+
+        // Without the i flag the same pattern must not match.
+        let mut m2 = serde_json::Map::new();
+        m2.insert("$regex".to_string(), json!("^alice$"));
+        let mut query2 = Document::new();
+        query2.insert("name".to_string(), Value::Object(m2));
+        assert!(!matches_query(&doc, &query2));
+    }
+
+    #[test]
+    fn test_expr_field_comparison() {
+        // $expr lets one field be compared to another.
+        let doc = {
+            let mut x = Document::new();
+            x.insert("budget".to_string(), json!(100));
+            x.insert("spent".to_string(), json!(120));
+            x
+        };
+        let mut query = Document::new();
+        query.insert("$expr".to_string(), json!({"$gt": ["$spent", "$budget"]}));
+        assert!(matches_query(&doc, &query));
+
+        let mut query2 = Document::new();
+        query2.insert("$expr".to_string(), json!({"$lt": ["$spent", "$budget"]}));
+        assert!(!matches_query(&doc, &query2));
+    }
+
+    #[test]
+    fn test_expr_logical_and() {
+        let doc = {
+            let mut x = Document::new();
+            x.insert("a".to_string(), json!(5));
+            x.insert("b".to_string(), json!(10));
+            x
+        };
+        let mut query = Document::new();
+        query.insert(
+            "$expr".to_string(),
+            json!({"$and": [{"$gt": ["$b", "$a"]}, {"$eq": ["$a", 5]}]}),
+        );
+        assert!(matches_query(&doc, &query));
+    }
 }
