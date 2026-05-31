@@ -31,6 +31,7 @@ use std::collections::BTreeMap;
 
 pub mod provisioning;
 pub mod registry;
+pub mod rule_engine;
 pub mod transport;
 
 /// A telemetry / attribute scalar value (ThingsBoard `KvEntry` data types).
