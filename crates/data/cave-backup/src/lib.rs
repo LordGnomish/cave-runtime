@@ -16,6 +16,7 @@ pub mod includes_excludes;
 pub mod models;
 pub mod restore_order;
 pub mod restore_request;
+pub mod restore_reset;
 pub mod routes;
 pub mod schedule;
 pub mod snapshot_locations;
