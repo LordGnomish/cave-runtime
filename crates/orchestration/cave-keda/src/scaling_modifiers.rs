@@ -66,31 +66,28 @@ pub fn eval_formula(formula: &str, vars: &BTreeMap<String, f64>) -> Result<f64, 
             p.pos
         )));
     }
-    Ok(eval(&expr, vars)?.as_num())
+    eval(&expr, vars, None)?.as_num()
 }
 
 /// A runtime value during formula evaluation. expr-lang is dynamically
-/// typed; we carry the numeric and boolean shapes a scaling-modifier
+/// typed; we carry the numeric, boolean and array shapes a scaling-modifier
 /// formula can produce.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Value {
     Num(f64),
     Bool(bool),
+    Array(Vec<Value>),
 }
 
 impl Value {
     /// Coerce to a float, exactly as upstream's `float(...)` /
-    /// `expr.AsFloat64()` do (`true → 1.0`, `false → 0.0`).
-    fn as_num(&self) -> f64 {
+    /// `expr.AsFloat64()` do (`true → 1.0`, `false → 0.0`). An array
+    /// has no scalar value, so it surfaces an error.
+    fn as_num(&self) -> Result<f64, FormulaError> {
         match self {
-            Value::Num(n) => *n,
-            Value::Bool(b) => {
-                if *b {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            Value::Num(n) => Ok(*n),
+            Value::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
+            Value::Array(_) => Err(FormulaError::Eval("expected a number, got an array".into())),
         }
     }
 
@@ -98,6 +95,7 @@ impl Value {
         match self {
             Value::Bool(b) => *b,
             Value::Num(n) => *n != 0.0,
+            Value::Array(a) => !a.is_empty(),
         }
     }
 }
@@ -115,6 +113,11 @@ enum Tok {
     Percent,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
+    LBrace,
+    RBrace,
+    Hash,
     Comma,
     Lt,
     Le,
@@ -163,6 +166,26 @@ fn lex(src: &str) -> Result<Vec<Tok>, FormulaError> {
             }
             ')' => {
                 out.push(Tok::RParen);
+                i += 1;
+            }
+            '[' => {
+                out.push(Tok::LBracket);
+                i += 1;
+            }
+            ']' => {
+                out.push(Tok::RBracket);
+                i += 1;
+            }
+            '{' => {
+                out.push(Tok::LBrace);
+                i += 1;
+            }
+            '}' => {
+                out.push(Tok::RBrace);
+                i += 1;
+            }
+            '#' => {
+                out.push(Tok::Hash);
                 i += 1;
             }
             ',' => {
@@ -269,10 +292,15 @@ fn lex(src: &str) -> Result<Vec<Tok>, FormulaError> {
 enum Expr {
     Num(f64),
     Var(String),
+    /// `#` — the current element inside a `count(arr, {…})` predicate.
+    Hash,
+    Array(Vec<Expr>),
     Unary(UnOp, Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     Call(String, Vec<Expr>),
+    /// A `{ … }` predicate closure body (used as a `count` argument).
+    Closure(Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -392,10 +420,21 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expr, FormulaError> {
         match self.next() {
             Some(Tok::Num(n)) => Ok(Expr::Num(n)),
+            Some(Tok::Hash) => Ok(Expr::Hash),
             Some(Tok::LParen) => {
                 let e = self.parse_expr(0)?;
                 self.expect(&Tok::RParen)?;
                 Ok(e)
+            }
+            Some(Tok::LBracket) => {
+                let items = self.parse_arg_list(&Tok::RBracket)?;
+                self.expect(&Tok::RBracket)?;
+                Ok(Expr::Array(items))
+            }
+            Some(Tok::LBrace) => {
+                let body = self.parse_expr(0)?;
+                self.expect(&Tok::RBrace)?;
+                Ok(Expr::Closure(Box::new(body)))
             }
             Some(Tok::Ident(name)) => {
                 if self.peek() == Some(&Tok::LParen) {
@@ -432,29 +471,46 @@ impl Parser {
 
 // ─── evaluator ─────────────────────────────────────────────────────────────
 
-fn eval(expr: &Expr, vars: &BTreeMap<String, f64>) -> Result<Value, FormulaError> {
+fn eval(
+    expr: &Expr,
+    vars: &BTreeMap<String, f64>,
+    hash: Option<&Value>,
+) -> Result<Value, FormulaError> {
     match expr {
         Expr::Num(n) => Ok(Value::Num(*n)),
+        Expr::Hash => hash
+            .cloned()
+            .ok_or_else(|| FormulaError::Eval("'#' used outside a predicate".into())),
         Expr::Var(name) => vars
             .get(name)
             .map(|v| Value::Num(*v))
             .ok_or_else(|| FormulaError::UnknownVariable(name.clone())),
+        Expr::Array(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for it in items {
+                out.push(eval(it, vars, hash)?);
+            }
+            Ok(Value::Array(out))
+        }
         Expr::Unary(op, inner) => {
-            let v = eval(inner, vars)?;
+            let v = eval(inner, vars, hash)?;
             match op {
-                UnOp::Neg => Ok(Value::Num(-v.as_num())),
+                UnOp::Neg => Ok(Value::Num(-v.as_num()?)),
                 UnOp::Not => Ok(Value::Bool(!v.truthy())),
             }
         }
         Expr::Ternary(cond, a, b) => {
-            if eval(cond, vars)?.truthy() {
-                eval(a, vars)
+            if eval(cond, vars, hash)?.truthy() {
+                eval(a, vars, hash)
             } else {
-                eval(b, vars)
+                eval(b, vars, hash)
             }
         }
-        Expr::Binary(op, l, r) => eval_binary(*op, l, r, vars),
-        Expr::Call(name, args) => eval_call(name, args, vars),
+        Expr::Binary(op, l, r) => eval_binary(*op, l, r, vars, hash),
+        Expr::Call(name, args) => eval_call(name, args, vars, hash),
+        Expr::Closure(_) => Err(FormulaError::Eval(
+            "predicate closure may only appear as a count() argument".into(),
+        )),
     }
 }
 
@@ -463,16 +519,21 @@ fn eval_binary(
     l: &Expr,
     r: &Expr,
     vars: &BTreeMap<String, f64>,
+    hash: Option<&Value>,
 ) -> Result<Value, FormulaError> {
     // Short-circuit logical operators.
     if op == BinOp::And {
-        return Ok(Value::Bool(eval(l, vars)?.truthy() && eval(r, vars)?.truthy()));
+        return Ok(Value::Bool(
+            eval(l, vars, hash)?.truthy() && eval(r, vars, hash)?.truthy(),
+        ));
     }
     if op == BinOp::Or {
-        return Ok(Value::Bool(eval(l, vars)?.truthy() || eval(r, vars)?.truthy()));
+        return Ok(Value::Bool(
+            eval(l, vars, hash)?.truthy() || eval(r, vars, hash)?.truthy(),
+        ));
     }
-    let a = eval(l, vars)?.as_num();
-    let b = eval(r, vars)?.as_num();
+    let a = eval(l, vars, hash)?.as_num()?;
+    let b = eval(r, vars, hash)?.as_num()?;
     Ok(match op {
         BinOp::Add => Value::Num(a + b),
         BinOp::Sub => Value::Num(a - b),
@@ -499,17 +560,90 @@ fn eval_binary(
     })
 }
 
-fn eval_call(name: &str, args: &[Expr], vars: &BTreeMap<String, f64>) -> Result<Value, FormulaError> {
-    let one = |args: &[Expr]| -> Result<f64, FormulaError> {
-        if args.len() != 1 {
+fn eval_call(
+    name: &str,
+    args: &[Expr],
+    vars: &BTreeMap<String, f64>,
+    hash: Option<&Value>,
+) -> Result<Value, FormulaError> {
+    // count(array, {predicate}) — expr-lang builtin used by KEDA docs.
+    if name == "count" {
+        if args.is_empty() {
+            return Err(FormulaError::Eval("count() takes 1 or 2 arguments".into()));
+        }
+        let arr = match eval(&args[0], vars, hash)? {
+            Value::Array(a) => a,
+            other => vec![other],
+        };
+        if args.len() == 1 {
+            return Ok(Value::Num(arr.len() as f64));
+        }
+        if args.len() == 2 {
+            if let Expr::Closure(body) = &args[1] {
+                let mut n = 0u64;
+                for el in &arr {
+                    if eval(body, vars, Some(el))?.truthy() {
+                        n += 1;
+                    }
+                }
+                return Ok(Value::Num(n as f64));
+            }
+            return Err(FormulaError::Eval(
+                "count() second argument must be a {predicate}".into(),
+            ));
+        }
+        return Err(FormulaError::Eval("count() takes 1 or 2 arguments".into()));
+    }
+
+    // Collect numeric arguments, flattening a single array argument so both
+    // `sum(a, b)` and `sum([a, b])` work like expr-lang.
+    let mut nums: Vec<f64> = Vec::new();
+    for a in args {
+        match eval(a, vars, hash)? {
+            Value::Array(arr) => {
+                for el in arr {
+                    nums.push(el.as_num()?);
+                }
+            }
+            v => nums.push(v.as_num()?),
+        }
+    }
+
+    let one = |nums: &[f64]| -> Result<f64, FormulaError> {
+        if nums.len() != 1 {
             return Err(FormulaError::Eval(format!("{name}() expects 1 argument")));
         }
-        Ok(eval(&args[0], vars)?.as_num())
+        Ok(nums[0])
     };
+
     let v = match name {
         // expr-lang float()/int() coercions — the wrapper KEDA applies.
-        "float" => one(args)?,
-        "int" => one(args)?.trunc(),
+        "float" => one(&nums)?,
+        "int" => one(&nums)?.trunc(),
+        "abs" => one(&nums)?.abs(),
+        "ceil" => one(&nums)?.ceil(),
+        "floor" => one(&nums)?.floor(),
+        "round" => one(&nums)?.round(),
+        "len" => nums.len() as f64,
+        "sum" => nums.iter().sum(),
+        "avg" | "mean" => {
+            if nums.is_empty() {
+                return Err(FormulaError::Eval("avg() of empty set".into()));
+            }
+            nums.iter().sum::<f64>() / nums.len() as f64
+        }
+        "min" => {
+            if nums.is_empty() {
+                return Err(FormulaError::Eval("min() of empty set".into()));
+            }
+            nums.iter().copied().fold(f64::INFINITY, f64::min)
+        }
+        "max" => {
+            if nums.is_empty() {
+                return Err(FormulaError::Eval("max() of empty set".into()));
+            }
+            nums.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        }
         other => return Err(FormulaError::Eval(format!("unknown function '{other}'"))),
     };
     Ok(Value::Num(v))
