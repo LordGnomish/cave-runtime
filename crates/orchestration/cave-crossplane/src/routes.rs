@@ -34,6 +34,7 @@ pub fn create_router(state: Arc<CrossplaneState>) -> Router {
             "/api/crossplane/xrds/{group}/{kind}/versions",
             get(get_xrd_versions),
         )
+        .route("/api/crossplane/xrds/render-crd", post(render_xrd_crd))
         // Compositions
         .route(
             "/api/crossplane/compositions",
@@ -323,6 +324,19 @@ async fn gc_composition_revisions(
         .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
+}
+
+// ── XRD → CRD rendering ─────────────────────────────────────────────────────────
+
+/// Render an XRD (supplied as an XrdSpec body) into its composite + claim CRDs
+/// (preview — pure in-crate transform, mirrors xcrd.ForCompositeResource).
+async fn render_xrd_crd(Json(spec): Json<crate::xrd::spec::XrdSpec>) -> impl IntoResponse {
+    let xr = crate::xrd::crd_gen::for_composite_resource(&spec);
+    let claim = crate::xrd::crd_gen::for_composite_resource_claim(&spec);
+    Json(json!({
+        "compositeResourceDefinition": xr,
+        "claimDefinition": claim,
+    }))
 }
 
 // ── Composition selection (matchLabels resolver) ───────────────────────────────
