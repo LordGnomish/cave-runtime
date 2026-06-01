@@ -33,6 +33,7 @@
 //! self-contained `/admin/agent` operator page.
 
 pub mod error;
+pub mod tool;
 
 pub use error::{AgentError, Result};
 
