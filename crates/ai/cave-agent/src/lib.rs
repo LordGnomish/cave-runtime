@@ -41,6 +41,7 @@ pub mod compose;
 pub mod observe;
 pub mod tune;
 pub mod changelog;
+pub mod hotpatch;
 
 pub use error::{AgentError, Result};
 
