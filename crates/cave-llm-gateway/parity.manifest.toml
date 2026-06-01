@@ -23,14 +23,14 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.5532
+honest_ratio         = 0.5957
 parity_ratio_source  = "manifest"
-last_audit           = "2026-05-31"
+last_audit           = "2026-06-01"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 26
+mapped_count         = 28
 partial_count        = 2
-skipped_count        = 19
+skipped_count        = 17
 unmapped_count       = 0
 total                = 47
 
@@ -151,6 +151,18 @@ local    = "src/providers/groq.rs"
 upstream = "litellm/llms/deepseek/chat/transformation.py"
 local    = "src/providers/deepseek.rs"
 
+[[files]]
+upstream = "litellm/llms/together_ai/chat/transformation.py"
+local    = "src/providers/together.rs"
+
+[[files]]
+upstream = "litellm/llms/fireworks_ai/chat/transformation.py"
+local    = "src/providers/fireworks.rs"
+
+[[files]]
+upstream = "litellm/rerank_api/main.py"
+local    = "src/rerank.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 
 [[functions]]
@@ -208,6 +220,11 @@ upstream_name = "health_endpoint"
 local_name    = "check_all"
 file          = "src/health.rs"
 
+[[functions]]
+upstream_name = "rerank"
+local_name    = "rerank_local"
+file          = "src/rerank.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -257,6 +274,11 @@ local_path    = "/api/llm-gateway/health"
 kind          = "http"
 upstream_path = "/v1/chat/completions"
 local_path    = "/v1/chat/completions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/rerank"
+local_path    = "/v1/rerank"
 
 [[surfaces]]
 kind          = "http"
@@ -366,6 +388,14 @@ notes = "POST /v1/embeddings (OpenAI-compat). EmbeddingRequest/Response in opena
 name  = "provider-groq-deepseek"
 notes = "Groq (src/providers/groq.rs, base https://api.groq.com/openai) + DeepSeek (src/providers/deepseek.rs, base https://api.deepseek.com), both OpenAI-compat SaaS. ProviderType::Groq/DeepSeek dispatch via from_config, seeded in capability catalogue + cost pricing, classified by hermes bridge as OpenAi-kind."
 
+[[mapped]]
+name  = "provider-together-fireworks"
+notes = "Together AI (src/providers/together.rs, base https://api.together.xyz) + Fireworks AI (src/providers/fireworks.rs, base https://api.fireworks.ai/inference), both OpenAI-compat SaaS. ProviderType::Together/Fireworks dispatch via from_config, seeded in capability catalogue (Llama-3.3-70B) + cost pricing, classified by hermes bridge as OpenAi-kind. Same shape as the shipped groq-deepseek pair."
+
+[[mapped]]
+name  = "endpoint-rerank"
+notes = "POST /v1/rerank (Cohere/Jina-shaped, port of litellm/rerank_api/main.py). src/rerank.rs RerankRequest/RerankResponse + lexical_rerank (in-process BM25 cross-encoder surrogate, k1=1.5/b=0.75, [0,1]-normalised, top_n + return_documents) + rerank_local. LlmProvider::rerank trait method (default = local scorer, overridable by a remote Cohere/Jina backend). router.rerank() rate-limits + resolves model->provider->dispatch with local fallback. Remote rerank vendors stay a Phase-2 provider-matrix concern; the endpoint + scorer are live."
+
 # ── Partial subsystems (2) ───────────────────────────────────────────────────
 # Scaffold present but not yet wired into the live module tree. Both duplicate
 # capabilities already live behind GatewayRouter (cost.rs/cache.rs/logging.rs/
@@ -404,11 +434,6 @@ reason = "Cohere — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
 
 [[skipped]]
-name   = "provider-together-fireworks"
-reason = "Together AI + Fireworks AI — provider matrix Phase 2"
-cut_to = "cave-llm-gateway-phase-2"
-
-[[skipped]]
 name   = "provider-replicate-huggingface"
 reason = "Replicate + HuggingFace Inference Endpoints — provider matrix Phase 2"
 cut_to = "cave-llm-gateway-phase-2"
@@ -422,11 +447,6 @@ cut_to = "cave-llm-gateway-audio"
 name   = "endpoint-images"
 reason = "images/generations, images/edits — MVP cut"
 cut_to = "cave-llm-gateway-images"
-
-[[skipped]]
-name   = "endpoint-rerank"
-reason = "v1/rerank (Cohere/Jina cross-encoder rerank) — still MVP cut; embeddings now mapped, see [[mapped]] endpoint-embeddings"
-cut_to = "cave-llm-gateway-rerank"
 
 [[skipped]]
 name   = "endpoint-batch"
@@ -483,14 +503,13 @@ cut_to = "cave-portal-api"
 [[scope_cuts]]
 group   = "cloud-saas-matrix"
 members = ["provider-bedrock", "provider-azure-openai", "provider-vertex-google",
-           "provider-cohere", "provider-together-fireworks",
-           "provider-replicate-huggingface"]
-reason  = "Phase 2 — bespoke-wire SaaS (Bedrock/Vertex/Cohere/etc.). Groq + DeepSeek shipped (OpenAI-compat, see [[mapped]] provider-groq-deepseek)."
+           "provider-cohere", "provider-replicate-huggingface"]
+reason  = "Phase 2 — bespoke-wire SaaS (Bedrock/Vertex/Cohere/etc.). OpenAI-compat SaaS shipped: Groq + DeepSeek ([[mapped]] provider-groq-deepseek), Together AI + Fireworks AI ([[mapped]] provider-together-fireworks)."
 
 [[scope_cuts]]
 group   = "non-text-endpoints"
-members = ["endpoint-audio", "endpoint-images", "endpoint-rerank", "endpoint-batch"]
-reason  = "MVP is chat-completions + embeddings; audio/image/rerank/batch ship as sibling crates"
+members = ["endpoint-audio", "endpoint-images", "endpoint-batch"]
+reason  = "MVP is chat-completions + embeddings + rerank ([[mapped]] endpoint-rerank); audio/image/batch ship as sibling crates"
 
 [[scope_cuts]]
 group   = "owned-by-other-cave-crates"
