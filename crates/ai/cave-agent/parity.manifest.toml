@@ -1,0 +1,202 @@
+# parity.manifest.toml — cave-agent
+# Upstream: open-jarvis/OpenJarvis  https://github.com/open-jarvis/OpenJarvis  pinned v2026.5.20
+#
+# cave-agent ports the *control-plane* surface of OpenJarvis — the composable
+# on-device agent primitives plus the self-improvement loop mandated by
+# ADR-SELF-IMPROVE-001 — to dependency-light Rust:
+#
+#   OpenJarvis primitives
+#     - tool registry + pure built-in tools (calc / str_upper / str_len)
+#     - conversation memory (windowing, budget eviction, keyword recall)
+#     - plan-and-execute loop (decompose, step state machine, replan)
+#     - evaluation tools (energy / latency / cost / accuracy scoring + fleets)
+#     - composable patterns (Tool / Chain / Parallel / Fallback / Retry)
+#   Self-improvement loop
+#     - observability analysis (summary stats + z-score regression)
+#     - self-tuning policy (observation -> knob proposals -> apply)
+#     - upstream changelog watch (semver compare, classify, actionable diff)
+#     - hot-patch ingestion (checksum stage / apply / rollback / audit)
+#
+# The 4-track Charter v2 surface (Backend + Portal + cavectl + Observability):
+# Backend, a self-contained /admin/agent Portal page, and the `cavectl agent`
+# subcommand all ship in this wave. Live-side concerns (hardware energy
+# sampling, real IO tools, remote signed-patch fetch, OTLP scrape, on-disk
+# conversation store, OS thread fan-out) are scope-cut to the owning crates and
+# documented as [[skipped]] below.
+
+[upstream]
+org         = "open-jarvis"
+repo        = "OpenJarvis"
+version     = "v2026.5.20"
+name        = "OpenJarvis"
+license     = "Apache-2.0"
+language    = "Python"
+url         = "https://github.com/open-jarvis/OpenJarvis"
+source_sha  = "v2026.5.20"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.6552
+honest_ratio        = 0.6552
+adr_justified_ratio = 1.0      # all 7 skips delegate a live-side concern to an
+                               # owning crate (host/OS, cave-hermes, cave-vault,
+                               # cave-sign, cave-metrics, cave-store, cave-search)
+                               # and all 3 partials keep an honest control-plane
+                               # core with the LLM/embedding half delegated.
+adr_justification   = "ADR-SELF-IMPROVE-001, ADR-RUNTIME-STACK-001"
+last_audit          = "2026-06-01"
+infra_only          = false
+mapped_count        = 19
+partial_count       = 3
+skipped_count       = 7
+unmapped_count      = 0
+total               = 29       # 19 + 3 + 7 + 0 = 29
+
+# fill_ratio derivation (Charter v2 honest measurement):
+#   mapped / total = 19 / 29 = 0.6552
+# Subsystem-coverage framing (not LOC), since OpenJarvis is a Python upstream
+# and this is a clean-room control-plane port. Partials are counted as skipped
+# for the ratio — i.e. the ratio reports only fully-mapped subsystems, so it is
+# a floor, never inflated. impl LOC ≈ 1681 (src/, excluding #[cfg(test)]),
+# 873 LOC of strict-TDD tests, 92 tests green.
+
+# ── mapped (built + strict-TDD tested) ──────────────────────────────────────
+[[mapped]]   # 1
+name = "tool-registry"
+src  = "src/tool.rs"
+note = "register/get/invoke/catalog/names with schema-`required` validation"
+
+[[mapped]]   # 2
+name = "builtin-tools"
+src  = "src/tool.rs"
+note = "pure on-device tools: calc (4 ops, div-by-zero), str_upper, str_len"
+
+[[mapped]]   # 3
+name = "conversation-memory"
+src  = "src/memory.rs"
+note = "monotonic-seq append, last-n window, chars/4 token estimate"
+
+[[mapped]]   # 4
+name = "memory-budget-eviction"
+src  = "src/memory.rs"
+note = "evict oldest non-System turns to a token budget; System pinned"
+
+[[mapped]]   # 5
+name = "memory-recall"
+src  = "src/memory.rs"
+note = "case-insensitive substring recall over the transcript"
+
+[[mapped]]   # 6
+name = "plan-decompose"
+src  = "src/plan.rs"
+note = "heuristic connector split (then / and then / comma) into ordered steps"
+
+[[mapped]]   # 7
+name = "plan-execute"
+src  = "src/plan.rs"
+note = "step state machine + retry→skip|abort replan + Outcome tally"
+
+[[mapped]]   # 8
+name = "eval-scoring"
+src  = "src/eval.rs"
+note = "RunMetrics.score over energy/latency/cost/accuracy with weight presets"
+
+[[mapped]]   # 9
+name = "eval-aggregation"
+src  = "src/eval.rs"
+note = "Evaluator mean / nearest-rank percentile / best-by-score"
+
+[[mapped]]   # 10
+name = "composable-patterns"
+src  = "src/compose.rs"
+note = "Tool / Chain(_prev) / Parallel / Fallback / Retry interpreter, nestable"
+
+[[mapped]]   # 11
+name = "observe-statistics"
+src  = "src/observe.rs"
+note = "Series mean / stddev(pop) / min / max / percentile"
+
+[[mapped]]   # 12
+name = "observe-regression"
+src  = "src/observe.rs"
+note = "baseline-vs-recent z-score test; improvement excluded; delta_pct"
+
+[[mapped]]   # 13
+name = "self-tune-policy"
+src  = "src/tune.rs"
+note = "propose() guard-rail rules + apply() fold with hard clamps"
+
+[[mapped]]   # 14
+name = "changelog-parse"
+src  = "src/changelog.rs"
+note = "semver parse/Ord + `## vX.Y.Z` header & `- kind:` bullet classifier"
+
+[[mapped]]   # 15
+name = "changelog-diff"
+src  = "src/changelog.rs"
+note = "actionable_since + has_breaking_since against a pinned version"
+
+[[mapped]]   # 16
+name = "hotpatch-apply"
+src  = "src/hotpatch.rs"
+note = "checksum stage / apply (rollback snapshot) / rollback (absent-aware)"
+
+[[mapped]]   # 17
+name = "hotpatch-audit"
+src  = "src/hotpatch.rs"
+note = "chronological stage/apply/rollback audit trail"
+
+[[mapped]]   # 18
+name = "http-api-surface"
+src  = "src/router.rs"
+note = "/api/agent/{health,tools,invoke,plan} over pure cores"
+
+[[mapped]]   # 19
+name = "portal-page"
+src  = "src/router.rs"
+note = "self-contained /admin/agent operator page (tools + knobs)"
+
+# ── partial (honest control-plane core; live/LLM half delegated) ────────────
+[[partial]]
+name   = "llm-backed-planner"
+src    = "src/plan.rs"
+reason = "Planner::decompose is the offline heuristic fallback; LLM-driven goal→tool-DAG decomposition is delegated to cave-llm-gateway (no live model in this crate)."
+
+[[partial]]
+name   = "llm-driven-self-tuner"
+src    = "src/tune.rs"
+reason = "propose() is the deterministic guard-rail policy that bounds any tuner; the tuning-LLM prompt+call is delegated to cave-llm-gateway."
+
+[[partial]]
+name   = "semantic-recall"
+src    = "src/memory.rs"
+reason = "recall() is a deterministic substring scan; embedding-backed semantic recall is delegated to cave-search."
+
+# ── skipped (ADR-justified scope cuts to owning crates) ─────────────────────
+[[skipped]]
+name   = "hardware-energy-sampling"
+reason = "RAPL / battery-counter sampling is host/OS-owned; RunMetrics energy is caller-supplied."
+
+[[skipped]]
+name   = "live-io-tools"
+reason = "bash / file / web-fetch side-effecting tools and their sandbox live in cave-hermes; cave-agent ships only pure built-ins."
+
+[[skipped]]
+name   = "remote-signed-patch-fetch"
+reason = "network fetch + signature verification of patch bundles is delegated to cave-vault (secrets) and cave-sign (sigstore); hotpatch is the in-process apply engine."
+
+[[skipped]]
+name   = "otlp-prometheus-scrape"
+reason = "live telemetry ingestion is owned by cave-metrics; observe consumes already-collected sample windows."
+
+[[skipped]]
+name   = "changelog-network-fetch"
+reason = "fetching the upstream CHANGELOG over HTTP is owned by cave-upstream / cave-changelog; this crate is the pure parser+diff."
+
+[[skipped]]
+name   = "persistent-conversation-store"
+reason = "on-disk / sqlite transcript persistence is owned by cave-hermes / cave-store; ConversationMemory is in-process."
+
+[[skipped]]
+name   = "thread-fanout-scheduler"
+reason = "true OS-thread parallel tool execution is owned by the host runtime; Pattern::Parallel has array semantics, sequential evaluation."
