@@ -245,6 +245,28 @@ mod tests {
     }
 
     #[test]
+    fn second_run_recalls_prior_output_into_the_loop() {
+        // The executor retains memory/recall across run() calls. A later turn
+        // whose goal overlaps an earlier turn's output should pull that prior
+        // context back into the loop and journal a Recall event — the "observe
+        // what we already know" half of think -> act -> observe.
+        let mut exec = AgentExecutor::new(default_runtime());
+        exec.run("run echo alphatoken bravotoken charlietoken")
+            .unwrap();
+        assert_eq!(
+            exec.session().of_kind(EventKind::Recall).len(),
+            0,
+            "nothing to recall on the first turn"
+        );
+        exec.run("run echo alphatoken bravotoken charlietoken")
+            .unwrap();
+        assert!(
+            !exec.session().of_kind(EventKind::Recall).is_empty(),
+            "second turn should recall the first turn's output"
+        );
+    }
+
+    #[test]
     fn with_scope_routes_memory_records() {
         let mut exec = AgentExecutor::new(default_runtime()).with_scope("alpha");
         exec.run("run echo scoped").unwrap();
