@@ -1509,6 +1509,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-embed"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum 0.8.9",
+ "base64 0.22.1",
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "cave-erp"
 version = "0.1.0"
 dependencies = [
