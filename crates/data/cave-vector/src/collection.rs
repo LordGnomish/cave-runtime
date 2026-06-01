@@ -29,18 +29,25 @@ impl Collection {
     }
 
     /// Insert or replace a point. Validates vector dimension against schema.
-    pub fn upsert(&mut self, _point: Point) -> Result<(), VectorError> {
+    pub fn upsert(&mut self, point: Point) -> Result<(), VectorError> {
+        if point.vector.len() != self.params.size {
+            return Err(VectorError::DimensionMismatch {
+                expected: self.params.size,
+                got: point.vector.len(),
+            });
+        }
+        self.points.insert(point.id.clone(), point);
         Ok(())
     }
 
     /// Fetch a point by id.
-    pub fn get(&self, _id: &PointId) -> Option<&Point> {
-        None
+    pub fn get(&self, id: &PointId) -> Option<&Point> {
+        self.points.get(id)
     }
 
     /// Delete a point; returns whether it existed.
-    pub fn delete(&mut self, _id: &PointId) -> bool {
-        false
+    pub fn delete(&mut self, id: &PointId) -> bool {
+        self.points.remove(id).is_some()
     }
 
     /// Number of stored points.
@@ -54,8 +61,8 @@ impl Collection {
     }
 
     /// Exhaustive (brute-force) top-`k` search by metric score.
-    pub fn search_bruteforce(&self, _query: &[f32], _k: usize) -> Vec<ScoredPoint> {
-        Vec::new()
+    pub fn search_bruteforce(&self, query: &[f32], k: usize) -> Vec<ScoredPoint> {
+        topk_scored(Metric(self.params.distance), query, self.points.iter(), k)
     }
 }
 
@@ -74,30 +81,36 @@ impl CollectionStore {
     /// Create a new collection. Errors if the name is taken.
     pub fn create_collection(
         &mut self,
-        _name: &str,
-        _params: VectorParams,
+        name: &str,
+        params: VectorParams,
     ) -> Result<(), VectorError> {
+        if self.cols.contains_key(name) {
+            return Err(VectorError::CollectionExists(name.to_string()));
+        }
+        self.cols.insert(name.to_string(), Collection::new(params));
         Ok(())
     }
 
     /// Immutable handle to a collection.
-    pub fn get(&self, _name: &str) -> Option<&Collection> {
-        None
+    pub fn get(&self, name: &str) -> Option<&Collection> {
+        self.cols.get(name)
     }
 
     /// Mutable handle to a collection.
-    pub fn get_mut(&mut self, _name: &str) -> Option<&mut Collection> {
-        None
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Collection> {
+        self.cols.get_mut(name)
     }
 
     /// Delete a collection; returns whether it existed.
-    pub fn delete_collection(&mut self, _name: &str) -> bool {
-        false
+    pub fn delete_collection(&mut self, name: &str) -> bool {
+        self.cols.remove(name).is_some()
     }
 
     /// Sorted list of collection names.
     pub fn list(&self) -> Vec<String> {
-        Vec::new()
+        let mut names: Vec<String> = self.cols.keys().cloned().collect();
+        names.sort();
+        names
     }
 }
 
