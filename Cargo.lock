@@ -2059,6 +2059,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-mlx"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "proptest",
+ "rand 0.8.6",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "cave-net"
 version = "0.1.0"
 dependencies = [
