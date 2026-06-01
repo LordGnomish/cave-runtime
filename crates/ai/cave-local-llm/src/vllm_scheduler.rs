@@ -20,6 +20,98 @@ use std::collections::VecDeque;
 
 use crate::vllm_paged_attention::{AllocStatus, BlockSpaceManager};
 
+/// One prefill chunk emitted by [`ChunkedPrefillPlanner::step`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PrefillChunk {
+    /// Request id this chunk belongs to.
+    pub id: u64,
+    /// Prompt tokens prefilled this step.
+    pub tokens: usize,
+    /// True once the request's full prompt has been prefilled.
+    pub done: bool,
+}
+
+/// One waiting/partially-prefilled prompt in the chunked-prefill queue.
+#[derive(Debug, Clone, Copy)]
+struct PrefillState {
+    id: u64,
+    prompt: usize,
+    computed: usize,
+}
+
+/// Chunked-prefill admission — a pure-Rust port of vLLM's
+/// `enable_chunked_prefill` schedule (vllm-project/vllm `vllm/core/scheduler.py`
+/// `_schedule_chunked_prefill` / `_get_num_new_tokens`, Apache-2.0).
+///
+/// Each [`step`](ChunkedPrefillPlanner::step) greedily fills the per-step token
+/// budget (`max_num_batched_tokens`) with prefill chunks taken FCFS from the
+/// queue: a prompt that fits the remaining budget completes (`done = true`);
+/// the next prompt that does not fit is emitted as a partial chunk consuming
+/// the rest of the budget and resumes on the following step. This is how vLLM
+/// keeps a long prompt from monopolising a step while still saturating it.
+#[derive(Debug, Default)]
+pub struct ChunkedPrefillPlanner {
+    token_budget: usize,
+    queue: VecDeque<PrefillState>,
+}
+
+impl ChunkedPrefillPlanner {
+    /// New planner with a per-step token budget (`max_num_batched_tokens`).
+    pub fn new(token_budget: usize) -> Self {
+        Self {
+            token_budget,
+            queue: VecDeque::new(),
+        }
+    }
+
+    /// Enqueue a prompt of `prompt_tokens` to be prefilled.
+    pub fn add(&mut self, id: u64, prompt_tokens: usize) {
+        self.queue.push_back(PrefillState {
+            id,
+            prompt: prompt_tokens,
+            computed: 0,
+        });
+    }
+
+    /// Prompts still awaiting (full or partial) prefill.
+    pub fn num_waiting(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// True once every queued prompt has been fully prefilled.
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    /// Run one chunked-prefill step, returning the chunks scheduled this step.
+    pub fn step(&mut self) -> Vec<PrefillChunk> {
+        let mut remaining = self.token_budget;
+        let mut out = Vec::new();
+        while remaining > 0 {
+            let front = match self.queue.front_mut() {
+                Some(f) => f,
+                None => break,
+            };
+            let need = front.prompt - front.computed;
+            let chunk = need.min(remaining);
+            front.computed += chunk;
+            remaining -= chunk;
+            let done = front.computed >= front.prompt;
+            out.push(PrefillChunk {
+                id: front.id,
+                tokens: chunk,
+                done,
+            });
+            if done {
+                self.queue.pop_front();
+            }
+            // A partial chunk has consumed all remaining budget (chunk ==
+            // remaining_before), so the loop exits naturally next iteration.
+        }
+        out
+    }
+}
+
 /// Lifecycle state of a scheduled request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SeqStatus {
