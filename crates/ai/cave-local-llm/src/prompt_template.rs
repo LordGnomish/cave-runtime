@@ -319,4 +319,47 @@ mod tests {
         ctx.set_bool("off", false);
         assert_eq!(render("{{ on }}/{{ off }}", &ctx).unwrap(), "true/false");
     }
+
+    #[test]
+    fn if_else_renders_then_branch_when_truthy() {
+        let mut ctx = PromptContext::new();
+        ctx.set_bool("flag", true);
+        assert_eq!(
+            render("{{ if flag }}yes{{ else }}no{{ end }}", &ctx).unwrap(),
+            "yes"
+        );
+    }
+
+    #[test]
+    fn if_else_renders_else_branch_when_falsy() {
+        let mut ctx = PromptContext::new();
+        ctx.set_bool("flag", false);
+        assert_eq!(
+            render("{{ if flag }}yes{{ else }}no{{ end }}", &ctx).unwrap(),
+            "no"
+        );
+    }
+
+    #[test]
+    fn nested_if_with_else_picks_inner_else() {
+        // The {{ else }} must bind to the *inner* if at depth 1, not the outer.
+        let mut ctx = PromptContext::new();
+        ctx.set_bool("outer", true);
+        ctx.set_bool("inner", false);
+        let out = render(
+            "{{ if outer }}A{{ if inner }}B{{ else }}C{{ end }}D{{ else }}E{{ end }}",
+            &ctx,
+        )
+        .unwrap();
+        assert_eq!(out, "ACD");
+    }
+
+    #[test]
+    fn else_outside_if_errors() {
+        let ctx = PromptContext::new();
+        assert!(matches!(
+            render("{{ else }}", &ctx),
+            Err(TemplateError::Unbalanced(_))
+        ));
+    }
 }
