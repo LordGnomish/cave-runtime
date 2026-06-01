@@ -40,6 +40,7 @@ pub mod eval;
 pub mod compose;
 pub mod observe;
 pub mod tune;
+pub mod changelog;
 
 pub use error::{AgentError, Result};
 
