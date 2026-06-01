@@ -48,7 +48,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LlmGateway
 <li><code>POST /api/gateway/budgets</code> — <code>{{user, total_budget, duration?}}</code> (daily/weekly/monthly/yearly)</li>
 <li><code>GET /api/gateway/budgets/:user</code> — one consumer's ledger</li>
 <li><code>POST /api/gateway/budgets/:user/reset</code> — clear accrued spend</li>
-</ul></section>"#,
+</ul></section>
+<section class="mt-4"><h3 class="text-md font-semibold mb-1">OpenAI-compatible endpoints</h3>
+<ul class="text-sm list-disc ml-5">
+<li><code>POST /v1/chat/completions</code> — chat completions across every provider</li>
+<li><code>POST /v1/embeddings</code> — embeddings (OpenAI + local-compat backends)</li>
+<li><code>POST /v1/rerank</code> — Cohere/Jina-shaped rerank, scored in-process with a BM25 lexical cross-encoder (<code>top_n</code> + <code>return_documents</code>)</li>
+</ul>
+<p class="text-sm text-gray-500 mt-1">SaaS providers (OpenAI-compatible): OpenAI · Anthropic · Mistral · Groq · DeepSeek · Together AI · Fireworks AI. Local: Ollama · llama.cpp · MLX.</p>
+</section>"#,
         n = rows.len(),
         tbl = table(
             &["name", "upstream", "rpm_limit", "daily_tokens"],
@@ -120,6 +128,19 @@ mod tests {
         );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::LlmGatewayRead])).unwrap();
         assert!(!html.contains("evil-route"));
+    }
+
+    #[test]
+    fn render_lists_rerank_endpoint_and_new_providers() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/llm-gateway/src/components/RoutesList.tsx",
+            "Rerank",
+            "acme"
+        );
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::LlmGatewayRead])).unwrap();
+        assert!(html.contains("/v1/rerank"), "rerank endpoint advertised");
+        assert!(html.contains("Together AI"), "Together AI provider listed");
+        assert!(html.contains("Fireworks AI"), "Fireworks AI provider listed");
     }
 
     #[test]

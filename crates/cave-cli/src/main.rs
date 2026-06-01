@@ -626,6 +626,21 @@ enum LlmGwCmd {
     Budgets,
     /// Trigger a cave-llm-tracker bench run via the gateway
     Bench,
+    /// Rerank documents against a query via POST /v1/rerank (local BM25 scorer)
+    Rerank {
+        /// Query string to score documents against
+        #[arg(long)]
+        query: String,
+        /// Candidate documents (repeat --doc for each)
+        #[arg(long = "doc")]
+        docs: Vec<String>,
+        /// Return only the top-N reranked documents
+        #[arg(long)]
+        top_n: Option<usize>,
+        /// Rerank model name (default cohere-style label)
+        #[arg(long, default_value = "rerank-english-v3.0")]
+        model: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4618,6 +4633,24 @@ source_root = "src"
             LlmGwCmd::Cache => c.get("/api/llm-gateway/cache/stats").await,
             LlmGwCmd::Budgets => c.get("/api/gateway/budgets").await,
             LlmGwCmd::Bench => c.post("/api/llm-gateway/bench", json!({})).await,
+            LlmGwCmd::Rerank {
+                query,
+                docs,
+                top_n,
+                model,
+            } => {
+                c.post(
+                    "/v1/rerank",
+                    json!({
+                        "model": model,
+                        "query": query,
+                        "documents": docs,
+                        "top_n": top_n,
+                        "return_documents": true,
+                    }),
+                )
+                .await
+            }
         },
         Commands::Logs { cmd } => match cmd {
             LogsCmd::Streams => c.get("/api/logs/streams").await,
