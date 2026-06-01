@@ -254,4 +254,54 @@ mod tests {
         let n = 1_000_000_000;
         assert!(QuantType::Q8_0.estimate_bytes(n) > QuantType::Q4_K_M.estimate_bytes(n));
     }
+
+    // --- per-tensor ggml type (Tensor.Kind) — cite llm/ggml.go blockSize/typeSize ---
+
+    #[test]
+    fn tensor_type_names_match_ggml_ids() {
+        assert_eq!(TensorType(0).name(), "F32");
+        assert_eq!(TensorType(1).name(), "F16");
+        assert_eq!(TensorType(2).name(), "Q4_0");
+        assert_eq!(TensorType(6).name(), "Q5_0");
+        assert_eq!(TensorType(7).name(), "Q5_1");
+        assert_eq!(TensorType(8).name(), "Q8_0");
+        assert_eq!(TensorType(12).name(), "Q4_K");
+        assert_eq!(TensorType(14).name(), "Q6_K");
+        assert_eq!(TensorType(30).name(), "BF16");
+        assert_eq!(TensorType(999).name(), "UNKNOWN");
+    }
+
+    #[test]
+    fn block_size_matches_ggml() {
+        // F32/F16/BF16 are scalar (block 1); legacy Q4/Q5/Q8 block 32; K-quants 256.
+        assert_eq!(TensorType(0).block_size(), 1); // F32
+        assert_eq!(TensorType(1).block_size(), 1); // F16
+        assert_eq!(TensorType(30).block_size(), 1); // BF16
+        assert_eq!(TensorType(2).block_size(), 32); // Q4_0
+        assert_eq!(TensorType(8).block_size(), 32); // Q8_0
+        assert_eq!(TensorType(20).block_size(), 32); // IQ4_NL
+        assert_eq!(TensorType(12).block_size(), 256); // Q4_K
+        assert_eq!(TensorType(14).block_size(), 256); // Q6_K
+    }
+
+    #[test]
+    fn type_size_matches_ggml() {
+        assert_eq!(TensorType(0).type_size(), 4); // F32
+        assert_eq!(TensorType(1).type_size(), 2); // F16
+        assert_eq!(TensorType(2).type_size(), 2 + 32 / 2); // Q4_0 = 18
+        assert_eq!(TensorType(8).type_size(), 2 + 32); // Q8_0 = 34
+        assert_eq!(TensorType(12).type_size(), 2 + 2 + 12 + 256 / 2); // Q4_K = 144
+        assert_eq!(TensorType(14).type_size(), 256 / 2 + 256 / 4 + 256 / 16 + 2); // Q6_K = 210
+        assert_eq!(TensorType(999).type_size(), 0); // default
+    }
+
+    #[test]
+    fn tensor_byte_size_uses_blocks_times_typesize() {
+        // F32 4096 elements: 4096 blocks * 4 bytes = 16384.
+        assert_eq!(TensorType(0).tensor_size(4096), 16_384);
+        // Q4_0 4096 elements: (4096/32) blocks * 18 bytes = 128 * 18 = 2304.
+        assert_eq!(TensorType(2).tensor_size(4096), 2_304);
+        // Q4_K 4096 elements: (4096/256) * 144 = 16 * 144 = 2304.
+        assert_eq!(TensorType(12).tensor_size(4096), 2_304);
+    }
 }
