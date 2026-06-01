@@ -32,6 +32,7 @@ pub mod openai;
 pub mod provider;
 pub mod providers;
 pub mod rate_limit;
+pub mod rerank;
 pub mod retry;
 pub mod router;
 pub mod routes;
