@@ -21,7 +21,10 @@ use cave_local_llm::{
     },
     vllm_prefix_cache::PrefixCachingAllocator,
     vllm_quant::{ActivationScheme, Fp8Format, QuantConfig},
+    vllm_sampler,
     vllm_sampling::{OpenAiSampling, SamplingParams},
+    vllm_scheduler::ChunkedPrefillPlanner,
+    vllm_spec_decode::TypicalAcceptanceSampler,
 };
 use clap::{Parser, Subcommand};
 use prometheus_client::registry::Registry;
@@ -174,6 +177,45 @@ enum VllmCmd {
         num_kv_heads: usize,
         /// Vocabulary size
         #[arg(long, default_value_t = 32000)]
+        vocab: usize,
+    },
+    /// Warp a logits row through the sampler pipeline (temp/top-k/top-p/min-p)
+    Warp {
+        /// Comma-separated logits row, e.g. "1.0,2.0,3.0,4.0"
+        #[arg(long)]
+        logits: String,
+        /// Softmax temperature (0 = greedy)
+        #[arg(long, default_value_t = 1.0)]
+        temperature: f32,
+        /// Top-k (-1 disables)
+        #[arg(long, default_value_t = -1)]
+        top_k: i32,
+        /// Nucleus top_p
+        #[arg(long, default_value_t = 1.0)]
+        top_p: f32,
+        /// Min-p relative cutoff
+        #[arg(long, default_value_t = 0.0)]
+        min_p: f32,
+    },
+    /// Plan chunked prefill: split prompts across steps under a token budget
+    ChunkedPrefill {
+        /// Per-step token budget (max_num_batched_tokens)
+        #[arg(long, default_value_t = 512)]
+        budget: usize,
+        /// Comma-separated prompt lengths, e.g. "100,30,800"
+        #[arg(long)]
+        prompts: String,
+    },
+    /// Run typical-acceptance speculative decoding over a peaked target row
+    SpecTypical {
+        /// Number of speculative tokens k
+        #[arg(long, default_value_t = 3)]
+        k: usize,
+        /// Probability mass on the peak token of each position (rest uniform)
+        #[arg(long, default_value_t = 0.9)]
+        peak: f32,
+        /// Vocabulary size of the synthetic target distribution
+        #[arg(long, default_value_t = 8)]
         vocab: usize,
     },
 }
@@ -508,6 +550,85 @@ fn run_vllm(cmd: VllmCmd) -> Result<()> {
                 vs.start, vs.end, vs.padded_vocab, vs.num_embeddings_per_partition
             );
             println!("  layers:        [{start_layer}, {end_layer}) of {num_layers}");
+            Ok(())
+        }
+        VllmCmd::Warp {
+            logits,
+            temperature,
+            top_k,
+            top_p,
+            min_p,
+        } => {
+            let mut row: Vec<f32> = logits
+                .split(',')
+                .map(|s| s.trim().parse::<f32>())
+                .collect::<Result<_, _>>()
+                .map_err(|e| anyhow::anyhow!("bad logits list: {e}"))?;
+            let params = SamplingParams {
+                temperature,
+                top_k,
+                top_p,
+                min_p,
+                ..Default::default()
+            };
+            let probs = vllm_sampler::process(&mut row, &params, &[], &[]);
+            println!("Logits-sampler warp (temp={temperature}, top_k={top_k}, top_p={top_p}, min_p={min_p})");
+            for (i, (l, p)) in row.iter().zip(probs.iter()).enumerate() {
+                let l = if l.is_finite() {
+                    format!("{l:.4}")
+                } else {
+                    "-inf".to_string()
+                };
+                println!("  token {i:>3}: logit {l:>10}   prob {:.4}", p);
+            }
+            Ok(())
+        }
+        VllmCmd::ChunkedPrefill { budget, prompts } => {
+            let lengths: Vec<usize> = prompts
+                .split(',')
+                .map(|s| s.trim().parse::<usize>())
+                .collect::<Result<_, _>>()
+                .map_err(|e| anyhow::anyhow!("bad prompt list: {e}"))?;
+            let mut planner = ChunkedPrefillPlanner::new(budget);
+            for (i, len) in lengths.iter().enumerate() {
+                planner.add(i as u64, *len);
+            }
+            println!("Chunked-prefill plan (budget={budget}/step, {} prompts)", lengths.len());
+            let mut step = 0usize;
+            while !planner.is_empty() {
+                let chunks = planner.step();
+                let rendered: Vec<String> = chunks
+                    .iter()
+                    .map(|c| {
+                        format!("seq{}:{}{}", c.id, c.tokens, if c.done { "*" } else { "" })
+                    })
+                    .collect();
+                println!("  step {step:>2}: [{}]", rendered.join(", "));
+                step += 1;
+            }
+            println!("  ({step} steps; '*' = prompt fully prefilled)");
+            Ok(())
+        }
+        VllmCmd::SpecTypical { k, peak, vocab } => {
+            if vocab < 2 {
+                return Err(anyhow::anyhow!("vocab must be >= 2"));
+            }
+            // Synthetic peaked target rows: peak on token 0, rest uniform.
+            let rest = (1.0 - peak) / (vocab - 1) as f32;
+            let row: Vec<f32> = (0..vocab)
+                .map(|j| if j == 0 { peak } else { rest })
+                .collect();
+            let target: Vec<Vec<f32>> = (0..=k).map(|_| row.clone()).collect();
+            // Draft all peaks (token 0) -> all should be typical and accepted.
+            let draft: Vec<u32> = vec![0; k];
+            let sampler = TypicalAcceptanceSampler::with_defaults(k);
+            let r = sampler.sample(&draft, &target);
+            println!("Typical-acceptance spec decode (k={k}, peak={peak}, vocab={vocab})");
+            println!("  threshold:     {:.4}", sampler.posterior_threshold());
+            println!("  alpha:         {:.4}", sampler.posterior_alpha());
+            println!("  accepted:      {} / {k}", r.accepted);
+            println!("  emitted:       {:?}", r.emitted);
+            println!("  bonus token:   {}", if r.all_accepted { "yes" } else { "no (rejected)" });
             Ok(())
         }
     }
