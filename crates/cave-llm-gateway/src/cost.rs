@@ -106,6 +106,12 @@ pub fn default_pricing() -> Vec<ModelPricing> {
             input_per_million: 0.88,
             output_per_million: 0.88,
         },
+        // Fireworks AI (OpenAI-compat SaaS)
+        ModelPricing {
+            model: "accounts/fireworks/models/llama-v3p3-70b-instruct".into(),
+            input_per_million: 0.90,
+            output_per_million: 0.90,
+        },
         // Local / mock — free
         ModelPricing {
             model: "llama3".into(),

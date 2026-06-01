@@ -323,6 +323,18 @@ pub fn seed_catalogue() -> Vec<ModelCapability> {
             cost_out_per_1k_micro_usd: 880,
             quality: 83,
         },
+        ModelCapability {
+            provider: "fireworks".into(),
+            model: "accounts/fireworks/models/llama-v3p3-70b-instruct".into(),
+            locality: Locality::Saas,
+            context_window: 131_072,
+            supports_tools: true,
+            supports_vision: false,
+            supports_json: true,
+            cost_in_per_1k_micro_usd: 900,
+            cost_out_per_1k_micro_usd: 900,
+            quality: 82,
+        },
     ]
 }
 

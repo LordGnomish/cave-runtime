@@ -7,6 +7,7 @@
 //! `provider.rs`.
 
 pub mod deepseek;
+pub mod fireworks;
 pub mod groq;
 pub mod llama_cpp;
 pub mod mistral;
