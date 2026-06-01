@@ -406,4 +406,36 @@ mod tests {
             Err(TemplateError::Unbalanced(_))
         ));
     }
+
+    #[test]
+    fn trim_right_marker_strips_following_whitespace() {
+        let mut ctx = PromptContext::new();
+        ctx.set_scalar("x", "A");
+        assert_eq!(render("{{ x -}}   \n   B", &ctx).unwrap(), "AB");
+    }
+
+    #[test]
+    fn trim_left_marker_strips_preceding_whitespace() {
+        let mut ctx = PromptContext::new();
+        ctx.set_scalar("x", "B");
+        assert_eq!(render("A   \n  {{- x }}", &ctx).unwrap(), "AB");
+    }
+
+    #[test]
+    fn trim_markers_in_if_block_ollama_pattern() {
+        // Mirrors ollama docs/template.md: an indented {{- if }} with a
+        // trailing {{- end }} so the rendered prompt has no stray blank lines.
+        let mut ctx = PromptContext::new();
+        ctx.set_scalar("system", "SYS");
+        let tmpl = "{{- if system }}\n  {{ system }}\n{{- end }}";
+        assert_eq!(render(tmpl, &ctx).unwrap(), "\n  SYS");
+    }
+
+    #[test]
+    fn trim_both_markers_collapse_to_empty_when_falsy() {
+        let mut ctx = PromptContext::new();
+        ctx.set_bool("system", false);
+        let tmpl = "X\n{{- if system }}\n  {{ system }}\n{{- end -}}\n  Y";
+        assert_eq!(render(tmpl, &ctx).unwrap(), "XY");
+    }
 }
