@@ -380,6 +380,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: LlmGwCmd,
     },
+    /// cave-hermes agent orchestration
+    Hermes {
+        #[command(subcommand)]
+        cmd: HermesCmd,
+    },
     /// cave-logs CLI parity
     Logs {
         #[command(subcommand)]
@@ -716,6 +721,28 @@ enum LlmGwCmd {
     Routes,
     Usage,
     Limits,
+}
+
+#[derive(Subcommand)]
+enum HermesCmd {
+    /// List the registered built-in tools (JSON Schema catalogue).
+    Tools,
+    /// Run the agent loop on a goal and print the trace.
+    Run {
+        /// Natural-language goal for the agent.
+        goal: String,
+        /// Memory / session scope to file records under.
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    /// Fan a batch of goals (one per line) out across worker agents.
+    Orchestrate {
+        /// Goals separated by `;;` — each becomes an independent subtask.
+        goals: String,
+        /// Worker-pool size.
+        #[arg(long)]
+        pool_size: Option<usize>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4813,6 +4840,30 @@ source_root = "src"
             LlmGwCmd::Routes => c.get("/api/llm-gateway/routes").await,
             LlmGwCmd::Usage => c.get("/api/llm-gateway/usage").await,
             LlmGwCmd::Limits => c.get("/api/llm-gateway/limits").await,
+        },
+        Commands::Hermes { cmd } => match cmd {
+            HermesCmd::Tools => c.get("/api/hermes/tools").await,
+            HermesCmd::Run { goal, scope } => {
+                c.post(
+                    "/api/hermes/agent/run",
+                    json!({ "goal": goal, "scope": scope }),
+                )
+                .await
+            }
+            HermesCmd::Orchestrate { goals, pool_size } => {
+                let subtasks: Vec<serde_json::Value> = goals
+                    .split(";;")
+                    .map(str::trim)
+                    .filter(|g| !g.is_empty())
+                    .enumerate()
+                    .map(|(i, g)| json!({ "id": format!("t{i}"), "goal": g, "deps": [] }))
+                    .collect();
+                c.post(
+                    "/api/hermes/orchestrate",
+                    json!({ "subtasks": subtasks, "pool_size": pool_size }),
+                )
+                .await
+            }
         },
         Commands::Logs { cmd } => match cmd {
             LogsCmd::Streams => c.get("/api/logs/streams").await,
