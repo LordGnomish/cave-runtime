@@ -84,8 +84,121 @@ pub struct ModelCatalog {
 impl ModelCatalog {
     /// Build the static built-in catalog.
     pub fn builtin() -> Self {
-        // PLACEHOLDER (RED): empty catalog.
-        Self { cards: Vec::new() }
+        const NOMIC_MATRYOSHKA: &[usize] = &[64, 128, 256, 512, 768];
+        let cards = vec![
+            // --- sentence-transformers symmetric ---
+            ModelCard {
+                id: "sentence-transformers/all-MiniLM-L6-v2",
+                family: ModelFamily::SentenceTransformers,
+                dims: 384,
+                max_seq_len: 256,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: None,
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+            ModelCard {
+                id: "sentence-transformers/all-mpnet-base-v2",
+                family: ModelFamily::SentenceTransformers,
+                dims: 768,
+                max_seq_len: 384,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: None,
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+            // --- BAAI BGE (CLS pooling, asymmetric query instruction) ---
+            ModelCard {
+                id: "BAAI/bge-large-en-v1.5",
+                family: ModelFamily::Bge,
+                dims: 1024,
+                max_seq_len: 512,
+                pooling: PoolingStrategy::Cls,
+                normalize: true,
+                query_instruction: Some(
+                    "Represent this sentence for searching relevant passages: ",
+                ),
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+            ModelCard {
+                id: "BAAI/bge-base-en-v1.5",
+                family: ModelFamily::Bge,
+                dims: 768,
+                max_seq_len: 512,
+                pooling: PoolingStrategy::Cls,
+                normalize: true,
+                query_instruction: Some(
+                    "Represent this sentence for searching relevant passages: ",
+                ),
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+            // --- intfloat E5 (query:/passage: prefixes, mean pooling) ---
+            ModelCard {
+                id: "intfloat/e5-large-v2",
+                family: ModelFamily::E5,
+                dims: 1024,
+                max_seq_len: 512,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: Some("query: "),
+                passage_instruction: Some("passage: "),
+                matryoshka_dims: &[],
+            },
+            ModelCard {
+                id: "intfloat/multilingual-e5-large",
+                family: ModelFamily::E5,
+                dims: 1024,
+                max_seq_len: 512,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: Some("query: "),
+                passage_instruction: Some("passage: "),
+                matryoshka_dims: &[],
+            },
+            // --- nomic (search_query:/search_document:, Matryoshka) ---
+            ModelCard {
+                id: "nomic-ai/nomic-embed-text-v1.5",
+                family: ModelFamily::Nomic,
+                dims: 768,
+                max_seq_len: 8192,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: Some("search_query: "),
+                passage_instruction: Some("search_document: "),
+                matryoshka_dims: NOMIC_MATRYOSHKA,
+            },
+            // --- Jina (long context, mean pooling) ---
+            ModelCard {
+                id: "jinaai/jina-embeddings-v2-base-en",
+                family: ModelFamily::Jina,
+                dims: 768,
+                max_seq_len: 8192,
+                pooling: PoolingStrategy::Mean,
+                normalize: true,
+                query_instruction: None,
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+            // --- Mistral decoder embedder (last-token pooling, 4096-d) ---
+            ModelCard {
+                id: "intfloat/e5-mistral-7b-instruct",
+                family: ModelFamily::Mistral,
+                dims: 4096,
+                max_seq_len: 4096,
+                pooling: PoolingStrategy::LastToken,
+                normalize: true,
+                query_instruction: Some(
+                    "Instruct: Given a query, retrieve relevant passages\nQuery: ",
+                ),
+                passage_instruction: None,
+                matryoshka_dims: &[],
+            },
+        ];
+        Self { cards }
     }
 
     /// Look up a model by exact id.
