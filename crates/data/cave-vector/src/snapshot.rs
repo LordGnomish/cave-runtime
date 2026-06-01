@@ -51,7 +51,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// Recompute the checksum and compare — detects corruption/tampering.
     pub fn verify(&self) -> bool {
-        false
+        checksum(&self.schema, &self.points) == self.checksum
     }
 }
 
@@ -70,32 +70,57 @@ impl SnapshotStore {
     /// Capture `collection` as a new snapshot. Errors if the name is taken.
     pub fn create(
         &mut self,
-        _name: &str,
-        _collection: &str,
-        _c: &Collection,
-        _now_unix: u64,
+        name: &str,
+        collection: &str,
+        c: &Collection,
+        now_unix: u64,
     ) -> Result<&Snapshot, VectorError> {
-        Err(VectorError::Invalid("not implemented".into()))
+        if self.snaps.contains_key(name) {
+            return Err(VectorError::Invalid(format!("snapshot {name:?} already exists")));
+        }
+        let points: Vec<Point> = c.points.values().cloned().collect();
+        let snap = Snapshot {
+            name: name.to_string(),
+            collection: collection.to_string(),
+            created_unix: now_unix,
+            schema: c.params.clone(),
+            checksum: checksum(&c.params, &points),
+            points,
+        };
+        Ok(self.snaps.entry(name.to_string()).or_insert(snap))
     }
 
     /// Sorted snapshot names.
     pub fn list(&self) -> Vec<String> {
-        Vec::new()
+        let mut names: Vec<String> = self.snaps.keys().cloned().collect();
+        names.sort();
+        names
     }
 
     /// Fetch a snapshot.
-    pub fn get(&self, _name: &str) -> Option<&Snapshot> {
-        None
+    pub fn get(&self, name: &str) -> Option<&Snapshot> {
+        self.snaps.get(name)
     }
 
     /// Delete a snapshot; returns whether it existed.
-    pub fn delete(&mut self, _name: &str) -> bool {
-        false
+    pub fn delete(&mut self, name: &str) -> bool {
+        self.snaps.remove(name).is_some()
     }
 
     /// Rebuild a [`Collection`] from a snapshot, verifying the checksum first.
-    pub fn restore(&self, _name: &str) -> Result<Collection, VectorError> {
-        Err(VectorError::Invalid("not implemented".into()))
+    pub fn restore(&self, name: &str) -> Result<Collection, VectorError> {
+        let snap = self
+            .snaps
+            .get(name)
+            .ok_or_else(|| VectorError::Invalid(format!("snapshot {name:?} not found")))?;
+        if !snap.verify() {
+            return Err(VectorError::Invalid(format!("snapshot {name:?} checksum mismatch")));
+        }
+        let mut c = Collection::new(snap.schema.clone());
+        for p in &snap.points {
+            c.upsert(p.clone())?;
+        }
+        Ok(c)
     }
 }
 
