@@ -2673,6 +2673,15 @@ enum MlxCmd {
         #[arg(long, default_value_t = 0.1)]
         lr: f32,
     },
+    /// Sample the mx.random distribution suite and print summary statistics
+    Rand {
+        /// PRNG seed (mx.random.key analog)
+        #[arg(long, default_value_t = 0)]
+        seed: u64,
+        /// Number of samples drawn per distribution
+        #[arg(long, default_value_t = 10_000)]
+        n: usize,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4332,6 +4341,13 @@ source_root = "src"
                     args.push(steps.to_string());
                     args.push("--lr".into());
                     args.push(lr.to_string());
+                }
+                MlxCmd::Rand { seed, n } => {
+                    args.push("rand".into());
+                    args.push("--seed".into());
+                    args.push(seed.to_string());
+                    args.push("--n".into());
+                    args.push(n.to_string());
                 }
             }
             let status = std::process::Command::new("cave-mlx")

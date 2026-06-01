@@ -12,6 +12,7 @@ use cave_mlx::autograd::Tape;
 use cave_mlx::conv;
 use cave_mlx::nn::Linear;
 use cave_mlx::optim::{Adam, Optimizer};
+use cave_mlx::random::{self, Key};
 
 const MLX_PARITY_VERSION: &str = "v0.31.2";
 
@@ -43,6 +44,16 @@ enum Command {
     },
     /// Run a small channel-last conv2d + 2x2 max-pool over a sample image.
     Conv,
+    /// Sample the mx.random distribution suite from a seeded key and print
+    /// summary statistics (mean/std, Bernoulli rate, a categorical histogram).
+    Rand {
+        /// PRNG seed (mx.random.key analog).
+        #[arg(long, default_value_t = 0)]
+        seed: u64,
+        /// Number of samples drawn per distribution.
+        #[arg(long, default_value_t = 10_000)]
+        n: usize,
+    },
 }
 
 fn main() {
@@ -62,10 +73,55 @@ fn main() {
             println!("  conv    : conv1d/conv2d (channel-last), max_pool2d/avg_pool2d");
             println!("  nn      : Linear, Conv2d, Activation");
             println!("  optim   : Sgd (momentum/decay), Adam, AdamW");
+            println!(
+                "  random  : Threefry2x32 key/split, uniform/normal/bernoulli/randint/"
+            );
+            println!("            truncated_normal/categorical");
         }
         Command::Demo { steps, lr } => run_demo(steps, lr),
         Command::Conv => run_conv(),
+        Command::Rand { seed, n } => run_rand(seed, n),
     }
+}
+
+/// Draw from each distribution off one seeded key (split into sub-streams) and
+/// print summary statistics, exercising the full `mx.random` surface.
+fn run_rand(seed: u64, n: usize) {
+    let keys = Key::new(seed).split(5);
+    println!("mx.random suite — seed {seed}, n={n} per distribution");
+
+    let u = random::uniform(&keys[0], 0.0, 1.0, &[n]);
+    println!("  uniform[0,1)       mean={:.4}", mean(u.data()));
+
+    let g = random::normal(&keys[1], 0.0, 1.0, &[n]);
+    let (m, s) = mean_std(g.data());
+    println!("  normal(0,1)        mean={m:.4} std={s:.4}");
+
+    let b = random::bernoulli(&keys[2], 0.25, &[n]);
+    println!("  bernoulli(p=0.25)  rate={:.4}", mean(b.data()));
+
+    let t = random::truncated_normal(&keys[3], -1.0, 1.0, &[n]);
+    let (tm, ts) = mean_std(t.data());
+    println!("  truncated_normal[-1,1] mean={tm:.4} std={ts:.4}");
+
+    // 4-class categorical with a peaked logit; histogram the picks.
+    let logits: Vec<f32> = (0..n).flat_map(|_| [0.5, 2.0, 1.0, 0.0]).collect();
+    let idx = random::categorical(&keys[4], &Array::new(logits, &[n, 4]).unwrap());
+    let mut hist = [0usize; 4];
+    for &v in idx.data() {
+        hist[v as usize] += 1;
+    }
+    println!("  categorical[.5,2,1,0] histogram={hist:?}");
+}
+
+fn mean(xs: &[f32]) -> f32 {
+    xs.iter().sum::<f32>() / xs.len() as f32
+}
+
+fn mean_std(xs: &[f32]) -> (f32, f32) {
+    let m = mean(xs);
+    let var = xs.iter().map(|x| (x - m).powi(2)).sum::<f32>() / xs.len() as f32;
+    (m, var.sqrt())
 }
 
 /// Convolve a 4x4 single-channel image with a 2x2 box kernel, then 2x2 max-pool.
