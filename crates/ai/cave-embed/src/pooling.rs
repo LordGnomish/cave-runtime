@@ -57,16 +57,71 @@ pub fn pool(
             mask: mask.len(),
         });
     }
-    // PLACEHOLDER (RED): return the first token regardless of strategy.
-    let _ = strategy;
-    Ok(token_embeddings[0].clone())
+    let hidden = token_embeddings[0].len();
+    match strategy {
+        PoolingStrategy::Cls => Ok(token_embeddings[0].clone()),
+        PoolingStrategy::Mean | PoolingStrategy::MeanSqrtLen => {
+            let mut acc = vec![0.0f32; hidden];
+            let mut count = 0usize;
+            for (row, &m) in token_embeddings.iter().zip(mask) {
+                if m == 0 {
+                    continue;
+                }
+                count += 1;
+                for (a, &x) in acc.iter_mut().zip(row) {
+                    *a += x;
+                }
+            }
+            if count == 0 {
+                return Err(EmbedError::Degenerate("no unmasked tokens".into()));
+            }
+            let divisor = match strategy {
+                PoolingStrategy::MeanSqrtLen => (count as f32).sqrt(),
+                _ => count as f32,
+            };
+            for a in &mut acc {
+                *a /= divisor;
+            }
+            Ok(acc)
+        }
+        PoolingStrategy::Max => {
+            let mut acc = vec![f32::NEG_INFINITY; hidden];
+            let mut any = false;
+            for (row, &m) in token_embeddings.iter().zip(mask) {
+                if m == 0 {
+                    continue;
+                }
+                any = true;
+                for (a, &x) in acc.iter_mut().zip(row) {
+                    if x > *a {
+                        *a = x;
+                    }
+                }
+            }
+            if !any {
+                return Err(EmbedError::Degenerate("no unmasked tokens".into()));
+            }
+            Ok(acc)
+        }
+        PoolingStrategy::LastToken => {
+            for (row, &m) in token_embeddings.iter().zip(mask).rev() {
+                if m != 0 {
+                    return Ok(row.clone());
+                }
+            }
+            Err(EmbedError::Degenerate("no unmasked tokens".into()))
+        }
+    }
 }
 
 /// L2-normalize a vector in place-style (returns a new vector). Returns
 /// `Degenerate` if the norm is ~zero.
 pub fn l2_normalize(v: &[f32]) -> EmbedResult<Vec<f32>> {
-    // PLACEHOLDER (RED): identity, no normalization.
-    Ok(v.to_vec())
+    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm < 1e-12 {
+        return Err(EmbedError::Degenerate("zero-norm vector".into()));
+    }
+    Ok(v.iter().map(|x| x / norm).collect())
 }
 
 #[cfg(test)]
