@@ -38,6 +38,7 @@ pub mod memory;
 pub mod plan;
 pub mod eval;
 pub mod compose;
+pub mod observe;
 
 pub use error::{AgentError, Result};
 
