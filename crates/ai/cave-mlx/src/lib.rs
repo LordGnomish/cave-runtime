@@ -41,3 +41,6 @@ pub mod quant;
 
 /// Convolution + pooling — `mx.conv1d` / `mx.conv2d` and pooling layers.
 pub mod conv;
+
+/// Pseudo-random sampling — `mx.random` (Threefry2x32 + distribution suite).
+pub mod random;
