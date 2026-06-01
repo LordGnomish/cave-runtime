@@ -59,6 +59,128 @@ pub struct RerankResponse {
     pub meta: RerankMeta,
 }
 
+// ── Local lexical cross-encoder surrogate ──────────────────────────────────────
+
+/// Lowercase, split on non-alphanumeric boundaries, drop empties.
+fn tokenize(s: &str) -> Vec<String> {
+    s.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_string())
+        .collect()
+}
+
+/// Deterministic FNV-1a 64-bit hash, used for a stable response `id`.
+fn fnv1a(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+/// Score `documents` against `query` with a BM25 lexical relevance model and
+/// return `(original_index, relevance_score)` sorted by score descending.
+///
+/// Scores are min-normalised by the maximum BM25 score so the best document
+/// maps to `1.0` and a document sharing no query terms maps to `0.0`
+/// (Cohere-style `[0, 1]` relevance). Ties preserve original document order.
+pub fn lexical_rerank(query: &str, documents: &[String]) -> Vec<(usize, f32)> {
+    const K1: f64 = 1.5;
+    const B: f64 = 0.75;
+
+    let q_terms: Vec<String> = {
+        let mut t = tokenize(query);
+        t.sort();
+        t.dedup();
+        t
+    };
+    let doc_tokens: Vec<Vec<String>> = documents.iter().map(|d| tokenize(d)).collect();
+    let n = doc_tokens.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let avgdl = doc_tokens.iter().map(|d| d.len()).sum::<usize>() as f64 / n as f64;
+
+    // Document frequency per query term.
+    let df = |term: &str| -> usize {
+        doc_tokens
+            .iter()
+            .filter(|d| d.iter().any(|w| w == term))
+            .count()
+    };
+
+    let raw: Vec<(usize, f64)> = doc_tokens
+        .iter()
+        .enumerate()
+        .map(|(i, tokens)| {
+            let dl = tokens.len() as f64;
+            let mut score = 0.0_f64;
+            for term in &q_terms {
+                let tf = tokens.iter().filter(|w| *w == term).count() as f64;
+                if tf == 0.0 {
+                    continue;
+                }
+                let df_t = df(term) as f64;
+                // BM25 IDF (always positive via the +1 inside the log).
+                let idf = (((n as f64 - df_t + 0.5) / (df_t + 0.5)) + 1.0).ln();
+                let denom = tf + K1 * (1.0 - B + B * (dl / avgdl.max(1.0)));
+                score += idf * (tf * (K1 + 1.0)) / denom;
+            }
+            (i, score)
+        })
+        .collect();
+
+    // Normalise to [0, 1] by the maximum raw score.
+    let max = raw.iter().fold(0.0_f64, |m, (_, s)| m.max(*s));
+    let mut scored: Vec<(usize, f32)> = raw
+        .into_iter()
+        .map(|(i, s)| (i, if max > 0.0 { (s / max) as f32 } else { 0.0 }))
+        .collect();
+
+    // Stable sort by score descending (ties keep original index order).
+    scored.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
+    scored
+}
+
+/// Run a rerank request through the in-process lexical scorer and build a
+/// Cohere/Jina-compatible [`RerankResponse`] (applies `top_n` truncation,
+/// echoes documents when `return_documents` is set, bills one search unit per
+/// 100 candidate documents).
+pub fn rerank_local(req: &RerankRequest) -> RerankResponse {
+    let ranked = lexical_rerank(&req.query, &req.documents);
+    let echo = req.return_documents.unwrap_or(false);
+    let limit = req.top_n.unwrap_or(ranked.len()).min(ranked.len());
+
+    let results = ranked
+        .into_iter()
+        .take(limit)
+        .map(|(index, relevance_score)| RerankResult {
+            index,
+            relevance_score,
+            document: echo.then(|| RerankDocument {
+                text: req.documents[index].clone(),
+            }),
+        })
+        .collect();
+
+    let search_units = ((req.documents.len() + 99) / 100).max(1) as u32;
+
+    RerankResponse {
+        id: format!("rerank-{:016x}", fnv1a(&req.query)),
+        results,
+        model: req.model.clone(),
+        meta: RerankMeta {
+            billed_units: RerankBilledUnits { search_units },
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
