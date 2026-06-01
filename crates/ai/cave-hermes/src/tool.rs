@@ -335,6 +335,96 @@ mod tests {
         assert_eq!(first["toolset"], "core");
     }
 
+    fn typed_entry() -> ToolEntry {
+        // schema: requires "path" (string); optional "count" (integer).
+        ToolEntry::new(
+            "typed",
+            "core",
+            "needs a path",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "count": { "type": "integer" }
+                },
+                "required": ["path"]
+            }),
+            Arc::new(|_args: &serde_json::Value| Ok(ToolResult::ok("ran"))),
+        )
+    }
+
+    #[test]
+    fn invoke_rejects_missing_required_field_before_handler() {
+        // The handler ignores args and would happily return ok; the registry
+        // must reject the call up front because `path` is required.
+        let mut r = ToolRegistry::new();
+        r.register(typed_entry());
+        let err = r.invoke("typed", &serde_json::json!({})).unwrap_err();
+        match err {
+            HermesError::ToolArguments { name, reason } => {
+                assert_eq!(name, "typed");
+                assert!(reason.contains("path"), "reason was: {reason}");
+            }
+            e => panic!("expected ToolArguments, got {e}"),
+        }
+    }
+
+    #[test]
+    fn invoke_rejects_required_field_of_wrong_type() {
+        let mut r = ToolRegistry::new();
+        r.register(typed_entry());
+        let err = r
+            .invoke("typed", &serde_json::json!({ "path": 5 }))
+            .unwrap_err();
+        match err {
+            HermesError::ToolArguments { reason, .. } => {
+                assert!(reason.contains("path"), "reason was: {reason}");
+                assert!(reason.contains("string"), "reason was: {reason}");
+            }
+            e => panic!("expected ToolArguments, got {e}"),
+        }
+    }
+
+    #[test]
+    fn invoke_rejects_optional_field_of_wrong_type() {
+        // `count` is not required, but if present it must be an integer.
+        let mut r = ToolRegistry::new();
+        r.register(typed_entry());
+        let err = r
+            .invoke(
+                "typed",
+                &serde_json::json!({ "path": "/ok", "count": "nope" }),
+            )
+            .unwrap_err();
+        match err {
+            HermesError::ToolArguments { reason, .. } => {
+                assert!(reason.contains("count"), "reason was: {reason}");
+            }
+            e => panic!("expected ToolArguments, got {e}"),
+        }
+    }
+
+    #[test]
+    fn invoke_accepts_valid_args_against_schema() {
+        let mut r = ToolRegistry::new();
+        r.register(typed_entry());
+        let out = r
+            .invoke("typed", &serde_json::json!({ "path": "/ok", "count": 3 }))
+            .unwrap();
+        assert!(out.ok);
+        assert_eq!(out.output, "ran");
+    }
+
+    #[test]
+    fn invoke_without_required_keys_tolerates_null_args() {
+        // A schema that declares no `required` array must not force args to
+        // be an object — Null is a valid "no arguments" payload.
+        let mut r = ToolRegistry::new();
+        r.register(echo_entry()); // schema {"type":"object"}, no required
+        let out = r.invoke("echo", &serde_json::Value::Null).unwrap();
+        assert!(out.ok);
+    }
+
     #[test]
     fn names_are_sorted_alphabetically() {
         let mut r = ToolRegistry::new();
