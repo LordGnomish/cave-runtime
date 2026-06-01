@@ -55,6 +55,17 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Inspect a local .gguf model file — header, metadata, and tensor layout.
+    Gguf {
+        /// Path to the .gguf file
+        #[arg(long)]
+        path: PathBuf,
+
+        /// Also list every tensor (name / type / shape / size)
+        #[arg(long)]
+        tensors: bool,
+    },
 }
 
 #[tokio::main]
@@ -188,6 +199,41 @@ async fn run(cli: Cli) -> Result<()> {
             );
             println!("  model:    {model}");
             println!("  elapsed:  {elapsed:.2}s");
+
+            Ok(())
+        }
+        Commands::Gguf { path, tensors } => {
+            let bytes = std::fs::read(&path)
+                .with_context(|| format!("reading gguf file '{}'", path.display()))?;
+            let g = cave_local_llm::gguf::GgufFile::parse(&bytes)
+                .with_context(|| format!("parsing gguf file '{}'", path.display()))?;
+
+            println!("{}", path.display());
+            println!("  gguf version:  {}", g.version);
+            println!("  architecture:  {}", g.architecture().unwrap_or("(unknown)"));
+            println!("  tensor count:  {}", g.tensor_count);
+            println!("  metadata keys: {}", g.metadata.len());
+            println!("  alignment:     {}", g.alignment());
+
+            let total: u64 = g.tensors.iter().map(|t| t.size_bytes()).sum();
+            println!(
+                "  tensor bytes:  {} ({:.2} GiB)",
+                total,
+                total as f64 / (1024.0 * 1024.0 * 1024.0)
+            );
+
+            if tensors {
+                println!("  tensors:");
+                for t in &g.tensors {
+                    println!(
+                        "    {:<32} {:<7} {:?}  {} bytes",
+                        t.name,
+                        t.kind_type().name(),
+                        t.shape,
+                        t.size_bytes()
+                    );
+                }
+            }
 
             Ok(())
         }

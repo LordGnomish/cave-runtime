@@ -129,7 +129,6 @@ fn apply_trim_markers(t: &str) -> TemplateResult<String> {
                 let mut lit = &rest[..open];
                 if trim_next_ws {
                     lit = lit.trim_start();
-                    trim_next_ws = false;
                 }
                 out.push_str(lit);
 
