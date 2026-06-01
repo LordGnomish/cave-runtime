@@ -49,11 +49,36 @@ pub fn padding_waste(batch: &[BatchItem]) -> usize {
 /// Plan length-sorted micro-batches honoring both caps. An item longer than
 /// the token budget on its own still receives a singleton batch (never dropped).
 pub fn plan_batches(items: Vec<BatchItem>, cfg: &BatchConfig) -> Vec<Vec<BatchItem>> {
-    // PLACEHOLDER (RED): one big batch, ignoring all caps and sorting.
     if items.is_empty() {
         return Vec::new();
     }
-    vec![items]
+    let max_batch = cfg.max_batch_size.max(1);
+    // Length-sort ascending so each batch groups similar-length sequences,
+    // minimizing the padding that a uniform-length batch must add.
+    let mut sorted = items;
+    sorted.sort_by_key(|i| i.len);
+
+    let mut batches: Vec<Vec<BatchItem>> = Vec::new();
+    let mut current: Vec<BatchItem> = Vec::new();
+    let mut cur_max = 0usize;
+
+    for item in sorted {
+        // With ascending sort the incoming item is the new max-length, so the
+        // padded cost of the prospective batch is (count+1) * item.len.
+        let prospective_max = cur_max.max(item.len);
+        let prospective_tokens = (current.len() + 1) * prospective_max;
+        let fits = current.len() < max_batch && prospective_tokens <= cfg.max_tokens_per_batch;
+        if !current.is_empty() && !fits {
+            batches.push(std::mem::take(&mut current));
+            cur_max = 0;
+        }
+        cur_max = cur_max.max(item.len);
+        current.push(item);
+    }
+    if !current.is_empty() {
+        batches.push(current);
+    }
+    batches
 }
 
 #[cfg(test)]
