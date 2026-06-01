@@ -211,6 +211,47 @@ mod tests {
         b
     }
 
+    /// Encode a tensor descriptor: name, n_dims (u32), shape (u64 each),
+    /// kind (u32 ggml type), offset (u64). Cite fs/ggml gguf.go decode loop.
+    fn put_tensor(buf: &mut Vec<u8>, name: &str, shape: &[u64], kind: u32, offset: u64) {
+        put_str(buf, name);
+        buf.extend_from_slice(&(shape.len() as u32).to_le_bytes());
+        for d in shape {
+            buf.extend_from_slice(&d.to_le_bytes());
+        }
+        buf.extend_from_slice(&kind.to_le_bytes());
+        buf.extend_from_slice(&offset.to_le_bytes());
+    }
+
+    #[test]
+    fn parses_tensor_info_after_kv_block() {
+        // tensor_count=1, kv_count=1 (general.alignment = 16)
+        let mut buf = header(3, 1, 1);
+        put_str(&mut buf, "general.alignment");
+        buf.extend_from_slice(&T_UINT32.to_le_bytes());
+        buf.extend_from_slice(&16u32.to_le_bytes());
+        // one tensor: token_embd.weight, [4096, 32000], kind 12 (Q4_K), offset 0
+        put_tensor(&mut buf, "token_embd.weight", &[4096, 32000], 12, 0);
+
+        let g = GgufFile::parse(&buf).expect("parse ok");
+        assert_eq!(g.tensors.len(), 1);
+        let t = &g.tensors[0];
+        assert_eq!(t.name, "token_embd.weight");
+        assert_eq!(t.shape, vec![4096u64, 32000]);
+        assert_eq!(t.kind, 12);
+        assert_eq!(t.offset, 0);
+        assert_eq!(t.num_elements(), 4096 * 32000);
+        assert_eq!(g.alignment(), 16);
+    }
+
+    #[test]
+    fn alignment_defaults_to_32_when_absent() {
+        let buf = header(3, 0, 0);
+        let g = GgufFile::parse(&buf).expect("parse ok");
+        assert_eq!(g.alignment(), 32);
+        assert!(g.tensors.is_empty());
+    }
+
     #[test]
     fn parses_minimal_header() {
         let buf = header(3, 0, 0);
