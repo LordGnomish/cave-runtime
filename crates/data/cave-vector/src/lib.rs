@@ -29,7 +29,14 @@ pub mod collection;
 /// HNSW proximity-graph index.
 pub mod hnsw;
 
+/// Payload filtering.
+pub mod filter;
+
+/// Search composition (filtered / MMR / hybrid fusion).
+pub mod search;
+
 pub use collection::{Collection, CollectionStore};
+pub use filter::{Condition, Filter};
 pub use hnsw::HnswIndex;
 pub use distance::Metric;
 pub use error::VectorError;
