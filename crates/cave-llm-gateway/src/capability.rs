@@ -349,6 +349,15 @@ mod tests {
     }
 
     #[test]
+    fn seed_catalogue_covers_together() {
+        let providers: std::collections::HashSet<_> = seed_catalogue()
+            .into_iter()
+            .map(|c| c.provider)
+            .collect();
+        assert!(providers.contains("together"), "missing together in seed");
+    }
+
+    #[test]
     fn score_excludes_models_lacking_required_capability() {
         let req = CapabilityRequest {
             need_vision: true,
