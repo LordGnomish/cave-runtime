@@ -76,6 +76,17 @@ impl TensorInfo {
     pub fn num_elements(&self) -> u64 {
         self.shape.iter().product()
     }
+
+    /// The tensor's ggml type (`Tensor.Kind`) as a [`crate::quant::TensorType`].
+    pub fn kind_type(&self) -> crate::quant::TensorType {
+        crate::quant::TensorType(self.kind)
+    }
+
+    /// Exact on-disk byte size of this tensor: `(num_elements / block_size) *
+    /// type_size`. Cite ollama/ollama llm/ggml.go `Tensor.Size()`.
+    pub fn size_bytes(&self) -> u64 {
+        self.kind_type().tensor_size(self.num_elements())
+    }
 }
 
 /// A parsed GGUF container: header fields, the metadata key/value block, and
