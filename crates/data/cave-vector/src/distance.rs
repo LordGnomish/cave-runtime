@@ -15,36 +15,61 @@ use crate::models::Distance;
 pub struct Metric(pub Distance);
 
 impl Metric {
-    /// Raw geometric distance. For cosine/dot this is `1 - similarity` /
-    /// `-dot` so that "lower = closer" holds uniformly.
-    pub fn distance(&self, _a: &[f32], _b: &[f32]) -> f32 {
-        0.0
+    /// Raw geometric distance (lower = closer). For cosine this is
+    /// `1 - similarity`; for dot it is `-dot`.
+    pub fn distance(&self, a: &[f32], b: &[f32]) -> f32 {
+        match self.0 {
+            Distance::Cosine => 1.0 - cosine(a, b),
+            Distance::Euclid => euclid(a, b),
+            Distance::Dot => -dot(a, b),
+            Distance::Manhattan => manhattan(a, b),
+        }
     }
 
     /// Unified similarity score (higher = closer).
-    pub fn score(&self, _a: &[f32], _b: &[f32]) -> f32 {
-        0.0
+    pub fn score(&self, a: &[f32], b: &[f32]) -> f32 {
+        match self.0 {
+            Distance::Cosine => cosine(a, b),
+            Distance::Euclid => -euclid(a, b),
+            Distance::Dot => dot(a, b),
+            Distance::Manhattan => -manhattan(a, b),
+        }
     }
 }
 
-/// Cosine similarity `dot(a,b) / (|a||b|)`.
-pub fn cosine(_a: &[f32], _b: &[f32]) -> f32 {
-    0.0
+/// Cosine similarity `dot(a,b) / (|a||b|)`. Returns `0.0` when either operand
+/// has zero norm (avoids NaN), matching Qdrant's degenerate-vector handling.
+pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
+    let d = dot(a, b);
+    let na = dot(a, a).sqrt();
+    let nb = dot(b, b).sqrt();
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        d / (na * nb)
+    }
 }
 
 /// Dot product.
-pub fn dot(_a: &[f32], _b: &[f32]) -> f32 {
-    0.0
+pub fn dot(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
 
 /// Euclidean (L2) distance.
-pub fn euclid(_a: &[f32], _b: &[f32]) -> f32 {
-    0.0
+pub fn euclid(a: &[f32], b: &[f32]) -> f32 {
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| {
+            let d = x - y;
+            d * d
+        })
+        .sum::<f32>()
+        .sqrt()
 }
 
 /// Manhattan (L1) distance.
-pub fn manhattan(_a: &[f32], _b: &[f32]) -> f32 {
-    0.0
+pub fn manhattan(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum()
 }
 
 #[cfg(test)]
