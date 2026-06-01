@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-agent — OpenJarvis-parity composable on-device agent runtime (MVP).
+# Upstream: open-jarvis/OpenJarvis v2026.5.20 (Apache-2.0).
+# Self-improvement mandate: ADR-SELF-IMPROVE-001.
+# cave-agent is AGPL-3.0-or-later.
+
+[package]
+name = "cave-agent"
+description = "OpenJarvis-parity agent primitives — tool registry, conversation memory, plan-and-execute loop, evaluation tools (energy/latency/cost/accuracy), composable patterns, and a self-improvement loop (observability analysis, self-tuning, changelog watch, hot-patch ingestion)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+parking_lot = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
