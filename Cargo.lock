@@ -2251,6 +2251,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-rag"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.9",
+ "clap",
+ "flate2",
+ "proptest",
+ "pulldown-cmark",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.5.3",
+]
+
+[[package]]
 name = "cave-rdbms"
 version = "0.1.0"
 dependencies = [
@@ -2381,6 +2400,7 @@ dependencies = [
  "cave-policy",
  "cave-portal",
  "cave-profiler",
+ "cave-rag",
  "cave-rdbms",
  "cave-rdbms-operator",
  "cave-rollouts",
