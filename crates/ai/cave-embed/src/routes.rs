@@ -6,7 +6,6 @@
 
 use crate::error::EmbedError;
 use crate::openai::{EmbeddingRequest, EmbeddingService};
-use crate::registry::ModelCatalog;
 use crate::rerank::{RerankRequest, RerankService};
 use axum::{
     Json, Router,
@@ -57,8 +56,17 @@ fn error_response(err: EmbedError) -> axum::response::Response {
 
 /// Build the cave-embed router.
 pub fn create_router(state: Arc<EmbedState>) -> Router {
-    // PLACEHOLDER (RED): no routes mounted.
-    Router::new().with_state(state)
+    Router::new()
+        // OpenAI-compatible surface
+        .route("/v1/embeddings", post(embeddings))
+        .route("/v1/models", get(list_models))
+        // Cohere/infinity rerank
+        .route("/rerank", post(rerank))
+        // Admin / introspection
+        .route("/admin/embed", get(admin_page))
+        .route("/api/embed/models", get(model_cards))
+        .route("/api/embed/health", get(health))
+        .with_state(state)
 }
 
 async fn embeddings(
@@ -136,13 +144,6 @@ async fn admin_page(State(state): State<Arc<EmbedState>>) -> Html<String> {
          </body></html>",
         ver = crate::UPSTREAM_VERSION,
     ))
-}
-
-// Mark handlers used even while create_router is the RED placeholder.
-#[allow(dead_code)]
-fn _wire_check() {
-    let _ = (embeddings, rerank, list_models, model_cards, health, admin_page);
-    let _ = ModelCatalog::builtin();
 }
 
 #[cfg(test)]
