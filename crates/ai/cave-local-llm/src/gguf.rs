@@ -57,12 +57,35 @@ pub enum MetaValue {
     Array(Vec<MetaValue>),
 }
 
-/// A parsed GGUF container: header fields + the metadata key/value block.
+/// One tensor descriptor from the GGUF tensor-info block. Cite fs/ggml
+/// gguf.go `Tensor{Name, Kind, Offset, Shape}`. `kind` is the ggml type id
+/// (see [`crate::quant`]); `offset` is relative to the aligned start of the
+/// tensor-data section. This reader records the descriptors only — it never
+/// loads tensor data (that is the llama.cpp runtime scope-cut).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TensorInfo {
+    pub name: String,
+    pub kind: u32,
+    pub offset: u64,
+    pub shape: Vec<u64>,
+}
+
+impl TensorInfo {
+    /// Total element count = product of the shape dimensions (1 for a scalar,
+    /// matching Go's `slices` product over an empty shape).
+    pub fn num_elements(&self) -> u64 {
+        self.shape.iter().product()
+    }
+}
+
+/// A parsed GGUF container: header fields, the metadata key/value block, and
+/// the tensor-info descriptors that follow it.
 #[derive(Debug, Clone)]
 pub struct GgufFile {
     pub version: u32,
     pub tensor_count: u64,
     pub metadata: BTreeMap<String, MetaValue>,
+    pub tensors: Vec<TensorInfo>,
 }
 
 impl GgufFile {
@@ -98,10 +121,31 @@ impl GgufFile {
             metadata.insert(key, value);
         }
 
+        // Tensor-info block follows the KV block: tensor_count descriptors,
+        // each name / n_dims(u32) / shape(n_dims × u64) / kind(u32) / offset(u64).
+        let mut tensors = Vec::with_capacity(tensor_count.min(65_536) as usize);
+        for _ in 0..tensor_count {
+            let name = cur.read_string()?;
+            let n_dims = cur.read_u32()?;
+            let mut shape = Vec::with_capacity(n_dims.min(8) as usize);
+            for _ in 0..n_dims {
+                shape.push(cur.read_u64()?);
+            }
+            let kind = cur.read_u32()?;
+            let offset = cur.read_u64()?;
+            tensors.push(TensorInfo {
+                name,
+                kind,
+                offset,
+                shape,
+            });
+        }
+
         Ok(GgufFile {
             version,
             tensor_count,
             metadata,
+            tensors,
         })
     }
 
@@ -115,6 +159,19 @@ impl GgufFile {
         match self.metadata.get("general.architecture") {
             Some(MetaValue::String(s)) => Some(s.as_str()),
             _ => None,
+        }
+    }
+
+    /// Tensor-data alignment. Cite fs/ggml gguf.go: read from
+    /// `general.alignment` (any unsigned-int metadata type), defaulting to 32
+    /// when absent. Used to pad the start of the tensor-data section.
+    pub fn alignment(&self) -> u64 {
+        match self.metadata.get("general.alignment") {
+            Some(MetaValue::U8(v)) => *v as u64,
+            Some(MetaValue::U16(v)) => *v as u64,
+            Some(MetaValue::U32(v)) => *v as u64,
+            Some(MetaValue::U64(v)) => *v,
+            _ => 32,
         }
     }
 }
