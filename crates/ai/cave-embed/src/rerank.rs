@@ -103,17 +103,29 @@ impl<R: Reranker> RerankService<R> {
 
     /// Run a rerank request.
     pub async fn rerank(&self, req: &RerankRequest) -> EmbedResult<RerankResponse> {
-        // PLACEHOLDER (RED): echo documents unscored, unsorted, no top_n.
-        let results = req
-            .documents
-            .iter()
-            .enumerate()
-            .map(|(index, _)| RerankResult {
+        if req.documents.is_empty() {
+            return Err(EmbedError::EmptyInput);
+        }
+        let mut results: Vec<RerankResult> = Vec::with_capacity(req.documents.len());
+        for (index, doc) in req.documents.iter().enumerate() {
+            let score = self.reranker.score(&req.query, doc).await?;
+            results.push(RerankResult {
                 index,
-                relevance_score: 0.0,
-                document: None,
-            })
-            .collect();
+                relevance_score: score,
+                document: req.return_documents.then(|| doc.clone()),
+            });
+        }
+        // Sort by descending relevance; ties broken by original index for
+        // determinism.
+        results.sort_by(|a, b| {
+            b.relevance_score
+                .partial_cmp(&a.relevance_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.index.cmp(&b.index))
+        });
+        if let Some(n) = req.top_n {
+            results.truncate(n);
+        }
         Ok(RerankResponse {
             model: req.model.clone(),
             results,
