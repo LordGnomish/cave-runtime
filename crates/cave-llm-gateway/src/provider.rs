@@ -28,6 +28,18 @@ pub trait LlmProvider: Send + Sync {
             self.name()
         )))
     }
+
+    /// Rerank documents against a query (`POST /v1/rerank`). The default
+    /// implementation scores locally with the in-process BM25 lexical
+    /// cross-encoder surrogate ([`crate::rerank::rerank_local`]), so every
+    /// provider can rerank without a remote vendor; a provider backed by a
+    /// dedicated rerank API (Cohere/Jina) may override this.
+    async fn rerank(
+        &self,
+        req: &crate::rerank::RerankRequest,
+    ) -> GatewayResult<crate::rerank::RerankResponse> {
+        Ok(crate::rerank::rerank_local(req))
+    }
 }
 
 /// Forward an embeddings request to an OpenAI-compatible `/v1/embeddings`

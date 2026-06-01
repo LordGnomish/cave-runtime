@@ -8,6 +8,7 @@ use crate::api_keys::{ApiKeyStore, Scope};
 use crate::error::GatewayError;
 use crate::openai::{ChatCompletionRequest, EmbeddingRequest, ModelList, ModelObject, OpenAIError};
 use crate::rate_limit::RateLimit;
+use crate::rerank::RerankRequest;
 use crate::router::GatewayRouter;
 use axum::{
     Json, Router,
@@ -38,6 +39,7 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
         // OpenAI-compatible endpoints
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/embeddings", post(embeddings))
+        .route("/v1/rerank", post(rerank))
         .route("/v1/models", get(list_models))
         .route("/v1/models/{model}", get(get_model))
         // Admin — providers
@@ -160,6 +162,46 @@ async fn embeddings(
 ) -> impl IntoResponse {
     let consumer = extract_consumer(&headers);
     match s.router.embeddings(&consumer, req).await {
+        Ok(resp) => Json(serde_json::to_value(resp).unwrap()).into_response(),
+        Err(GatewayError::RateLimitExceeded { retry_after_ms, .. }) => {
+            let err = OpenAIError::rate_limit("Rate limit exceeded");
+            let mut resp = (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response();
+            resp.headers_mut().insert(
+                "Retry-After",
+                format!("{}", retry_after_ms / 1000 + 1).parse().unwrap(),
+            );
+            resp
+        }
+        Err(e @ GatewayError::InvalidRequest(_)) => {
+            let err = OpenAIError::invalid_request(&e.to_string());
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            let err = OpenAIError::server_error(&e.to_string());
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn rerank(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RerankRequest>,
+) -> impl IntoResponse {
+    let consumer = extract_consumer(&headers);
+    match s.router.rerank(&consumer, req).await {
         Ok(resp) => Json(serde_json::to_value(resp).unwrap()).into_response(),
         Err(GatewayError::RateLimitExceeded { retry_after_ms, .. }) => {
             let err = OpenAIError::rate_limit("Rate limit exceeded");

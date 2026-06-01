@@ -210,6 +210,32 @@ impl GatewayRouter {
         provider.embeddings(&req).await
     }
 
+    /// Route a rerank request (`POST /v1/rerank`): rate-limit the consumer on
+    /// the query + documents token estimate, resolve the model to a provider,
+    /// then dispatch to that provider's `rerank()`. When the model resolves to
+    /// no registered provider, score locally with the in-process lexical
+    /// cross-encoder so the endpoint stays functional standalone.
+    pub async fn rerank(
+        &self,
+        consumer: &str,
+        mut req: crate::rerank::RerankRequest,
+    ) -> GatewayResult<crate::rerank::RerankResponse> {
+        let estimated_tokens: u32 = crate::cost::estimate_tokens(&req.query)
+            + req
+                .documents
+                .iter()
+                .map(|d| crate::cost::estimate_tokens(d))
+                .sum::<u32>();
+        self.rate_limiter.check(consumer, estimated_tokens)?;
+
+        let (provider_name, model) = self.resolve_model(&req.model);
+        req.model = model;
+        match self.providers.get(&provider_name) {
+            Some(provider) => provider.rerank(&req).await,
+            None => Ok(crate::rerank::rerank_local(&req)),
+        }
+    }
+
     fn resolve_model(&self, model: &str) -> (String, String) {
         if let Some(alias) = self.aliases.resolve(model) {
             (alias.provider, alias.model)
