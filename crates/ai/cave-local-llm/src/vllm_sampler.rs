@@ -185,6 +185,52 @@ pub fn apply_penalties(
     }
 }
 
+/// Add a per-token bias to selected logits (vLLM OpenAI `logit_bias`:
+/// `logits[token] += bias`). Out-of-range ids are ignored.
+pub fn apply_logit_bias(logits: &mut [f32], biases: &[(u32, f32)]) {
+    let vocab = logits.len();
+    for &(token, bias) in biases {
+        let t = token as usize;
+        if t < vocab {
+            logits[t] += bias;
+        }
+    }
+}
+
+/// Mask the given token ids to `-inf` (vLLM bad-words masking, and the
+/// EOS/stop-token suppression applied while `min_tokens` is unmet). Out-of-
+/// range ids are ignored; an empty list is a no-op.
+pub fn suppress_tokens(logits: &mut [f32], token_ids: &[u32]) {
+    let vocab = logits.len();
+    for &t in token_ids {
+        let t = t as usize;
+        if t < vocab {
+            logits[t] = f32::NEG_INFINITY;
+        }
+    }
+}
+
+/// Mask every token NOT in `allowed` to `-inf` (vLLM `allowed_token_ids`).
+/// An empty allow-list means "no restriction" — the row is left untouched.
+pub fn restrict_to_allowed(logits: &mut [f32], allowed: &[u32]) {
+    if allowed.is_empty() {
+        return;
+    }
+    let vocab = logits.len();
+    let mut keep = vec![false; vocab];
+    for &t in allowed {
+        let t = t as usize;
+        if t < vocab {
+            keep[t] = true;
+        }
+    }
+    for (i, l) in logits.iter_mut().enumerate() {
+        if !keep[i] {
+            *l = f32::NEG_INFINITY;
+        }
+    }
+}
+
 /// Apply the full vLLM warp pipeline for one decode step, in canonical order:
 /// penalties → temperature → top-k → top-p → min-p. Returns the resulting
 /// sampling probability distribution (`softmax` of the warped logits).
