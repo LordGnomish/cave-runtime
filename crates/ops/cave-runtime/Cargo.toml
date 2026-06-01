@@ -62,6 +62,7 @@ cave-dns = { path = "../../networking/cave-dns" }
 cave-logs     = { path = "../../observability/cave-logs" }
 # Phase 3 modules
 cave-llm-gateway = { path = "../../ai/cave-llm-gateway" }
+cave-rag = { path = "../../ai/cave-rag" }
 cave-secrets = { path = "../../security/cave-secrets" }
 cave-lint = { path = "../cave-lint" }
 cave-docs = { path = "../cave-docs" }
