@@ -113,3 +113,61 @@ pub fn uniform(key: &Key, low: f32, high: f32, shape: &[usize]) -> Array {
     let data: Vec<f32> = keystream(key, n).into_iter().map(|b| low + span * to_unit(b)).collect();
     Array::from_parts(data, shape.to_vec())
 }
+
+/// Map a unit float in `[0, 1)` into the open interval `(0, 1)` so that
+/// `ln(u)` and `ln(1 - u)` are always finite (needed by Box-Muller / Gumbel).
+#[inline]
+fn open_unit(u: f32) -> f32 {
+    // Nudge endpoints to half an ULP-scale interior; `to_unit` produces values
+    // in [0, 1) on a 2^-24 grid, so this keeps every draw strictly interior.
+    const EPS: f32 = 1.0 / (1u32 << 25) as f32;
+    u.clamp(EPS, 1.0 - EPS)
+}
+
+/// Normal (Gaussian) samples with mean `loc` and standard deviation `scale`
+/// (`mx.random.normal`). Implemented with the Box-Muller transform.
+pub fn normal(key: &Key, loc: f32, scale: f32, shape: &[usize]) -> Array {
+    let n = numel(shape);
+    // Two uniforms per Gaussian; round the request up to an even count.
+    let bits = keystream(key, n.div_ceil(2) * 2);
+    let two_pi = std::f32::consts::TAU;
+    let mut data = Vec::with_capacity(n);
+    let mut i = 0;
+    while data.len() < n {
+        let u1 = open_unit(to_unit(bits[i]));
+        let u2 = to_unit(bits[i + 1]);
+        let r = (-2.0 * u1.ln()).sqrt();
+        let z0 = r * (two_pi * u2).cos();
+        let z1 = r * (two_pi * u2).sin();
+        data.push(loc + scale * z0);
+        if data.len() < n {
+            data.push(loc + scale * z1);
+        }
+        i += 2;
+    }
+    Array::from_parts(data, shape.to_vec())
+}
+
+/// Bernoulli samples: `1.0` with probability `p`, else `0.0`
+/// (`mx.random.bernoulli`).
+pub fn bernoulli(key: &Key, p: f32, shape: &[usize]) -> Array {
+    let n = numel(shape);
+    let data: Vec<f32> = keystream(key, n)
+        .into_iter()
+        .map(|b| if to_unit(b) < p { 1.0 } else { 0.0 })
+        .collect();
+    Array::from_parts(data, shape.to_vec())
+}
+
+/// Integer samples over the half-open range `[low, high)`, returned as `f32`
+/// (`mx.random.randint`; cave-mlx arrays are f32-typed).
+pub fn randint(key: &Key, low: i64, high: i64, shape: &[usize]) -> Array {
+    assert!(high > low, "randint requires high > low");
+    let span = (high - low) as u64;
+    let n = numel(shape);
+    let data: Vec<f32> = keystream(key, n)
+        .into_iter()
+        .map(|b| (low + (b as u64 % span) as i64) as f32)
+        .collect();
+    Array::from_parts(data, shape.to_vec())
+}
