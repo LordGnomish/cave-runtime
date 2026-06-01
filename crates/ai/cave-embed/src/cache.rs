@@ -46,15 +46,43 @@ impl EmbeddingCache {
 
     /// Look up an embedding, updating recency + hit/miss stats.
     pub fn get(&mut self, model: &str, text: &str) -> Option<Vec<f32>> {
-        // PLACEHOLDER (RED): always miss.
-        let _ = (model, text);
-        None
+        let key = cache_key(model, text);
+        self.clock += 1;
+        let tick = self.clock;
+        match self.map.get_mut(&key) {
+            Some(entry) => {
+                entry.tick = tick;
+                self.hits += 1;
+                Some(entry.value.clone())
+            }
+            None => {
+                self.misses += 1;
+                None
+            }
+        }
     }
 
     /// Insert an embedding, evicting the LRU entry if over capacity.
     pub fn put(&mut self, model: &str, text: &str, value: Vec<f32>) {
-        // PLACEHOLDER (RED): no-op.
-        let _ = (model, text, value);
+        let key = cache_key(model, text);
+        self.clock += 1;
+        let tick = self.clock;
+        if let Some(entry) = self.map.get_mut(&key) {
+            entry.value = value;
+            entry.tick = tick;
+            return;
+        }
+        if self.map.len() >= self.capacity {
+            if let Some(lru) = self
+                .map
+                .iter()
+                .min_by_key(|(_, e)| e.tick)
+                .map(|(k, _)| k.clone())
+            {
+                self.map.remove(&lru);
+            }
+        }
+        self.map.insert(key, Entry { value, tick });
     }
 
     /// Current entry count.
