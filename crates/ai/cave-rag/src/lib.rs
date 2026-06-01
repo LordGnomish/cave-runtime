@@ -17,6 +17,7 @@
 pub mod agentic;
 pub mod chain;
 pub mod citation;
+pub mod cli;
 pub mod document;
 pub mod embedding;
 pub mod error;
