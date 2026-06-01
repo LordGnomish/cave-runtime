@@ -66,6 +66,10 @@ pub struct AgentRun {
     pub goal: String,
     pub steps: Vec<StepOutcome>,
     pub final_response: String,
+    /// Ids of memory records this turn recalled (relevant prior context
+    /// surfaced before planning). Empty when the recall index had no
+    /// token-overlapping match — e.g. the first turn of a fresh session.
+    pub recalled: Vec<String>,
 }
 
 /// Drives a [`HermesRuntime`] through a plan-execute-observe loop.
@@ -83,6 +87,9 @@ pub struct AgentExecutor {
     max_steps: usize,
     /// Monotonic counter feeding unique memory-record ids.
     step_seq: u64,
+    /// How many prior-context records to recall at the start of each turn.
+    /// `0` disables recall. Defaults to 5.
+    recall_k: usize,
 }
 
 impl AgentExecutor {
@@ -93,6 +100,7 @@ impl AgentExecutor {
             scope: "default".to_string(),
             max_steps: 32,
             step_seq: 0,
+            recall_k: 5,
         }
     }
 
@@ -105,6 +113,13 @@ impl AgentExecutor {
     /// Override the per-run step budget.
     pub fn with_max_steps(mut self, n: usize) -> Self {
         self.max_steps = n;
+        self
+    }
+
+    /// Override how many prior-context records each turn recalls (`0` to
+    /// disable opening-turn recall entirely).
+    pub fn with_recall_k(mut self, k: usize) -> Self {
+        self.recall_k = k;
         self
     }
 
@@ -131,6 +146,34 @@ impl AgentExecutor {
     /// Run the loop for `goal`, returning the per-step trace and final
     /// response. State (memory, recall, session) is retained on `self`.
     pub fn run(&mut self, goal: &str) -> Result<AgentRun> {
+        // Observe first: pull relevant prior context out of the recall index
+        // before planning, mirroring upstream's turn-opening retrieval. The
+        // index is seeded by earlier turns' tool outputs, so this is what
+        // carries memory across a conversation. Journalled as a Recall event
+        // and surfaced on the AgentRun for callers / LLM-backed planners.
+        let recalled: Vec<String> = if self.recall_k == 0 {
+            Vec::new()
+        } else {
+            let hits = self
+                .runtime
+                .recall
+                .query(goal, self.recall_k)
+                .unwrap_or_default();
+            if !hits.is_empty() {
+                self.runtime.session.append(Event::new(
+                    EventKind::Recall,
+                    json!({
+                        "goal": goal,
+                        "hits": hits
+                            .iter()
+                            .map(|h| json!({ "id": h.record.id, "score": h.score }))
+                            .collect::<Vec<_>>(),
+                    }),
+                ))?;
+            }
+            hits.into_iter().map(|h| h.record.id).collect()
+        };
+
         let plan = self.runtime.planner.plan(goal)?;
         self.runtime.session.append(Event::new(
             EventKind::PlanCreated,
@@ -216,6 +259,7 @@ impl AgentExecutor {
             goal: goal.to_string(),
             steps,
             final_response,
+            recalled,
         })
     }
 }
@@ -264,6 +308,27 @@ mod tests {
             !exec.session().of_kind(EventKind::Recall).is_empty(),
             "second turn should recall the first turn's output"
         );
+    }
+
+    #[test]
+    fn recalled_ids_surface_on_the_agent_run() {
+        let mut exec = AgentExecutor::new(default_runtime());
+        let r1 = exec.run("run echo zuluword yankeeword xrayword").unwrap();
+        assert!(r1.recalled.is_empty(), "first turn recalls nothing");
+        let r2 = exec.run("run echo zuluword yankeeword xrayword").unwrap();
+        assert!(
+            !r2.recalled.is_empty(),
+            "second turn surfaces prior record ids on AgentRun.recalled"
+        );
+    }
+
+    #[test]
+    fn with_recall_k_zero_disables_opening_recall() {
+        let mut exec = AgentExecutor::new(default_runtime()).with_recall_k(0);
+        exec.run("run echo kilo lima mike").unwrap();
+        let r2 = exec.run("run echo kilo lima mike").unwrap();
+        assert!(r2.recalled.is_empty(), "recall_k=0 disables recall");
+        assert_eq!(exec.session().of_kind(EventKind::Recall).len(), 0);
     }
 
     #[test]
