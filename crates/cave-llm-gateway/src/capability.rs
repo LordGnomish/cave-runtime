@@ -370,6 +370,15 @@ mod tests {
     }
 
     #[test]
+    fn seed_catalogue_covers_fireworks() {
+        let providers: std::collections::HashSet<_> = seed_catalogue()
+            .into_iter()
+            .map(|c| c.provider)
+            .collect();
+        assert!(providers.contains("fireworks"), "missing fireworks in seed");
+    }
+
+    #[test]
     fn score_excludes_models_lacking_required_capability() {
         let req = CapabilityRequest {
             need_vision: true,
