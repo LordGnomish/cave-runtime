@@ -48,7 +48,20 @@ pub mod rerank;
 
 pub mod clip;
 
+/// HTTP routes + shared service state.
+pub mod routes;
+
 pub use error::{EmbedError, EmbedResult};
+pub use routes::EmbedState;
+
+use axum::Router;
+use std::sync::Arc;
+
+/// Build the Axum router exposing the OpenAI-compatible embeddings + rerank
+/// API and the `/admin/embed` status page. Mounted by `cave-runtime`.
+pub fn router(state: Arc<EmbedState>) -> Router {
+    routes::create_router(state)
+}
 
 /// Crate identity. The self-audit (`gate_*`) asserts this stays in lockstep
 /// with `parity.manifest.toml`'s `[upstream] version`.

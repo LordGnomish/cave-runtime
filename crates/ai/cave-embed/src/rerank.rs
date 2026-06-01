@@ -8,7 +8,7 @@
 //! cross-encoder model is a scope-cut; we ship a deterministic cosine reranker
 //! built on the reference embedder so the contract is fully exercisable.
 
-use crate::backend::{self, EmbeddingBackend, HashingEmbedder};
+use crate::backend::{self, HashingEmbedder};
 use crate::error::{EmbedError, EmbedResult};
 use crate::pooling::PoolingStrategy;
 use async_trait::async_trait;
