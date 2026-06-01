@@ -100,6 +100,12 @@ pub fn default_pricing() -> Vec<ModelPricing> {
             input_per_million: 0.27,
             output_per_million: 1.10,
         },
+        // Together AI (OpenAI-compat SaaS)
+        ModelPricing {
+            model: "meta-llama/Llama-3.3-70B-Instruct-Turbo".into(),
+            input_per_million: 0.88,
+            output_per_million: 0.88,
+        },
         // Local / mock — free
         ModelPricing {
             model: "llama3".into(),

@@ -12,3 +12,4 @@ pub mod llama_cpp;
 pub mod mistral;
 pub mod mlx;
 pub mod ollama;
+pub mod together;

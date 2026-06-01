@@ -311,6 +311,18 @@ pub fn seed_catalogue() -> Vec<ModelCapability> {
             cost_out_per_1k_micro_usd: 1_100,
             quality: 84,
         },
+        ModelCapability {
+            provider: "together".into(),
+            model: "meta-llama/Llama-3.3-70B-Instruct-Turbo".into(),
+            locality: Locality::Saas,
+            context_window: 131_072,
+            supports_tools: true,
+            supports_vision: false,
+            supports_json: true,
+            cost_in_per_1k_micro_usd: 880,
+            cost_out_per_1k_micro_usd: 880,
+            quality: 83,
+        },
     ]
 }
 
@@ -428,13 +440,16 @@ mod tests {
         // quality 84 + full cost bonus + headroom) outranks the pricier
         // claude-opus-4-7 (quality 95, zero cost bonus) when nothing constrains
         // the request. claude-opus still places near the top on raw quality.
+        // Top-4 (was top-3) since the Together AI Llama-3.3-70B-Turbo seed
+        // (quality 83, mid SaaS cost) now sits on the cost/quality frontier
+        // between deepseek and opus, shifting opus from #3 to #4.
         assert_eq!(ranked[0].cap.model, "deepseek-v4-flash");
         assert!(
             ranked
                 .iter()
-                .take(3)
+                .take(4)
                 .any(|s| s.cap.model == "claude-opus-4-7"),
-            "claude-opus-4-7 should still rank in the top 3 on quality"
+            "claude-opus-4-7 should still rank in the top 4 on quality"
         );
     }
 

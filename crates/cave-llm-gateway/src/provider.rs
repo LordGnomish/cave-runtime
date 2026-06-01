@@ -96,6 +96,8 @@ pub enum ProviderType {
     Groq,
     /// DeepSeek SaaS (OpenAI-compatible).
     DeepSeek,
+    /// Together AI SaaS (OpenAI-compatible).
+    Together,
     /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
@@ -526,6 +528,9 @@ impl ProviderRegistry {
                 ProviderType::DeepSeek => {
                     Arc::new(crate::providers::deepseek::DeepSeekProvider::new(cfg))
                 }
+                ProviderType::Together => {
+                    Arc::new(crate::providers::together::TogetherProvider::new(cfg))
+                }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
             };
@@ -608,6 +613,21 @@ mod tests {
         ]);
         assert!(reg.get("groq").is_some());
         assert!(reg.get("deepseek").is_some());
+    }
+
+    #[test]
+    fn from_config_dispatches_together() {
+        let reg = ProviderRegistry::from_config(vec![ProviderConfig {
+            name: "together".into(),
+            provider_type: ProviderType::Together,
+            base_url: "".into(),
+            api_key: Some("x".into()),
+            timeout_secs: 5,
+            max_retries: 0,
+            weight: 1,
+            enabled: true,
+        }]);
+        assert!(reg.get("together").is_some());
     }
 
     #[tokio::test]
