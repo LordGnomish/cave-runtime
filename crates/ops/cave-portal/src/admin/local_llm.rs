@@ -42,9 +42,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LocalLlmVi
         })
         .collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Local Llm ({n})</h2>{tbl}</section>"#,
+        r#"<section><h2 class="text-lg font-semibold mb-2">Local Llm ({n})</h2>{tbl}</section>{vllm}"#,
         n = rows.len(),
         tbl = table(&["tag", "size_bytes", "quant", "loaded"], &table_rows),
+        vllm = vllm_engine_panel(),
     );
     Ok(page_shell_full(
         ctx,
@@ -52,6 +53,33 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LocalLlmVi
         &format!("local-llm · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
+}
+
+/// Static panel advertising the vLLM-parity inference-engine control plane
+/// ported in `cave-local-llm` (pure-Rust ports of vllm-project/vllm,
+/// Apache-2.0). Introspectable from the CLI via `cave-local-llm vllm …`.
+fn vllm_engine_panel() -> String {
+    let items = [
+        ("PagedAttention", "KV-block manager — alloc, copy-on-write, GPU↔CPU swap, prefix cache"),
+        ("continuous-batching scheduler", "iteration-level prefill/decode + chunked prefill"),
+        ("logits sampler", "temperature / top-k / top-p / min-p + presence·frequency·repetition penalties"),
+        ("speculative decode", "rejection sampler + typical acceptance"),
+        ("tensor / pipeline parallel", "rank topology, vocab + layer partition"),
+        ("weight quantization", "AWQ / GPTQ / FP8 footprint introspection"),
+    ];
+    let rows: String = items
+        .iter()
+        .map(|(name, desc)| {
+            format!(
+                r#"<li><span class="font-mono">{}</span> — {}</li>"#,
+                escape(name),
+                escape(desc)
+            )
+        })
+        .collect();
+    format!(
+        r#"<section class="mt-6"><h2 class="text-lg font-semibold mb-2">vLLM engine control plane</h2><ul class="list-disc pl-6 text-sm space-y-1">{rows}</ul></section>"#
+    )
 }
 
 #[allow(dead_code)]
