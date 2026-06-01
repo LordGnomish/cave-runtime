@@ -16,18 +16,130 @@ use serde_json::Value;
 
 use crate::error::{Result, ToolError};
 
-/// A single content block in a tool result. MCP defines text / image /
-/// audio / resource blocks; the framework MVP carries text (the universal
-/// case); richer block types are tracked as a scope-cut in the manifest.
+/// The contents an [`Content::Resource`] (MCP `EmbeddedResource`) carries.
+/// Mirrors the `TextResourceContents | BlobResourceContents` union from
+/// `schema/2025-11-25/schema.ts`: both share `uri` + optional `mimeType`,
+/// and carry *either* inline `text` or base64 `blob` (never both).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+pub struct ResourceContents {
+    pub uri: String,
+    #[serde(
+        rename = "mimeType",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub text: Option<String>,
+    /// Base64-encoded binary payload.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub blob: Option<String>,
+}
+
+/// A single content block in a tool result, modelling the full MCP
+/// `ContentBlock` union from `schema/2025-11-25/schema.ts`:
+/// `TextContent | ImageContent | AudioContent | ResourceLink |
+/// EmbeddedResource`. Image/audio carry base64 `data` + `mimeType`; the
+/// embedded `Resource` carries inline text or a base64 blob; `ResourceLink`
+/// references a resource the client can fetch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Content {
-    Text { text: String },
+    Text {
+        text: String,
+    },
+    Image {
+        /// Base64-encoded image bytes.
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+    },
+    Audio {
+        /// Base64-encoded audio bytes.
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+    },
+    /// MCP `EmbeddedResource` — resource data inlined into the result.
+    Resource {
+        resource: ResourceContents,
+    },
+    /// MCP `ResourceLink` — a reference the client can resolve via
+    /// `resources/read`.
+    ResourceLink {
+        uri: String,
+        name: String,
+    },
 }
 
 impl Content {
     pub fn text(s: impl Into<String>) -> Self {
         Content::Text { text: s.into() }
+    }
+
+    /// An image block from base64 `data` and its MIME type.
+    pub fn image(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Content::Image {
+            data: data.into(),
+            mime_type: mime_type.into(),
+        }
+    }
+
+    /// An audio block from base64 `data` and its MIME type.
+    pub fn audio(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Content::Audio {
+            data: data.into(),
+            mime_type: mime_type.into(),
+        }
+    }
+
+    /// An embedded resource carrying inline `text`.
+    pub fn resource_text(
+        uri: impl Into<String>,
+        mime_type: Option<&str>,
+        text: impl Into<String>,
+    ) -> Self {
+        Content::Resource {
+            resource: ResourceContents {
+                uri: uri.into(),
+                mime_type: mime_type.map(str::to_string),
+                text: Some(text.into()),
+                blob: None,
+            },
+        }
+    }
+
+    /// An embedded resource carrying a base64 `blob`.
+    pub fn resource_blob(
+        uri: impl Into<String>,
+        mime_type: Option<&str>,
+        blob: impl Into<String>,
+    ) -> Self {
+        Content::Resource {
+            resource: ResourceContents {
+                uri: uri.into(),
+                mime_type: mime_type.map(str::to_string),
+                text: None,
+                blob: Some(blob.into()),
+            },
+        }
+    }
+
+    /// A link to a resource the client can fetch.
+    pub fn resource_link(uri: impl Into<String>, name: impl Into<String>) -> Self {
+        Content::ResourceLink {
+            uri: uri.into(),
+            name: name.into(),
+        }
+    }
+
+    /// The textual projection of this block, if any. Only [`Content::Text`]
+    /// contributes prose; binary/resource blocks return `None`.
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Content::Text { text } => Some(text.as_str()),
+            _ => None,
+        }
     }
 }
 
@@ -80,9 +192,7 @@ impl ToolResult {
     pub fn text_output(&self) -> String {
         self.content
             .iter()
-            .map(|c| match c {
-                Content::Text { text } => text.as_str(),
-            })
+            .filter_map(Content::as_text)
             .collect::<Vec<_>>()
             .join("\n")
     }
