@@ -302,6 +302,19 @@ mod tests {
     }
 
     #[test]
+    fn tensor_kind_type_and_size_bytes() {
+        // tensor_count=1, kv_count=0; one F32 (kind 0) tensor of [4096, 4096].
+        let mut buf = header(3, 1, 0);
+        put_tensor(&mut buf, "blk.0.attn_q.weight", &[4096, 4096], 0, 0);
+        let g = GgufFile::parse(&buf).expect("parse ok");
+        let t = &g.tensors[0];
+        assert_eq!(t.kind_type(), crate::quant::TensorType(0));
+        assert_eq!(t.kind_type().name(), "F32");
+        // F32: (4096*4096 / 1) * 4 bytes = 67_108_864.
+        assert_eq!(t.size_bytes(), 4096u64 * 4096 * 4);
+    }
+
+    #[test]
     fn alignment_defaults_to_32_when_absent() {
         let buf = header(3, 0, 0);
         let g = GgufFile::parse(&buf).expect("parse ok");
