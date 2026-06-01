@@ -16,12 +16,13 @@ use crate::models::{PointId, ScoredPoint};
 
 /// Top-`k` search restricted to points whose payload passes `filter`.
 pub fn filtered_search(
-    _c: &Collection,
-    _query: &[f32],
-    _k: usize,
-    _filter: &Filter,
+    c: &Collection,
+    query: &[f32],
+    k: usize,
+    filter: &Filter,
 ) -> Vec<ScoredPoint> {
-    Vec::new()
+    let matching = c.points.iter().filter(|(_, p)| filter.matches(&p.payload));
+    topk_scored(Metric(c.params.distance), query, matching, k)
 }
 
 /// Maximal Marginal Relevance re-rank.
@@ -31,21 +32,57 @@ pub fn filtered_search(
 /// `argmax  λ·rel(q,d) − (1−λ)·max_{s∈S} sim(d,s)`.
 /// `lambda = 1.0` is pure relevance; lower favours diversity.
 pub fn mmr_rerank(
-    _query: &[f32],
-    _candidates: &[(PointId, Vec<f32>)],
-    _metric: Metric,
-    _lambda: f32,
-    _k: usize,
+    query: &[f32],
+    candidates: &[(PointId, Vec<f32>)],
+    metric: Metric,
+    lambda: f32,
+    k: usize,
 ) -> Vec<PointId> {
-    Vec::new()
+    let rel: Vec<f32> = candidates.iter().map(|(_, v)| metric.score(query, v)).collect();
+    let mut selected: Vec<usize> = Vec::new();
+    let mut remaining: Vec<usize> = (0..candidates.len()).collect();
+    let want = k.min(candidates.len());
+
+    while selected.len() < want && !remaining.is_empty() {
+        let mut best_idx = 0usize; // position within `remaining`
+        let mut best_score = f32::NEG_INFINITY;
+        for (pos, &i) in remaining.iter().enumerate() {
+            let max_sim_to_selected = selected
+                .iter()
+                .map(|&s| metric.score(&candidates[i].1, &candidates[s].1))
+                .fold(f32::NEG_INFINITY, f32::max);
+            let diversity = if selected.is_empty() { 0.0 } else { max_sim_to_selected };
+            let mmr = lambda * rel[i] - (1.0 - lambda) * diversity;
+            // strict `>` keeps the lowest original index on ties (determinism).
+            if mmr > best_score {
+                best_score = mmr;
+                best_idx = pos;
+            }
+        }
+        selected.push(remaining.remove(best_idx));
+    }
+    selected.into_iter().map(|i| candidates[i].0.clone()).collect()
 }
 
 /// Reciprocal Rank Fusion over several ranked id lists (best-first).
 ///
 /// `score(d) = Σ_lists 1 / (k_const + rank_1based(d))`. Returns `(id, score)`
 /// sorted by score descending (ties broken by id for determinism).
-pub fn rrf_fuse(_rankings: &[Vec<PointId>], _k_const: f32) -> Vec<(PointId, f32)> {
-    Vec::new()
+pub fn rrf_fuse(rankings: &[Vec<PointId>], k_const: f32) -> Vec<(PointId, f32)> {
+    use std::collections::HashMap;
+    let mut scores: HashMap<PointId, f32> = HashMap::new();
+    for list in rankings {
+        for (rank0, id) in list.iter().enumerate() {
+            let rank = (rank0 + 1) as f32; // 1-based
+            *scores.entry(id.clone()).or_insert(0.0) += 1.0 / (k_const + rank);
+        }
+    }
+    let mut out: Vec<(PointId, f32)> = scores.into_iter().collect();
+    // score desc; ties broken by id ascending for determinism.
+    out.sort_by(|a, b| {
+        b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0))
+    });
+    out
 }
 
 #[cfg(test)]

@@ -49,8 +49,22 @@ pub enum Condition {
 
 impl Condition {
     /// Whether this condition holds for `payload`.
-    pub fn matches(&self, _payload: &Payload) -> bool {
-        false
+    pub fn matches(&self, payload: &Payload) -> bool {
+        match self {
+            Condition::Match { key, value } => payload.get(key) == Some(value),
+            Condition::MatchAny { key, values } => {
+                payload.get(key).is_some_and(|v| values.contains(v))
+            }
+            Condition::Range { key, gte, lte, gt, lt } => {
+                let Some(n) = payload.get(key).and_then(|v| v.as_f64()) else {
+                    return false;
+                };
+                gte.is_none_or(|b| n >= b)
+                    && lte.is_none_or(|b| n <= b)
+                    && gt.is_none_or(|b| n > b)
+                    && lt.is_none_or(|b| n < b)
+            }
+        }
     }
 }
 
@@ -70,8 +84,11 @@ pub struct Filter {
 
 impl Filter {
     /// Whether `payload` passes the filter.
-    pub fn matches(&self, _payload: &Payload) -> bool {
-        false
+    pub fn matches(&self, payload: &Payload) -> bool {
+        let must_ok = self.must.iter().all(|c| c.matches(payload));
+        let should_ok = self.should.is_empty() || self.should.iter().any(|c| c.matches(payload));
+        let must_not_ok = !self.must_not.iter().any(|c| c.matches(payload));
+        must_ok && should_ok && must_not_ok
     }
 }
 
