@@ -46,6 +46,8 @@ pub mod cache;
 
 pub mod rerank;
 
+pub mod clip;
+
 pub use error::{EmbedError, EmbedResult};
 
 /// Crate identity. The self-audit (`gate_*`) asserts this stays in lockstep
