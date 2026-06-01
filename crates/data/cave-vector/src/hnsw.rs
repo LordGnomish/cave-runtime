@@ -86,21 +86,197 @@ impl HnswIndex {
     }
 
     /// Insert or replace a point.
-    pub fn insert(&mut self, _id: PointId, _vector: Vec<f32>) {}
+    pub fn insert(&mut self, id: PointId, vector: Vec<f32>) {
+        // Upsert: if id exists, drop the old node's edges (soft) and rewire.
+        if let Some(&existing) = self.id_map.get(&id) {
+            self.nodes[existing].deleted = true;
+            self.id_map.remove(&id);
+        }
+
+        let level = self.random_level();
+        let new_id = self.nodes.len();
+        self.nodes.push(Node {
+            id: id.clone(),
+            vector,
+            neighbors: vec![Vec::new(); level + 1],
+            deleted: false,
+        });
+        self.id_map.insert(id, new_id);
+
+        let Some(entry) = self.entry else {
+            self.entry = Some(new_id);
+            self.max_layer = level;
+            return;
+        };
+
+        let query = self.nodes[new_id].vector.clone();
+        let mut ep = entry;
+
+        // Phase 1: greedily descend layers above the new point's top layer.
+        let mut lc = self.max_layer;
+        while lc > level {
+            let w = self.search_layer(&query, &[ep], 1, lc);
+            if let Some(&(_, best)) = w.first() {
+                ep = best;
+            }
+            lc -= 1;
+        }
+
+        // Phase 2: connect on every layer from min(level, max_layer) down to 0.
+        let mut entry_points = vec![ep];
+        let top = level.min(self.max_layer);
+        for lc in (0..=top).rev() {
+            let candidates = self.search_layer(&query, &entry_points, self.ef_construct, lc);
+            let m_max = if lc == 0 { self.m0 } else { self.m };
+            let selected: Vec<usize> =
+                candidates.iter().take(m_max).map(|&(_, n)| n).collect();
+
+            self.nodes[new_id].neighbors[lc] = selected.clone();
+            for nb in selected {
+                self.nodes[nb].neighbors[lc].push(new_id);
+                self.prune(nb, lc, m_max);
+            }
+            entry_points = candidates.iter().map(|&(_, n)| n).collect();
+            if entry_points.is_empty() {
+                entry_points = vec![ep];
+            }
+        }
+
+        if level > self.max_layer {
+            self.max_layer = level;
+            self.entry = Some(new_id);
+        }
+    }
 
     /// Soft-delete a point. Returns whether it was present + live.
-    pub fn delete(&mut self, _id: &PointId) -> bool {
+    pub fn delete(&mut self, id: &PointId) -> bool {
+        if let Some(&internal) = self.id_map.get(id) {
+            if !self.nodes[internal].deleted {
+                self.nodes[internal].deleted = true;
+                self.id_map.remove(id);
+                return true;
+            }
+        }
         false
     }
 
     /// Search for the top-`k` nearest neighbours using `self.ef`.
     pub fn search(&self, query: &[f32], k: usize) -> Vec<ScoredPoint> {
-        self.search_with_ef(query, k, self.ef)
+        self.search_with_ef(query, k, self.ef.max(k))
     }
 
     /// Search with an explicit `ef`.
-    pub fn search_with_ef(&self, _query: &[f32], _k: usize, _ef: usize) -> Vec<ScoredPoint> {
-        Vec::new()
+    pub fn search_with_ef(&self, query: &[f32], k: usize, ef: usize) -> Vec<ScoredPoint> {
+        let Some(entry) = self.entry else {
+            return Vec::new();
+        };
+        // Descend the upper layers greedily (ef=1) to find a good entry point.
+        let mut ep = entry;
+        let mut lc = self.max_layer;
+        while lc > 0 {
+            let w = self.search_layer(query, &[ep], 1, lc);
+            if let Some(&(_, best)) = w.first() {
+                ep = best;
+            }
+            lc -= 1;
+        }
+        // Layer 0: full ef search, then take k live results.
+        let candidates = self.search_layer(query, &[ep], ef.max(k), 0);
+        candidates
+            .into_iter()
+            .filter(|&(_, n)| !self.nodes[n].deleted)
+            .take(k)
+            .map(|(_dist, n)| ScoredPoint {
+                id: self.nodes[n].id.clone(),
+                // recover the unified higher-is-better score from the metric.
+                score: self.metric.score(query, &self.nodes[n].vector),
+                payload: Payload::new(),
+            })
+            .collect()
+    }
+
+    // ── internals ──────────────────────────────────────────────────────────
+
+    fn dist(&self, query: &[f32], internal: usize) -> f32 {
+        self.metric.distance(query, &self.nodes[internal].vector)
+    }
+
+    /// splitmix64 → uniform `[0,1)`.
+    fn next_unit(&mut self) -> f64 {
+        self.rng = self.rng.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.rng;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^= z >> 31;
+        (z >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    fn random_level(&mut self) -> usize {
+        let r = self.next_unit().max(1e-12);
+        (-r.ln() * self.ml).floor() as usize
+    }
+
+    /// Greedy `search_layer` (Malkov & Yashunin Algorithm 2). Returns the `ef`
+    /// closest nodes at `layer`, sorted ascending by distance.
+    fn search_layer(
+        &self,
+        query: &[f32],
+        entry_points: &[usize],
+        ef: usize,
+        layer: usize,
+    ) -> Vec<(f32, usize)> {
+        let mut visited: HashSet<usize> = HashSet::new();
+        // candidates: min-heap on distance (explore closest first).
+        let mut candidates: BinaryHeap<std::cmp::Reverse<(OrdF32, usize)>> = BinaryHeap::new();
+        // results: max-heap on distance (peek = current farthest), capped at ef.
+        let mut results: BinaryHeap<(OrdF32, usize)> = BinaryHeap::new();
+
+        for &ep in entry_points {
+            let d = self.dist(query, ep);
+            visited.insert(ep);
+            candidates.push(std::cmp::Reverse((OrdF32(d), ep)));
+            results.push((OrdF32(d), ep));
+        }
+
+        while let Some(std::cmp::Reverse((OrdF32(c_dist), c))) = candidates.pop() {
+            let farthest = results.peek().map(|x| x.0 .0).unwrap_or(f32::INFINITY);
+            if c_dist > farthest && results.len() >= ef {
+                break;
+            }
+            for &nb in &self.nodes[c].neighbors[layer] {
+                if visited.insert(nb) {
+                    let d = self.dist(query, nb);
+                    let farthest = results.peek().map(|x| x.0 .0).unwrap_or(f32::INFINITY);
+                    if d < farthest || results.len() < ef {
+                        candidates.push(std::cmp::Reverse((OrdF32(d), nb)));
+                        results.push((OrdF32(d), nb));
+                        if results.len() > ef {
+                            results.pop();
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut out: Vec<(f32, usize)> =
+            results.into_iter().map(|(OrdF32(d), n)| (d, n)).collect();
+        out.sort_by(|a, b| a.0.total_cmp(&b.0));
+        out
+    }
+
+    /// Trim node `internal`'s neighbour list at `layer` to the `m` closest.
+    fn prune(&mut self, internal: usize, layer: usize, m: usize) {
+        if self.nodes[internal].neighbors[layer].len() <= m {
+            return;
+        }
+        let base = self.nodes[internal].vector.clone();
+        let mut scored: Vec<(f32, usize)> = self.nodes[internal].neighbors[layer]
+            .iter()
+            .map(|&nb| (self.metric.distance(&base, &self.nodes[nb].vector), nb))
+            .collect();
+        scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+        scored.truncate(m);
+        self.nodes[internal].neighbors[layer] = scored.into_iter().map(|(_, n)| n).collect();
     }
 }
 
