@@ -108,6 +108,110 @@ impl RejectionSampler {
     }
 }
 
+/// Shannon entropy of a probability row (natural log; `0·log0 ≡ 0`).
+fn entropy(row: &[f32]) -> f32 {
+    let mut h = 0.0_f32;
+    for &p in row {
+        if p > 0.0 {
+            h -= p * p.ln();
+        }
+    }
+    h
+}
+
+/// Typical-acceptance sampler — a pure-Rust port of vLLM's
+/// `TypicalAcceptanceSampler` (vllm-project/vllm
+/// `vllm/model_executor/layers/typical_acceptance_sampler.py`, Apache-2.0).
+///
+/// Unlike modified rejection sampling, this needs neither the draft
+/// distribution `q` nor uniform samples: a drafted token `x_i` is accepted iff
+/// the *target* assigns it more than an entropy-adaptive threshold
+///
+/// ```text
+/// threshold_i = min(posterior_threshold, posterior_alpha · exp(-H(p_i)))
+/// accept_i    = p_i(x_i) > threshold_i
+/// ```
+///
+/// where `H(p_i)` is the entropy of the target distribution at position `i`.
+/// On the first rejection it emits the target argmax (recovery); on full
+/// acceptance it appends a bonus token from the target's next-position row.
+/// Fully deterministic given the target probabilities.
+#[derive(Debug, Clone)]
+pub struct TypicalAcceptanceSampler {
+    k: usize,
+    posterior_threshold: f32,
+    posterior_alpha: f32,
+}
+
+impl TypicalAcceptanceSampler {
+    /// New sampler with explicit thresholds.
+    pub fn new(k: usize, posterior_threshold: f32, posterior_alpha: f32) -> Self {
+        Self {
+            k,
+            posterior_threshold,
+            posterior_alpha,
+        }
+    }
+
+    /// New sampler with vLLM's defaults (`posterior_threshold = 0.09`,
+    /// `posterior_alpha = sqrt(0.09) = 0.3`).
+    pub fn with_defaults(k: usize) -> Self {
+        let threshold = 0.09_f32;
+        Self::new(k, threshold, threshold.sqrt())
+    }
+
+    /// Number of speculative tokens per step.
+    pub fn num_speculative_tokens(&self) -> usize {
+        self.k
+    }
+
+    /// Posterior probability floor.
+    pub fn posterior_threshold(&self) -> f32 {
+        self.posterior_threshold
+    }
+
+    /// Entropy-scaling coefficient.
+    pub fn posterior_alpha(&self) -> f32 {
+        self.posterior_alpha
+    }
+
+    /// Run typical acceptance over `k` drafted tokens.
+    ///
+    /// * `draft_tokens` — the `k` proposed token ids.
+    /// * `target_probs` — target distribution at each of the `k` positions,
+    ///   plus one extra (`k + 1` rows) for the bonus token on full acceptance.
+    pub fn sample(&self, draft_tokens: &[u32], target_probs: &[Vec<f32>]) -> AcceptanceResult {
+        let mut emitted: Vec<u32> = Vec::with_capacity(self.k + 1);
+        for i in 0..self.k {
+            let row = &target_probs[i];
+            let tok = draft_tokens[i] as usize;
+            let candidate = row[tok];
+            let threshold = self
+                .posterior_threshold
+                .min(self.posterior_alpha * (-entropy(row)).exp());
+            if candidate > threshold {
+                emitted.push(draft_tokens[i]);
+                continue;
+            }
+            // Rejected: recover with the target's argmax at this position.
+            emitted.push(argmax(row) as u32);
+            return AcceptanceResult {
+                accepted: i,
+                emitted,
+                all_accepted: false,
+            };
+        }
+        // All k accepted: bonus token from the target's next-position row.
+        let bonus = argmax(&target_probs[self.k]);
+        emitted.push(bonus as u32);
+        AcceptanceResult {
+            accepted: self.k,
+            emitted,
+            all_accepted: true,
+        }
+    }
+}
+
 /// Recovery token = argmax of the normalized residual `max(0, p - q)`.
 ///
 /// Normalization does not change the argmax, so we pick the residual argmax
