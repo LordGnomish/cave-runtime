@@ -74,9 +74,25 @@ impl EmbeddingBackend for HashingEmbedder {
     fn dims(&self) -> usize {
         self.dims
     }
-    async fn encode_tokens(&self, _text: &str) -> EmbedResult<(Vec<Vec<f32>>, Vec<u32>)> {
-        // PLACEHOLDER (RED): single zero token.
-        Ok((vec![vec![0.0; self.dims]], vec![1]))
+    async fn encode_tokens(&self, text: &str) -> EmbedResult<(Vec<Vec<f32>>, Vec<u32>)> {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.is_empty() {
+            return Err(EmbedError::EmptyInput);
+        }
+        let mut tokens = Vec::with_capacity(words.len());
+        for w in &words {
+            let mut state = Self::fnv1a(&w.to_ascii_lowercase());
+            let mut row = Vec::with_capacity(self.dims);
+            for _ in 0..self.dims {
+                // Map a u64 into a deterministic f32 in [-1, 1).
+                let r = Self::splitmix(&mut state);
+                let unit = (r >> 11) as f32 / (1u64 << 53) as f32; // [0,1)
+                row.push(unit * 2.0 - 1.0);
+            }
+            tokens.push(row);
+        }
+        let mask = vec![1u32; tokens.len()];
+        Ok((tokens, mask))
     }
 }
 
@@ -116,18 +132,9 @@ impl BackendRegistry {
     /// every model in the built-in catalog (matching its native dims).
     pub fn seeded() -> Self {
         let mut reg = Self::new();
-        for card in crate::registry::ModelCatalog::builtin().ids().into_iter().zip(
-            crate::registry::ModelCatalog::builtin()
-                .ids()
-                .into_iter()
-                .map(|id| {
-                    crate::registry::ModelCatalog::builtin()
-                        .get(id)
-                        .map(|c| c.dims)
-                        .unwrap_or(0)
-                }),
-        ) {
-            let (id, dims) = card;
+        let catalog = crate::registry::ModelCatalog::builtin();
+        for id in catalog.ids() {
+            let dims = catalog.get(id).map(|c| c.dims).unwrap_or(0);
             reg.register(Arc::new(HashingEmbedder::new(id, dims)));
         }
         reg
