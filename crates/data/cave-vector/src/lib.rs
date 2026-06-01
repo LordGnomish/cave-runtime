@@ -26,7 +26,11 @@ pub mod error;
 /// Collection schema + point storage.
 pub mod collection;
 
+/// HNSW proximity-graph index.
+pub mod hnsw;
+
 pub use collection::{Collection, CollectionStore};
+pub use hnsw::HnswIndex;
 pub use distance::Metric;
 pub use error::VectorError;
 pub use models::{Distance, Point, PointId, ScoredPoint, VectorParams};
