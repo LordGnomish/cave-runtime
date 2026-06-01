@@ -14,11 +14,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod agentic;
 pub mod chain;
 pub mod citation;
 pub mod document;
 pub mod embedding;
 pub mod error;
+pub mod graphrag;
 pub mod loaders;
 pub mod math;
 pub mod rerank;
