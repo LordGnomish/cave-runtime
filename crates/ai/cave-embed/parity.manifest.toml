@@ -1,0 +1,166 @@
+# parity.manifest.toml — cave-embed
+# Upstream: michaelfeil/infinity  https://github.com/michaelfeil/infinity
+# Patterns: UKPLab/sentence-transformers (pooling / normalize / quantize)
+
+[upstream]
+org        = "michaelfeil"
+repo       = "infinity"
+version    = "0.0.75"
+license    = "MIT"
+source_sha = "0.0.75"   # infinity_emb package release line
+
+[parity]
+# 2026-06-01 fresh clean-room port. cave-embed re-implements infinity's
+# embedding/rerank inference-server CONTROL PLANE in pure safe Rust with no
+# native ML runtime: the OpenAI-compatible embeddings API, the model catalog,
+# the sentence-transformers pooling/normalize/quantize math, infinity's
+# length-sorted dynamic batcher, an LRU cache, the Cohere/infinity rerank
+# contract, and CLIP modality routing. A deterministic feature-hashing
+# reference embedder stands in for model weights so the whole surface is
+# exercisable offline; concrete neural runtimes are ADR-justified scope-cuts.
+#
+# Mapped (12):
+#   1. openai.rs        — OpenAI POST /v1/embeddings: string|array input,
+#                         float|base64 (LE-f32) encoding, dimensions param,
+#                         usage accounting, model resolution.
+#   2. routes.rs        — /v1/models listing (OpenAI model-list shape).
+#   3. registry.rs      — model catalog across 6 families (sentence-transformers,
+#                         BGE, E5, nomic, Jina, Mistral) with native dims, default
+#                         pooling, normalize flag and asymmetric query/passage
+#                         instruction prefixes.
+#   4. pooling.rs       — sentence-transformers Pooling: mean / cls / max /
+#                         last-token / mean-sqrt-len.
+#   5. pooling.rs       — sentence-transformers Normalize (L2 unit length).
+#   6. backend.rs       — EmbeddingBackend trait + FNV-1a/SplitMix64 reference
+#                         embedder + BackendRegistry (seeded per catalog model).
+#   7. backend.rs       — Matryoshka dimension truncation + renormalize.
+#   8. batch.rs         — infinity length-sorted dynamic batcher (max-batch +
+#                         padded-token budget, padding-waste accounting).
+#   9. quantize.rs      — sentence-transformers quantize_embeddings: int8/uint8
+#                         scalar (calibration ranges) + binary/ubinary packbits.
+#  10. cache.rs         — LRU embedding cache keyed by sha256(model, text).
+#  11. rerank.rs        — Cohere/infinity POST /rerank: Reranker trait, score +
+#                         sort + top_n + return_documents; cosine reference reranker.
+#  12. clip.rs          — CLIP multimodal modality routing into a shared
+#                         text/image embedding space.
+#
+# Partial (2):
+#   * Tokenizer — token counting uses a whitespace heuristic for usage + length;
+#     the real HuggingFace BPE/WordPiece tokenizer (and exact max_seq_len
+#     truncation) is not implemented. Kept honest (not claimed as mapped).
+#   * CLIP image branch — modality routing + shared-space contract are mapped,
+#     but real image decode/preprocess + a vision tower are deferred (the image
+#     branch hashes raw bytes as a deterministic stand-in).
+#
+# Skipped (5) — ADR-justified scope cuts:
+#   * Concrete ONNX (optimum/onnxruntime) backend          → vendor-adapter
+#   * Concrete torch / sentence-transformers / CTranslate2 → vendor-adapter
+#   * GPU/device mgmt + fp16/bettertransformer accel       → out-of-scope (host)
+#   * Prometheus /metrics hosting                          → parallel-track (cave-metrics)
+#   * /classify sequence-classification head               → out-of-scope-subsystem
+mapped_count          = 12
+partial_count         = 2
+skipped_count         = 5
+unmapped_count        = 0
+total                 = 19
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 19/19
+honest_ratio          = 0.8947  # (mapped + skipped) / total            = 17/19
+adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites a standard scope-cut label
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
+parity_ratio_source   = "manifest"
+last_audit            = "2026-06-01"
+infra_only            = false
+
+# adr_justified_ratio breakdown (2026-06-01):
+#   * tokenizer partial        → vendor-adapter (HF tokenizers / a future cave-tokenize)
+#   * CLIP image partial       → vendor-adapter (image decode + vision tower)
+#   * ONNX backend             → vendor-adapter (delegated; trait stays open)
+#   * torch/ST/CTranslate2     → vendor-adapter (cave-llm-gateway federates model serving)
+#   * GPU/fp16 acceleration    → out-of-scope-subsystem (host/runtime)
+#   * Prometheus /metrics      → parallel-track (cave-metrics scrape)
+#   * /classify head           → out-of-scope-subsystem (sequence classification, not embeddings)
+
+[[scope_cuts]]
+upstream_pkg = "infinity_emb/transformer/embedder/optimum.py (ONNX) + sentence_transformer.py (torch) + ctranslate2.py"
+reason       = "delegated"
+note         = "Concrete neural runtimes are vendor adapters; cave-embed ships the EmbeddingBackend/Reranker traits + a deterministic reference embedder. cave-llm-gateway federates concrete model serving."
+
+[[scope_cuts]]
+upstream_pkg = "infinity_emb/inference/select_model.py device/dtype (cuda/mps, fp16, bettertransformer)"
+reason       = "host-preflight"
+note         = "GPU/device + dtype acceleration is owned by the host/runtime, not this control-plane crate."
+
+[[scope_cuts]]
+upstream_pkg = "infinity_emb/fastapi_schemas + api: /classify sequence-classification head"
+reason       = "out-of-scope-subsystem"
+note         = "Text classification is a separate task head from embeddings/rerank; not in cave-embed scope."
+
+[module]
+name        = "cave-embed"
+description = "OpenAI-compatible embeddings + rerank inference server — infinity / sentence-transformers parity (pure Rust)"
+source_root = "src"
+
+[[functions]]
+upstream_name = "OpenAIEmbeddingInput / _embeddings (POST /v1/embeddings)"
+local_name    = "EmbeddingService::embed"
+file          = "src/openai.rs"
+
+[[functions]]
+upstream_name = "base64 float32 encoding (encoding_format)"
+local_name    = "encode_f32_base64"
+file          = "src/openai.rs"
+
+[[functions]]
+upstream_name = "list_models (GET /v1/models)"
+local_name    = "list_models"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "sentence_transformers model config (pooling/normalize/prompts)"
+local_name    = "ModelCatalog::builtin"
+file          = "src/registry.rs"
+
+[[functions]]
+upstream_name = "sentence_transformers.models.Pooling.forward"
+local_name    = "pooling::pool"
+file          = "src/pooling.rs"
+
+[[functions]]
+upstream_name = "sentence_transformers.models.Normalize.forward"
+local_name    = "pooling::l2_normalize"
+file          = "src/pooling.rs"
+
+[[functions]]
+upstream_name = "BaseEmbedder.encode / TransformerBackend"
+local_name    = "EmbeddingBackend + HashingEmbedder + embed_with"
+file          = "src/backend.rs"
+
+[[functions]]
+upstream_name = "matryoshka truncate_dim"
+local_name    = "embed_with(truncate_dims)"
+file          = "src/backend.rs"
+
+[[functions]]
+upstream_name = "infinity_emb.inference.BatchHandler (length-sorted batching)"
+local_name    = "plan_batches"
+file          = "src/batch.rs"
+
+[[functions]]
+upstream_name = "sentence_transformers.quantization.quantize_embeddings"
+local_name    = "quantize::quantize"
+file          = "src/quantize.rs"
+
+[[functions]]
+upstream_name = "embedding response cache"
+local_name    = "EmbeddingCache"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "CrossEncoder / _rerank (POST /rerank)"
+local_name    = "RerankService::rerank"
+file          = "src/rerank.rs"
+
+[[functions]]
+upstream_name = "CLIP image/text modality dispatch"
+local_name    = "ClipEmbedder + classify_modality"
+file          = "src/clip.rs"
