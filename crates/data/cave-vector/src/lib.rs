@@ -38,6 +38,9 @@ pub mod search;
 /// Vector quantization (scalar / binary / product).
 pub mod quantization;
 
+/// Sharding + replication.
+pub mod sharding;
+
 pub use collection::{Collection, CollectionStore};
 pub use filter::{Condition, Filter};
 pub use hnsw::HnswIndex;
