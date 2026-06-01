@@ -313,4 +313,41 @@ mod tests {
         // a(idx2) → b(idx1) → c(idx0)
         assert_eq!(order, vec![2, 1, 0]);
     }
+
+    /// Planner that turns any goal into a single `respond` step whose
+    /// rationale *is* the goal — so a worker's `final_response` echoes back
+    /// exactly the (possibly augmented) goal it was handed. Lets us observe
+    /// what the coordinator actually fed each worker.
+    struct EchoPlanner;
+    impl crate::planner::Planner for EchoPlanner {
+        fn plan(&self, goal: &str) -> Result<crate::planner::Plan> {
+            Ok(crate::planner::Plan::new(goal)
+                .push(crate::planner::PlanStep::new("respond", goal)))
+        }
+    }
+
+    fn echo_factory() -> RuntimeFactory {
+        Arc::new(|| {
+            let mut rt = default_runtime();
+            rt.planner = Box::new(EchoPlanner);
+            rt
+        })
+    }
+
+    #[test]
+    fn dependent_worker_receives_dependency_output_as_context() {
+        // a → b. The coordinator must thread a's output into b's goal so the
+        // dependent worker can build on it (the amele coordinator's job).
+        let subs = vec![
+            Subtask::new("a", "PRODUCE_ALPHA"),
+            Subtask::new("b", "consume").after("a"),
+        ];
+        let report = Orchestrator::new(echo_factory()).run(subs).unwrap();
+        let b = report.get("b").expect("subtask b ran");
+        assert!(
+            b.output.contains("PRODUCE_ALPHA"),
+            "dependent worker should see dependency output; got: {}",
+            b.output
+        );
+    }
 }
