@@ -20,7 +20,15 @@ pub mod models;
 /// Distance / similarity metrics.
 pub mod distance;
 
+/// Error type.
+pub mod error;
+
+/// Collection schema + point storage.
+pub mod collection;
+
+pub use collection::{Collection, CollectionStore};
 pub use distance::Metric;
+pub use error::VectorError;
 pub use models::{Distance, Point, PointId, ScoredPoint, VectorParams};
 
 /// Module name constant (used by the runtime parity discovery + router mount).
