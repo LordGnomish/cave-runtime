@@ -42,9 +42,36 @@ pub mod observe;
 pub mod tune;
 pub mod changelog;
 pub mod hotpatch;
+pub mod router;
 
 pub use error::{AgentError, Result};
+pub use router::{router, AgentState};
 
 /// Upstream OpenJarvis version this crate is pinned to. Asserted by the
 /// Charter v2 self-audit against the manifest.
 pub const UPSTREAM_VERSION: &str = "v2026.5.20";
+
+/// An assembled agent runtime: the tool registry, the current tunable knobs,
+/// and the hot-patchable config registry. Constructed by [`default_runtime`].
+pub struct Runtime {
+    /// The composable tool registry (pre-loaded with the pure built-ins).
+    pub tools: tool::ToolRegistry,
+    /// The current self-tuning knobs.
+    pub knobs: tune::Knobs,
+    /// The hot-patchable config registry.
+    pub config: hotpatch::PatchRegistry,
+}
+
+/// The default on-device runtime: built-in tools, sane starting knobs, and an
+/// empty config registry.
+pub fn default_runtime() -> Runtime {
+    Runtime {
+        tools: tool::builtins(),
+        knobs: tune::Knobs {
+            max_tokens: 2048,
+            temperature: 0.7,
+            concurrency: 8,
+        },
+        config: hotpatch::PatchRegistry::new(),
+    }
+}
