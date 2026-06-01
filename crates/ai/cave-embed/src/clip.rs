@@ -10,7 +10,7 @@
 //! tower is a scope-cut; the image branch hashes the raw bytes deterministically
 //! as a faithful stand-in.
 
-use crate::backend::{self, EmbeddingBackend, HashingEmbedder};
+use crate::backend::{self, HashingEmbedder};
 use crate::error::{EmbedError, EmbedResult};
 use crate::pooling::{self, PoolingStrategy};
 use serde::{Deserialize, Serialize};
@@ -38,9 +38,10 @@ pub enum ClipInput {
 
 /// Classify an input's modality.
 pub fn classify_modality(input: &ClipInput) -> Modality {
-    // PLACEHOLDER (RED): everything is text.
-    let _ = input;
-    Modality::Text
+    match input {
+        ClipInput::Text(_) => Modality::Text,
+        ClipInput::ImageBytes(_) | ClipInput::ImageUrl(_) => Modality::Image,
+    }
 }
 
 /// CLIP embedder — a text tower and an image tower sharing one dimensionality.
@@ -89,9 +90,13 @@ impl ClipEmbedder {
 
     /// Embed a single input into the shared space.
     pub async fn embed(&self, input: &ClipInput) -> EmbedResult<Vec<f32>> {
-        // PLACEHOLDER (RED): empty vector regardless of modality.
-        let _ = input;
-        Ok(Vec::new())
+        match input {
+            ClipInput::Text(t) => {
+                backend::embed_with(&self.text_tower, PoolingStrategy::Mean, true, None, t).await
+            }
+            ClipInput::ImageBytes(b) => self.image_embedding(b),
+            ClipInput::ImageUrl(u) => self.image_embedding(u.as_bytes()),
+        }
     }
 
     /// Embed a batch of mixed-modality inputs.
