@@ -31,31 +31,35 @@ source_sha  = "2025-11-25"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.875
-honest_ratio        = 0.875
-adr_justified_ratio = 1.0      # all 8 skipped subsystems are out-of-scope by ADR (sibling-crate- or host-owned); the 4 partials are the honest in-scope gaps
+fill_ratio          = 0.9375
+honest_ratio        = 0.9375
+adr_justified_ratio = 1.0      # all 8 skipped subsystems are out-of-scope by ADR (sibling-crate- or host-owned); the 2 remaining partials are the honest in-scope gaps
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-31"
+last_audit          = "2026-06-01"
 infra_only          = false
-mapped_count        = 28
-partial_count       = 4
+mapped_count        = 30
+partial_count       = 2
 skipped_count       = 8
 unmapped_count      = 0
-total               = 40       # 28 + 4 + 8 + 0 = 40
+total               = 40       # 30 + 2 + 8 + 0 = 40
 
 # honest_ratio derivation (Charter v2 honest measurement):
-#   In-scope subsystems  = mapped + partial + unmapped = 28 + 4 + 0 = 32
-#   Fully mapped         = 28
-#   28 / 32              = 0.875
+#   In-scope subsystems  = mapped + partial + unmapped = 30 + 2 + 0 = 32
+#   Fully mapped         = 30
+#   30 / 32              = 0.9375
 # The 8 [[skipped]] subsystems are excluded from the denominator: each is a
 # documented out-of-scope boundary (adr_justified_ratio = 1.0), not an
 # unfinished obligation. honest_ratio therefore rises ONLY by converting a
 # partial → mapped, never by reclassifying a real gap as skipped.
+# 2026-06-01 (cont): two partials promoted → mapped — the Content block union
+# now models the full MCP ContentBlock (image/audio/embedded-resource/
+# resource_link), and tools/list_changed notifications + capability are
+# emitted (transport delivery stays in the skipped transport layer).
 #
 # impl LOC (src/, excludes tests/ which are integration tests):
-#   error 67 · tool 266 · schema 204 · mcp 164 · permission 177 · audit 198 ·
+#   error 67 · tool 398 · schema 204 · mcp 221 · permission 177 · audit 198 ·
 #   builtin 553 · streaming 157 · batch 200 · search 148 · adapters 114 ·
-#   lib 65  ──  2313 impl LOC, 1138 test LOC across 10 RED→GREEN cycles.
+#   lib 65  ──  ~2502 impl LOC, ~1291 test LOC across 12 RED→GREEN cycles.
 
 [module]
 name        = "cave-tools"
@@ -250,13 +254,17 @@ name     = "adapters.LangChain tool descriptor (StructuredTool args)"
 upstream = "LangChain convert_to_openai_tool / StructuredTool.args"
 local    = "src/adapters.rs:to_langchain_tool"
 
-# ── Partials (honest in-scope gaps) ─────────────────────────────────────────
+[[mapped]]
+name     = "tool.Content block types (full MCP ContentBlock union)"
+upstream = "schema.ts:TextContent | ImageContent | AudioContent | ResourceLink | EmbeddedResource"
+local    = "src/tool.rs:Content + ResourceContents"
 
-[[partial]]
-name     = "tool.Content block types"
-upstream = "schema.ts:TextContent | ImageContent | AudioContent | EmbeddedResource"
-local    = "src/tool.rs:Content (Text only)"
-note     = "Only text content blocks are modelled; image/audio/embedded-resource blocks are deferred until a Cave modality pipeline needs them. The Content enum is the single extension point."
+[[mapped]]
+name     = "mcp.tools/list_changed notifications + capability"
+upstream = "server/tools notifications/tools/list_changed; capabilities.tools.listChanged"
+local    = "src/mcp.rs:take_list_changed_notification + ToolRegistry::generation"
+
+# ── Partials (honest in-scope gaps) ─────────────────────────────────────────
 
 [[partial]]
 name     = "builtin.code_exec execution surface"
@@ -269,12 +277,6 @@ name     = "search.ToolSearchIndex ranking backend"
 upstream = "embedding-vector semantic tool selection"
 local    = "src/search.rs:ToolSearchIndex (TF-IDF lexical)"
 note     = "Lexical TF-IDF cosine ranking, deterministic and dependency-free. An embedding-backed index is hot-swappable behind the same search() API once cave-search exposes a vector store."
-
-[[partial]]
-name     = "mcp.tools listChanged notifications"
-upstream = "server/tools notifications/tools/list_changed"
-local    = "src/mcp.rs:initialize (capabilities.tools.listChanged = false)"
-note     = "The capability is negotiated (advertised false). Emitting live list_changed notifications needs a mutable/observed registry + a transport push channel, deferred with the transport layer."
 
 # ── Skipped (ADR-justified out-of-scope) ────────────────────────────────────
 
