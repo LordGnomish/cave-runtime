@@ -435,6 +435,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rerank_dispatch_scores_documents_locally() {
+        let registry = Arc::new(ProviderRegistry::new());
+        registry.register(Arc::new(MockProvider::new("mock")));
+        let aliases = Arc::new(AliasRegistry::new());
+        let router = GatewayRouter::new(
+            registry,
+            aliases,
+            RoutingStrategy::Fixed {
+                provider: "mock".into(),
+            },
+        );
+        let req = crate::rerank::RerankRequest {
+            model: "rerank-english-v3.0".into(),
+            query: "capital of france".into(),
+            documents: vec![
+                "Berlin is the capital of Germany.".into(),
+                "Paris is the capital of France.".into(),
+                "Gardening tips for spring.".into(),
+            ],
+            top_n: Some(2),
+            return_documents: Some(true),
+        };
+        let resp = router.rerank("user-1", req).await.unwrap();
+        assert_eq!(resp.results.len(), 2, "top_n truncates");
+        assert_eq!(resp.results[0].index, 1, "France doc ranks first");
+        assert!(resp.results[0].relevance_score >= resp.results[1].relevance_score);
+    }
+
+    #[tokio::test]
     async fn fallback_strategy_tries_next_on_failure() {
         let registry = Arc::new(ProviderRegistry::new());
         // Register only "mock", not "broken"
