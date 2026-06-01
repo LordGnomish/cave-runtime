@@ -155,6 +155,9 @@ impl Orchestrator {
 
         let mut results: Vec<WorkerResult> = Vec::with_capacity(order.len());
         let mut status: HashMap<String, bool> = HashMap::new();
+        // Outputs of completed subtasks, threaded forward to their dependents
+        // (the coordinator's "pass the predecessor's result on" duty).
+        let mut outputs: HashMap<String, String> = HashMap::new();
         let mut next_worker = 0usize;
 
         for &idx in &order {
@@ -179,12 +182,22 @@ impl Orchestrator {
                 continue;
             }
 
+            // Thread each successful dependency's output into this subtask's
+            // goal as context, in declared-dependency order.
+            let dep_outputs: Vec<(String, String)> = s
+                .deps
+                .iter()
+                .filter_map(|d| outputs.get(d).map(|o| (d.clone(), o.clone())))
+                .collect();
+            let goal = augment_goal_with_deps(&s.goal, &dep_outputs);
+
             let mut exec = AgentExecutor::new((self.factory)()).with_scope(&s.id);
-            let (ok, output) = match exec.run(&s.goal) {
+            let (ok, output) = match exec.run(&goal) {
                 Ok(run) => (run.steps.iter().all(|st| st.ok), run.final_response),
                 Err(e) => (false, e.to_string()),
             };
             status.insert(s.id.clone(), ok);
+            outputs.insert(s.id.clone(), output.clone());
             results.push(WorkerResult {
                 subtask_id: s.id.clone(),
                 worker,
@@ -228,6 +241,22 @@ impl Orchestrator {
         }
         Ok(())
     }
+}
+
+/// Build the goal a worker actually receives, threading completed-dependency
+/// outputs in as a context block (declared-dependency order). With no
+/// dependency outputs the goal passes through verbatim — a leaf subtask runs
+/// exactly the goal it was given.
+fn augment_goal_with_deps(goal: &str, dep_outputs: &[(String, String)]) -> String {
+    if dep_outputs.is_empty() {
+        return goal.to_string();
+    }
+    let mut out = String::from(goal);
+    out.push_str("\n\nContext from completed dependencies:");
+    for (id, output) in dep_outputs {
+        out.push_str(&format!("\n- {id}: {output}"));
+    }
+    out
 }
 
 /// Kahn's algorithm. Returns subtask indices in dependency order, processing
@@ -332,6 +361,25 @@ mod tests {
             rt.planner = Box::new(EchoPlanner);
             rt
         })
+    }
+
+    #[test]
+    fn augment_goal_with_no_deps_is_identity() {
+        assert_eq!(augment_goal_with_deps("do x", &[]), "do x");
+    }
+
+    #[test]
+    fn augment_goal_appends_dependency_context_in_order() {
+        let deps = vec![
+            ("a".to_string(), "RESULT_A".to_string()),
+            ("b".to_string(), "RESULT_B".to_string()),
+        ];
+        let g = augment_goal_with_deps("synthesize", &deps);
+        assert!(g.starts_with("synthesize"));
+        assert!(g.contains("Context from completed dependencies"));
+        let ia = g.find("a: RESULT_A").expect("a present");
+        let ib = g.find("b: RESULT_B").expect("b present");
+        assert!(ia < ib, "dependency context preserves declared order");
     }
 
     #[test]
