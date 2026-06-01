@@ -32,6 +32,8 @@ pub mod error;
 
 pub mod pooling;
 
+pub mod registry;
+
 pub use error::{EmbedError, EmbedResult};
 
 /// Crate identity. The self-audit (`gate_*`) asserts this stays in lockstep
