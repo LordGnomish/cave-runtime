@@ -44,6 +44,9 @@ pub mod sharding;
 /// Collection snapshots.
 pub mod snapshot;
 
+/// Sparse vectors, BM25, ColBERT MaxSim.
+pub mod sparse;
+
 pub use collection::{Collection, CollectionStore};
 pub use filter::{Condition, Filter};
 pub use hnsw::HnswIndex;
