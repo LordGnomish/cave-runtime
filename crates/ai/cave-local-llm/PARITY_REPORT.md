@@ -1,13 +1,13 @@
 # cave-local-llm — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2; vLLM engine port 2026-05-30 (strict-TDD)
+**Status:** 8/8 PASS — Charter v2; vLLM engine port 2026-06-01 cont3 (strict-TDD)
 **Upstream (primary):** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
-**Upstream (engine):** vllm-project/vllm (Apache-2.0) — PagedAttention / scheduler / sampling / quant / spec-decode / LoRA
+**Upstream (engine):** vllm-project/vllm (Apache-2.0) — PagedAttention / scheduler / sampling / sampler / quant / spec-decode / parallel / LoRA
 **source_sha:** v0.3.0
-**fill_ratio:** 1.0000 (35/35)
-**honest_ratio:** 0.9714 (34/35)
+**fill_ratio:** 1.0000 (39/39)
+**honest_ratio:** 0.9744 (38/39)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-30
+**last_audit:** 2026-06-01
 
 ## vLLM engine port (2026-05-30, strict-TDD, 6 RED→GREEN cycles, +61 tests)
 
@@ -20,8 +20,28 @@ dequant / attention / matmul kernels remain out of scope — hardware-dependent)
 | `src/vllm_scheduler.rs`      | `core/scheduler.py` Scheduler + SchedulingBudget| 9     | mapped |
 | `src/vllm_sampling.rs`       | `sampling_params.py` SamplingParams             | 14    | mapped |
 | `src/vllm_quant.rs`          | `layers/quantization/{awq,gptq,fp8}.py`         | 11    | mapped |
-| `src/vllm_spec_decode.rs`    | `layers/rejection_sampler.py`                   | 5     | mapped |
+| `src/vllm_spec_decode.rs`    | `layers/rejection_sampler.py` + typical-accept  | 10    | mapped |
 | `src/vllm_lora.rs`           | `lora/worker_manager.py` (LRU LoRA pool)        | 7     | mapped |
+| `src/vllm_engine.rs`         | `engine/llm_engine.py` step + StopChecker       | —     | mapped |
+| `src/vllm_prefix_cache.rs`   | `core/block/prefix_caching_block.py`            | —     | mapped |
+| `src/vllm_parallel.rs`       | `distributed/utils.py` + parallel-linear        | —     | mapped |
+| `src/vllm_sampler.rs`        | `layers/sampler.py` + `utils.apply_penalties`   | 20    | mapped |
+
+### cont3 additions (2026-06-01, +30 tests)
+
+- **`src/vllm_sampler.rs`** (NEW mapped) — the runtime logits-processing sampler:
+  `temperature_scale`, `apply_top_k` / `apply_top_p` (nucleus) / `apply_min_p`,
+  stable `softmax`, `apply_penalties` (repetition · frequency · presence), and
+  the vocabulary-mask processors `apply_logit_bias` / `suppress_tokens`
+  (bad-words + min_tokens EOS) / `restrict_to_allowed`, behind a canonical
+  `process` pipeline. GPU sampler kernels stay out of scope.
+- **`ChunkedPrefillPlanner`** (depth, count-neutral) in `vllm_scheduler.rs` —
+  vLLM `enable_chunked_prefill` admission splitting a long prompt across steps.
+- **`TypicalAcceptanceSampler`** (depth, count-neutral) in `vllm_spec_decode.rs`
+  — entropy-adaptive acceptance `target_prob > min(threshold, alpha·exp(-H))`.
+
+Wired via `cave-local-llm vllm {warp,chunked-prefill,spec-typical}` and the
+`/admin/local-llm` portal engine-control-plane panel.
 
 Coverage: PagedAttention block alloc / ref-counted copy-on-write / fork / free
 / GPU↔CPU swap / watermark admission; continuous-batching prefill + one-token

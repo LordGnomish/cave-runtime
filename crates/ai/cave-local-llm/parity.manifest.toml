@@ -19,7 +19,7 @@ org        = "vllm-project"
 repo       = "vllm"
 version    = "v0.6.x"
 license    = "Apache-2.0"
-note       = "PagedAttention block manager, continuous-batching scheduler, SamplingParams, AWQ/GPTQ/FP8 quant configs, speculative-decode rejection sampler, multi-LoRA manager — pure-Rust control logic; GPU kernels remain out of scope (no-backcompat hardware dependency)."
+note       = "PagedAttention block manager, continuous-batching scheduler (incl. chunked prefill), SamplingParams + logits-processing sampler (temp/top-k/top-p/min-p + penalties + logit_bias/allowed/suppress), AWQ/GPTQ/FP8 quant configs, speculative-decode rejection + typical-acceptance samplers, multi-LoRA manager — pure-Rust control logic; GPU kernels remain out of scope (no-backcompat hardware dependency)."
 
 [parity]
 # 2026-05-19 Charter v2 deep-port — cave-local-llm covers the in-scope
@@ -80,6 +80,28 @@ note       = "PagedAttention block manager, continuous-batching scheduler, Sampl
 # cross-rank collectives (all-reduce / all-gather / pipeline send-recv) require
 # a real multi-device backend and stay a host scope-cut.
 #
+# 2026-06-01 vLLM engine port cont3 (strict-TDD, 4 RED->GREEN cycles, +30
+# tests): one NEW mapped module plus two count-neutral depth ports of the
+# already-mapped scheduler / spec-decode control plane (vllm-project/vllm,
+# Apache-2.0).
+#   * NEW mapped — vllm_sampler.rs: the runtime logits-processing sampler
+#     (model_executor/layers/sampler.py + utils.py::apply_penalties) — the
+#     *math* behind SamplingParams on a plain &mut [f32] row: temperature
+#     scaling, top-k / top-p (nucleus, ascending-cumsum, argmax always kept) /
+#     min-p truncation, stable softmax, presence·frequency·repetition
+#     penalties, plus the vocabulary-mask processors logit_bias /
+#     suppress_tokens (bad-words + min_tokens EOS suppression) /
+#     restrict_to_allowed (allowed_token_ids), and a canonical `process`
+#     pipeline. The GPU sampler kernels stay out of scope.
+#   * DEPTH (count-neutral) — vllm_scheduler.rs ChunkedPrefillPlanner: vLLM's
+#     enable_chunked_prefill admission (_schedule_chunked_prefill /
+#     _get_num_new_tokens) splitting a long prompt across steps, greedily
+#     packing max_num_batched_tokens with FCFS prefill chunks.
+#   * DEPTH (count-neutral) — vllm_spec_decode.rs TypicalAcceptanceSampler
+#     (typical_acceptance_sampler.py): accept iff target_prob >
+#     min(posterior_threshold, posterior_alpha · exp(-entropy)); argmax
+#     recovery on first rejection, bonus on full acceptance.
+#
 # Partial (1): daemon graceful-shutdown — the loop already handles SIGTERM +
 # a stop-signal file (daemon.rs); SIGINT/full in-flight drain is still owned
 # by the cave-runtime host. Kept honest (not inflated to mapped).
@@ -91,17 +113,17 @@ note       = "PagedAttention block manager, continuous-batching scheduler, Sampl
 # (trait open for extension), embedding-recall RAG store (cave-hermes),
 # KV-cache eviction state machine (runtime-internal), JSON-mode response
 # validation, /api/version surface in extras.
-mapped_count          = 27  # 2026-05-30 cont2: +3 vLLM modules (LLMEngine step+StopChecker, prefix cache, tensor/pipeline parallel)
+mapped_count          = 28  # 2026-06-01 cont3: +1 NEW vLLM module (logits-processing sampler.py); chunked-prefill + typical-acceptance were count-neutral depth
 partial_count         = 1
 skipped_count         = 10
 unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
-total                 = 38  # 2026-05-30 cont2: +3 vLLM mapped modules (was 35)
-fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 38/38
-honest_ratio          = 0.9737  # (mapped + skipped) / total            = 37/38
+total                 = 39  # 2026-06-01 cont3: +1 vLLM mapped module (was 38)
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 39/39
+honest_ratio          = 0.9744  # (mapped + skipped) / total            = 38/39
 adr_justified_ratio   = 1.00    # every [[skipped]] + [[partial]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-30"
+last_audit            = "2026-06-01"
 infra_only            = false
 
 # adr_justified_ratio breakdown (2026-05-28):
@@ -228,6 +250,12 @@ file          = "src/vllm_prefix_cache.rs"
 upstream_name = "vllm.distributed.utils + parallel-linear/VocabParallelEmbedding partition"
 local_name    = "ParallelConfig"
 file          = "src/vllm_parallel.rs"
+
+# 2026-06-01 cont3 — NEW mapped: the runtime logits-processing sampler.
+[[functions]]
+upstream_name = "vllm.model_executor.layers.sampler + utils.apply_penalties"
+local_name    = "vllm_sampler::process"
+file          = "src/vllm_sampler.rs"
 
 [[surfaces]]
 kind          = "http"
