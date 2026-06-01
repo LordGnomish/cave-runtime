@@ -169,7 +169,7 @@ pub fn rerank_local(req: &RerankRequest) -> RerankResponse {
         })
         .collect();
 
-    let search_units = ((req.documents.len() + 99) / 100).max(1) as u32;
+    let search_units = req.documents.len().div_ceil(100).max(1) as u32;
 
     RerankResponse {
         id: format!("rerank-{:016x}", fnv1a(&req.query)),
