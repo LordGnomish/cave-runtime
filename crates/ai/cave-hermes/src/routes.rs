@@ -113,30 +113,64 @@ pub struct OrchestrateResponse {
 
 // ── Logic (pure, testable) ─────────────────────────────────────────────────
 
-fn do_tools(_state: &HermesState) -> serde_json::Value {
-    // RED placeholder
-    serde_json::Value::Array(Vec::new())
+fn do_tools(state: &HermesState) -> serde_json::Value {
+    state.runtime().tools.schema_catalogue()
 }
 
-fn do_run(_state: &HermesState, req: RunRequest) -> crate::error::Result<RunResponse> {
-    // RED placeholder
+fn do_run(state: &HermesState, req: RunRequest) -> crate::error::Result<RunResponse> {
+    let mut exec = AgentExecutor::new(state.runtime());
+    if let Some(scope) = req.scope.as_deref() {
+        exec = exec.with_scope(scope);
+    }
+    let run = exec.run(&req.goal)?;
     Ok(RunResponse {
-        goal: req.goal,
-        final_response: String::new(),
-        steps: Vec::new(),
-        recalled: Vec::new(),
+        goal: run.goal,
+        final_response: run.final_response,
+        steps: run
+            .steps
+            .into_iter()
+            .map(|s| StepDto {
+                tool: s.tool,
+                ok: s.ok,
+                output: s.output,
+            })
+            .collect(),
+        recalled: run.recalled,
     })
 }
 
 fn do_orchestrate(
-    _state: &HermesState,
-    _req: OrchestrateRequest,
+    state: &HermesState,
+    req: OrchestrateRequest,
 ) -> crate::error::Result<OrchestrateResponse> {
-    // RED placeholder
+    let subtasks: Vec<Subtask> = req
+        .subtasks
+        .into_iter()
+        .map(|s| {
+            let mut t = Subtask::new(s.id, s.goal);
+            t.deps = s.deps;
+            t
+        })
+        .collect();
+    let factory = state.factory.clone();
+    let mut orch = Orchestrator::new(factory);
+    if let Some(n) = req.pool_size {
+        orch = orch.with_pool_size(n);
+    }
+    let report = orch.run(subtasks)?;
     Ok(OrchestrateResponse {
-        completed: 0,
-        failed: 0,
-        results: Vec::new(),
+        completed: report.completed,
+        failed: report.failed,
+        results: report
+            .results
+            .into_iter()
+            .map(|r| WorkerDto {
+                subtask_id: r.subtask_id,
+                worker: r.worker,
+                ok: r.ok,
+                output: r.output,
+            })
+            .collect(),
     })
 }
 

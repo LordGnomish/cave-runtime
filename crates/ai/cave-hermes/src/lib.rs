@@ -60,6 +60,7 @@ pub use prompt::{
 };
 pub use recall::{Embedder, EmbeddingRecall, HashEmbedder, HashRecall, RecallEngine, RecallHit};
 pub use router::{ModelRouter, ModelTier, RouteDecision, TaskComplexity};
+pub use routes::{HermesState, new_state, router};
 pub use session::{Event, EventKind, SessionStore};
 pub use tool::{ToolEntry, ToolRegistry, ToolResult};
 pub use workflow::{Checkpoint, Workflow, WorkflowStatus};
