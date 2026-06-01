@@ -108,9 +108,11 @@ pub struct EmbeddingResponse {
 
 /// Encode a float32 slice as OpenAI-style base64 (little-endian bytes).
 pub fn encode_f32_base64(v: &[f32]) -> String {
-    // PLACEHOLDER (RED).
-    let _ = v;
-    String::new()
+    let mut bytes = Vec::with_capacity(v.len() * 4);
+    for f in v {
+        bytes.extend_from_slice(&f.to_le_bytes());
+    }
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 /// Heuristic token count (whitespace tokenization). The real server uses the
@@ -147,15 +149,62 @@ impl EmbeddingService {
 
     /// Run an embedding request.
     pub async fn embed(&self, req: &EmbeddingRequest) -> EmbedResult<EmbeddingResponse> {
-        // PLACEHOLDER (RED): empty response.
-        let _ = (&self.catalog, &self.backends, req);
+        let card = self
+            .catalog
+            .get(&req.model)
+            .ok_or_else(|| EmbedError::UnknownModel(req.model.clone()))?;
+        let backend = self
+            .backends
+            .get(&req.model)
+            .ok_or_else(|| EmbedError::UnknownModel(req.model.clone()))?;
+
+        if let Some(d) = req.dimensions {
+            if !card.supports_dim(d) {
+                return Err(EmbedError::InvalidDimensions {
+                    requested: d,
+                    native: card.dims,
+                });
+            }
+        }
+
+        let inputs = req.input.clone().into_vec();
+        if inputs.is_empty() {
+            return Err(EmbedError::EmptyInput);
+        }
+
+        let mut data = Vec::with_capacity(inputs.len());
+        let mut prompt_tokens = 0usize;
+        for (index, text) in inputs.iter().enumerate() {
+            prompt_tokens += approx_tokens(text);
+            // Only pass dimensions to the pipeline when it actually truncates
+            // below native (== native is a no-op the pipeline would reject).
+            let truncate = req.dimensions.filter(|d| *d != card.dims);
+            let vec = backend::embed_with(
+                backend.as_ref(),
+                card.pooling,
+                card.normalize,
+                truncate,
+                text,
+            )
+            .await?;
+            let embedding = match req.encoding_format {
+                EncodingFormat::Float => EmbeddingValue::Float(vec),
+                EncodingFormat::Base64 => EmbeddingValue::Base64(encode_f32_base64(&vec)),
+            };
+            data.push(EmbeddingData {
+                object: "embedding".into(),
+                index,
+                embedding,
+            });
+        }
+
         Ok(EmbeddingResponse {
             object: "list".into(),
-            data: Vec::new(),
+            data,
             model: req.model.clone(),
             usage: Usage {
-                prompt_tokens: 0,
-                total_tokens: 0,
+                prompt_tokens,
+                total_tokens: prompt_tokens,
             },
         })
     }
