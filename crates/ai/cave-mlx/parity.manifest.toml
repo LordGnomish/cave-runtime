@@ -15,7 +15,7 @@ source_sha = "v0.31.2"   # 68cf2fddd8de5edd8ab3d926391772b2e2cedad8 (latest stab
 # was built test-first (RED commit → GREEN commit) with analytic-gradient and
 # numeric checks; 71 crate tests pass.
 #
-# Mapped (17): array.rs (N-dim f32 Array — shape/strides/reshape(-1)/arange/
+# Mapped (18): array.rs (N-dim f32 Array — shape/strides/reshape(-1)/arange/
 # zeros/ones/full/from_scalar/get/item); ops.rs broadcasting elementwise
 # (add/sub/mul/div), unary math (exp/log/sqrt/neg), activations
 # (relu/sigmoid/tanh), matmul, transpose, axis/full reductions (sum/mean/max),
@@ -25,13 +25,25 @@ source_sha = "v0.31.2"   # 68cf2fddd8de5edd8ab3d926391772b2e2cedad8 (latest stab
 # stride + implicit zero-padding, dilation 1) + max_pool2d / avg_pool2d;
 # nn.rs Linear + Conv2d (forward-only inference layer) + Activation modules;
 # optim.rs Sgd (momentum + coupled decay), Adam, AdamW (decoupled decay);
-# quant.rs group-wise affine quantize/dequantize (4/8-bit); cave-mlx CLI
-# (version/info/demo). [2026-05-30 cont2: conv.rs + nn.Conv2d closed the
-# previously-unmapped convolution gap via 2 strict RED→GREEN cycles.]
+# quant.rs group-wise affine quantize/dequantize (4/8-bit);
+# random.rs mx.random — a faithful Threefry2x32-20 counter PRNG (verified
+# against the canonical Random123 KAT vectors) with Key/split plus the full
+# distribution suite: uniform / normal (Box-Muller) / bernoulli / randint /
+# truncated_normal (exact inverse-CDF via erf + Giles erfinv) / categorical
+# (Gumbel-max); cave-mlx CLI (version/info/demo/conv/rand). [2026-05-30 cont2:
+# conv.rs + nn.Conv2d closed the convolution gap. 2026-06-01 cont3: random.rs
+# closed the mx.random gap via 3 strict RED→GREEN cycles — promoted partial→
+# mapped.]
 #
-# Partial (1): mx.random — only a seeded Kaiming-uniform initializer (StdRng)
-# is present (used by nn.Linear::new); the full distribution suite
-# (normal / bernoulli / categorical / truncated) is not ported. Kept honest.
+# Partial (0): none. (mx.random — formerly partial, with only the seeded
+# Kaiming-uniform initializer present — is now fully ported in random.rs.)
+#
+# Divergence note (honest, not a parity gap): random.rs reproduces the
+# Threefry2x32 primitive bit-exactly (KAT-verified) and the distribution
+# semantics, but the per-element counter→position fill order is cave-mlx's own
+# scheme, so a whole-array draw is not byte-for-byte identical to an equivalent
+# upstream mx.random call. The PRNG and distributions match; only the internal
+# element layout is implementation-local.
 #
 # Skipped (8): seven are genuine architectural cuts for a sovereign, eager,
 # CPU array core — they are not subsystems of this crate:
@@ -50,21 +62,25 @@ source_sha = "v0.31.2"   # 68cf2fddd8de5edd8ab3d926391772b2e2cedad8 (latest stab
 # Unmapped (0): the convolution gap (conv1d / conv2d / pooling) that previously
 # sat here was closed on 2026-05-30 (cont2) — it is now mapped (conv.rs +
 # nn.Conv2d). No in-scope item is left unmapped.
-mapped_count          = 17
-partial_count         = 1
+mapped_count          = 18
+partial_count         = 0
 skipped_count         = 8
 unmapped_count        = 0
 total                 = 26
 fill_ratio            = 1.0     # (mapped + partial + skipped) / total = 26/26
-honest_ratio          = 0.9615  # (mapped + skipped) / total            = 25/26
+honest_ratio          = 1.0     # (mapped + skipped) / total            = 26/26
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-30"
+last_audit            = "2026-06-01"
 infra_only            = false
 # NOTE: adr_justified_ratio is intentionally omitted. The skipped items above
 # are described by plain engineering rationale (architectural cuts + one
 # parallel-track delegation); no item is marked ADR-justified. honest_ratio
-# (0.9615) stays below fill_ratio (1.0) because mx.random is still partial
-# (only the seeded Kaiming initializer is ported) — kept honest, not inflated.
+# reaches 1.0 on 2026-06-01 (cont3): the last partial item (mx.random) was
+# completed in random.rs — a KAT-verified Threefry2x32 PRNG plus the full
+# distribution suite. Every in-scope item is now mapped or skipped; the eight
+# skips remain genuine architectural cuts (lazy graph / Metal-GPU / compile /
+# distributed / fft / linalg / vmap) plus one parallel-track delegation
+# (weight loading → cave-local-llm), so honest_ratio == fill_ratio == 1.0.
 
 [module]
 name        = "cave-mlx"
@@ -136,11 +152,16 @@ upstream_name = "mx.quantize / mx.dequantize"
 local_name    = "quant::quantize / Quantized::dequantize"
 file          = "src/quant.rs"
 
+[[functions]]
+upstream_name = "mx.random.{key,split,uniform,normal,bernoulli,randint,truncated_normal,categorical}"
+local_name    = "random::{Key,uniform,normal,bernoulli,randint,truncated_normal,categorical}"
+file          = "src/random.rs"
+
 [portal_ui]
 upstream_ui  = "(library / CLI)"
 upstream_url = "https://github.com/ml-explore/mlx"
 status       = "scaffold"
 loc          = 0
 priority     = "P2"
-notes        = "MLX is a library + CLI; cave-mlx surfaces via `cavectl mlx` and the upstream-tracker portal entry."
-last_audit   = "2026-05-30"
+notes        = "MLX is a library + CLI; cave-mlx surfaces via `cavectl mlx` (version/info/demo/conv/rand) and the upstream-tracker portal entry."
+last_audit   = "2026-06-01"
