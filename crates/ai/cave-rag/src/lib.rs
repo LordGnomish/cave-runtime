@@ -26,8 +26,10 @@ pub mod loaders;
 pub mod math;
 pub mod rerank;
 pub mod retriever;
+pub mod routes;
 pub mod splitter;
 pub mod vectorstore;
 
 pub use document::{Document, Metadata};
 pub use error::{RagError, Result};
+pub use routes::{router, RagState};
