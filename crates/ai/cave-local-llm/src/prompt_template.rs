@@ -108,7 +108,65 @@ impl PromptContext {
 
 /// Parse + render a template against the given context.
 pub fn render(template: &str, ctx: &PromptContext) -> TemplateResult<String> {
-    render_impl(template, ctx, None)
+    let normalized = apply_trim_markers(template)?;
+    render_impl(&normalized, ctx, None)
+}
+
+/// Lexer-level whitespace-trim pass mirroring Go text/template. A `{{-`
+/// trims all whitespace at the end of the text immediately preceding the
+/// action; a `-}}` trims all whitespace at the start of the text immediately
+/// following it. Cite ollama/ollama docs/template.md (every shipped template
+/// uses `{{-` / `-}}` to keep indented if/range blocks tidy). The pass also
+/// re-emits each action canonically as `{{ inner }}`, dash-free, so the
+/// downstream [`render_impl`] never sees a trim marker.
+fn apply_trim_markers(t: &str) -> TemplateResult<String> {
+    let mut out = String::with_capacity(t.len());
+    let mut rest = t;
+    let mut trim_next_ws = false;
+    while !rest.is_empty() {
+        match rest.find("{{") {
+            Some(open) => {
+                let mut lit = &rest[..open];
+                if trim_next_ws {
+                    lit = lit.trim_start();
+                    trim_next_ws = false;
+                }
+                out.push_str(lit);
+
+                let body = &rest[open + 2..];
+                let close = body
+                    .find("}}")
+                    .ok_or_else(|| TemplateError::Unbalanced("missing '}}'".into()))?;
+                let raw = body[..close].trim();
+                let (trim_left, raw) = match raw.strip_prefix('-') {
+                    Some(r) => (true, r),
+                    None => (false, raw),
+                };
+                let (trim_right, raw) = match raw.strip_suffix('-') {
+                    Some(r) => (true, r),
+                    None => (false, raw),
+                };
+                if trim_left {
+                    let kept = out.trim_end_matches(|c: char| c.is_whitespace()).len();
+                    out.truncate(kept);
+                }
+                out.push_str("{{ ");
+                out.push_str(raw.trim());
+                out.push_str(" }}");
+                trim_next_ws = trim_right;
+                rest = &body[close + 2..];
+            }
+            None => {
+                let mut lit = rest;
+                if trim_next_ws {
+                    lit = lit.trim_start();
+                }
+                out.push_str(lit);
+                break;
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn render_impl(
