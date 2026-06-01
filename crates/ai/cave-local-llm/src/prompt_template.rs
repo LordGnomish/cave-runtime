@@ -130,13 +130,18 @@ fn render_impl(
 
             if let Some(cond_name) = directive.strip_prefix("if ") {
                 let cond_name = cond_name.trim();
-                let block_end = find_matching_end(&template[i..])?;
-                let body = &template[i..i + block_end];
+                let (else_at, end_pos) = find_else_and_end(&template[i..])?;
+                let (then_body, else_body): (&str, &str) = match else_at {
+                    Some((else_pos, else_len)) => (
+                        &template[i..i + else_pos],
+                        &template[i + else_pos + else_len..i + end_pos],
+                    ),
+                    None => (&template[i..i + end_pos], ""),
+                };
                 let cond = lookup(ctx, range_binding, cond_name)?;
-                if cond.is_truthy() {
-                    out.push_str(&render_impl(body, ctx, range_binding)?);
-                }
-                i += block_end + "{{ end }}".len();
+                let branch = if cond.is_truthy() { then_body } else { else_body };
+                out.push_str(&render_impl(branch, ctx, range_binding)?);
+                i += end_pos + "{{ end }}".len();
                 continue;
             }
             if let Some(loop_name) = directive.strip_prefix("range ") {
@@ -155,6 +160,9 @@ fn render_impl(
             }
             if directive == "end" {
                 return Err(TemplateError::Unbalanced("stray '{{ end }}'".into()));
+            }
+            if directive == "else" {
+                return Err(TemplateError::Unbalanced("stray '{{ else }}'".into()));
             }
 
             // Bare variable substitution
@@ -191,6 +199,42 @@ fn lookup(
     ctx.get(name)
         .cloned()
         .ok_or_else(|| TemplateError::UnknownVariable(name.to_string()))
+}
+
+/// Like [`find_matching_end`], but for an `{{ if }}` block: also reports the
+/// depth-1 `{{ else }}` separating the then/else branches, if present. Returns
+/// `(else, end_pos)` where `else` is `(offset, token_len)` of the `{{` opening
+/// the `{{ else }}` directive and `end_pos` is the `{{` offset of the closing
+/// `{{ end }}`. A nested inner `{{ else }}` (depth > 1) is ignored so the
+/// branch binds to the innermost enclosing `if`, matching Go text/template.
+fn find_else_and_end(s: &str) -> TemplateResult<(Option<(usize, usize)>, usize)> {
+    let mut depth = 1i32;
+    let mut i = 0usize;
+    let mut else_at: Option<(usize, usize)> = None;
+    let bytes = s.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'{' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+            let close = s[i + 2..]
+                .find("}}")
+                .ok_or_else(|| TemplateError::Unbalanced("missing '}}'".into()))?;
+            let directive = s[i + 2..i + 2 + close].trim();
+            let token_len = (i + 2 + close + 2) - i;
+            if directive.starts_with("if ") || directive.starts_with("range ") {
+                depth += 1;
+            } else if directive == "end" {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok((else_at, i));
+                }
+            } else if directive == "else" && depth == 1 && else_at.is_none() {
+                else_at = Some((i, token_len));
+            }
+            i = i + 2 + close + 2;
+        } else {
+            i += 1;
+        }
+    }
+    Err(TemplateError::Unbalanced("missing '{{ end }}'".into()))
 }
 
 /// Walk from the start of `s` finding the `{{ end }}` that closes the
