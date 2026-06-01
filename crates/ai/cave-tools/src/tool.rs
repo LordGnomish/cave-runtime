@@ -307,6 +307,10 @@ impl Tool for FnTool {
 #[derive(Default, Clone)]
 pub struct ToolRegistry {
     inner: BTreeMap<String, Arc<dyn Tool>>,
+    /// Monotonic counter bumped on every mutation of the tool set. The MCP
+    /// server compares it against its last broadcast to decide whether a
+    /// `notifications/tools/list_changed` is due.
+    generation: u64,
 }
 
 impl ToolRegistry {
@@ -317,12 +321,30 @@ impl ToolRegistry {
     /// Insert (or replace) a tool, returning the previous entry if any.
     pub fn register(&mut self, tool: impl Tool + 'static) -> Option<Arc<dyn Tool>> {
         let name = tool.name().to_string();
+        self.generation += 1;
         self.inner.insert(name, Arc::new(tool))
     }
 
     /// Insert an already-`Arc`'d tool (used when sharing instances).
     pub fn register_arc(&mut self, tool: Arc<dyn Tool>) -> Option<Arc<dyn Tool>> {
+        self.generation += 1;
         self.inner.insert(tool.name().to_string(), tool)
+    }
+
+    /// Remove a tool by name. Returns the removed entry if it was present;
+    /// bumps the generation only on an actual removal.
+    pub fn remove(&mut self, name: &str) -> Option<Arc<dyn Tool>> {
+        let removed = self.inner.remove(name);
+        if removed.is_some() {
+            self.generation += 1;
+        }
+        removed
+    }
+
+    /// The current mutation generation. Changes whenever the tool set is
+    /// added to, replaced, or removed from.
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     pub fn get(&self, name: &str) -> Option<&Arc<dyn Tool>> {

@@ -14,10 +14,16 @@
 //! * *tool execution* failures become a successful response whose
 //!   `result.isError` is `true`, so the model can see and react to them.
 
+use std::cell::Cell;
+use std::sync::Arc;
+
 use serde_json::{json, Value};
 
 use crate::error::ToolError;
-use crate::tool::ToolRegistry;
+use crate::tool::{Tool, ToolRegistry};
+
+/// JSON-RPC method name for the tools-list-changed notification.
+pub const LIST_CHANGED_METHOD: &str = "notifications/tools/list_changed";
 
 /// Default number of tools returned per `tools/list` page when the client
 /// does not constrain it. Large enough that small servers never paginate.
@@ -28,14 +34,19 @@ pub struct McpServer {
     registry: ToolRegistry,
     server_name: String,
     page_size: usize,
+    /// Registry generation at the last `list_changed` broadcast. When the
+    /// registry's generation moves past this, a notification is due.
+    last_broadcast: Cell<u64>,
 }
 
 impl McpServer {
     pub fn new(registry: ToolRegistry, server_name: impl Into<String>) -> Self {
+        let generation = registry.generation();
         Self {
             registry,
             server_name: server_name.into(),
             page_size: DEFAULT_PAGE_SIZE,
+            last_broadcast: Cell::new(generation),
         }
     }
 
@@ -49,6 +60,52 @@ impl McpServer {
     /// requires rebuilding; this is read-only access for inspection).
     pub fn registry(&self) -> &ToolRegistry {
         &self.registry
+    }
+
+    /// Register (or replace) a tool after construction. Bumps the registry
+    /// generation, so a subsequent [`take_list_changed_notification`] yields
+    /// a `notifications/tools/list_changed`.
+    ///
+    /// [`take_list_changed_notification`]: McpServer::take_list_changed_notification
+    pub fn register_tool(&mut self, tool: impl Tool + 'static) {
+        self.registry.register(tool);
+    }
+
+    /// Register an already-`Arc`'d tool after construction (see
+    /// [`register_tool`](McpServer::register_tool)).
+    pub fn register_tool_arc(&mut self, tool: Arc<dyn Tool>) {
+        self.registry.register_arc(tool);
+    }
+
+    /// Remove a tool by name. Returns `true` if a tool was actually removed
+    /// (which signals a list change); `false` for an absent name.
+    pub fn unregister_tool(&mut self, name: &str) -> bool {
+        self.registry.remove(name).is_some()
+    }
+
+    /// Whether the tool list has changed since the last drained
+    /// notification — i.e. a `list_changed` is owed to the client.
+    pub fn list_changed_pending(&self) -> bool {
+        self.registry.generation() != self.last_broadcast.get()
+    }
+
+    /// The JSON-RPC `notifications/tools/list_changed` envelope (no `id`,
+    /// no `params`), regardless of pending state.
+    pub fn list_changed_notification() -> Value {
+        json!({ "jsonrpc": "2.0", "method": LIST_CHANGED_METHOD })
+    }
+
+    /// If the tool list changed since the last drain, return the
+    /// `list_changed` notification to push over the transport and mark the
+    /// current generation as broadcast. Returns `None` when nothing changed,
+    /// so the caller can poll this after every mutation batch.
+    pub fn take_list_changed_notification(&self) -> Option<Value> {
+        if self.list_changed_pending() {
+            self.last_broadcast.set(self.registry.generation());
+            Some(Self::list_changed_notification())
+        } else {
+            None
+        }
     }
 
     /// Handle one JSON-RPC message. Returns `Some(response)` for requests
@@ -97,7 +154,7 @@ impl McpServer {
         json!({
             "protocolVersion": crate::MCP_PROTOCOL_VERSION,
             "capabilities": {
-                "tools": { "listChanged": false }
+                "tools": { "listChanged": true }
             },
             "serverInfo": {
                 "name": self.server_name,
