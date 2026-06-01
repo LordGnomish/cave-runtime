@@ -35,6 +35,9 @@ pub mod filter;
 /// Search composition (filtered / MMR / hybrid fusion).
 pub mod search;
 
+/// Vector quantization (scalar / binary / product).
+pub mod quantization;
+
 pub use collection::{Collection, CollectionStore};
 pub use filter::{Condition, Filter};
 pub use hnsw::HnswIndex;
