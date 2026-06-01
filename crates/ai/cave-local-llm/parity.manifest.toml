@@ -60,6 +60,21 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # drain, exactly as ollama's server owns its scheduler context cancel), so it is
 # reclassified partial -> mapped, not inflated.
 #
+# 2026-06-01 count-neutral depth (strict-TDD, 5 RED->GREEN cycles; NO count
+# change — all additions deepen already-mapped modules): (1) gguf.rs now decodes
+# the GGUF tensor-info block that follows the KV metadata (fs/ggml gguf.go decode
+# loop) into TensorInfo{name,kind,offset,shape}, plus GgufFile::alignment()
+# (general.alignment, default 32) and TensorInfo::num_elements(); (2+3)
+# prompt_template.rs gains Go text/template {{ if }}{{ else }}{{ end }} branches
+# (depth-aware nesting) and {{- -}} whitespace-trim markers (apply_trim_markers
+# lexer pass), so it renders ollama's shipped docs/template.md templates verbatim;
+# (4) quant.rs adds TensorType — the per-tensor ggml GGML_TYPE_* enum (distinct
+# from the model-level FileType QuantType) with name()/block_size()/type_size()
+# ported verbatim from llm/ggml.go and tensor_size(num_elements); (5) TensorInfo
+# ties them together via kind_type() + size_bytes(). A `cave-local-llm gguf`
+# inspect subcommand surfaces the new introspection. All re-validated against
+# ollama v0.3.0 llm/ggml.go + docs/template.md; lib tests 159 -> 174.
+#
 # Partial (0): none — the former daemon graceful-shutdown partial is now mapped.
 #
 # Skipped (10): /api/pull (NDJSON progress UX deferred), /api/push (no
@@ -80,7 +95,7 @@ honest_ratio          = 1.0000  # (mapped + skipped) / total            = 31/31
 adr_justified_ratio   = 1.00    # every [[skipped]] cites one of the 8 standard scope-cut labels from ADR-RUNTIME-PARITY-100-PCT-001
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-AI-STACK-CONSOLIDATION"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-30"
+last_audit            = "2026-06-01"
 infra_only            = false
 
 # adr_justified_ratio breakdown (2026-05-30):
@@ -160,6 +175,23 @@ file          = "src/gguf.rs"
 upstream_name = "fs/ggml.ParseFileType / FileType.String"
 local_name    = "QuantType::{from_file_type,from_str,name}"
 file          = "src/quant.rs"
+
+# 2026-06-01 count-neutral depth (strict-TDD) — no count change; these deepen
+# already-mapped modules (gguf.rs / prompt_template.rs / quant.rs).
+[[functions]]
+upstream_name = "fs/ggml gguf.go decode (tensor-info block) + alignment"
+local_name    = "GgufFile::{tensors,alignment} + TensorInfo"
+file          = "src/gguf.rs"
+
+[[functions]]
+upstream_name = "llm/ggml.go Tensor.{blockSize,typeSize,Size}"
+local_name    = "TensorType::{name,block_size,type_size,tensor_size}"
+file          = "src/quant.rs"
+
+[[functions]]
+upstream_name = "text/template if/else + {{- -}} trim (docs/template.md)"
+local_name    = "render (else branch + apply_trim_markers)"
+file          = "src/prompt_template.rs"
 
 # 2026-05-30 honest_ratio uplift — Modelfile authoring (strict-TDD).
 [[functions]]
