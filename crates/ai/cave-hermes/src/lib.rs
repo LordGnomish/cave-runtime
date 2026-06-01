@@ -40,6 +40,7 @@ pub mod prompt;
 pub mod provider_tools;
 pub mod recall;
 pub mod router;
+pub mod routes;
 pub mod session;
 pub mod tool;
 pub mod tools_builtin;

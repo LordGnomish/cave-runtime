@@ -26,6 +26,7 @@ regex = { workspace = true }
 rusqlite = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
+axum = { workspace = true }
 
 [dev-dependencies]
 proptest = "1"
