@@ -123,4 +123,20 @@ mod tests {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::LocalLlmRead])).unwrap();
         assert!(html.contains("(2)"));
     }
+
+    #[test]
+    fn render_lists_vllm_engine_control_plane() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/local-llm/src/components/ModelsList.tsx",
+            "VllmPanel",
+            "acme"
+        );
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::LocalLlmRead])).unwrap();
+        // The vLLM-parity engine surfaces are advertised on the page.
+        assert!(html.contains("vLLM engine control plane"));
+        assert!(html.contains("PagedAttention"));
+        assert!(html.contains("logits sampler"));
+        assert!(html.contains("chunked prefill"));
+        assert!(html.contains("typical acceptance"));
+    }
 }
