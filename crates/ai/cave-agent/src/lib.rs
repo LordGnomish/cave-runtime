@@ -36,6 +36,7 @@ pub mod error;
 pub mod tool;
 pub mod memory;
 pub mod plan;
+pub mod eval;
 
 pub use error::{AgentError, Result};
 
