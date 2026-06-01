@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-embed"
+description = "Cave Embeddings — OpenAI-compatible text-embedding + rerank inference server (infinity / sentence-transformers parity)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-embed"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["embeddings", "rerank", "sentence-transformers", "openai", "infinity"]
+categories = ["api-bindings", "science", "web-programming::http-server"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-embed"
+path = "src/bin/cave-embed.rs"
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true, features = ["env"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }
