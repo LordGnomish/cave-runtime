@@ -88,9 +88,44 @@ pub fn quantize(
     precision: Precision,
     ranges: Option<&CalibrationRange>,
 ) -> EmbedResult<QuantizedEmbedding> {
-    // PLACEHOLDER (RED): always passthrough float32.
-    let _ = (precision, ranges);
-    Ok(QuantizedEmbedding::Float32(emb.to_vec()))
+    match precision {
+        Precision::Float32 => Ok(QuantizedEmbedding::Float32(emb.to_vec())),
+        Precision::Binary => Ok(QuantizedEmbedding::Binary(
+            packbits(emb).into_iter().map(|b| b as i8).collect(),
+        )),
+        Precision::Ubinary => Ok(QuantizedEmbedding::Ubinary(packbits(emb))),
+        Precision::Int8 | Precision::Uint8 => {
+            let r = ranges.ok_or_else(|| {
+                EmbedError::InvalidArgument(
+                    "int8/uint8 quantization requires calibration ranges".into(),
+                )
+            })?;
+            if r.min.len() != emb.len() || r.max.len() != emb.len() {
+                return Err(EmbedError::ShapeMismatch {
+                    tokens: emb.len(),
+                    mask: r.min.len(),
+                });
+            }
+            let mut int8 = Vec::with_capacity(emb.len());
+            let mut uint8 = Vec::with_capacity(emb.len());
+            for i in 0..emb.len() {
+                let span = r.max[i] - r.min[i];
+                // 256 buckets across [min, max]: step = span / 255.
+                let bucket = if span <= 0.0 {
+                    0i32
+                } else {
+                    let step = span / 255.0;
+                    (((emb[i] - r.min[i]) / step).round() as i32).clamp(0, 255)
+                };
+                int8.push((bucket - 128) as i8);
+                uint8.push(bucket as u8);
+            }
+            match precision {
+                Precision::Int8 => Ok(QuantizedEmbedding::Int8(int8)),
+                _ => Ok(QuantizedEmbedding::Uint8(uint8)),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
