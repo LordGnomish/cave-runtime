@@ -151,6 +151,9 @@ async fn main() -> anyhow::Result<()> {
     // LLM Gateway
     let llm_gateway_state = Arc::new(cave_llm_gateway::GatewayState::default());
 
+    // Agent orchestration (Hermes)
+    let hermes_state = cave_hermes::new_state();
+
     // Infrastructure & Networking
     let api_gateway_state = Arc::new(cave_gateway::GatewayState::default());
     let dns_zones = Arc::new(cave_dns::zone::ZoneManager::default());
@@ -326,6 +329,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_pam::router(pam_state))
         // LLM Gateway
         .merge(cave_llm_gateway::router(llm_gateway_state))
+        // Agent orchestration (Hermes)
+        .merge(cave_hermes::router(hermes_state))
         // Infrastructure & Networking
         .merge(cave_gateway::router(api_gateway_state))
         .merge(cave_dns::router(dns_zones))

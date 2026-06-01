@@ -2364,6 +2364,7 @@ dependencies = [
  "cave-forensics",
  "cave-gateway",
  "cave-gitops-config",
+ "cave-hermes",
  "cave-incidents",
  "cave-infra",
  "cave-kamaji",
