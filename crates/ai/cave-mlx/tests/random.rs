@@ -71,3 +71,53 @@ fn uniform_mean_is_roughly_centered() {
     let mean: f32 = a.data().iter().sum::<f32>() / a.size() as f32;
     assert!((mean - 0.5).abs() < 0.02, "uniform mean {mean} not near 0.5");
 }
+
+// ── Cycle 2: normal + bernoulli + randint ──────────────────────────────────
+
+fn moments(xs: &[f32]) -> (f32, f32) {
+    let n = xs.len() as f32;
+    let mean = xs.iter().sum::<f32>() / n;
+    let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
+    (mean, var.sqrt())
+}
+
+#[test]
+fn normal_shape_mean_and_std() {
+    let a = random::normal(&Key::new(5), 2.0, 0.5, &[40_000]);
+    assert_eq!(a.shape(), &[40_000]);
+    let (mean, std) = moments(a.data());
+    assert!((mean - 2.0).abs() < 0.02, "normal mean {mean} not near loc=2.0");
+    assert!((std - 0.5).abs() < 0.02, "normal std {std} not near scale=0.5");
+}
+
+#[test]
+fn normal_is_deterministic_for_a_key() {
+    let a = random::normal(&Key::new(11), 0.0, 1.0, &[256]);
+    let b = random::normal(&Key::new(11), 0.0, 1.0, &[256]);
+    assert_eq!(a.data(), b.data());
+}
+
+#[test]
+fn bernoulli_is_binary_with_expected_rate() {
+    let p = 0.3;
+    let a = random::bernoulli(&Key::new(8), p, &[30_000]);
+    assert_eq!(a.shape(), &[30_000]);
+    for &v in a.data() {
+        assert!(v == 0.0 || v == 1.0, "bernoulli value {v} is not 0/1");
+    }
+    let rate = a.data().iter().sum::<f32>() / a.size() as f32;
+    assert!((rate - p).abs() < 0.02, "bernoulli rate {rate} not near p={p}");
+}
+
+#[test]
+fn randint_range_integrality_and_coverage() {
+    let a = random::randint(&Key::new(3), 5, 10, &[5_000]);
+    assert_eq!(a.shape(), &[5_000]);
+    let mut seen = [false; 5];
+    for &v in a.data() {
+        assert_eq!(v, v.trunc(), "randint value {v} is not integral");
+        assert!((5.0..10.0).contains(&v), "randint value {v} out of [5,10)");
+        seen[(v as usize) - 5] = true;
+    }
+    assert!(seen.iter().all(|&s| s), "randint should cover every value in [5,10)");
+}
