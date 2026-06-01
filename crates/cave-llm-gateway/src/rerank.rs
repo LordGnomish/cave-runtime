@@ -64,6 +64,69 @@ mod tests {
     use super::*;
 
     #[test]
+    fn lexical_rerank_ranks_relevant_doc_first_and_scores_disjoint_zero() {
+        let docs = vec![
+            "Berlin is the capital of Germany.".to_string(),
+            "Paris is the capital of France and a major city.".to_string(),
+            "The quick brown fox jumps.".to_string(),
+        ];
+        let ranked = lexical_rerank("capital of france", &docs);
+        // Highest-scoring document must be the France one (index 1).
+        assert_eq!(ranked[0].0, 1, "France doc should rank first");
+        assert!(ranked[0].1 > 0.0);
+        // Scores are sorted descending.
+        for w in ranked.windows(2) {
+            assert!(w[0].1 >= w[1].1, "scores must be sorted descending");
+        }
+        // The fox doc shares no query terms -> exactly zero relevance.
+        let fox = ranked.iter().find(|(i, _)| *i == 2).unwrap();
+        assert_eq!(fox.1, 0.0, "disjoint document scores 0.0");
+    }
+
+    #[test]
+    fn rerank_local_applies_top_n_and_returns_documents() {
+        let req = RerankRequest {
+            model: "rerank-english-v3.0".into(),
+            query: "capital of france".into(),
+            documents: vec![
+                "Berlin is the capital of Germany.".into(),
+                "Paris is the capital of France.".into(),
+                "Unrelated text about gardening.".into(),
+            ],
+            top_n: Some(2),
+            return_documents: Some(true),
+        };
+        let resp = rerank_local(&req);
+        assert_eq!(resp.model, "rerank-english-v3.0");
+        assert_eq!(resp.results.len(), 2, "top_n truncates to 2");
+        assert_eq!(resp.results[0].index, 1, "France doc first");
+        assert!(resp.results[0].document.is_some(), "documents echoed");
+        assert_eq!(
+            resp.results[0].document.as_ref().unwrap().text,
+            "Paris is the capital of France."
+        );
+        // Every relevance score is a valid [0,1] fraction.
+        for r in &resp.results {
+            assert!((0.0..=1.0).contains(&r.relevance_score));
+        }
+        assert!(resp.meta.billed_units.search_units >= 1);
+    }
+
+    #[test]
+    fn rerank_local_omits_documents_when_not_requested() {
+        let req = RerankRequest {
+            model: "rerank".into(),
+            query: "france".into(),
+            documents: vec!["France".into(), "Spain".into()],
+            top_n: None,
+            return_documents: None,
+        };
+        let resp = rerank_local(&req);
+        assert_eq!(resp.results.len(), 2, "no top_n -> all docs");
+        assert!(resp.results.iter().all(|r| r.document.is_none()));
+    }
+
+    #[test]
     fn rerank_request_deserialises_cohere_shape() {
         let req: RerankRequest = serde_json::from_str(
             r#"{"model":"rerank-english-v3.0","query":"capital of france","documents":["Paris is the capital of France.","Berlin is in Germany."],"top_n":1,"return_documents":true}"#,
