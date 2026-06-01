@@ -13,14 +13,19 @@ use std::collections::BTreeMap;
 /// Logical shard identifier.
 pub type ShardId = u32;
 
-/// FNV-1a 64-bit — a stable, build-independent hash for ring placement.
+/// FNV-1a 64-bit followed by a splitmix64 finalizer — a stable,
+/// build-independent hash with good avalanche so sequential integer ids
+/// spread uniformly across ring positions (plain FNV-1a clusters them).
 fn fnv1a(bytes: &[u8]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for &b in bytes {
         h ^= b as u64;
         h = h.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    h
+    // splitmix64 finalizer (avalanche).
+    h = (h ^ (h >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    h = (h ^ (h >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    h ^ (h >> 31)
 }
 
 fn hash_key(id: &PointId) -> u64 {
@@ -39,24 +44,62 @@ pub struct HashRing {
 
 impl HashRing {
     /// Build a ring over `shards`, each placed at `vnodes` ring positions.
-    pub fn new(_shards: &[ShardId], vnodes: usize) -> Self {
-        Self { ring: BTreeMap::new(), vnodes }
+    pub fn new(shards: &[ShardId], vnodes: usize) -> Self {
+        let mut r = Self { ring: BTreeMap::new(), vnodes };
+        for &s in shards {
+            r.add_shard(s);
+        }
+        r
     }
 
     /// Add a shard's virtual nodes.
-    pub fn add_shard(&mut self, _shard: ShardId) {}
+    pub fn add_shard(&mut self, shard: ShardId) {
+        for v in 0..self.vnodes {
+            let pos = fnv1a(&[&shard.to_le_bytes()[..], &(v as u32).to_le_bytes()[..]].concat());
+            self.ring.insert(pos, shard);
+        }
+    }
 
     /// Remove a shard's virtual nodes.
-    pub fn remove_shard(&mut self, _shard: ShardId) {}
+    pub fn remove_shard(&mut self, shard: ShardId) {
+        self.ring.retain(|_, &mut s| s != shard);
+    }
 
     /// Route a key to its owning shard (first ring node clockwise).
-    pub fn route(&self, _id: &PointId) -> Option<ShardId> {
-        None
+    pub fn route(&self, id: &PointId) -> Option<ShardId> {
+        if self.ring.is_empty() {
+            return None;
+        }
+        let h = hash_key(id);
+        self.ring
+            .range(h..)
+            .next()
+            .or_else(|| self.ring.iter().next())
+            .map(|(_, &s)| s)
     }
 
     /// Route a key to `rf` distinct replica shards (clockwise walk).
-    pub fn route_replicas(&self, _id: &PointId, _rf: usize) -> Vec<ShardId> {
-        Vec::new()
+    pub fn route_replicas(&self, id: &PointId, rf: usize) -> Vec<ShardId> {
+        if self.ring.is_empty() {
+            return Vec::new();
+        }
+        let h = hash_key(id);
+        let mut out: Vec<ShardId> = Vec::new();
+        // walk clockwise from h, wrapping, collecting distinct shards.
+        let clockwise = self
+            .ring
+            .range(h..)
+            .chain(self.ring.range(..h))
+            .map(|(_, &s)| s);
+        for s in clockwise {
+            if !out.contains(&s) {
+                out.push(s);
+                if out.len() == rf {
+                    break;
+                }
+            }
+        }
+        out
     }
 }
 
@@ -105,17 +148,26 @@ impl ReplicaSet {
 
     /// Peers currently `Active`.
     pub fn active_peers(&self) -> Vec<u64> {
-        Vec::new()
+        self.replicas
+            .iter()
+            .filter(|r| r.state == ReplicaState::Active)
+            .map(|r| r.peer)
+            .collect()
     }
 
     /// Transition a peer's state. Returns whether the peer existed.
-    pub fn set_state(&mut self, _peer: u64, _state: ReplicaState) -> bool {
-        false
+    pub fn set_state(&mut self, peer: u64, state: ReplicaState) -> bool {
+        if let Some(r) = self.replicas.iter_mut().find(|r| r.peer == peer) {
+            r.state = state;
+            true
+        } else {
+            false
+        }
     }
 
     /// Whether at least `write_factor` replicas are active (write quorum).
-    pub fn is_writable(&self, _write_factor: usize) -> bool {
-        false
+    pub fn is_writable(&self, write_factor: usize) -> bool {
+        self.active_peers().len() >= write_factor
     }
 }
 
