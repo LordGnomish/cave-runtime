@@ -157,3 +157,73 @@ fn malformed_envelope_is_invalid_request() {
     let resp = s.handle(&json!({"id": 10, "method": "tools/list"})).unwrap();
     assert_eq!(resp["error"]["code"], -32600);
 }
+
+// ── Cycle 12 (RED→GREEN): tools list_changed notifications ──────────────────
+// server/tools.mdx: a server whose tool list can change advertises
+// capabilities.tools.listChanged = true and emits
+// notifications/tools/list_changed (a JSON-RPC notification: no id) when it
+// mutates. Transport delivery rides the (separately-skipped) transport seam.
+
+#[test]
+fn initialize_advertises_list_changed_capability() {
+    let s = server();
+    let resp = s
+        .handle(&json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}))
+        .unwrap();
+    assert_eq!(resp["result"]["capabilities"]["tools"]["listChanged"], true);
+}
+
+#[test]
+fn fresh_server_has_no_pending_list_changed() {
+    let s = server();
+    assert!(!s.list_changed_pending());
+    assert!(s.take_list_changed_notification().is_none());
+}
+
+#[test]
+fn registering_a_tool_makes_list_changed_pending() {
+    let mut s = server();
+    assert!(!s.list_changed_pending());
+    s.register_tool(FnTool::new(
+        "ping_tool",
+        "p",
+        json!({"type": "object"}),
+        |_| Ok(ToolResult::text("pong")),
+    ));
+    assert!(s.list_changed_pending());
+    // tools/list now reflects the new tool.
+    let resp = s
+        .handle(&json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))
+        .unwrap();
+    assert_eq!(resp["result"]["tools"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn list_changed_notification_is_idless_and_well_formed() {
+    let mut s = server();
+    s.register_tool(FnTool::new(
+        "x",
+        "x",
+        json!({"type": "object"}),
+        |_| Ok(ToolResult::text("x")),
+    ));
+    let note = s.take_list_changed_notification().expect("pending notification");
+    assert_eq!(note["jsonrpc"], "2.0");
+    assert_eq!(note["method"], "notifications/tools/list_changed");
+    assert!(note.get("id").is_none(), "a notification carries no id");
+    // Draining clears the pending flag (idempotent until the next change).
+    assert!(!s.list_changed_pending());
+    assert!(s.take_list_changed_notification().is_none());
+}
+
+#[test]
+fn removing_a_tool_also_signals_list_changed() {
+    let mut s = server();
+    let removed = s.unregister_tool("add");
+    assert!(removed, "add was present");
+    assert!(s.list_changed_pending());
+    // Removing an absent tool is a no-op and signals nothing new.
+    let _ = s.take_list_changed_notification();
+    assert!(!s.unregister_tool("nope"));
+    assert!(!s.list_changed_pending());
+}
