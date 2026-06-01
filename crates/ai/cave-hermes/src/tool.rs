@@ -203,6 +203,12 @@ impl ToolRegistry {
                 });
             }
         }
+        if let Err(reason) = validate_args(&entry.schema, args) {
+            return Err(HermesError::ToolArguments {
+                name: entry.name.clone(),
+                reason,
+            });
+        }
         let mut out = (entry.handler)(args)?;
         if let Some(cap) = entry.max_result_size_chars
             && out.output.len() > cap
@@ -228,6 +234,89 @@ impl ToolRegistry {
             }));
         }
         serde_json::Value::Array(arr)
+    }
+}
+
+/// Validate `args` against a tool's parameter JSON Schema, mirroring the
+/// pre-dispatch check `tools/registry.py` runs upstream.
+///
+/// Deliberately a *narrow* subset of JSON Schema — the part the wire format
+/// actually exercises for function-calling: the top-level `required` array
+/// and per-property `type` keywords. A schema that declares no `required`
+/// keys imposes no object-ness constraint (Null / absent args is a valid
+/// "no arguments" payload), so tools with trivial schemas keep working.
+///
+/// Returns `Err(reason)` describing the first violation found, or `Ok(())`.
+fn validate_args(schema: &serde_json::Value, args: &serde_json::Value) -> std::result::Result<(), String> {
+    let Some(obj) = schema.as_object() else {
+        return Ok(()); // non-object schema (e.g. `true`/`{}`): nothing to enforce
+    };
+
+    // 1. required keys must be present (and non-null) in an object payload.
+    if let Some(required) = obj.get("required").and_then(|v| v.as_array())
+        && !required.is_empty()
+    {
+        let arg_obj = args.as_object();
+        for req in required {
+            let Some(key) = req.as_str() else { continue };
+            let present = arg_obj
+                .map(|m| m.get(key).map(|v| !v.is_null()).unwrap_or(false))
+                .unwrap_or(false);
+            if !present {
+                return Err(format!("missing required field '{key}'"));
+            }
+        }
+    }
+
+    // 2. for every supplied field that declares a `type`, the value must match.
+    if let (Some(props), Some(arg_obj)) = (
+        obj.get("properties").and_then(|v| v.as_object()),
+        args.as_object(),
+    ) {
+        for (key, value) in arg_obj {
+            let Some(decl_type) = props
+                .get(key)
+                .and_then(|p| p.get("type"))
+                .and_then(|t| t.as_str())
+            else {
+                continue; // undeclared property or untyped — leave permissive
+            };
+            if !json_type_matches(decl_type, value) {
+                return Err(format!(
+                    "field '{key}' expected type {decl_type}, got {}",
+                    json_type_name(value)
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Does `value` satisfy a JSON Schema `type` keyword? `integer` accepts only
+/// integral numbers; `number` accepts any JSON number (integral included).
+fn json_type_matches(decl: &str, value: &serde_json::Value) -> bool {
+    match decl {
+        "string" => value.is_string(),
+        "integer" => value.is_i64() || value.is_u64(),
+        "number" => value.is_number(),
+        "boolean" => value.is_boolean(),
+        "object" => value.is_object(),
+        "array" => value.is_array(),
+        "null" => value.is_null(),
+        _ => true, // unknown type keyword — don't reject
+    }
+}
+
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(n) if n.is_i64() || n.is_u64() => "integer",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
     }
 }
 
