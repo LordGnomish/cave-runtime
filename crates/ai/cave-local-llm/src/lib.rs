@@ -62,6 +62,9 @@ pub mod vllm_scheduler;
 /// vLLM SamplingParams — sampling contract, validation, OpenAI mapping.
 pub mod vllm_sampling;
 
+/// vLLM logits-processing sampler — temperature/top-k/top-p/min-p + penalties.
+pub mod vllm_sampler;
+
 /// vLLM weight-quant configs — AWQ/GPTQ/FP8 layout, pack factor, ratios.
 pub mod vllm_quant;
 
