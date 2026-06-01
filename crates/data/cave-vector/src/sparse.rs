@@ -22,8 +22,21 @@ pub struct SparseVector {
 }
 
 /// Merge-join dot product of two sparse vectors.
-pub fn sparse_dot(_a: &SparseVector, _b: &SparseVector) -> f32 {
-    0.0
+pub fn sparse_dot(a: &SparseVector, b: &SparseVector) -> f32 {
+    let (mut i, mut j) = (0usize, 0usize);
+    let mut sum = 0.0;
+    while i < a.indices.len() && j < b.indices.len() {
+        match a.indices[i].cmp(&b.indices[j]) {
+            std::cmp::Ordering::Equal => {
+                sum += a.values[i] * b.values[j];
+                i += 1;
+                j += 1;
+            }
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+        }
+    }
+    sum
 }
 
 /// Okapi BM25 index over a token-id corpus.
@@ -43,35 +56,77 @@ impl Bm25Index {
     }
 
     /// Append a tokenized document; returns its doc id.
-    pub fn add_document(&mut self, _tokens: Vec<u32>) -> usize {
-        0
+    pub fn add_document(&mut self, tokens: Vec<u32>) -> usize {
+        self.total_len += tokens.len();
+        // document frequency counts each distinct term once.
+        let mut distinct: Vec<u32> = tokens.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        for t in distinct {
+            *self.doc_freq.entry(t).or_insert(0) += 1;
+        }
+        self.docs.push(tokens);
+        self.docs.len() - 1
     }
 
     /// Robertson IDF: `ln(1 + (N - df + 0.5)/(df + 0.5))`.
-    pub fn idf(&self, _term: u32) -> f32 {
-        0.0
+    pub fn idf(&self, term: u32) -> f32 {
+        let n = self.docs.len() as f32;
+        let df = *self.doc_freq.get(&term).unwrap_or(&0) as f32;
+        (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
     }
 
     /// Average document length.
     pub fn avgdl(&self) -> f32 {
-        0.0
+        if self.docs.is_empty() {
+            0.0
+        } else {
+            self.total_len as f32 / self.docs.len() as f32
+        }
     }
 
     /// BM25 score of `query` terms against document `doc_id`.
-    pub fn score(&self, _query: &[u32], _doc_id: usize) -> f32 {
-        0.0
+    pub fn score(&self, query: &[u32], doc_id: usize) -> f32 {
+        let Some(doc) = self.docs.get(doc_id) else {
+            return 0.0;
+        };
+        let dl = doc.len() as f32;
+        let avgdl = self.avgdl().max(f32::EPSILON);
+        let norm = self.k1 * (1.0 - self.b + self.b * dl / avgdl);
+        let mut score = 0.0;
+        for &term in query {
+            let tf = doc.iter().filter(|&&t| t == term).count() as f32;
+            if tf > 0.0 {
+                score += self.idf(term) * (tf * (self.k1 + 1.0)) / (tf + norm);
+            }
+        }
+        score
     }
 
     /// Top-`k` documents by BM25 score (id, score), score-descending.
-    pub fn search(&self, _query: &[u32], _k: usize) -> Vec<(usize, f32)> {
-        Vec::new()
+    pub fn search(&self, query: &[u32], k: usize) -> Vec<(usize, f32)> {
+        let mut scored: Vec<(usize, f32)> =
+            (0..self.docs.len()).map(|d| (d, self.score(query, d))).collect();
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        scored.truncate(k);
+        scored
     }
 }
 
 /// ColBERT late-interaction MaxSim: `Σ_q max_d sim(q, d)` over query token
 /// vectors `query` and document token vectors `doc`, using `metric`.
-pub fn colbert_maxsim(_query: &[Vec<f32>], _doc: &[Vec<f32>], _metric: Metric) -> f32 {
-    0.0
+pub fn colbert_maxsim(query: &[Vec<f32>], doc: &[Vec<f32>], metric: Metric) -> f32 {
+    if doc.is_empty() {
+        return 0.0;
+    }
+    query
+        .iter()
+        .map(|q| {
+            doc.iter()
+                .map(|d| metric.score(q, d))
+                .fold(f32::NEG_INFINITY, f32::max)
+        })
+        .sum()
 }
 
 #[cfg(test)]
