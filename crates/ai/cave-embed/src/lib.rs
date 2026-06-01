@@ -36,6 +36,8 @@ pub mod registry;
 
 pub mod backend;
 
+pub mod openai;
+
 pub use error::{EmbedError, EmbedResult};
 
 /// Crate identity. The self-audit (`gate_*`) asserts this stays in lockstep
