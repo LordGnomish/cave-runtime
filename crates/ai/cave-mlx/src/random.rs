@@ -171,3 +171,111 @@ pub fn randint(key: &Key, low: i64, high: i64, shape: &[usize]) -> Array {
         .collect();
     Array::from_parts(data, shape.to_vec())
 }
+
+/// Gauss error function `erf(x)` — Abramowitz & Stegun 7.1.26 approximation
+/// (max abs error ≈ 1.5e-7, well within f32 precision).
+#[allow(clippy::excessive_precision)] // canonical A&S coefficients kept verbatim
+fn erf(x: f32) -> f32 {
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    let t = 1.0 / (1.0 + 0.327_591_1 * x);
+    let y = 1.0
+        - (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t
+            + 0.254_829_592)
+            * t
+            * (-x * x).exp();
+    sign * y
+}
+
+/// Inverse error function `erfinv(x)` for `x ∈ (-1, 1)` — Giles (2010)
+/// single-precision polynomial approximation.
+#[allow(clippy::excessive_precision)] // canonical Giles coefficients kept verbatim
+fn erfinv(x: f32) -> f32 {
+    let w = -((1.0 - x) * (1.0 + x)).ln();
+    let p = if w < 5.0 {
+        let w = w - 2.5;
+        let mut p = 2.810_226_36e-08;
+        p = 3.432_739_39e-07 + p * w;
+        p = -3.523_387_7e-06 + p * w;
+        p = -4.391_506_54e-06 + p * w;
+        p = 0.000_218_580_87 + p * w;
+        p = -0.001_253_725_03 + p * w;
+        p = -0.004_177_681_64 + p * w;
+        p = 0.246_640_727 + p * w;
+        1.501_409_41 + p * w
+    } else {
+        let w = w.sqrt() - 3.0;
+        let mut p = -0.000_200_214_257;
+        p = 0.000_100_950_558 + p * w;
+        p = 0.001_349_343_22 + p * w;
+        p = -0.003_673_428_44 + p * w;
+        p = 0.005_739_507_73 + p * w;
+        p = -0.007_622_461_3 + p * w;
+        p = 0.009_438_870_47 + p * w;
+        p = 1.001_674_06 + p * w;
+        2.832_976_82 + p * w
+    };
+    p * x
+}
+
+/// Standard-normal CDF: `Φ(x) = ½(1 + erf(x/√2))`.
+#[inline]
+fn std_normal_cdf(x: f32) -> f32 {
+    0.5 * (1.0 + erf(x * std::f32::consts::FRAC_1_SQRT_2))
+}
+
+/// Samples from a standard normal truncated to `[lower, upper]`
+/// (`mx.random.truncated_normal`). Uses the exact inverse-CDF method (no
+/// rejection): draw `u` uniformly in `[Φ(lower), Φ(upper)]`, return `Φ⁻¹(u)`.
+pub fn truncated_normal(key: &Key, lower: f32, upper: f32, shape: &[usize]) -> Array {
+    assert!(upper > lower, "truncated_normal requires upper > lower");
+    let lo = std_normal_cdf(lower);
+    let hi = std_normal_cdf(upper);
+    let span = hi - lo;
+    let sqrt2 = std::f32::consts::SQRT_2;
+    let n = numel(shape);
+    let data: Vec<f32> = keystream(key, n)
+        .into_iter()
+        .map(|b| {
+            let u = lo + span * to_unit(b);
+            // Φ⁻¹(u) = √2 · erfinv(2u − 1); clamp to the requested bounds to
+            // absorb the approximation's tail error.
+            (sqrt2 * erfinv((2.0 * u - 1.0).clamp(-0.999_999, 0.999_999)))
+                .clamp(lower, upper)
+        })
+        .collect();
+    Array::from_parts(data, shape.to_vec())
+}
+
+/// Samples class indices from unnormalized `logits` along the last axis via the
+/// Gumbel-max trick (`mx.random.categorical`). The result drops the last axis:
+/// `(…, num_classes)` logits → `(…)` integer indices (as `f32`).
+pub fn categorical(key: &Key, logits: &Array) -> Array {
+    let shape = logits.shape();
+    assert!(!shape.is_empty(), "categorical requires at least a 1-D logits array");
+    let classes = *shape.last().unwrap();
+    assert!(classes > 0, "categorical requires a non-empty class axis");
+    let rows: usize = shape[..shape.len() - 1].iter().product::<usize>().max(1);
+    let data = logits.data();
+
+    // One Gumbel sample per logit element.
+    let bits = keystream(key, rows * classes);
+    let mut out = Vec::with_capacity(rows);
+    for r in 0..rows {
+        let base = r * classes;
+        let mut best = f32::NEG_INFINITY;
+        let mut best_idx = 0usize;
+        for c in 0..classes {
+            let u = open_unit(to_unit(bits[base + c]));
+            // Gumbel(0,1) noise: g = -ln(-ln(u)).
+            let g = -(-u.ln()).ln();
+            let score = data[base + c] + g;
+            if score > best {
+                best = score;
+                best_idx = c;
+            }
+        }
+        out.push(best_idx as f32);
+    }
+    Array::from_parts(out, shape[..shape.len() - 1].to_vec())
+}
