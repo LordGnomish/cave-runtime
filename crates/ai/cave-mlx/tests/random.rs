@@ -9,6 +9,7 @@
 //! categorical) are exercised for shape, support, statistical sanity, and
 //! key-determinism.
 
+use cave_mlx::array::Array;
 use cave_mlx::random::{self, Key};
 
 // ── Cycle 1: Threefry2x32 PRNG core + Key/split + uniform ──────────────────
@@ -120,4 +121,65 @@ fn randint_range_integrality_and_coverage() {
         seen[(v as usize) - 5] = true;
     }
     assert!(seen.iter().all(|&s| s), "randint should cover every value in [5,10)");
+}
+
+// ── Cycle 3: truncated_normal + categorical ────────────────────────────────
+
+#[test]
+fn truncated_normal_respects_bounds() {
+    let a = random::truncated_normal(&Key::new(21), -1.0, 2.0, &[20_000]);
+    assert_eq!(a.shape(), &[20_000]);
+    for &v in a.data() {
+        assert!((-1.0..=2.0).contains(&v), "truncated_normal value {v} out of [-1,2]");
+    }
+}
+
+#[test]
+fn truncated_normal_symmetric_interval_is_centered() {
+    // A symmetric truncation [-a, a] of a standard normal has mean 0.
+    let a = random::truncated_normal(&Key::new(22), -1.5, 1.5, &[40_000]);
+    let mean: f32 = a.data().iter().sum::<f32>() / a.size() as f32;
+    assert!(mean.abs() < 0.03, "symmetric truncated_normal mean {mean} not near 0");
+    // And the spread is meaningfully positive (not collapsed to a point).
+    let var = a.data().iter().map(|x| x * x).sum::<f32>() / a.size() as f32;
+    assert!(var > 0.2, "truncated_normal variance {var} too small");
+}
+
+#[test]
+fn truncated_normal_is_deterministic_for_a_key() {
+    let a = random::truncated_normal(&Key::new(23), -2.0, 2.0, &[128]);
+    let b = random::truncated_normal(&Key::new(23), -2.0, 2.0, &[128]);
+    assert_eq!(a.data(), b.data());
+}
+
+#[test]
+fn categorical_shape_drops_last_axis() {
+    // (batch=3, classes=4) logits -> (3,) sampled class indices.
+    let logits = Array::new(vec![0.0; 12], &[3, 4]).unwrap();
+    let idx = random::categorical(&Key::new(31), &logits);
+    assert_eq!(idx.shape(), &[3]);
+    for &v in idx.data() {
+        assert!((0.0..4.0).contains(&v) && v == v.trunc(), "class index {v} invalid");
+    }
+}
+
+#[test]
+fn categorical_favors_the_dominant_logit() {
+    // Class 2 has an overwhelmingly large logit; nearly all draws pick it.
+    let mut rows = Vec::new();
+    for _ in 0..2_000 {
+        rows.extend_from_slice(&[0.0, 0.0, 20.0, 0.0]);
+    }
+    let logits = Array::new(rows, &[2_000, 4]).unwrap();
+    let idx = random::categorical(&Key::new(32), &logits);
+    let hits = idx.data().iter().filter(|&&v| v == 2.0).count();
+    assert!(hits >= 1_990, "dominant class chosen {hits}/2000 times (expected ~all)");
+}
+
+#[test]
+fn categorical_1d_logits_yield_a_scalar_index() {
+    let logits = Array::new(vec![1.0, 25.0, 1.0], &[3]).unwrap();
+    let idx = random::categorical(&Key::new(33), &logits);
+    assert_eq!(idx.shape(), &[] as &[usize]);
+    assert_eq!(idx.item(), 1.0, "the strongly-favored class 1 should be picked");
 }
