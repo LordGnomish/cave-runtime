@@ -115,14 +115,32 @@ fn base_env(home: &str) -> Vec<(String, String)> {
 
 /// The daily drift+LOC report agent — `report --measure` at 06:30 local
 /// (30 min after the cave-home tracker, per the isolation note).
-pub fn daily_report_agent(home: &str, bin: &str, support_dir: &str) -> AgentSpec {
+///
+/// `github_token`, when set, is embedded as `GITHUB_TOKEN` so the daily
+/// poll clears GitHub's 60 req/h unauthenticated cap (the registry has
+/// ~70 distinct repos). It lands in `~/Library/LaunchAgents` (user-only
+/// readable), matching the existing `com.btartan.cave-upstream-watchd`
+/// agent's convention.
+pub fn daily_report_agent(
+    home: &str,
+    bin: &str,
+    support_dir: &str,
+    github_token: Option<&str>,
+) -> AgentSpec {
+    let mut env = base_env(home);
+    if let Some(tok) = github_token.filter(|t| !t.is_empty()) {
+        env.push(("GITHUB_TOKEN".to_string(), tok.to_string()));
+    }
     AgentSpec {
         label: "com.gnomish.cave-runtime-tracker".to_string(),
         program: vec![bin.to_string(), "report".to_string(), "--measure".to_string()],
         working_dir: home.to_string(),
-        env: base_env(home),
+        env,
         calendar: Some((6, 30)),
-        run_at_load: true,
+        // Calendar-only: fires at 06:30, not on every login — a full
+        // report --measure shallow-clones ~10 repos and shouldn't run on
+        // load. (The metrics daemon below is the RunAtLoad one.)
+        run_at_load: false,
         keep_alive: false,
         stdout_path: format!("{support_dir}/runtime-tracker-daily.log"),
         stderr_path: format!("{support_dir}/runtime-tracker-daily.err"),
@@ -156,7 +174,7 @@ mod tests {
 
     #[test]
     fn daily_agent_has_label_schedule_and_argv() {
-        let p = daily_report_agent("/Users/x", "/Users/x/.local/bin/cave-runtime-tracker", "/Users/x/Library/Application Support/cave-runtime")
+        let p = daily_report_agent("/Users/x", "/Users/x/.local/bin/cave-runtime-tracker", "/Users/x/Library/Application Support/cave-runtime", None)
             .render();
         assert!(p.starts_with("<?xml version=\"1.0\""));
         assert!(p.contains("<string>com.gnomish.cave-runtime-tracker</string>"));
@@ -164,7 +182,7 @@ mod tests {
         assert!(p.contains("<key>Minute</key>\n\t\t<integer>30</integer>"));
         assert!(p.contains("<string>report</string>"));
         assert!(p.contains("<string>--measure</string>"));
-        assert!(p.contains("<key>RunAtLoad</key>\n\t<true/>"));
+        assert!(p.contains("<key>RunAtLoad</key>\n\t<false/>"));
         // TZ pins the calendar interpretation.
         assert!(p.contains("<string>Europe/Berlin</string>"));
         // Well-formed: balanced plist envelope.
@@ -185,8 +203,19 @@ mod tests {
     }
 
     #[test]
+    fn token_is_embedded_only_when_present() {
+        let none = daily_report_agent("/Users/x", "/bin/t", "/sup", None).render();
+        assert!(!none.contains("GITHUB_TOKEN"));
+        let with = daily_report_agent("/Users/x", "/bin/t", "/sup", Some("ghp_secret")).render();
+        assert!(with.contains("<key>GITHUB_TOKEN</key>\n\t\t<string>ghp_secret</string>"));
+        // An empty token string is treated as absent.
+        let empty = daily_report_agent("/Users/x", "/bin/t", "/sup", Some("")).render();
+        assert!(!empty.contains("GITHUB_TOKEN"));
+    }
+
+    #[test]
     fn values_are_xml_escaped() {
-        let mut spec = daily_report_agent("/Users/x", "/bin/t", "/sup");
+        let mut spec = daily_report_agent("/Users/x", "/bin/t", "/sup", None);
         spec.program.push("a & b < c > d".to_string());
         let xml = spec.render();
         assert!(xml.contains("a &amp; b &lt; c &gt; d"));

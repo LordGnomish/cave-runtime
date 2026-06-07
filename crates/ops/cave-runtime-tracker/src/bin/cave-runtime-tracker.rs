@@ -235,8 +235,11 @@ fn install_agents(write: bool, port: u16) -> TrackerResult<()> {
     let home = std::env::var("HOME").map_err(|_| TrackerError::Config("HOME unset".into()))?;
     let bin = format!("{home}/.local/bin/cave-runtime-tracker");
     let support = format!("{home}/Library/Application Support/cave-runtime");
+    // Bake the token in at install time so the unattended daily poll
+    // clears GitHub's unauthenticated rate cap (~70 distinct repos).
+    let token = std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty());
     let agents = [
-        daily_report_agent(&home, &bin, &support),
+        daily_report_agent(&home, &bin, &support, token.as_deref()),
         metrics_serve_agent(&home, &bin, &support, port),
     ];
     for spec in agents {
