@@ -236,6 +236,22 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 1,
     },
     TrackedProject {
+        // 2026-06-07: the Cilium *control-plane* port. cave-net holds the
+        // eBPF datapath sim (LB/DSR/conntrack); cave-cilium holds the agent/
+        // operator control-plane — eBPF object loader, CiliumNetworkPolicy
+        // CRD + reconciler, cluster-pool IPAM, Hubble flow model, no-sidecar
+        // L7 mesh, and WireGuard/IPsec PQC-ready encryption. Both port the
+        // same upstream repo; the "Cilium" entry above stays mapped to
+        // cave-net (pinned by a test).
+        name: "Cilium Control-Plane",
+        github_repo: "cilium/cilium",
+        cave_module: "cave-cilium",
+        track_features: "eBPF loader/verifier, CiliumNetworkPolicy CRD + identity reconciler, cluster-pool IPAM, Hubble flows + drop reasons, no-sidecar L7 mesh, WireGuard/IPsec PQC hybrid",
+        check_frequency: "biweekly",
+        category: "networking",
+        phase: 1,
+    },
+    TrackedProject {
         name: "Cilium Hubble",
         github_repo: "cilium/hubble",
         cave_module: "cave-forensics",
