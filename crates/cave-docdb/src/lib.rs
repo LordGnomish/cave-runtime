@@ -46,6 +46,9 @@ pub mod query;
 /// MongoDB → PostgreSQL SQL translation (hybrid backend).
 pub mod sql;
 
+/// Pluggable storage backends (in-memory + SQL).
+pub mod backend;
+
 /// HTTP route handlers.
 pub mod routes;
 
