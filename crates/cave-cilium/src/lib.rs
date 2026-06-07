@@ -25,3 +25,4 @@
 
 pub mod ebpf;
 pub mod ipam;
+pub mod policy;
