@@ -44,6 +44,44 @@ pub async fn seal_status(
     })))
 }
 
+/// Report the seal/auto-seal barrier backends this build supports, including
+/// the cave PQC (post-quantum) ML-KEM-768 seal-wrap. Read-only capability
+/// discovery — does not touch seal state.
+pub async fn seal_backends(
+    State(state): State<Arc<VaultState>>,
+) -> Result<VaultResponse, VaultError> {
+    use crate::core::pqc_seal::{ML_KEM_768_CT_LEN, ML_KEM_768_EK_LEN};
+    use crate::core::seal::AutoSealType;
+    let active = {
+        let seal = state.seal_state.read().await;
+        if seal.is_initialized() { "shamir" } else { "uninitialized" }
+    };
+    Ok(VaultResponse::new().with_data(json!({
+        "active": active,
+        "backends": [
+            { "type": AutoSealType::Shamir.barrier_type(),       "kind": "manual",    "recovery_key": false, "quantum_resistant": false },
+            { "type": AutoSealType::Transit.barrier_type(),      "kind": "auto-kms",  "recovery_key": true,  "quantum_resistant": false },
+            { "type": AutoSealType::AwsKms.barrier_type(),       "kind": "auto-kms",  "recovery_key": true,  "quantum_resistant": false },
+            { "type": AutoSealType::AzureKeyVault.barrier_type(),"kind": "auto-kms",  "recovery_key": true,  "quantum_resistant": false },
+            { "type": AutoSealType::GcpCkms.barrier_type(),      "kind": "auto-kms",  "recovery_key": true,  "quantum_resistant": false },
+            { "type": AutoSealType::OciKms.barrier_type(),       "kind": "auto-kms",  "recovery_key": true,  "quantum_resistant": false },
+            { "type": AutoSealType::Pkcs11.barrier_type(),       "kind": "auto-hsm",  "recovery_key": true,  "quantum_resistant": false },
+            {
+                "type": AutoSealType::MlKem768.barrier_type(),
+                "kind": "auto-local-pqc",
+                "recovery_key": true,
+                "quantum_resistant": true,
+                "kem": "ML-KEM-768",
+                "standard": "NIST FIPS 203",
+                "nist_category": 3,
+                "encapsulation_key_bytes": ML_KEM_768_EK_LEN,
+                "ciphertext_bytes": ML_KEM_768_CT_LEN,
+                "envelope": "KEM-DEM (ML-KEM-768 + HKDF-SHA256 + AES-256-GCM)"
+            }
+        ]
+    })))
+}
+
 pub async fn health(State(state): State<Arc<VaultState>>) -> Result<VaultResponse, VaultError> {
     let seal = state.seal_state.read().await;
     Ok(VaultResponse::new().with_data(json!({
@@ -602,6 +640,7 @@ pub async fn capabilities_self(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/sys/seal-status", get(seal_status))
+        .route("/v1/sys/seal-backends", get(seal_backends))
         .route("/v1/sys/health", get(health))
         .route("/v1/sys/init", get(init_status).post(initialize))
         .route("/v1/sys/unseal", post(unseal))
