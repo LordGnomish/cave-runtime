@@ -178,6 +178,88 @@ pub fn decode_op_msg(bytes: &[u8]) -> Result<(i32, OpMsg), WireError> {
     ))
 }
 
+// ── Legacy op-codes (pre-OP_MSG write protocol, removed in MongoDB 5.1) ──────
+// Decoded for driver/tool compatibility. MongoDB 7.0 / FerretDB reject these
+// for execution; cave-docdb decodes them into normalised structs so a legacy
+// client's bytes can be understood and translated.
+
+/// OP_UPDATE opcode.
+pub const OP_UPDATE: i32 = 2001;
+/// OP_INSERT opcode.
+pub const OP_INSERT: i32 = 2002;
+/// OP_QUERY opcode.
+pub const OP_QUERY: i32 = 2004;
+/// OP_DELETE opcode.
+pub const OP_DELETE: i32 = 2006;
+
+/// Decoded legacy `OP_INSERT` (2002).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpInsert {
+    /// Insert flag bits (bit 0 = ContinueOnError).
+    pub flags: i32,
+    /// `db.collection` namespace.
+    pub collection: String,
+    /// Documents to insert.
+    pub documents: Vec<Document>,
+}
+
+/// Decoded legacy `OP_UPDATE` (2001).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpUpdate {
+    /// `db.collection` namespace.
+    pub collection: String,
+    /// Update flag bits (bit 0 = Upsert, bit 1 = MultiUpdate).
+    pub flags: i32,
+    /// Query selector.
+    pub selector: Document,
+    /// Update specification.
+    pub update: Document,
+}
+
+/// Decoded legacy `OP_DELETE` (2006).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpDelete {
+    /// `db.collection` namespace.
+    pub collection: String,
+    /// Delete flag bits (bit 0 = SingleRemove).
+    pub flags: i32,
+    /// Query selector.
+    pub selector: Document,
+}
+
+/// Decoded legacy `OP_QUERY` (2004).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpQuery {
+    /// Query flag bits.
+    pub flags: i32,
+    /// `db.collection` namespace.
+    pub collection: String,
+    /// Documents to skip.
+    pub number_to_skip: i32,
+    /// Batch size hint.
+    pub number_to_return: i32,
+    /// Query document.
+    pub query: Document,
+}
+
+/// A decoded legacy write/query op.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LegacyOp {
+    /// OP_INSERT (2002).
+    Insert(OpInsert),
+    /// OP_UPDATE (2001).
+    Update(OpUpdate),
+    /// OP_DELETE (2006).
+    Delete(OpDelete),
+    /// OP_QUERY (2004).
+    Query(OpQuery),
+}
+
+/// Decode a legacy wire message (OP_INSERT/OP_UPDATE/OP_DELETE/OP_QUERY).
+pub fn decode_legacy(_bytes: &[u8]) -> Result<LegacyOp, WireError> {
+    Err(WireError::WireError("legacy decode not built".to_string()))
+}
+
 fn read_cstring(bytes: &[u8]) -> Result<(String, usize), WireError> {
     for (i, &b) in bytes.iter().enumerate() {
         if b == 0 {
@@ -259,5 +341,117 @@ mod tests {
         assert!(encoded.len() >= 16);
         let opcode = i32::from_le_bytes([encoded[12], encoded[13], encoded[14], encoded[15]]);
         assert_eq!(opcode, 2013);
+    }
+
+    // ── legacy op decoders ───────────────────────────────────────────────
+
+    /// Build a legacy message: 16-byte header + body, with length filled in.
+    fn legacy_frame(opcode: i32, body: Vec<u8>) -> Vec<u8> {
+        let mut msg = Vec::new();
+        let len = (16 + body.len()) as u32;
+        msg.extend_from_slice(&len.to_le_bytes());
+        msg.extend_from_slice(&1i32.to_le_bytes()); // request_id
+        msg.extend_from_slice(&0i32.to_le_bytes()); // response_to
+        msg.extend_from_slice(&opcode.to_le_bytes());
+        msg.extend_from_slice(&body);
+        msg
+    }
+
+    fn doc(pairs: &[(&str, Value)]) -> Document {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    }
+
+    fn cstr(s: &str) -> Vec<u8> {
+        let mut b = s.as_bytes().to_vec();
+        b.push(0);
+        b
+    }
+
+    #[test]
+    fn decode_op_insert() {
+        let d1 = bson::encode_doc(&doc(&[("_id", Value::String("1".into()))])).unwrap();
+        let d2 = bson::encode_doc(&doc(&[("_id", Value::String("2".into()))])).unwrap();
+        let mut body = Vec::new();
+        body.extend_from_slice(&0i32.to_le_bytes()); // flags
+        body.extend_from_slice(&cstr("testdb.users"));
+        body.extend_from_slice(&d1);
+        body.extend_from_slice(&d2);
+
+        let op = decode_legacy(&legacy_frame(OP_INSERT, body)).unwrap();
+        match op {
+            LegacyOp::Insert(ins) => {
+                assert_eq!(ins.collection, "testdb.users");
+                assert_eq!(ins.documents.len(), 2);
+                assert_eq!(ins.documents[1].get("_id"), Some(&Value::String("2".into())));
+            }
+            other => panic!("expected Insert, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn decode_op_update() {
+        let selector = bson::encode_doc(&doc(&[("_id", Value::String("1".into()))])).unwrap();
+        let update = bson::encode_doc(&doc(&[("x", Value::Number(5.into()))])).unwrap();
+        let mut body = Vec::new();
+        body.extend_from_slice(&0i32.to_le_bytes()); // reserved ZERO
+        body.extend_from_slice(&cstr("testdb.c"));
+        body.extend_from_slice(&3i32.to_le_bytes()); // flags: upsert|multi
+        body.extend_from_slice(&selector);
+        body.extend_from_slice(&update);
+
+        match decode_legacy(&legacy_frame(OP_UPDATE, body)).unwrap() {
+            LegacyOp::Update(u) => {
+                assert_eq!(u.collection, "testdb.c");
+                assert_eq!(u.flags, 3);
+                assert_eq!(u.selector.get("_id"), Some(&Value::String("1".into())));
+                assert_eq!(u.update.get("x"), Some(&Value::Number(5.into())));
+            }
+            other => panic!("expected Update, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn decode_op_delete() {
+        let selector = bson::encode_doc(&doc(&[("_id", Value::String("9".into()))])).unwrap();
+        let mut body = Vec::new();
+        body.extend_from_slice(&0i32.to_le_bytes()); // reserved ZERO
+        body.extend_from_slice(&cstr("testdb.c"));
+        body.extend_from_slice(&1i32.to_le_bytes()); // flags: single
+        body.extend_from_slice(&selector);
+
+        match decode_legacy(&legacy_frame(OP_DELETE, body)).unwrap() {
+            LegacyOp::Delete(d) => {
+                assert_eq!(d.collection, "testdb.c");
+                assert_eq!(d.flags, 1);
+                assert_eq!(d.selector.get("_id"), Some(&Value::String("9".into())));
+            }
+            other => panic!("expected Delete, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn decode_op_query() {
+        let query = bson::encode_doc(&doc(&[("status", Value::String("active".into()))])).unwrap();
+        let mut body = Vec::new();
+        body.extend_from_slice(&0i32.to_le_bytes()); // flags
+        body.extend_from_slice(&cstr("testdb.c"));
+        body.extend_from_slice(&5i32.to_le_bytes()); // numberToSkip
+        body.extend_from_slice(&10i32.to_le_bytes()); // numberToReturn
+        body.extend_from_slice(&query);
+
+        match decode_legacy(&legacy_frame(OP_QUERY, body)).unwrap() {
+            LegacyOp::Query(q) => {
+                assert_eq!(q.collection, "testdb.c");
+                assert_eq!(q.number_to_skip, 5);
+                assert_eq!(q.number_to_return, 10);
+                assert_eq!(q.query.get("status"), Some(&Value::String("active".into())));
+            }
+            other => panic!("expected Query, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn decode_legacy_rejects_unknown_opcode() {
+        assert!(decode_legacy(&legacy_frame(2013, vec![0, 0, 0, 0])).is_err());
     }
 }
