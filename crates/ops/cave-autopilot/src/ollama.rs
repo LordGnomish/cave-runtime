@@ -218,4 +218,65 @@ mod tests {
         let c = OllamaClient::new("http://localhost:11434/");
         assert_eq!(c.base_url, "http://localhost:11434");
     }
+
+    #[test]
+    fn build_pull_request_is_non_streaming() {
+        let r = OllamaClient::build_pull_request("mellum2:12b-moe");
+        assert_eq!(r.name, "mellum2:12b-moe");
+        assert!(!r.stream);
+        let j = serde_json::to_value(&r).unwrap();
+        assert_eq!(j["name"], serde_json::json!("mellum2:12b-moe"));
+        assert_eq!(j["stream"], serde_json::json!(false));
+    }
+
+    #[test]
+    fn parse_pull_status_detects_success() {
+        // Non-streaming pull ends with a {"status":"success"} object.
+        assert!(OllamaClient::pull_succeeded(r#"{"status":"success"}"#));
+        // A failure carries an error field, never status=success.
+        assert!(!OllamaClient::pull_succeeded(
+            r#"{"error":"pull model manifest: file does not exist"}"#
+        ));
+        // Mid-stream progress lines are not success on their own.
+        assert!(!OllamaClient::pull_succeeded(
+            r#"{"status":"pulling manifest"}"#
+        ));
+    }
+
+    #[test]
+    fn resolve_tier_prefers_named_then_resident_fallback() {
+        // The honest reality on this machine: named MoE tiers aren't pulled, so
+        // both L1 and L2 resolve to the resident coding model.
+        let installed = vec!["qwen3.6:35b-a3b-coding-mxfp8".to_string()];
+        let tiers = OllamaClient::resolve_tiers(
+            &installed,
+            "mellum2:12b-moe",
+            "qwen3-coder-next:80b-moe",
+            "qwen3.6:35b-a3b-coding-mxfp8",
+        );
+        assert_eq!(tiers.router, "qwen3.6:35b-a3b-coding-mxfp8");
+        assert_eq!(tiers.coder, "qwen3.6:35b-a3b-coding-mxfp8");
+        // Both fell back, so neither named model was actually present.
+        assert!(tiers.router_fell_back);
+        assert!(tiers.coder_fell_back);
+    }
+
+    #[test]
+    fn resolve_tiers_uses_named_when_present() {
+        let installed = vec![
+            "mellum2:12b-moe".to_string(),
+            "qwen3-coder-next:80b-moe".to_string(),
+            "qwen3.6:35b-a3b-coding-mxfp8".to_string(),
+        ];
+        let tiers = OllamaClient::resolve_tiers(
+            &installed,
+            "mellum2:12b-moe",
+            "qwen3-coder-next:80b-moe",
+            "qwen3.6:35b-a3b-coding-mxfp8",
+        );
+        assert_eq!(tiers.router, "mellum2:12b-moe");
+        assert_eq!(tiers.coder, "qwen3-coder-next:80b-moe");
+        assert!(!tiers.router_fell_back);
+        assert!(!tiers.coder_fell_back);
+    }
 }
