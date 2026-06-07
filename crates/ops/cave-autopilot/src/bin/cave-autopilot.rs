@@ -5,6 +5,8 @@
 
 use cave_autopilot::config::AutopilotConfig;
 use cave_autopilot::daemon::Daemon;
+use cave_autopilot::executor::{LlmSmokeExecutor, SmokeSpec};
+use cave_autopilot::ollama::OllamaClient;
 use cave_autopilot::{launchagent, report};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -77,6 +79,41 @@ enum Command {
     SetupScript {
         #[arg(long, default_value = "cave-runtime")]
         instance: String,
+    },
+    /// Probe the live Ollama server: liveness, installed models, and the
+    /// concrete L1/L2 tier resolution (named MoE -> resident fallback).
+    OllamaCheck {
+        #[arg(long, default_value = "cave-runtime")]
+        instance: String,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Attempt to pull the named tier checkpoints before resolving.
+        #[arg(long)]
+        pull: bool,
+    },
+    /// End-to-end smoke: ask the local coder (L2) to write a real crate's
+    /// lib.rs + test, then `cargo test` it. Proves the LLM -> compile -> test
+    /// loop without polluting the repo (runs in a throwaway workdir).
+    Smoke {
+        #[arg(long, default_value = "cave-runtime")]
+        instance: String,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Crate name to scaffold + generate.
+        #[arg(long = "crate", default_value = "cave-test-autopilot")]
+        crate_name: String,
+        /// One-line description of the function the model must implement+test.
+        #[arg(long, default_value = "an integer add(a, b) function returning a + b")]
+        task: String,
+        /// Local-LLM retry budget.
+        #[arg(long, default_value_t = 3)]
+        retries: u32,
+        /// Override the model (defaults to the resolved L2 coder tier).
+        #[arg(long)]
+        model: Option<String>,
+        /// Throwaway working directory (default: a temp dir).
+        #[arg(long)]
+        workdir: Option<PathBuf>,
     },
     /// Write a daily report (uses live queue/metrics; mostly empty until the
     /// daemon has run a full day).
@@ -199,6 +236,98 @@ async fn main() -> anyhow::Result<()> {
         Command::SetupScript { instance } => {
             let cfg = AutopilotConfig::for_instance(&instance);
             println!("{}", launchagent::ollama_setup_script(&cfg));
+        }
+        Command::OllamaCheck {
+            instance,
+            config,
+            pull,
+        } => {
+            let cfg = load_cfg(&instance, &config);
+            let client = OllamaClient::new(&cfg.ollama_url);
+            if !client.is_up().await {
+                eprintln!("ollama UNREACHABLE at {}", cfg.ollama_url);
+                std::process::exit(1);
+            }
+            let models = client.list_models().await?;
+            println!("ollama: UP at {}", cfg.ollama_url);
+            println!("installed models ({}):", models.len());
+            for m in &models {
+                println!("  - {m}");
+            }
+            let tiers = if pull {
+                client
+                    .ensure_tiers(&cfg.model_l1_router, &cfg.model_l2_coder, &cfg.model_fallback)
+                    .await?
+            } else {
+                OllamaClient::resolve_tiers(
+                    &models,
+                    &cfg.model_l1_router,
+                    &cfg.model_l2_coder,
+                    &cfg.model_fallback,
+                )
+            };
+            println!(
+                "L1 router: {} ({})",
+                tiers.router,
+                if tiers.router_fell_back { "fell back to resident" } else { "named" }
+            );
+            println!(
+                "L2 coder:  {} ({})",
+                tiers.coder,
+                if tiers.coder_fell_back { "fell back to resident" } else { "named" }
+            );
+        }
+        Command::Smoke {
+            instance,
+            config,
+            crate_name,
+            task,
+            retries,
+            model,
+            workdir,
+        } => {
+            let cfg = load_cfg(&instance, &config);
+            let client = OllamaClient::new(&cfg.ollama_url);
+            if !client.is_up().await {
+                eprintln!("ollama UNREACHABLE at {}; cannot run smoke", cfg.ollama_url);
+                std::process::exit(1);
+            }
+            // Resolve the coder tier unless explicitly overridden.
+            let model = match model {
+                Some(m) => m,
+                None => {
+                    let installed = client.list_models().await?;
+                    OllamaClient::resolve_tiers(
+                        &installed,
+                        &cfg.model_l1_router,
+                        &cfg.model_l2_coder,
+                        &cfg.model_fallback,
+                    )
+                    .coder
+                }
+            };
+            let workdir = workdir
+                .unwrap_or_else(|| std::env::temp_dir().join("cave-autopilot-smoke"));
+            std::fs::create_dir_all(&workdir)?;
+            // Clean any prior crate dir so the run is fresh.
+            let _ = std::fs::remove_dir_all(workdir.join(&crate_name));
+
+            let exec = LlmSmokeExecutor::new(client, &model);
+            let spec = SmokeSpec {
+                crate_name: crate_name.clone(),
+                task_desc: task,
+                max_retries: retries,
+            };
+            println!("smoke: model={model} crate={crate_name} workdir={}", workdir.display());
+            let outcome = exec.run(&spec, &workdir).await?;
+            println!("model:     {}", outcome.model);
+            println!("attempts:  {}", outcome.attempts);
+            println!("generated: {}", outcome.generated);
+            println!("passed:    {}", outcome.passed);
+            println!("detail:    {}", outcome.detail);
+            if !outcome.passed {
+                std::process::exit(1);
+            }
         }
         Command::Report { instance, config } => {
             let cfg = load_cfg(&instance, &config);
