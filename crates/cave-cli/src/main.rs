@@ -278,6 +278,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: NetCmd,
     },
+    /// Cilium control-plane (eBPF/IPAM/policy/Hubble/mesh/encryption)
+    Cilium {
+        #[command(subcommand)]
+        cmd: CiliumCmd,
+    },
     /// Workload controllers (kube-controller-manager replacement)
     #[command(name = "controller-manager")]
     ControllerManager {
@@ -2964,6 +2969,45 @@ enum SchedulerCmd {
 // ── net (kube-proxy / CNI parity) ─────────────────────────────────────────────
 
 #[derive(Subcommand)]
+enum CiliumCmd {
+    /// Show control-plane health
+    Health,
+    /// Show aggregate status (ipam nodes, policy rules, flows)
+    Status,
+    /// Configure the cluster-pool CIDR
+    IpamConfigure {
+        /// Cluster CIDR, e.g. 10.244.0.0/16
+        #[arg(long)]
+        cidr: String,
+        /// Per-node prefix length, e.g. 24
+        #[arg(long, default_value_t = 24)]
+        node_mask: u8,
+    },
+    /// List nodes with their carved PodCIDRs
+    Nodes,
+    /// Carve (ensure) a PodCIDR for a node
+    EnsureNode {
+        /// Node name
+        node: String,
+    },
+    /// Allocate a pod IP on a node
+    Allocate {
+        /// Node name
+        node: String,
+        /// Owning endpoint
+        #[arg(long)]
+        owner: String,
+    },
+    /// Allocate a security identity for a label (key=value)
+    Identity {
+        /// One label as key=value
+        label: String,
+    },
+    /// Show Hubble flow count
+    Flows,
+}
+
+#[derive(Subcommand)]
 enum NetCmd {
     /// List allocated pod IPs
     Pods,
@@ -4435,6 +4479,38 @@ source_root = "src"
         },
 
         // ── net ───────────────────────────────────────────────────────────────
+        Commands::Cilium { cmd } => match cmd {
+            CiliumCmd::Health => c.get("/api/cilium/health").await,
+            CiliumCmd::Status => c.get("/api/cilium/status").await,
+            CiliumCmd::IpamConfigure { cidr, node_mask } => {
+                c.post(
+                    "/api/cilium/ipam/configure",
+                    json!({ "cidrs": [{ "cidr": cidr, "node_mask": node_mask }] }),
+                )
+                .await
+            }
+            CiliumCmd::Nodes => c.get("/api/cilium/ipam/nodes").await,
+            CiliumCmd::EnsureNode { node } => {
+                c.post(&format!("/api/cilium/ipam/nodes/{node}"), json!({}))
+                    .await
+            }
+            CiliumCmd::Allocate { node, owner } => {
+                c.post(
+                    &format!("/api/cilium/ipam/nodes/{node}/allocate"),
+                    json!({ "owner": owner }),
+                )
+                .await
+            }
+            CiliumCmd::Identity { label } => {
+                let (k, v) = label.split_once('=').unwrap_or((label.as_str(), ""));
+                c.post(
+                    "/api/cilium/identities/allocate",
+                    json!({ "labels": { k: v } }),
+                )
+                .await
+            }
+            CiliumCmd::Flows => c.get("/api/cilium/hubble/flows").await,
+        },
         Commands::Net { cmd } => match cmd {
             NetCmd::Pods => c.get("/api/net/pods").await,
             NetCmd::Alloc { namespace, name } => {

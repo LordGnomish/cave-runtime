@@ -108,6 +108,7 @@ members = [
     "crates/cave-kubelet",
     "crates/cave-kube-proxy",
     "crates/cave-net",
+    "crates/cave-cilium",
     "crates/cave-scheduler",
     "crates/cave-etcd",
     "crates/cave-crossplane",

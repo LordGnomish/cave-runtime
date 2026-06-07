@@ -22,6 +22,7 @@ path = "src/main.rs"
 cave-etcd = { path = "../cave-etcd" }
 cave-apiserver = { path = "../cave-apiserver" }
 cave-net = { path = "../cave-net" }
+cave-cilium = { path = "../cave-cilium" }
 cave-kubelet = { path = "../cave-kubelet" }
 cave-scheduler = { path = "../cave-scheduler" }
 cave-controller-manager = { path = "../cave-controller-manager" }
