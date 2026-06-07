@@ -53,17 +53,6 @@
       "upstream": "prometheus/alertmanager",
       "upstream_version": "v0.26.0"
     },
-    "cave-apigw": {
-      "cave_src_loc": null,
-      "manifest_filled": null,
-      "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
-      "stubs": null,
-      "tier": "C",
-      "upstream": null,
-      "upstream_version": null
-    },
     "cave-apiserver": {
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "labels/selector + fields/selector + namespacelifecycle + admission chain + limitranger + resourcequota (v1.36.0)",
@@ -506,17 +495,6 @@
       "note": null,
       "parity_ratio": 0.0,
       "parity_ratio_source": "manifest",
-      "stubs": null,
-      "tier": "C",
-      "upstream": null,
-      "upstream_version": null
-    },
-    "cave-dependency-track": {
-      "cave_src_loc": null,
-      "manifest_filled": null,
-      "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
       "stubs": null,
       "tier": "C",
       "upstream": null,
@@ -1792,7 +1770,7 @@
       "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.5625,
-      "last_audit_disk": "2026-05-23",
+      "last_audit_disk": "2026-06-07",
       "manifest_filled": true,
       "mapped_count": 27,
       "note": "1 fn missing, 1 surface missing, **0 tests declared** \u2014 needs test mapping pass",
@@ -1847,7 +1825,7 @@
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
     "flipped": 95,
-    "injected": 15,
+    "injected": 13,
     "new_filled": 95,
     "phantoms": 0,
     "ratio_overrides": 64
