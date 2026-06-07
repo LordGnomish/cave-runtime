@@ -91,9 +91,7 @@ pub fn hpa_max_replicas(max_replica_count: Option<i32>) -> i32 {
 
 /// `GenerateMetricNameWithIndex` — `s%d-%s`.
 pub fn generate_metric_name_with_index(trigger_index: i32, metric_name: &str) -> String {
-    // RED placeholder — real `s%d-%s` format added in GREEN step.
-    let _ = trigger_index;
-    metric_name.to_string()
+    format!("s{trigger_index}-{metric_name}")
 }
 
 /// `GenerateMetricInMili` / `GetMetricTargetMili` — value * 1000 as int64.
