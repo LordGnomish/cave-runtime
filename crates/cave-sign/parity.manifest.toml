@@ -34,6 +34,7 @@
 #   - TSA (RFC 3161) timestamp authority
 #   - Sigstore protobuf bundle v0.3 envelope (we ship the cosign JSON bundle)
 #   - Fuzz harness (deferred to workspace `cargo-fuzz` job)
+# Related ADR: docs/adr/ADR-005-RUNTIME-buildah.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "sigstore"

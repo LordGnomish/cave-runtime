@@ -19,6 +19,7 @@
 # Fresh control-plane port (2026-06-07) — NOT inflated to 1.0; the four
 # unmapped rows (ClusterMesh, egress gateway, BGP, bandwidth manager) and
 # three partials are honest.
+# Related ADR: docs/adr/ADR-004-RUNTIME-cilium-istio.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "cilium"

@@ -13,6 +13,7 @@
 # ships Backend only; Portal admin pages, cavectl subcommands, and observability
 # dashboards are scope-cut to a follow-up sprint and documented in
 # PARITY_REPORT.md §7.
+# Related ADR: docs/adr/ADR-009-RUNTIME-cave-hermes.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org         = "NousResearch"

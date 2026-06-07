@@ -5,6 +5,7 @@
 # src/cloud_volume_controller.rs (CloudVolume trait + Hetzner/Azure impls +
 # reconcile loop). Additive Hetzner+Azure deepening: hetzner_instance_lookup
 # and azure_instance_lookup helpers.
+# Related ADR: docs/adr/ADR-003-RUNTIME-talos-linux.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "kubernetes"

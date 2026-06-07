@@ -20,6 +20,26 @@ and are **not** carried by this OSS Cave Runtime catalogue.
 | [ADR-CONTRIB-ATTRIBUTION-001](ADR-CONTRIB-ATTRIBUTION-001.md) | Commit author + trailer attribution |
 | [ADR-SELF-IMPROVE-001](ADR-SELF-IMPROVE-001.md) | cave-agent — runtime-resident self-improvement |
 
+### Platform → Runtime sovereign variants (Charter mirror)
+
+Runtime-adapted variants of platform ADRs, ported under the
+[mirror principle](ADR-RUNTIME-UPSTREAM-MIRROR-001-platform-runtime-mirror.md).
+Each keeps the platform decision's intent but re-roots it on cave-native,
+sovereign, provider-agnostic primitives. Cloud-managed comparison columns
+(Azure Redis, Azure OpenAI, Hetzner-as-sole-provider) are dropped or demoted
+to provider-equal examples.
+
+| ADR | Title |
+|-----|-------|
+| [ADR-003-RUNTIME](ADR-003-RUNTIME-talos-linux.md) | Talos Linux as the sovereign immutable node OS (provider-agnostic via cave-cloud-controller-manager) |
+| [ADR-004-RUNTIME](ADR-004-RUNTIME-cilium-istio.md) | Cilium (cave-net + cave-cilium) + Istio Ambient (cave-mesh) — PQC-ready WireGuard, single-binary |
+| [ADR-005-RUNTIME](ADR-005-RUNTIME-buildah.md) | Buildah hermetic rootless build — distroless, RISC-V multi-arch, SLSA L4, ML-DSA hybrid sign |
+| [ADR-006-RUNTIME](ADR-006-RUNTIME-cave-auth.md) | cave-auth sovereign identity (Keycloak parity) — OIDC + RBAC + ABAC + SPIFFE |
+| [ADR-008-RUNTIME](ADR-008-RUNTIME-cave-cache.md) | cave-cache sovereign in-memory store (Valkey parity) — Azure Redis dropped |
+| [ADR-009-RUNTIME](ADR-009-RUNTIME-cave-hermes.md) | cave-hermes sovereign local LLM gateway over Ollama — Azure OpenAI dropped |
+| [ADR-010-RUNTIME](ADR-010-RUNTIME-ci-pipeline.md) | Multi-dimensional future-proof CI pipeline (Argo Workflows, ~47 stage) |
+| [ADR-001-COLLISION-2026-06-07](ADR-001-COLLISION-2026-06-07.md) | ADR-001 numbering collision reconciliation (Hetzner vs. bare-metal — **decision pending**) |
+
 ### Runtime stack & consolidation
 
 | ADR | Title |
@@ -32,7 +52,6 @@ and are **not** carried by this OSS Cave Runtime catalogue.
 | [ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001](ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001-multi-upstream-data-layer.md) | Multi-upstream data layer (cave-rdbms / cave-docdb / cave-cache / cave-etcd) |
 | [ADR-RUNTIME-STREAMING-CONSOLIDATION-001](ADR-RUNTIME-STREAMING-CONSOLIDATION-001-kafka-pulsar-into-cave-streams.md) | Kafka + Pulsar into cave-streams |
 | [ADR-RUNTIME-CERT-LIFECYCLE-001](ADR-RUNTIME-CERT-LIFECYCLE-001-sovereign-cert-hierarchy-pqc-acme.md) | Sovereign cert hierarchy — PQC + ACME |
-| [ADR-010-RUNTIME](ADR-010-RUNTIME-ci-pipeline.md) | Multi-dimensional future-proof CI pipeline (Runtime sovereign variant — Argo Workflows, ~47 stage) |
 | [ADR-076](ADR-076_cave_ctl_CLI_MCP_Server_Architecture.md) | cave-ctl CLI & MCP server architecture |
 | [ADR-147](ADR-147_Data_Persistence_Crate_Naming_and_Lakehouse_Consolidation.md) | Data-persistence crate naming + lakehouse consolidation |
 
