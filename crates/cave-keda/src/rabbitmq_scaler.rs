@@ -146,8 +146,12 @@ impl RabbitMqScaler {
     /// `exclude_unacknowledged`, else total `messages`.
     /// Port of `getQueueInfoViaHTTP`'s return selection.
     pub fn message_count(&self) -> i64 {
-        // RED placeholder — real selection added in GREEN step.
-        0
+        let info = self.composed();
+        if self.exclude_unacknowledged {
+            info.messages_ready
+        } else {
+            info.messages
+        }
     }
 
     pub fn publish_rate(&self) -> f64 {
