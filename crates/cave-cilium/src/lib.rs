@@ -26,4 +26,5 @@
 pub mod ebpf;
 pub mod hubble;
 pub mod ipam;
+pub mod mesh;
 pub mod policy;
