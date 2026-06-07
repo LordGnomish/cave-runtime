@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-runtime-tracker — daily always-latest tracker for the cave-runtime
+# platform seat. Polls the latest GitHub release/tag of every upstream
+# OSS project that a cave-* crate reimplements, compares it against the
+# version we have ported, and emits a daily markdown + JSON drift report.
+#
+# This is the cave-runtime sibling of cave-llm-tracker (which tracks the
+# local-LLM seat). The two are deliberately *separate copies* — see the
+# strict cave-runtime ↔ cave-home isolation rule — even though they share
+# the same daily-report shape.
+
+[package]
+name = "cave-runtime-tracker"
+description = "Daily upstream drift tracker — polls latest GitHub releases for every cave-* subsystem's upstream, scores drift, emits md+JSON report. Phase 0: report only, no auto-bump."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "cave-runtime-tracker"
+path = "src/bin/cave-runtime-tracker.rs"

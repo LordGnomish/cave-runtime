@@ -1,0 +1,85 @@
+# parity.manifest.toml — cave-runtime-tracker
+#
+# cave-runtime-tracker is an *original* cave crate (Burak-authored), not a
+# port of a single upstream. It binds the GitHub release/tag signal of
+# every cave-* subsystem's upstream into a daily drift report. The
+# "upstream" pin below is therefore the snapshot date of the curated
+# registry in src/registry.rs::default_registry (REGISTRY_SNAPSHOT), bumped
+# whenever the registry gains/loses entries or repos are re-targeted.
+#
+# Phase 0 (this release): poll + classify drift + emit md/JSON report.
+# **No automatic version bump** — drift is reported, never acted on.
+# Phase 1 will wire `cavectl runtime-tracker apply` to open a port-loop
+# task when an upstream drifts past a threshold.
+#
+# 4-track Charter v2 surface: ships Backend (lib + bin) and the daily
+# LaunchAgent (deploy/launchd/com.caveruntime.runtime-tracker.plist, 06:30
+# local — 30 min after the cave-home tracker). The cavectl wrapper, Portal
+# tile, and Obs dashboard are deferred and listed under [[skipped]] with a
+# stable JSON schema so they can land later without coordination.
+
+[upstream]
+org         = "cave-runtime"
+repo        = "cave-runtime-tracker"
+version     = "2026-06-07"
+name        = "cave-runtime-tracker (upstream drift aggregator)"
+license     = "AGPL-3.0-or-later"
+language    = "Rust"
+url         = "https://github.com/cave-runtime/cave-runtime/tree/main/crates/ops/cave-runtime-tracker"
+source      = "GitHub REST: /repos/{org}/{repo}/releases/latest then /tags?per_page=1"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0000
+honest_ratio        = 1.0000
+last_audit          = "2026-06-07"
+infra_only          = false
+mapped_count        = 5
+partial_count       = 0
+
+# ── Mapped surface (built + tested) ──────────────────────────────────────
+[[mapped]]
+name = "upstream_registry"
+note = "src/registry.rs — 81 curated upstreams across 75+ distinct repos; Upstream model + default_registry + drift classifier (v-prefix-normalised)."
+
+[[mapped]]
+name = "release_fetcher"
+note = "ReleaseFetcher trait + live GithubFetcher (releases/latest → tags fallback, GITHUB_TOKEN auth, graceful None on transport/rate-limit failure)."
+
+[[mapped]]
+name = "poll_pass"
+note = "src/poll.rs — poll_all fetches each distinct repo once, fans the tag out to every cave module tracking it, classifies drift; generic over the fetcher for offline deterministic tests."
+
+[[mapped]]
+name = "daily_report"
+note = "src/report.rs — DailyReport (totals + per-category markdown tables + stable schema_version=1 JSON), write_to_dir emits daily-<date>.{md,json} + latest.json."
+
+[[mapped]]
+name = "cli_and_config"
+note = "src/bin + src/config.rs — clap subcommands poll/report/config, YAML config (cave-runtime-tracker.yaml) with per-upstream pinning, ~/ expansion, validation."
+
+# ── Deferred (honest scope cuts) ─────────────────────────────────────────
+[[skipped]]
+name      = "cavectl_wrapper"
+reason    = "`cavectl runtime-tracker` shell-out to the binary mirrors the cave-llm-tracker pattern; deferred to keep this bootstrap focused on the daemon path."
+defer_to  = "cave-cli phase-2 runtime-tracker subcommand"
+
+[[skipped]]
+name      = "portal_tile"
+reason    = "Charter v2 4-track Portal slice deferred; daily-<date>.json schema_version=1 is stable so the portal can read it later without coordination."
+defer_to  = "cave-portal phase-2 runtime-tracker tile"
+
+[[skipped]]
+name      = "observability_dashboard"
+reason    = "Charter v2 4-track Obs slice deferred; the JSON report is already structured for Prometheus textfile + Grafana table ingestion."
+defer_to  = "cave-metrics + cave-dashboard phase-2"
+
+[[skipped]]
+name      = "auto_bump_port_loop"
+reason    = "Phase 0 mandate is report-only; opening a port-loop task on drift (cavectl runtime-tracker apply) is explicitly out of scope."
+defer_to  = "Phase 1 — runtime-tracker apply"
+
+[[skipped]]
+name      = "multi_day_drift_trending"
+reason    = "Each daily-<date>.json is independent; rolling 7/30-day drift trend lines are out of Phase 0 scope (the report files carry every input a Phase 1 trender needs)."
+defer_to  = "Phase 1 — runtime-tracker trend"

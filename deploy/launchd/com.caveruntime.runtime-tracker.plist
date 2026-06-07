@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent for cave-runtime-tracker — daily upstream drift report.
+
+  Runs once per day at 06:30 local time. This is deliberately 30 minutes
+  after the cave-home tracker (06:00) so the two daily runs never contend
+  for the GitHub API rate limit at the same instant. The two trackers are
+  separate binaries (cave-runtime ↔ cave-home isolation); this plist only
+  ever launches the cave-runtime copy.
+
+  Installation:
+    1. Build the release binary:
+         cargo build --release -p cave-runtime-tracker --bin cave-runtime-tracker
+    2. Copy it somewhere stable:
+         mkdir -p ~/.local/bin
+         cp target/release/cave-runtime-tracker ~/.local/bin/
+    3. (Optional, recommended) drop a GitHub token into the environment
+       block below or export GITHUB_TOKEN — the registry has ~70 distinct
+       repos, well over the 60 req/h unauthenticated limit.
+    4. (Optional) copy and pin the config:
+         mkdir -p "~/Library/Application Support/cave-runtime/runtime-tracker"
+         cp crates/ops/cave-runtime-tracker/cave-runtime-tracker.yaml \
+            "~/Library/Application Support/cave-runtime/runtime-tracker/config.yaml"
+       then add `--config <that path>` to ProgramArguments below.
+    5. Install + load:
+         cp deploy/launchd/com.caveruntime.runtime-tracker.plist \
+            ~/Library/LaunchAgents/
+         launchctl load -w \
+            ~/Library/LaunchAgents/com.caveruntime.runtime-tracker.plist
+
+  Verify / inspect:
+         launchctl list | grep cave-runtime-tracker
+         launchctl start com.caveruntime.runtime-tracker   # run now
+         tail -f ~/Library/Logs/cave-runtime-tracker.log
+         open "~/Library/Application Support/cave-runtime/runtime-tracker"
+
+  Uninstall:
+         launchctl unload -w \
+            ~/Library/LaunchAgents/com.caveruntime.runtime-tracker.plist
+         rm ~/Library/LaunchAgents/com.caveruntime.runtime-tracker.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.caveruntime.runtime-tracker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/gnomish/.local/bin/cave-runtime-tracker</string>
+        <string>report</string>
+    </array>
+
+    <!-- Fire once a day at 06:30 local time (cave-home runs at 06:00). -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- Daily batch, not a resident daemon: do NOT keep alive. -->
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <!--
+          Recommended — lift the GitHub rate limit:
+          <key>GITHUB_TOKEN</key>
+          <string>ghp_xxx</string>
+        -->
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/gnomish/Library/Logs/cave-runtime-tracker.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/gnomish/Library/Logs/cave-runtime-tracker.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gnomish</string>
+</dict>
+</plist>
