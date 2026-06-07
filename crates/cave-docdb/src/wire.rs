@@ -255,9 +255,109 @@ pub enum LegacyOp {
     Query(OpQuery),
 }
 
+/// Read a `i32` little-endian at `pos`.
+fn read_i32(bytes: &[u8], pos: usize) -> Result<i32, WireError> {
+    if pos + 4 > bytes.len() {
+        return Err(WireError::WireError("truncated i32".to_string()));
+    }
+    Ok(i32::from_le_bytes([
+        bytes[pos],
+        bytes[pos + 1],
+        bytes[pos + 2],
+        bytes[pos + 3],
+    ]))
+}
+
+/// Read a BSON document at `pos`, returning it and the bytes consumed.
+fn read_document(bytes: &[u8], pos: usize) -> Result<(Document, usize), WireError> {
+    let doc = bson::decode_doc(&bytes[pos..]).map_err(|e| WireError::BsonError(e.to_string()))?;
+    let consumed = bson::encode_doc(&doc)
+        .map_err(|e| WireError::BsonError(e.to_string()))?
+        .len();
+    Ok((doc, consumed))
+}
+
 /// Decode a legacy wire message (OP_INSERT/OP_UPDATE/OP_DELETE/OP_QUERY).
-pub fn decode_legacy(_bytes: &[u8]) -> Result<LegacyOp, WireError> {
-    Err(WireError::WireError("legacy decode not built".to_string()))
+///
+/// These pre-OP_MSG codes were removed from the server in MongoDB 5.1;
+/// cave-docdb decodes them so a legacy driver's bytes are understood and can be
+/// translated onto the modern command path.
+pub fn decode_legacy(bytes: &[u8]) -> Result<LegacyOp, WireError> {
+    if bytes.len() < 16 {
+        return Err(WireError::WireError("header too short".to_string()));
+    }
+    let opcode = read_i32(bytes, 12)?;
+    let mut pos = 16;
+    match opcode {
+        OP_INSERT => {
+            let flags = read_i32(bytes, pos)?;
+            pos += 4;
+            let (collection, consumed) = read_cstring(&bytes[pos..])?;
+            pos += consumed;
+            let mut documents = Vec::new();
+            while pos < bytes.len() {
+                let (d, c) = read_document(bytes, pos)?;
+                pos += c;
+                documents.push(d);
+            }
+            Ok(LegacyOp::Insert(OpInsert {
+                flags,
+                collection,
+                documents,
+            }))
+        }
+        OP_UPDATE => {
+            pos += 4; // reserved ZERO
+            let (collection, consumed) = read_cstring(&bytes[pos..])?;
+            pos += consumed;
+            let flags = read_i32(bytes, pos)?;
+            pos += 4;
+            let (selector, c1) = read_document(bytes, pos)?;
+            pos += c1;
+            let (update, _c2) = read_document(bytes, pos)?;
+            Ok(LegacyOp::Update(OpUpdate {
+                collection,
+                flags,
+                selector,
+                update,
+            }))
+        }
+        OP_DELETE => {
+            pos += 4; // reserved ZERO
+            let (collection, consumed) = read_cstring(&bytes[pos..])?;
+            pos += consumed;
+            let flags = read_i32(bytes, pos)?;
+            pos += 4;
+            let (selector, _c) = read_document(bytes, pos)?;
+            Ok(LegacyOp::Delete(OpDelete {
+                collection,
+                flags,
+                selector,
+            }))
+        }
+        OP_QUERY => {
+            let flags = read_i32(bytes, pos)?;
+            pos += 4;
+            let (collection, consumed) = read_cstring(&bytes[pos..])?;
+            pos += consumed;
+            let number_to_skip = read_i32(bytes, pos)?;
+            pos += 4;
+            let number_to_return = read_i32(bytes, pos)?;
+            pos += 4;
+            let (query, _c) = read_document(bytes, pos)?;
+            Ok(LegacyOp::Query(OpQuery {
+                flags,
+                collection,
+                number_to_skip,
+                number_to_return,
+                query,
+            }))
+        }
+        other => Err(WireError::WireError(format!(
+            "not a legacy write/query opcode: {}",
+            other
+        ))),
+    }
 }
 
 fn read_cstring(bytes: &[u8]) -> Result<(String, usize), WireError> {
