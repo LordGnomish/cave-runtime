@@ -43,6 +43,9 @@ pub mod projection;
 /// Query parsing and execution.
 pub mod query;
 
+/// MongoDB → PostgreSQL SQL translation (hybrid backend).
+pub mod sql;
+
 /// HTTP route handlers.
 pub mod routes;
 
