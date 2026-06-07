@@ -38,6 +38,7 @@ pub mod config;
 pub mod daemon;
 pub mod error;
 pub mod escalation;
+pub mod executor;
 pub mod launchagent;
 pub mod metrics;
 pub mod ollama;
