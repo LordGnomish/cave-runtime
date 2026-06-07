@@ -277,6 +277,202 @@ fn in_clause(field: &str, arg: &Value, ctx: &mut Ctx, negate: bool) -> String {
     }
 }
 
+/// A complete SQL statement plus its ordered bind parameters.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SqlQuery {
+    /// The SQL text with `$1..$N` placeholders.
+    pub sql: String,
+    /// Ordered bind parameters.
+    pub params: Vec<String>,
+}
+
+/// Quote a SQL identifier (table/collection name), escaping embedded `"`.
+fn quote_ident(name: &str) -> String {
+    format!("\"{}\"", name.replace('"', "\"\""))
+}
+
+/// Append a `WHERE` clause (using the shared ctx) and return its SQL text.
+fn where_suffix(filter: &Value, ctx: &mut Ctx) -> String {
+    let body = translate_filter(filter, ctx);
+    if body.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", body)
+    }
+}
+
+/// Build the `SELECT` projection list for an inclusion projection.
+///
+/// `_id` is implicitly included unless explicitly set to `0`. Returns `None`
+/// when the projection is empty or an exclusion projection (handled later in
+/// the document layer over the full `_jsonb`).
+fn projection_select(projection: Option<&Value>) -> Option<String> {
+    let obj = projection?.as_object()?;
+    if obj.is_empty() {
+        return None;
+    }
+    // Inclusion projection iff every non-`_id` value is truthy.
+    let is_inclusion = obj
+        .iter()
+        .filter(|(k, _)| *k != "_id")
+        .all(|(_, v)| truthy(v));
+    if !is_inclusion {
+        return None;
+    }
+    let mut pairs: Vec<String> = Vec::new();
+    let include_id = obj.get("_id").map(truthy).unwrap_or(true);
+    if include_id {
+        pairs.push(format!("'_id', {}", path_value("_id")));
+    }
+    let mut fields: Vec<&String> = obj.keys().filter(|k| *k != "_id").collect();
+    fields.sort();
+    for f in fields {
+        pairs.push(format!("'{}', {}", esc(f), path_value(f)));
+    }
+    Some(format!("jsonb_build_object({}) AS _jsonb", pairs.join(", ")))
+}
+
+/// Truthiness of a projection flag (`1`, `true` → include).
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().map(|f| f != 0.0).unwrap_or(false),
+        _ => false,
+    }
+}
+
+/// Translate a `find` into a `SELECT` statement.
+pub fn find_to_sql(
+    table: &str,
+    filter: &Value,
+    projection: Option<&Value>,
+    sort: Option<&Value>,
+    skip: Option<i64>,
+    limit: Option<i64>,
+) -> SqlQuery {
+    let mut ctx = Ctx::default();
+    let select = projection_select(projection).unwrap_or_else(|| "_jsonb".to_string());
+    let mut sql = format!("SELECT {} FROM {}", select, quote_ident(table));
+    sql.push_str(&where_suffix(filter, &mut ctx));
+    if let Some(s) = sort.and_then(|v| v.as_object()) {
+        let order: Vec<String> = s
+            .iter()
+            .map(|(field, dir)| {
+                let d = if dir.as_i64().unwrap_or(1) < 0 { "DESC" } else { "ASC" };
+                format!("{} {}", path_value(field), d)
+            })
+            .collect();
+        if !order.is_empty() {
+            sql.push_str(&format!(" ORDER BY {}", order.join(", ")));
+        }
+    }
+    if let Some(l) = limit {
+        sql.push_str(&format!(" LIMIT {}", l));
+    }
+    if let Some(s) = skip {
+        sql.push_str(&format!(" OFFSET {}", s));
+    }
+    SqlQuery {
+        sql,
+        params: ctx.params,
+    }
+}
+
+/// Translate a single-document `insert` into an `INSERT` statement.
+pub fn insert_to_sql(table: &str, doc: &Value) -> SqlQuery {
+    let mut ctx = Ctx::default();
+    let p = ctx.bind(json_param(doc));
+    SqlQuery {
+        sql: format!(
+            "INSERT INTO {} (_jsonb) VALUES ({}::jsonb)",
+            quote_ident(table),
+            p
+        ),
+        params: ctx.params,
+    }
+}
+
+/// Translate an `update` (replacement or `$set`/`$unset`/`$inc`) into `UPDATE`.
+pub fn update_to_sql(table: &str, filter: &Value, update: &Value) -> SqlQuery {
+    let mut ctx = Ctx::default();
+    let assignment = build_assignment(update, &mut ctx);
+    let mut sql = format!(
+        "UPDATE {} SET _jsonb = {}",
+        quote_ident(table),
+        assignment
+    );
+    sql.push_str(&where_suffix(filter, &mut ctx));
+    SqlQuery {
+        sql,
+        params: ctx.params,
+    }
+}
+
+/// Build the `_jsonb` assignment expression for an update document.
+fn build_assignment(update: &Value, ctx: &mut Ctx) -> String {
+    let Some(obj) = update.as_object() else {
+        let p = ctx.bind(json_param(update));
+        return format!("{}::jsonb", p);
+    };
+    let has_ops = obj.keys().any(|k| k.starts_with('$'));
+    if !has_ops {
+        // Whole-document replacement.
+        let p = ctx.bind(json_param(update));
+        return format!("{}::jsonb", p);
+    }
+    let mut expr = "_jsonb".to_string();
+    // Deterministic operator order: $inc, $set, $unset (alphabetical).
+    let mut keys: Vec<&String> = obj.keys().collect();
+    keys.sort();
+    for key in keys {
+        match key.as_str() {
+            "$inc" => {
+                if let Some(fields) = obj[key].as_object() {
+                    let mut fs: Vec<&String> = fields.keys().collect();
+                    fs.sort();
+                    for f in fs {
+                        let p = ctx.bind(json_param(&fields[f]));
+                        expr = format!(
+                            "jsonb_set({}, '{{{}}}', to_jsonb(COALESCE(({} ->> '{}')::numeric, 0) + {}::numeric))",
+                            expr,
+                            esc(f),
+                            "_jsonb",
+                            esc(f),
+                            p
+                        );
+                    }
+                }
+            }
+            "$set" => {
+                let p = ctx.bind(json_param(&obj[key]));
+                expr = format!("({}) || {}::jsonb", expr, p);
+            }
+            "$unset" => {
+                if let Some(fields) = obj[key].as_object() {
+                    let mut fs: Vec<&String> = fields.keys().collect();
+                    fs.sort();
+                    for f in fs {
+                        expr = format!("{} - '{}'", expr, esc(f));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    expr
+}
+
+/// Translate a `delete` into a `DELETE` statement.
+pub fn delete_to_sql(table: &str, filter: &Value) -> SqlQuery {
+    let mut ctx = Ctx::default();
+    let mut sql = format!("DELETE FROM {}", quote_ident(table));
+    sql.push_str(&where_suffix(filter, &mut ctx));
+    SqlQuery {
+        sql,
+        params: ctx.params,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,5 +612,110 @@ mod tests {
     #[test]
     fn empty_filter_is_match_all() {
         assert_eq!(wc(json!({})).sql, "");
+    }
+
+    // ── find_to_sql ──────────────────────────────────────────────────────
+
+    #[test]
+    fn find_basic_with_filter() {
+        let q = find_to_sql("users", &json!({"age": {"$gt": 21}}), None, None, None, None);
+        assert_eq!(
+            q.sql,
+            "SELECT _jsonb FROM \"users\" WHERE _jsonb -> 'age' > $1::jsonb"
+        );
+        assert_eq!(q.params, vec!["21"]);
+    }
+
+    #[test]
+    fn find_match_all_no_where() {
+        let q = find_to_sql("c", &json!({}), None, None, None, None);
+        assert_eq!(q.sql, "SELECT _jsonb FROM \"c\"");
+        assert!(q.params.is_empty());
+    }
+
+    #[test]
+    fn find_sort_skip_limit() {
+        let q = find_to_sql("c", &json!({}), None, Some(&json!({"age": -1})), Some(5), Some(10));
+        assert_eq!(
+            q.sql,
+            "SELECT _jsonb FROM \"c\" ORDER BY _jsonb -> 'age' DESC LIMIT 10 OFFSET 5"
+        );
+    }
+
+    #[test]
+    fn find_inclusion_projection_keeps_id() {
+        let q = find_to_sql("c", &json!({}), Some(&json!({"name": 1})), None, None, None);
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', _jsonb -> '_id', 'name', _jsonb -> 'name') AS _jsonb FROM \"c\""
+        );
+    }
+
+    #[test]
+    fn find_inclusion_projection_drops_id_when_zero() {
+        let q = find_to_sql("c", &json!({}), Some(&json!({"_id": 0, "name": 1})), None, None, None);
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('name', _jsonb -> 'name') AS _jsonb FROM \"c\""
+        );
+    }
+
+    #[test]
+    fn quoting_escapes_identifier() {
+        let q = find_to_sql("we\"ird", &json!({}), None, None, None, None);
+        assert_eq!(q.sql, "SELECT _jsonb FROM \"we\"\"ird\"");
+    }
+
+    // ── write ops ────────────────────────────────────────────────────────
+
+    #[test]
+    fn insert_single_doc() {
+        let q = insert_to_sql("c", &json!({"_id": "1", "n": 5}));
+        assert_eq!(q.sql, "INSERT INTO \"c\" (_jsonb) VALUES ($1::jsonb)");
+        assert_eq!(q.params, vec!["{\"_id\":\"1\",\"n\":5}"]);
+    }
+
+    #[test]
+    fn update_set_merges_jsonb() {
+        let q = update_to_sql("c", &json!({"_id": "1"}), &json!({"$set": {"a": 1}}));
+        assert_eq!(
+            q.sql,
+            "UPDATE \"c\" SET _jsonb = (_jsonb) || $1::jsonb WHERE _jsonb -> '_id' = $2::jsonb"
+        );
+        assert_eq!(q.params, vec!["{\"a\":1}", "\"1\""]);
+    }
+
+    #[test]
+    fn update_unset_drops_keys() {
+        let q = update_to_sql("c", &json!({}), &json!({"$unset": {"old": ""}}));
+        assert_eq!(q.sql, "UPDATE \"c\" SET _jsonb = _jsonb - 'old'");
+        assert!(q.params.is_empty());
+    }
+
+    #[test]
+    fn update_inc_uses_jsonb_set() {
+        let q = update_to_sql("c", &json!({}), &json!({"$inc": {"n": 5}}));
+        assert_eq!(
+            q.sql,
+            "UPDATE \"c\" SET _jsonb = jsonb_set(_jsonb, '{n}', to_jsonb(COALESCE((_jsonb ->> 'n')::numeric, 0) + $1::numeric))"
+        );
+        assert_eq!(q.params, vec!["5"]);
+    }
+
+    #[test]
+    fn update_replacement_whole_doc() {
+        let q = update_to_sql("c", &json!({"_id": "1"}), &json!({"name": "bob"}));
+        assert_eq!(
+            q.sql,
+            "UPDATE \"c\" SET _jsonb = $1::jsonb WHERE _jsonb -> '_id' = $2::jsonb"
+        );
+        assert_eq!(q.params, vec!["{\"name\":\"bob\"}", "\"1\""]);
+    }
+
+    #[test]
+    fn delete_with_filter() {
+        let q = delete_to_sql("c", &json!({"_id": "1"}));
+        assert_eq!(q.sql, "DELETE FROM \"c\" WHERE _jsonb -> '_id' = $1::jsonb");
+        assert_eq!(q.params, vec!["\"1\""]);
     }
 }
