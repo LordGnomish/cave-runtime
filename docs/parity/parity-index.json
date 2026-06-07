@@ -1770,7 +1770,7 @@
       "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.5625,
-      "last_audit_disk": "2026-05-23",
+      "last_audit_disk": "2026-06-07",
       "manifest_filled": true,
       "mapped_count": 27,
       "note": "1 fn missing, 1 surface missing, **0 tests declared** \u2014 needs test mapping pass",

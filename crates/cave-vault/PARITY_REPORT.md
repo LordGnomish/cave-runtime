@@ -85,3 +85,48 @@ cavectl secrets {store, external, push, generator, sealed, seal, unseal, rotate}
 ```
 
 To be wired in `crates/cave-cli/src/main.rs` post-merge.
+
+---
+
+## 2026-06-07 — PQC seal-wrap + Raft consensus (branch `feature/vault-real-impl`)
+
+Continuation pass against OpenBao **v2.5.4**. OpenBao parity counts unchanged
+(27 mapped / 48 total / honest_ratio **0.5625**) — this session is **depth**,
+plus a charter PQC extension, not a skip→mapped promotion. 8/8 Charter gates
+stay GREEN; the `tests/parity_self_audit.rs` gate set was reconciled from the
+stale v2.5.3 pins to v2.5.4 (9/9 gates pass).
+
+Strict-TDD cycles (each RED verified before GREEN):
+
+1. **PQC ML-KEM-768 seal-wrap** (`src/core/pqc_seal.rs`, charter PQC-ready
+   baseline). KEM-DEM hybrid envelope — ML-KEM-768 (NIST FIPS 203, cat 3) via
+   vetted RustCrypto `ml-kem` 0.3.2 → HKDF-SHA256 → AES-256-GCM. Round-trip,
+   per-call randomisation, tamper rejection (KEM ct + DEM ct), wrong-key
+   rejection, seed determinism, FIPS-203 deterministic-encapsulation KAT,
+   serde round-trip.
+2. **PQC auto-seal lifecycle** — `AutoSealType::MlKem768` (barrier "mlkem768",
+   local recovery-key seal) + `PqcSeal` (initialize / auto_unseal /
+   recover_master_key via Shamir recovery quorum / from_persisted).
+3. **Raft AppendEntries replication** (`src/storage/raft.rs`) — `append_entries`
+   (§5.3 consistency + conflict truncation + idempotent retransmit + commit
+   advance), `log_entries_from`, `last_log_term`; drives a 3-node consensus
+   integration test (`tests/raft_consensus.rs`).
+4. **Surface wiring** — read-only `GET /v1/sys/seal-backends` (cave-vault) +
+   `cavectl vault seal-backends`.
+
+Acceptance tests (all GREEN):
+
+| Criterion | Test |
+|---|---|
+| KV v2 secret round-trip | `tests/kv2_engine.rs`, `tests/kv2_deep.rs` |
+| Transit encrypt/decrypt | `engines::transit::tests::test_aes256_gcm_round_trip` / `test_chacha20_round_trip` |
+| PKI cert issue | `engines::pki` issuance tests |
+| Raft consensus integration | `tests/raft_consensus.rs` (5 tests) |
+| PQC seal-wrap | `tests/pqc_seal.rs` (8) + `tests/pqc_autoseal.rs` (6) + in-src |
+
+New tests this session: 8 + 6 + 5 + 1 (sys endpoint) + 1 (cavectl) + in-src
+(seal/pqc/raft) ≈ 35.
+
+Licensing: OpenBao is MPL-2.0; MPL-2.0 is compatible with the cave-runtime
+AGPL-3.0-or-later target (a clean-room Rust port, no Go source copied). The
+`ml-kem` crate is Apache-2.0/MIT — AGPL-compatible.

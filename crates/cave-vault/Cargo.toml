@@ -56,6 +56,10 @@ rsa = { version = "0.9", features = ["sha2"] }
 sha2 = "0.10"
 async-trait = { workspace = true }
 parking_lot = { workspace = true }
+# Post-quantum KEM for the seal-wrap barrier (FIPS 203 ML-KEM, RustCrypto).
+# `getrandom` enables SysRng-backed keygen/encapsulation; `hazmat` exposes the
+# deterministic encapsulation used to pin a reproducible KAT in tests.
+ml-kem = { version = "0.3", features = ["getrandom", "hazmat"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

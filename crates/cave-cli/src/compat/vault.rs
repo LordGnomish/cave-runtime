@@ -60,6 +60,9 @@ pub enum VaultCmd {
     },
     /// `vault status`
     Status,
+    /// `vault seal-backends` — list supported seal barriers, including the
+    /// post-quantum ML-KEM-768 (FIPS 203) seal-wrap.
+    SealBackends,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -189,6 +192,10 @@ pub fn prepare(cmd: &VaultCmd) -> Result<PreparedRequest> {
         VaultCmd::Status => Ok(PreparedRequest::new(
             HttpVerb::Get,
             "/api/compat/vault/v1/sys/health",
+        )),
+        VaultCmd::SealBackends => Ok(PreparedRequest::new(
+            HttpVerb::Get,
+            "/api/compat/vault/v1/sys/seal-backends",
         )),
     }
 }
@@ -780,6 +787,13 @@ mod tests {
     fn status() {
         let r = prepare(&VaultCmd::Status).unwrap();
         assert_eq!(r.path, "/api/compat/vault/v1/sys/health");
+    }
+
+    #[test]
+    fn seal_backends() {
+        let r = prepare(&VaultCmd::SealBackends).unwrap();
+        assert_eq!(r.verb, HttpVerb::Get);
+        assert_eq!(r.path, "/api/compat/vault/v1/sys/seal-backends");
     }
 
     #[test]

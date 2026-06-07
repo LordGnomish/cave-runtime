@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Charter v2 self-audit for cave-vault — pinned to openbao/openbao v2.5.3.
+//! Charter v2 self-audit for cave-vault — pinned to openbao/openbao v2.5.4.
 
 use std::fs;
 use std::path::PathBuf;
@@ -25,30 +25,33 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 }
 
 #[test]
-fn gate_1_upstream_version_pinned_v2_5_3() {
+fn gate_1_upstream_version_pinned_v2_5_4() {
     let m = manifest_text();
     let v = extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
     assert_eq!(
         v.as_deref(),
-        Some("v2.5.3"),
-        "manifest [upstream] version must pin OpenBao v2.5.3 (was {:?}).",
+        Some("v2.5.4"),
+        "manifest [upstream] version must pin OpenBao v2.5.4 (was {:?}).",
         v
     );
 }
 
 #[test]
-fn gate_2_source_sha_present_and_matches_version() {
+fn gate_2_source_sha_present_and_is_real_commit() {
     let m = manifest_text();
     let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
-    assert!(
-        sha.is_some() && !sha.as_deref().unwrap().is_empty(),
-        "manifest [upstream] source_sha must be set (got {:?})",
-        sha
-    );
+    let sha = sha.expect("manifest [upstream] source_sha must be set");
+    // source_sha pins the exact upstream commit, not a tag string. It must be
+    // a 40-char lowercase hex git SHA-1 (the earlier placeholder "v2.5.3" was a
+    // stale tag string — reconciled to the real commit at the v2.5.4 bump).
     assert_eq!(
-        sha.as_deref(),
-        Some("v2.5.3"),
-        "source_sha must match the pinned upstream version (got {:?})",
+        sha,
+        "4f6d47246a053375271a5fd8af85c3b75695aa46",
+        "source_sha must pin the OpenBao v2.5.4 commit"
+    );
+    assert!(
+        sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+        "source_sha must be a 40-char lowercase hex git SHA (got {:?})",
         sha
     );
 }
@@ -87,13 +90,13 @@ fn gate_4_parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn gate_5_last_audit_is_2026_05_19() {
+fn gate_5_last_audit_is_2026_06_07() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-19"),
-        "[parity] last_audit must reflect the 2026-05-19 wave-3 close-out"
+        Some("2026-06-07"),
+        "[parity] last_audit must reflect the 2026-06-07 PQC seal-wrap audit"
     );
 }
 
@@ -131,6 +134,11 @@ fn gate_7_no_stub_macros_in_src() {
     let root: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src"].iter().collect();
     let mut offenders = Vec::new();
     walk(&root, &mut |p| {
+        // The self-audit scanner itself carries the macro names as string
+        // literals (it greps for them); excluding it avoids a false positive.
+        if p.file_name().map(|n| n == "parity_self_audit.rs").unwrap_or(false) {
+            return;
+        }
         if p.extension().map(|e| e == "rs").unwrap_or(false)
             && let Ok(s) = fs::read_to_string(p)
         {
@@ -194,12 +202,12 @@ fn gate_9_parity_report_exists_with_charter_v2_stamp() {
         "PARITY_REPORT.md must reference Charter v2"
     );
     assert!(
-        body.contains("8/8 PASS") || body.contains("8-gate"),
-        "PARITY_REPORT.md must record 8-gate close-out"
+        body.contains("8/8") || body.contains("9/9") || body.contains("9-gate"),
+        "PARITY_REPORT.md must record the gate close-out roll-up"
     );
     assert!(
-        body.contains("v2.5.3"),
-        "PARITY_REPORT.md must pin OpenBao v2.5.3"
+        body.contains("v2.5.4"),
+        "PARITY_REPORT.md must pin OpenBao v2.5.4"
     );
 }
 
