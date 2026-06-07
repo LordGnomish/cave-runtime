@@ -23,6 +23,7 @@
 pub mod config;
 pub mod error;
 pub mod measure;
+pub mod metrics;
 pub mod poll;
 pub mod registry;
 pub mod report;
@@ -33,6 +34,7 @@ pub use measure::{
     measure_subset, parse_tokei_json, port_ratio, LocSource, LocStats, Measurement, TokeiLoc,
     DEFAULT_MEASURE_REPOS,
 };
+pub use metrics::render_prometheus;
 pub use poll::{poll_all, PollResult, PollSummary};
 pub use registry::{
     default_registry, drift, DriftStatus, GithubFetcher, ReleaseFetcher, Upstream,
