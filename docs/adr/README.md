@@ -38,6 +38,7 @@ to provider-equal examples.
 | [ADR-008-RUNTIME](ADR-008-RUNTIME-cave-cache.md) | cave-cache sovereign in-memory store (Valkey parity) — Azure Redis dropped |
 | [ADR-009-RUNTIME](ADR-009-RUNTIME-cave-hermes.md) | cave-hermes sovereign local LLM gateway over Ollama — Azure OpenAI dropped |
 | [ADR-010-RUNTIME](ADR-010-RUNTIME-ci-pipeline.md) | Multi-dimensional future-proof CI pipeline (Argo Workflows, ~47 stage) |
+| [ADR-011-RUNTIME](ADR-011-RUNTIME-cave-portal.md) | cave-portal sovereign developer portal — Rust-native Backstage parity, single-binary (Backstage runtime dropped) |
 | [ADR-001-COLLISION-2026-06-07](ADR-001-COLLISION-2026-06-07.md) | ADR-001 numbering collision reconciliation (Hetzner vs. bare-metal — **decision pending**) |
 
 ### Runtime stack & consolidation
