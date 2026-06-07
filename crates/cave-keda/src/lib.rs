@@ -26,6 +26,7 @@ pub mod datadog_scaler;
 pub mod etcd_scaler;
 pub mod gcp_pubsub_scaler;
 pub mod hibernation;
+pub mod hpa;
 pub mod http_scaler;
 pub mod kafka_scaler;
 pub mod nats_jetstream_scaler;
@@ -52,6 +53,11 @@ pub use datadog_scaler::DatadogScaler;
 pub use etcd_scaler::EtcdScaler;
 pub use gcp_pubsub_scaler::GcpPubSubScaler;
 pub use hibernation::{Hibernation, HibernationDecision, HibernationSchedule};
+pub use hpa::{
+    ExternalMetricSpec, HpaMetricTargetType, HpaSpec, HpaTrigger, ScaleTargetRef, build_hpa,
+    default_hpa_name, generate_metric_in_mili, generate_metric_name_with_index, hpa_max_replicas,
+    hpa_min_replicas, hpa_name,
+};
 pub use http_scaler::HttpScaler;
 pub use kafka_scaler::KafkaScaler;
 pub use nats_jetstream_scaler::NatsJetStreamScaler;
