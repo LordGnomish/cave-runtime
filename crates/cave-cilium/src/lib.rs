@@ -24,3 +24,4 @@
 //! and `parity.manifest.toml` enumerates the mapping.
 
 pub mod ebpf;
+pub mod ipam;
