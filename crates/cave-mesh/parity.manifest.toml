@@ -5,6 +5,7 @@
 # LDS/RDS/CDS/EDS/SDS streams, Envoy WASM filter runtime) is removed
 # from the workspace, not deferred — see [[skipped]] block + the
 # 2026-05-19 ambient-only sweep.
+# Related ADR: docs/adr/ADR-004-RUNTIME-cilium-istio.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "istio"

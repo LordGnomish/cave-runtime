@@ -10,6 +10,7 @@
 # Stubbed 2026-05-02 — was missing despite cave-registry being on the
 # kernel HIGH_PRIORITY_MODULES list in cave-upstream. Function/test
 # mappings to be filled in pre-OSS-launch (see post-launch port plan).
+# Related ADR: docs/adr/ADR-005-RUNTIME-buildah.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org     = "distribution"

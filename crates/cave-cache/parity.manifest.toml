@@ -11,6 +11,7 @@
 # hyperloglog, bitmap, geo), pub/sub, ACL, scripting, transactions, expiry,
 # persistence, cluster slots, plus a side REST surface (src/routes.rs)
 # for cave-runtime.
+# Related ADR: docs/adr/ADR-008-RUNTIME-cave-cache.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org         = "valkey-io"

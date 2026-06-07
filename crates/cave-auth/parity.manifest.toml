@@ -4,6 +4,7 @@
 # cave-auth implements the Keycloak realm/user/token endpoint set, OIDC
 # discovery, JWKS publication, RBAC + ABAC, PKCE, post-quantum-crypto
 # (PQC) JWS keys, plus an Okta and a generic OIDC adapter.
+# Related ADR: docs/adr/ADR-006-RUNTIME-cave-auth.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "keycloak"

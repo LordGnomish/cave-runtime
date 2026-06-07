@@ -27,6 +27,7 @@
 #     sweep `bcf64002` already landed on main).
 #   * 4-track: Backend cave-net lib + Portal /admin/net/ + cavectl
 #     NetCmd + observability alert+dashboard — all green pre-close.
+# Related ADR: docs/adr/ADR-004-RUNTIME-cilium-istio.md (Runtime sovereign variant, 2026-06-07)
 
 [upstream]
 org        = "cilium"
