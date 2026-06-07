@@ -12,7 +12,7 @@ pub mod wrapping;
 pub use audit::{AuditAuth, AuditBackend, AuditBackendType, AuditEntry, AuditLogger, AuditRequest};
 pub use lease::{Lease, LeaseStore};
 pub use policy::{Capability, Policy, PolicyRule, PolicyStore};
-pub use pqc_seal::{PqcSealKeypair, PqcWrappedKey};
+pub use pqc_seal::{PqcSeal, PqcSealInit, PqcSealKeypair, PqcWrappedKey};
 pub use quota::{LeaseCountQuota, QuotaDecision, QuotaRule, QuotaStore, RateLimitQuota};
 pub use seal::{SealState, SealStatus, combine_shares, split_secret};
 pub use storage::StorageBackend;

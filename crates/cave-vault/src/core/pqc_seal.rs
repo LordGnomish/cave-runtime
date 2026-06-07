@@ -37,6 +37,7 @@
 //! tamper-rejection, wrong-key-rejection and seed-determinism.
 
 use crate::error::{VaultError, VaultResult};
+use base64::Engine as _;
 use ml_kem::array::Array;
 use ml_kem::kem::{Decapsulate, Encapsulate, Kem};
 use ml_kem::{EncapsulationKey, KeyExport, KeyInit, MlKem768, Seed};
@@ -158,6 +159,129 @@ impl PqcSealKeypair {
             .map_err(|_| VaultError::Crypto("decapsulation failed".into()))?;
         let wrap_key = derive_wrap_key(shared.as_slice())?;
         aes256_gcm_open(&wrap_key, &wrapped.nonce, &wrapped.ciphertext)
+    }
+}
+
+/// Result of [`PqcSeal::initialize`] — the freshly-minted barrier secrets.
+#[derive(Debug, Clone)]
+pub struct PqcSealInit {
+    /// The 32-byte barrier master key (kept by the caller to derive the
+    /// encryption barrier; not persisted in the clear).
+    pub master_key: Vec<u8>,
+    /// Hex-encoded Shamir recovery shares of the master key.
+    pub recovery_shares: Vec<String>,
+    /// Initial root token, `hvs.<base64url>`.
+    pub root_token: String,
+}
+
+/// A PQC auto-seal: an ML-KEM-768 keypair that wraps the barrier master key
+/// for automatic unseal, plus the stored wrapped envelope.
+///
+/// Lifecycle mirrors OpenBao auto-seal:
+/// * [`initialize`](Self::initialize) generates the master key, wraps it under
+///   the keypair (stored), and splits the master key into Shamir **recovery**
+///   shares (the quorum-loss / migration backup path).
+/// * [`auto_unseal`](Self::auto_unseal) unwraps the stored envelope with the
+///   held decapsulation key — no operator interaction (the "auto" in
+///   auto-unseal).
+/// * [`recover_master_key`](Self::recover_master_key) reconstructs the master
+///   key from a recovery-share quorum, independent of the keypair.
+pub struct PqcSeal {
+    keypair: PqcSealKeypair,
+    wrapped: Option<PqcWrappedKey>,
+}
+
+impl PqcSeal {
+    /// Build a PQC seal with a fresh ML-KEM-768 keypair (uninitialized).
+    pub fn generate() -> Self {
+        Self {
+            keypair: PqcSealKeypair::generate(),
+            wrapped: None,
+        }
+    }
+
+    /// Generate the barrier master key, wrap it under the keypair, and split it
+    /// into `recovery_shares` Shamir shares (any `recovery_threshold` of which
+    /// reconstruct it).
+    pub fn initialize(
+        &mut self,
+        recovery_shares: u8,
+        recovery_threshold: u8,
+    ) -> VaultResult<PqcSealInit> {
+        super::seal::SealState::validate_threshold(recovery_shares, recovery_threshold)?;
+        let rng = SystemRandom::new();
+        let mut master_key = vec![0u8; AES_256_KEY_LEN];
+        rng.fill(&mut master_key)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+
+        self.wrapped = Some(self.keypair.seal_wrap(&master_key)?);
+
+        let shares = super::seal::split_secret(&master_key, recovery_shares, recovery_threshold)?;
+        let recovery_shares: Vec<String> = shares.iter().map(hex::encode).collect();
+
+        let mut root_token_bytes = vec![0u8; 16];
+        rng.fill(&mut root_token_bytes)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        let root_token = format!(
+            "hvs.{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&root_token_bytes)
+        );
+
+        Ok(PqcSealInit {
+            master_key,
+            recovery_shares,
+            root_token,
+        })
+    }
+
+    /// Auto-unseal: recover the master key by unwrapping the stored envelope
+    /// with the held decapsulation key. Errors if not initialized.
+    pub fn auto_unseal(&self) -> VaultResult<Vec<u8>> {
+        let wrapped = self
+            .wrapped
+            .as_ref()
+            .ok_or_else(|| VaultError::InvalidRequest("PQC seal not initialized".into()))?;
+        self.keypair.seal_unwrap(wrapped)
+    }
+
+    /// Reconstruct the master key from a quorum of hex-encoded recovery shares.
+    pub fn recover_master_key(shares_hex: &[String]) -> VaultResult<Vec<u8>> {
+        let shares: Vec<Vec<u8>> = shares_hex
+            .iter()
+            .map(|s| {
+                hex::decode(s).map_err(|_| VaultError::InvalidRequest("bad recovery share".into()))
+            })
+            .collect::<VaultResult<_>>()?;
+        super::seal::combine_shares(&shares)
+    }
+
+    /// Serialize the keypair seed for storage (64-byte FIPS 203 seed).
+    pub fn seed_bytes(&self) -> [u8; SEED_LEN] {
+        self.keypair.seed_bytes()
+    }
+
+    /// JSON of the stored wrapped envelope, for persistence.
+    pub fn wrapped_key_json(&self) -> VaultResult<String> {
+        let wrapped = self
+            .wrapped
+            .as_ref()
+            .ok_or_else(|| VaultError::InvalidRequest("PQC seal not initialized".into()))?;
+        serde_json::to_string(wrapped).map_err(|e| VaultError::Crypto(e.to_string()))
+    }
+
+    /// Export the encapsulation (public) key.
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.keypair.public_key_bytes()
+    }
+
+    /// Restore a PQC seal from a persisted seed + wrapped-envelope JSON.
+    pub fn from_persisted(seed: &[u8; SEED_LEN], wrapped_json: &str) -> VaultResult<Self> {
+        let wrapped: PqcWrappedKey =
+            serde_json::from_str(wrapped_json).map_err(|e| VaultError::Crypto(e.to_string()))?;
+        Ok(Self {
+            keypair: PqcSealKeypair::from_seed_bytes(seed),
+            wrapped: Some(wrapped),
+        })
     }
 }
 
