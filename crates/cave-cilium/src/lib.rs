@@ -24,6 +24,7 @@
 //! and `parity.manifest.toml` enumerates the mapping.
 
 pub mod ebpf;
+pub mod encryption;
 pub mod hubble;
 pub mod ipam;
 pub mod mesh;
