@@ -32,6 +32,7 @@ and are **not** carried by this OSS Cave Runtime catalogue.
 | [ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001](ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001-multi-upstream-data-layer.md) | Multi-upstream data layer (cave-rdbms / cave-docdb / cave-cache / cave-etcd) |
 | [ADR-RUNTIME-STREAMING-CONSOLIDATION-001](ADR-RUNTIME-STREAMING-CONSOLIDATION-001-kafka-pulsar-into-cave-streams.md) | Kafka + Pulsar into cave-streams |
 | [ADR-RUNTIME-CERT-LIFECYCLE-001](ADR-RUNTIME-CERT-LIFECYCLE-001-sovereign-cert-hierarchy-pqc-acme.md) | Sovereign cert hierarchy — PQC + ACME |
+| [ADR-010-RUNTIME](ADR-010-RUNTIME-ci-pipeline.md) | Multi-dimensional future-proof CI pipeline (Runtime sovereign variant — Argo Workflows, ~47 stage) |
 | [ADR-076](ADR-076_cave_ctl_CLI_MCP_Server_Architecture.md) | cave-ctl CLI & MCP server architecture |
 | [ADR-147](ADR-147_Data_Persistence_Crate_Naming_and_Lakehouse_Consolidation.md) | Data-persistence crate naming + lakehouse consolidation |
 
