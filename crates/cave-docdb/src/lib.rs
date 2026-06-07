@@ -49,6 +49,10 @@ pub mod sql;
 /// Pluggable storage backends (in-memory + SQL).
 pub mod backend;
 
+/// Real PostgreSQL executor over tokio-postgres (feature `pg`).
+#[cfg(feature = "pg")]
+pub mod pg_executor;
+
 /// HTTP route handlers.
 pub mod routes;
 

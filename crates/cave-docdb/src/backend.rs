@@ -15,7 +15,6 @@
 
 use crate::bson::Document;
 use crate::engine::Database;
-use crate::query::matches_query;
 use crate::sql;
 use async_trait::async_trait;
 use serde_json::Value;
