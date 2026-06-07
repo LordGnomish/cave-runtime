@@ -481,8 +481,158 @@ pub fn delete_to_sql(table: &str, filter: &Value) -> SqlQuery {
 /// `$count`. Stages outside this set leave the pipeline to the in-memory
 /// executor — callers should fall back when `pipeline_to_sql` cannot represent
 /// a stage (signalled by `None`).
-pub fn pipeline_to_sql(_table: &str, _pipeline: &[Value]) -> Option<SqlQuery> {
-    Some(SqlQuery::default())
+pub fn pipeline_to_sql(table: &str, pipeline: &[Value]) -> Option<SqlQuery> {
+    let mut ctx = Ctx::default();
+    let mut where_terms: Vec<String> = Vec::new();
+    let mut sort: Option<Value> = None;
+    let mut skip: Option<i64> = None;
+    let mut limit: Option<i64> = None;
+    let mut project: Option<Value> = None;
+    let mut group: Option<Value> = None;
+    let mut count_name: Option<String> = None;
+
+    for stage in pipeline {
+        let obj = stage.as_object()?;
+        if obj.len() != 1 {
+            return None;
+        }
+        let (name, body) = obj.iter().next()?;
+        match name.as_str() {
+            "$match" => {
+                let term = translate_filter(body, &mut ctx);
+                if !term.is_empty() {
+                    where_terms.push(term);
+                }
+            }
+            "$sort" => sort = Some(body.clone()),
+            "$skip" => skip = body.as_i64(),
+            "$limit" => limit = body.as_i64(),
+            "$project" => project = Some(body.clone()),
+            "$group" => group = Some(body.clone()),
+            "$count" => count_name = body.as_str().map(|s| s.to_string()),
+            // Any stage we cannot represent in SQL → defer to the engine.
+            _ => return None,
+        }
+    }
+
+    let from = quote_ident(table);
+    let where_sql = if where_terms.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", where_terms.join(" AND "))
+    };
+
+    // $count is terminal.
+    if let Some(name) = count_name {
+        return Some(SqlQuery {
+            sql: format!(
+                "SELECT jsonb_build_object('{}', count(*)) AS _jsonb FROM {}{}",
+                esc(&name),
+                from,
+                where_sql
+            ),
+            params: ctx.params,
+        });
+    }
+
+    // $group is terminal (aside from a trailing $sort/$limit, omitted here).
+    if let Some(g) = group {
+        let (select, group_by) = group_to_sql(&g)?;
+        let mut sql = format!("SELECT {} FROM {}{}", select, from, where_sql);
+        if let Some(gb) = group_by {
+            sql.push_str(&format!(" GROUP BY {}", gb));
+        }
+        return Some(SqlQuery {
+            sql,
+            params: ctx.params,
+        });
+    }
+
+    // Linear projection pipeline.
+    let select = projection_select(project.as_ref()).unwrap_or_else(|| "_jsonb".to_string());
+    let mut sql = format!("SELECT {} FROM {}{}", select, from, where_sql);
+    if let Some(s) = sort.as_ref().and_then(|v| v.as_object()) {
+        let order: Vec<String> = s
+            .iter()
+            .map(|(field, dir)| {
+                let d = if dir.as_i64().unwrap_or(1) < 0 { "DESC" } else { "ASC" };
+                format!("{} {}", path_value(field), d)
+            })
+            .collect();
+        if !order.is_empty() {
+            sql.push_str(&format!(" ORDER BY {}", order.join(", ")));
+        }
+    }
+    if let Some(l) = limit {
+        sql.push_str(&format!(" LIMIT {}", l));
+    }
+    if let Some(s) = skip {
+        sql.push_str(&format!(" OFFSET {}", s));
+    }
+    Some(SqlQuery {
+        sql,
+        params: ctx.params,
+    })
+}
+
+/// Build a `$group` `SELECT` list and `GROUP BY` expression.
+///
+/// Returns `(select_list, Some(group_by_expr))`, or a `None` group-by for a
+/// whole-collection aggregate (`_id: null`).
+fn group_to_sql(spec: &Value) -> Option<(String, Option<String>)> {
+    let obj = spec.as_object()?;
+    let id = obj.get("_id")?;
+    // _id expression and the GROUP BY key (None == aggregate over all rows).
+    let (id_expr, group_by) = match id {
+        Value::Null => ("'null'::jsonb".to_string(), None),
+        Value::String(s) if s.starts_with('$') => {
+            let e = path_value(s.trim_start_matches('$'));
+            (e.clone(), Some(e))
+        }
+        other => {
+            // Constant grouping key.
+            (format!("'{}'::jsonb", esc(&json_param(other))), None)
+        }
+    };
+    let mut pairs = vec![format!("'_id', {}", id_expr)];
+    let mut fields: Vec<&String> = obj.keys().filter(|k| *k != "_id").collect();
+    fields.sort();
+    for f in fields {
+        let acc = accumulator_to_sql(&obj[f])?;
+        pairs.push(format!("'{}', {}", esc(f), acc));
+    }
+    Some((
+        format!("jsonb_build_object({}) AS _jsonb", pairs.join(", ")),
+        group_by,
+    ))
+}
+
+/// Translate one accumulator expression (`{"$sum": "$f"}` etc.) into SQL.
+fn accumulator_to_sql(spec: &Value) -> Option<String> {
+    let obj = spec.as_object()?;
+    let (op, arg) = obj.iter().next()?;
+    // numeric field reference "$f" → cast to numeric; literal number → count.
+    let numeric_arg = |arg: &Value| -> Option<String> {
+        match arg {
+            Value::String(s) if s.starts_with('$') => {
+                Some(format!("({})::numeric", path_text(s.trim_start_matches('$'))))
+            }
+            _ => None,
+        }
+    };
+    let sql = match op.as_str() {
+        "$sum" => match numeric_arg(arg) {
+            Some(col) => format!("to_jsonb(sum({}))", col),
+            // $sum: <constant> counts matching rows.
+            None => "to_jsonb(count(*))".to_string(),
+        },
+        "$avg" => format!("to_jsonb(avg({}))", numeric_arg(arg)?),
+        "$min" => format!("to_jsonb(min({}))", numeric_arg(arg)?),
+        "$max" => format!("to_jsonb(max({}))", numeric_arg(arg)?),
+        "$count" => "to_jsonb(count(*))".to_string(),
+        _ => return None,
+    };
+    Some(sql)
 }
 
 #[cfg(test)]
