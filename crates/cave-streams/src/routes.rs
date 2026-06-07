@@ -21,8 +21,9 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
     let connect = Arc::new(crate::connect::ConnectCluster::new());
 
     Router::new()
-        // ── Health ─────────────────────────────────────────────────────────
+        // ── Health + metrics ───────────────────────────────────────────────
         .route("/api/streams/health", get(health))
+        .route("/api/streams/metrics", get(metrics_endpoint))
 
         // ── Schema Registry ────────────────────────────────────────────────
         .route("/subjects", get(list_subjects))
@@ -119,6 +120,14 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
             "tenants": pulsar_tenants,
         },
     }))
+}
+
+/// Prometheus text exposition — live broker/Pulsar gauges + preview counters.
+async fn metrics_endpoint(State((s, _)): State<AppState>) -> impl IntoResponse {
+    (
+        [("content-type", "text/plain; version=0.0.4")],
+        crate::metrics::render_prometheus(&s),
+    )
 }
 
 // ── Schema Registry handlers ──────────────────────────────────────────────────
@@ -849,6 +858,7 @@ struct TxnPreviewTxn {
 /// two-phase-commit invariant that aborted writes never surface.
 async fn pulsar_txn_preview(Json(req): Json<TxnPreviewRequest>) -> impl IntoResponse {
     use crate::pulsar_transactions::{TransactionBuffer, TransactionCoordinator};
+    crate::metrics::inc_txn_preview();
     let mut tc = TransactionCoordinator::new(req.coordinator_id);
     let mut buf = TransactionBuffer::new();
     let mut statuses = Vec::new();
@@ -918,6 +928,7 @@ struct ShareAck {
 /// resulting SPSO + state counts.
 async fn share_group_preview(Json(req): Json<ShareGroupPreviewRequest>) -> impl IntoResponse {
     use crate::share_group::{AcknowledgeType, SharePartition};
+    crate::metrics::inc_share_preview();
     let mut p = SharePartition::new(0, req.max_delivery_count, req.lock_ms);
     let acquired = p.acquire("m-default", req.log_end_offset as usize, req.log_end_offset, 0);
     let mut applied = 0usize;

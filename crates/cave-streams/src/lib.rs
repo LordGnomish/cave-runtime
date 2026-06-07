@@ -40,6 +40,7 @@ pub mod kafka_streams_processor;
 pub mod kafka_wire;
 pub mod kraft;
 pub mod log_compaction;
+pub mod metrics;
 pub mod mirror;
 pub mod partitioned_topic;
 pub mod protocol;

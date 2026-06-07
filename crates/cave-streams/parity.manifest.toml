@@ -493,6 +493,11 @@ local_path    = "/connectors/{name}/status"
 # streaming-ray-2 preview surfaces
 [[surfaces]]
 kind          = "http"
+upstream_path = "prometheus /metrics text exposition"
+local_path    = "/api/streams/metrics"
+
+[[surfaces]]
+kind          = "http"
 upstream_path = "pulsar-admin transactions coordinator-stats"
 local_path    = "/api/streams/pulsar/transactions/preview"
 
