@@ -50,17 +50,26 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 #     (kafka/pulsar/connect/tiered) + cavectl streams sub-commands +
 #     observability cave-streams alerts & dashboard — all green
 #     pre-close.
-mapped_count   = 27
+mapped_count   = 29
 partial_count  = 0
 skipped_count  = 16
-unmapped_count = 2
+unmapped_count = 0
 total          = 45
-fill_ratio     = 0.9556
-honest_ratio   = 0.9556
+fill_ratio     = 1.0
+honest_ratio   = 1.0
 parity_ratio_source = "manifest"
 source_sha     = { kafka = "9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2", pulsar = "1940aebc6ade10050399cd65f870353eedf80008" }
-last_audit     = "2026-05-19"
+last_audit     = "2026-06-07"
 infra_only     = false
+
+# 2026-06-07 streaming-ray-2 close — the two remaining [[unmapped]] gaps
+# (formally the [[scope_cuts]] deferred 2026-05-19) ported via strict
+# RED→GREEN TDD and promoted to [[mapped]]:
+#   apache/pulsar:pulsar-broker/.../transactions/  → src/pulsar_transactions.rs
+#   apache/kafka:server/group-coordinator/share/   → src/share_group.rs
+# mapped 27 → 29, unmapped 2 → 0, fill_ratio 0.9556 → 1.0 (honest close:
+# the 16 remaining skips are all CLI/build/test-harness/non-Java-client/
+# crypto scope cuts — no unmapped library-surface gaps remain).
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
 #   * 4 of 6 prior [[scope_cuts]] promoted to [[mapped]] via real Rust ports:
@@ -173,6 +182,16 @@ local    = "src/pulsar_io_connectors.rs"
 [[files]]
 upstream = "streams/src/main/java/org/apache/kafka/streams/processor/{Processor,ProcessorContext,StateStore,Punctuator}.java"
 local    = "src/kafka_streams_processor.rs"
+
+# streaming-ray-2 — 2026-06-07 deep-port
+
+[[files]]
+upstream = "pulsar-transaction/coordinator/.../{TransactionMetadataStore,TxnMetaImpl}.java + pulsar-broker/.../transaction/buffer/TopicTransactionBuffer.java"
+local    = "src/pulsar_transactions.rs"
+
+[[files]]
+upstream = "core/src/main/java/kafka/server/share/SharePartition.java + server-common/.../share/{RecordState,AcknowledgeType}.java"
+local    = "src/share_group.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -323,6 +342,33 @@ upstream_name = "CooperativeStickyAssignor.assign"
 local_name    = "compute_incremental_plan"
 file          = "src/incremental_rebalance.rs"
 
+# Pulsar transactions (PIP-31) — streaming-ray-2
+[[functions]]
+upstream_name = "TransactionMetadataStore.newTransaction"
+local_name    = "TransactionCoordinator::new_transaction"
+file          = "src/pulsar_transactions.rs"
+
+[[functions]]
+upstream_name = "TxnMetaImpl.checkTxnStatusCanBeUpdated"
+local_name    = "TxnMeta::can_transition_to"
+file          = "src/pulsar_transactions.rs"
+
+[[functions]]
+upstream_name = "TopicTransactionBuffer.commitTxn"
+local_name    = "TransactionBuffer::commit"
+file          = "src/pulsar_transactions.rs"
+
+# Kafka share groups (KIP-932) — streaming-ray-2
+[[functions]]
+upstream_name = "SharePartition.acquire"
+local_name    = "SharePartition::acquire"
+file          = "src/share_group.rs"
+
+[[functions]]
+upstream_name = "SharePartition.acknowledge"
+local_name    = "SharePartition::acknowledge"
+file          = "src/share_group.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 # Kafka wire
@@ -392,6 +438,24 @@ local_test    = "test_segment_log_append_assigns_offset"
 upstream_test = "EnsembleTest.testQuorumWrite"
 local_test    = "test_ensemble_write_satisfies_quorum"
 
+# Pulsar transactions (PIP-31) — streaming-ray-2
+[[tests]]
+upstream_test = "MLTransactionMetadataStoreTest.testUpdateTxnStatus"
+local_test    = "pulsar_transactions::tests::open_to_committing_to_committed_is_legal"
+
+[[tests]]
+upstream_test = "TransactionTest.txnAbortNotVisible"
+local_test    = "pulsar_transaction_commit_publishes_abort_discards"
+
+# Kafka share groups (KIP-932) — streaming-ray-2
+[[tests]]
+upstream_test = "SharePartitionTest.testAcquireAndAcknowledge"
+local_test    = "share_group_acquire_acknowledge_advances_spso"
+
+[[tests]]
+upstream_test = "SharePartitionTest.testMaxDeliveryCountArchive"
+local_test    = "share_group::tests::record_archived_after_max_delivery_attempts"
+
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
 [[surfaces]]
@@ -425,6 +489,17 @@ local_path    = "/connectors"
 kind          = "http"
 upstream_path = "/connectors/{name}/status"
 local_path    = "/connectors/{name}/status"
+
+# streaming-ray-2 preview surfaces
+[[surfaces]]
+kind          = "http"
+upstream_path = "pulsar-admin transactions coordinator-stats"
+local_path    = "/api/streams/pulsar/transactions/preview"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "kafka-share-groups describe"
+local_path    = "/api/streams/share-groups/preview"
 
 [portal_ui]
 upstream_ui  = "AKHQ / kafdrop (external)"
@@ -602,6 +677,18 @@ upstream_pkg = "apache/kafka:streams/processor-api"
 local_files  = ["src/kafka_streams_processor.rs"]
 note         = "Low-level Streams Processor API — Topology(add_source/add_processor/add_sink/add_state_store) with parent validation; Processor trait + StateStore (put/get/delete/keys); ProcessorContext.forward/commit/schedule; ScheduledPunctuator wall-clock + stream-time with last_fired interval check; BFS routing source→processor→sink with explicit forward override."
 
+# ─── streaming-ray-2 mapped (2026-06-07 — last two scope_cuts resolved) ────
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../transaction/ + pulsar-transaction/coordinator/"
+local_files  = ["src/pulsar_transactions.rs"]
+note         = "Pulsar transactions (PIP-31) — TransactionCoordinator (= TransactionMetadataStore): newTransaction hands out monotonic TxnID(coordinator_id, sequence_id), addProducedPartitions/addAckedPartitions gated on OPEN, updateTxnStatus guards both the expected-status precondition and TxnMetaImpl.checkTxnStatusCanBeUpdated's exact legal-transition table (OPEN→COMMITTING/ABORTING, COMMITTING→COMMITTED, ABORTING→ABORTED, idempotent restatement), TransactionTimeoutTracker. TopicTransactionBuffer — append-buffered (invisible) → commit publishes + advances max-read-position / abort discards + records aborted txn; interleaved txns publish independently. Cross-broker TC failover + on-ledger persistence delegate to pulsar_managed_ledger.rs substrate."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/group-coordinator/share/ + core/.../share/SharePartition"
+local_files  = ["src/share_group.rs"]
+note         = "Kafka share groups (KIP-932) — SharePartition in-flight record state machine: RecordState (AVAILABLE/ACQUIRED/ACKNOWLEDGED/ARCHIVED, Kafka ordinals) + AcknowledgeType (ACCEPT/RELEASE/REJECT); acquire materialises offsets up to the fetch high-watermark under a per-record acquisition lock + delivery-count bump, capped at max_records; acknowledge applies the disposition (RELEASE redelivers unless delivery_count ≥ max_delivery_count → ARCHIVED poison-pill guard); SPSO slides over the contiguous terminal prefix reclaiming entries; releaseAcquisitionLockOnTimeout reverts expired locks. ShareGroup registry with epoch-fenced member join. Persistent share-state topic + coordinator RPC transport tracked-not-shipped."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -676,20 +763,17 @@ upstream_pkg = "apache/pulsar:bouncy-castle/"
 reason       = "stdlib-analog"
 note         = "BC crypto provider — Rust uses ring"
 
-# ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
+# ─── Unmapped (0) — no honest library-surface gaps remain ──────────────────
 
 # KRaft promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # storage/tiered/ promoted to mapped 2026-05-14 (skeleton) — see `[[mapped]]` entry below.
 # connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
-
-[[unmapped]]
-upstream_pkg = "apache/kafka:server/group-coordinator/share/"
-note         = "Share groups (KIP-932) — queue-style consumption. Preview feature in Kafka 4.x, not yet stable."
-
-[[unmapped]]
-upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
-note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar's transaction buffer + TC deferred."
+#
+# 2026-06-07 streaming-ray-2 — the last two [[unmapped]] rows were ported and
+# promoted to [[mapped]] (see the streaming-ray-2 mapped block above):
+#   apache/pulsar:pulsar-broker/.../transactions/  → src/pulsar_transactions.rs
+#   apache/kafka:server/group-coordinator/share/   → src/share_group.rs
 
 # Phase 2 promotions (2026-05-19) — moved from [[unmapped]] to [[mapped]]:
 #   apache/kafka:streams/processor-api          → src/kafka_streams_processor.rs
@@ -697,23 +781,14 @@ note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped;
 #   apache/pulsar:managed-ledger/                → src/pulsar_managed_ledger.rs
 #   apache/pulsar:pulsar-io/                     → src/pulsar_io_connectors.rs
 
-# ─── Scope cuts ─── deferred to next streaming ray (Pulsar-heavy) ─────────────
-# The 6 [[unmapped]] above are the formally scope-cut deferrals for the
-# 2026-05-19 close-out — promoted next ray as their own RED/GREEN
-# commits. `fill_ratio` is the honest measure post-scope-cut: mapped /
-# (mapped + partial + skipped + unmapped) ≡ (45 − 6) / 45 = 0.8667.
+# ─── Scope cuts ─── all resolved ──────────────────────────────────────────────
+# `fill_ratio` is the honest measure: (mapped + skipped) / total ≡
+# (29 + 16) / 45 = 1.0 — every in-scope library subsystem is mapped; the
+# 16 skips are CLI/build/test-harness/non-Java-client/crypto cuts.
 
-[[scope_cuts]]
-name      = "pulsar-transactions"
-upstream  = "apache/pulsar:pulsar-broker/.../transactions/"
-reason    = "Kafka EOS (idempotent producer + transaction coordinator) is mapped; Pulsar's transaction buffer + TC is a separate subsystem deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
-name      = "kafka-share-groups"
-upstream  = "apache/kafka:server/group-coordinator/share/"
-reason    = "KIP-932 queue-style share groups (Kafka 4.x preview feature). Deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
+# Resolved scope_cuts (2026-06-07 streaming-ray-2 deep-port):
+#   * pulsar-transactions  → mapped (src/pulsar_transactions.rs)
+#   * kafka-share-groups   → mapped (src/share_group.rs)
 
 # Resolved scope_cuts (2026-05-19 Phase 2 deep-port):
 #   * pulsar-geographic-replication → mapped (src/pulsar_geo_replication.rs)
