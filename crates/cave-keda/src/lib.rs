@@ -19,6 +19,7 @@
 pub mod aws_sqs_scaler;
 pub mod azure_eventhub_scaler;
 pub mod azure_servicebus_scaler;
+pub mod cloudevents;
 pub mod cpu_memory_scaler;
 pub mod cron_scaler;
 pub mod datadog_scaler;
@@ -41,6 +42,10 @@ pub mod trigger_authentication;
 pub use aws_sqs_scaler::AwsSqsScaler;
 pub use azure_eventhub_scaler::AzureEventHubScaler;
 pub use azure_servicebus_scaler::{AzureServiceBusEntity, AzureServiceBusScaler};
+pub use cloudevents::{
+    CloudEvent, CloudEventEmitter, CloudEventType, EmitData, EventData,
+    generate_cloud_event_source, generate_cloud_event_subject,
+};
 pub use cpu_memory_scaler::{CpuScaler, MemoryScaler, ResourceMetricType};
 pub use cron_scaler::{CronScaler, validate_cron};
 pub use datadog_scaler::DatadogScaler;
