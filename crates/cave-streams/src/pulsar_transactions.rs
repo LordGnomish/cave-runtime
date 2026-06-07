@@ -118,9 +118,20 @@ impl TxnMeta {
     /// `TxnMetaImpl.checkTxnStatusCanBeUpdated(newStatus)` — Pulsar's exact
     /// legal-transition table. Idempotent re-statements of the current target
     /// status (e.g. COMMITTING→COMMITTING) are allowed so retries are safe.
-    fn can_transition_to(&self, _new_status: TxnStatus) -> bool {
-        // RED placeholder — legal-transition table not yet ported.
-        true
+    fn can_transition_to(&self, new_status: TxnStatus) -> bool {
+        match self.status {
+            TxnStatus::Open => {
+                new_status == TxnStatus::Committing || new_status == TxnStatus::Aborting
+            }
+            TxnStatus::Committing => {
+                new_status == TxnStatus::Committing || new_status == TxnStatus::Committed
+            }
+            TxnStatus::Committed => new_status == TxnStatus::Committed,
+            TxnStatus::Aborting => {
+                new_status == TxnStatus::Aborting || new_status == TxnStatus::Aborted
+            }
+            TxnStatus::Aborted => new_status == TxnStatus::Aborted,
+        }
     }
 }
 
@@ -309,10 +320,13 @@ impl TransactionBuffer {
     /// advance the max-read-position. Returns the now-visible messages in
     /// the order they were appended.
     pub fn commit(&mut self, txn_id: &TxnID) -> StreamsResult<Vec<BufferedMessage>> {
-        // RED placeholder — commit does not yet publish buffered messages.
         let msgs = self.ongoing.remove(txn_id).ok_or_else(|| {
             StreamsError::InvalidTxnState(format!("no buffered messages for txn {txn_id}"))
         })?;
+        for m in &msgs {
+            self.committed.push(m.clone());
+            self.max_read_position += 1;
+        }
         Ok(msgs)
     }
 
