@@ -52,8 +52,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DocdbViewE
             ]
         })
         .collect();
+    let backend = r#"<section class="mb-4"><h2 class="text-lg font-semibold mb-2">Storage backend</h2><p class="text-sm text-gray-600">Hybrid: MongoDB wire protocol (OP_MSG / BSON) over a PostgreSQL JSONB backend. MongoDB queries and aggregation pipelines are translated to parameterised SQL — inspect via <code>POST /api/docdb/sql/translate</code> or <code>cavectl docdb sql-translate</code>.</p></section>"#;
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Collections ({n})</h2>{tbl}</section>"#,
+        r#"{backend}<section><h2 class="text-lg font-semibold mb-2">Collections ({n})</h2>{tbl}</section>"#,
+        backend = backend,
         n = cols.len(),
         tbl = table(&["database", "collection", "documents"], &rows),
     );
@@ -126,6 +128,20 @@ mod tests {
         let s = AdminState::seeded();
         let c = collections_in(&s, &ctx(&[Permission::DocdbRead]), "secrets").unwrap();
         assert!(c.is_empty());
+    }
+
+    #[test]
+    fn render_shows_hybrid_sql_backend() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/mongo-explorer/src/components/CollectionsPage.tsx",
+            "CollectionsPage",
+            "acme"
+        );
+        let s = AdminState::seeded();
+        let html = render(&s, &ctx(&[Permission::DocdbRead])).unwrap();
+        assert!(html.contains("Storage backend"));
+        assert!(html.contains("PostgreSQL JSONB"));
+        assert!(html.contains("/api/docdb/sql/translate"));
     }
 
     #[test]
