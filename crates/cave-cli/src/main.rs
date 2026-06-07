@@ -1785,6 +1785,18 @@ enum DocdbCmd {
     },
     /// Show wire-protocol server info (mongosh `db.runCommand({hello:1})`)
     Info,
+    /// Translate a MongoDB query/pipeline to PostgreSQL SQL (hybrid backend)
+    SqlTranslate {
+        /// Collection name
+        #[arg(long)]
+        collection: String,
+        /// JSON filter document (find shape)
+        #[arg(long, default_value = "{}")]
+        filter: String,
+        /// JSON aggregation pipeline array (takes precedence over filter)
+        #[arg(long)]
+        pipeline: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3598,6 +3610,15 @@ async fn run(cli: Cli) -> Result<()> {
                 .await
             }
             DocdbCmd::Info => c.get("/api/docdb/server/info").await,
+            DocdbCmd::SqlTranslate { collection, filter, pipeline } => {
+                let mut body = json!({ "collection": collection });
+                if let Some(p) = pipeline {
+                    body["pipeline"] = serde_json::from_str(&p).unwrap_or(json!([]));
+                } else {
+                    body["filter"] = serde_json::from_str(&filter).unwrap_or(json!({}));
+                }
+                c.post("/api/docdb/sql/translate", body).await
+            }
         },
 
         // ── Cache ─────────────────────────────────────────────────────────────

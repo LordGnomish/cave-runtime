@@ -205,6 +205,12 @@ impl Database {
         }
     }
 
+    /// Public constructor for a standalone, empty database — used by the
+    /// pluggable storage backends ([`crate::backend`]).
+    pub fn default_db() -> Self {
+        Self::new()
+    }
+
     pub async fn get_or_create_collection(&self, name: &str) -> Collection {
         let mut cols = self.collections.write().await;
         cols.entry(name.to_string())
