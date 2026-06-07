@@ -22,6 +22,7 @@
 //! # }
 //! ```
 
+pub mod contact_creation;
 pub mod graphql_resolver;
 pub mod graphql_schema;
 pub mod indexes;
