@@ -99,6 +99,37 @@ fn norm_tag(tag: &str) -> &str {
     t.strip_prefix('v').unwrap_or(t)
 }
 
+/// Parse a *pure* version tag (`v?` + dotted decimals, nothing else) into
+/// its numeric components. Rejects component-prefixed tags such as
+/// `sdk/v2.9.1`, `python-0.4.0`, `kafka-0.7.2`, `knative-v1.22.0`,
+/// `RELEASE.2025-…` and pre-release suffixes like `1.2.0-rc1` — exactly
+/// the noise that pollutes a repo's raw tag list.
+fn semver_core(tag: &str) -> Option<Vec<u64>> {
+    let core = tag.trim().strip_prefix('v').unwrap_or(tag.trim());
+    if core.is_empty() {
+        return None;
+    }
+    let parts: Vec<u64> = core
+        .split('.')
+        .map(|p| p.parse::<u64>().ok())
+        .collect::<Option<Vec<u64>>>()?;
+    (!parts.is_empty()).then_some(parts)
+}
+
+/// From a repo's raw tag list, pick the highest *clean* semver tag,
+/// returning it verbatim (original `v`/casing preserved). `None` when no
+/// tag is a pure version — the caller then keeps the first-tag fallback.
+///
+/// This is what turns a `tags`-only repo's drift from junk (`apache/kafka`
+/// → `show`, `twentyhq/twenty` → `sdk/v2.9.1`) into the real latest
+/// release (`4.3.0`, `v2.9.0`).
+pub fn pick_latest_semver_tag(tags: &[String]) -> Option<String> {
+    tags.iter()
+        .filter_map(|t| semver_core(t).map(|core| (core, t)))
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, t)| t.clone())
+}
+
 /// Async release fetcher. Implementors return the latest release/tag for
 /// a `org/repo`, or `None` when it cannot be determined (offline, rate
 /// limited, no releases). Returning `None` keeps the daily report
@@ -154,16 +185,26 @@ impl ReleaseFetcher for GithubFetcher {
         {
             return Some(tag.to_string());
         }
-        // 2. tags — repos with git tags but no GitHub release objects.
-        let tags_url = format!("{}/repos/{}/tags?per_page=1", self.api_base, repo);
+        // 2. tags — repos with git tags but no GitHub release objects
+        //    (apache/kafka, apache/datafusion, twentyhq/twenty, …). Pull a
+        //    page and pick the highest *clean* semver tag; the raw list is
+        //    not version-ordered and is polluted with component tags
+        //    (`sdk/v…`, `python-…`, `kafka-0.7.…`).
+        let tags_url = format!("{}/repos/{}/tags?per_page=100", self.api_base, repo);
         if let Some(body) = self.get_json(&tags_url).await
-            && let Some(name) = body
-                .as_array()
-                .and_then(|a| a.first())
-                .and_then(|t| t.get("name"))
-                .and_then(|v| v.as_str())
+            && let Some(arr) = body.as_array()
         {
-            return Some(name.to_string());
+            let names: Vec<String> = arr
+                .iter()
+                .filter_map(|t| t.get("name").and_then(|v| v.as_str()).map(String::from))
+                .collect();
+            // Prefer the best semver tag; fall back to the first listed.
+            if let Some(best) = pick_latest_semver_tag(&names) {
+                return Some(best);
+            }
+            if let Some(first) = names.into_iter().next() {
+                return Some(first);
+            }
         }
         None
     }
@@ -175,7 +216,7 @@ impl ReleaseFetcher for GithubFetcher {
 /// or extend this through the YAML config.
 pub fn default_registry() -> Vec<Upstream> {
     use Upstream as U;
-    vec![
+    let mut registry = vec![
         // ── Kubernetes control plane ──────────────────────────────────
         U::new("kube-apiserver", "kubernetes/kubernetes", "cave-apiserver", "Kubernetes Core", 1, "resource CRUD, admission, RBAC, watch/list"),
         U::new("kube-scheduler", "kubernetes/kubernetes", "cave-scheduler", "Kubernetes Core", 1, "filter/score/bind, affinity, taints"),
@@ -266,7 +307,84 @@ pub fn default_registry() -> Vec<Upstream> {
         U::new("Backstage", "backstage/backstage", "cave-portal", "devex", 1, "service catalog, software templates"),
         U::new("Unleash", "Unleash/unleash", "cave-flags", "devex", 1, "feature flags, strategies"),
         U::new("Twenty", "twentyhq/twenty", "cave-crm", "crm", 4, "CRM objects, pipelines, workflows"),
-    ]
+    ];
+    apply_curated_pins(&mut registry);
+    registry
+}
+
+/// Ported-version baselines, keyed by `org/repo`, sourced from each
+/// crate's `parity.manifest.toml` `[upstream] version` (the upstream
+/// tag we line-ported against). These are the real pins that turn the
+/// daily report from all-`unknown` into an honest in-sync/behind delta.
+///
+/// Only repos whose `cave_module` genuinely tracks that exact upstream
+/// are listed — repos the registry maps to a *different* upstream than
+/// the manifest, or that are pinned to a moving `main`, are deliberately
+/// left unpinned (reported `unknown`) rather than pinned to a guess.
+///
+/// Snapshot: 2026-06-07. Re-sync when a crate's manifest version bumps.
+pub const CURATED_PINS: &[(&str, &str)] = &[
+    ("kubernetes/kubernetes", "v1.36.0"),
+    ("containerd/containerd", "v2.2.3"),
+    ("etcd-io/etcd", "v3.6.10"),
+    ("clastix/kamaji", "v1.0.0"),
+    ("kubevirt/kubevirt", "v1.8.2"),
+    ("cilium/cilium", "v1.19.3"),
+    ("cilium/tetragon", "v1.7.0"),
+    ("coredns/coredns", "v1.14.3"),
+    ("istio/istio", "1.30.0"),
+    ("Kong/kong", "3.9.1"),
+    ("knative/serving", "knative-v1.22.0"),
+    ("argoproj/argo-cd", "v3.4.2"),
+    ("argoproj/argo-rollouts", "v1.9.0"),
+    ("argoproj/argo-workflows", "v4.0.5"),
+    ("tektoncd/pipeline", "v0.55.0"),
+    ("crossplane/crossplane", "v2.3.1"),
+    ("kedacore/keda", "v2.16.1"),
+    ("kubernetes-sigs/karpenter", "v1.4.0"),
+    ("cert-manager/cert-manager", "v1.17.2"),
+    ("aquasecurity/trivy", "v0.70.0"),
+    ("DependencyTrack/dependency-track", "v4.11.6"),
+    ("open-policy-agent/opa", "v1.16.2"),
+    ("open-policy-agent/gatekeeper", "v3.17.1"),
+    ("keycloak/keycloak", "v22.0.0"),
+    ("spiffe/spire", "v1.15.0"),
+    ("openbao/openbao", "v2.5.4"),
+    ("falcosecurity/falco", "0.43.1"),
+    ("prometheus/prometheus", "v3.3.0"),
+    ("grafana/grafana", "v11.5.0"),
+    ("grafana/loki", "v3.4.0"),
+    ("grafana/pyroscope", "v1.3.0"),
+    ("grafana/oncall", "v1.10.0"),
+    ("FerretDB/FerretDB", "v2.0.0"),
+    ("valkey-io/valkey", "8.0.0"),
+    ("minio/minio", "RELEASE.2025-04-22T22-12-26Z"),
+    ("apache/kafka", "4.2.0"),
+    ("apache/pulsar", "v4.2.0"),
+    ("apache/iceberg-rust", "v0.9.1"),
+    ("apache/datafusion", "53.1.0"),
+    ("BerriAI/litellm", "v1.85.1"),
+    ("ollama/ollama", "v0.3.0"),
+    ("microsoft/presidio", "v2.2.0"),
+    ("langfuse/langfuse", "v3.75.1"),
+    ("opencost/opencost", "v1.108.0"),
+    ("chaos-mesh/chaos-mesh", "v2.7.0"),
+    ("apache/incubator-devlake", "v0.21.1"),
+    ("louislam/uptime-kuma", "v1.23.13"),
+    ("backstage/backstage", "v1.50.4"),
+    ("Unleash/unleash", "v5.0.0"),
+    ("twentyhq/twenty", "v2.6.0"),
+];
+
+/// Stamp [`CURATED_PINS`] onto every matching registry row. A repo shared
+/// by several cave modules (e.g. `kubernetes/kubernetes`) gets the same
+/// pin on each of its rows.
+fn apply_curated_pins(registry: &mut [Upstream]) {
+    for u in registry.iter_mut() {
+        if let Some((_, ver)) = CURATED_PINS.iter().find(|(repo, _)| *repo == u.repo) {
+            u.pinned = Some((*ver).to_string());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -330,6 +448,104 @@ mod tests {
         assert_eq!(drift(Some("1.2.3"), Some("v1.2.4")), DriftStatus::Behind);
         assert_eq!(drift(None, Some("v1.2.3")), DriftStatus::Unknown);
         assert_eq!(drift(Some("1.2.3"), None), DriftStatus::Unknown);
+    }
+
+    #[test]
+    fn curated_pins_land_on_their_rows() {
+        let reg = default_registry();
+        let pin = |repo: &str| {
+            reg.iter()
+                .find(|u| u.repo == repo)
+                .and_then(|u| u.pinned.clone())
+        };
+        // A representative pin from each major area, matching the manifests.
+        assert_eq!(pin("kubernetes/kubernetes").as_deref(), Some("v1.36.0"));
+        assert_eq!(pin("clastix/kamaji").as_deref(), Some("v1.0.0"));
+        assert_eq!(pin("cilium/cilium").as_deref(), Some("v1.19.3"));
+        assert_eq!(pin("openbao/openbao").as_deref(), Some("v2.5.4"));
+        assert_eq!(pin("kedacore/keda").as_deref(), Some("v2.16.1"));
+        assert_eq!(pin("kubernetes-sigs/karpenter").as_deref(), Some("v1.4.0"));
+        assert_eq!(pin("twentyhq/twenty").as_deref(), Some("v2.6.0"));
+        assert_eq!(pin("FerretDB/FerretDB").as_deref(), Some("v2.0.0"));
+        assert_eq!(pin("apache/kafka").as_deref(), Some("4.2.0"));
+        assert_eq!(pin("apache/pulsar").as_deref(), Some("v4.2.0"));
+    }
+
+    #[test]
+    fn shared_repo_pins_fan_to_every_row() {
+        // All five kubernetes/kubernetes rows carry the same pin.
+        let reg = default_registry();
+        let k8s: Vec<_> = reg
+            .iter()
+            .filter(|u| u.repo == "kubernetes/kubernetes")
+            .collect();
+        assert!(k8s.len() >= 4, "expected several k8s rows");
+        assert!(k8s.iter().all(|u| u.pinned.as_deref() == Some("v1.36.0")));
+    }
+
+    #[test]
+    fn majority_of_registry_is_now_pinned() {
+        // Phase 0 cont2 turned the all-unknown report into a real delta:
+        // most rows now carry a manifest-sourced baseline.
+        let reg = default_registry();
+        let pinned = reg.iter().filter(|u| u.pinned.is_some()).count();
+        assert!(
+            pinned >= 50,
+            "expected >=50 pinned rows after cont2, got {pinned}"
+        );
+    }
+
+    #[test]
+    fn every_curated_pin_targets_a_real_registry_repo() {
+        // Guard against a pin entry whose repo was renamed/removed from
+        // the registry (it would silently never apply).
+        let repos: std::collections::BTreeSet<String> =
+            default_registry().into_iter().map(|u| u.repo).collect();
+        for (repo, _) in CURATED_PINS {
+            assert!(
+                repos.contains(*repo),
+                "curated pin {repo} has no matching registry row"
+            );
+        }
+    }
+
+    #[test]
+    fn pick_latest_semver_tag_handles_noisy_lists() {
+        // apache/kafka: bare numerics mixed with junk → highest numeric.
+        let kafka = vec![
+            "show".to_string(),
+            "kafka-0.7.2-incubating".to_string(),
+            "4.2.0".to_string(),
+            "4.3.0".to_string(),
+            "4.2.1".to_string(),
+        ];
+        assert_eq!(pick_latest_semver_tag(&kafka).as_deref(), Some("4.3.0"));
+
+        // twentyhq/twenty: component-prefixed sdk tags must be ignored.
+        let twenty = vec![
+            "sdk/v2.9.1".to_string(),
+            "v2.9.0".to_string(),
+            "v2.8.3".to_string(),
+        ];
+        assert_eq!(pick_latest_semver_tag(&twenty).as_deref(), Some("v2.9.0"));
+
+        // datafusion: numeric tags alongside a python sub-project tag.
+        let df = vec!["python-0.4.0".to_string(), "53.1.0".to_string(), "52.5.0".to_string()];
+        assert_eq!(pick_latest_semver_tag(&df).as_deref(), Some("53.1.0"));
+
+        // Nothing clean → None (caller keeps its first-tag fallback).
+        let messy = vec!["RELEASE.2025-10-15".to_string(), "nightly".to_string()];
+        assert_eq!(pick_latest_semver_tag(&messy), None);
+    }
+
+    #[test]
+    fn semver_core_rejects_prefixed_and_prerelease() {
+        assert_eq!(super::semver_core("v1.2.3"), Some(vec![1, 2, 3]));
+        assert_eq!(super::semver_core("4.2.0"), Some(vec![4, 2, 0]));
+        assert!(super::semver_core("sdk/v2.9.1").is_none());
+        assert!(super::semver_core("1.2.0-rc1").is_none());
+        assert!(super::semver_core("knative-v1.22.0").is_none());
+        assert!(super::semver_core("RELEASE.2025-10-15").is_none());
     }
 
     #[test]

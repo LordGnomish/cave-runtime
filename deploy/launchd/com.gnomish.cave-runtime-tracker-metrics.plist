@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.gnomish.cave-runtime-tracker-metrics</string>
+	<key>Disabled</key>
+	<false/>
+	<key>WorkingDirectory</key>
+	<string>/tmp/rt-ref-61476</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/tmp/rt-ref-61476</string>
+		<key>PATH</key>
+		<string>/tmp/rt-ref-61476/.cargo/bin:/tmp/rt-ref-61476/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>TZ</key>
+		<string>Europe/Berlin</string>
+	</dict>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/tmp/rt-ref-61476/.local/bin/cave-runtime-tracker</string>
+		<string>serve</string>
+		<string>--port</string>
+		<string>9103</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>10</integer>
+	<key>StandardOutPath</key>
+	<string>/tmp/rt-ref-61476/Library/Application Support/cave-runtime/runtime-tracker-metrics.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/rt-ref-61476/Library/Application Support/cave-runtime/runtime-tracker-metrics.err</string>
+</dict>
+</plist>

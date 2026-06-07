@@ -112,7 +112,12 @@ mod tests {
     fn small_cfg() -> TrackerConfig {
         let mut c = TrackerConfig::default_config();
         c.upstreams.truncate(3);
-        // Pin the first so we can assert drift transitions.
+        // Start from a clean slate (the default registry now ships
+        // curated pins) so this fixture isolates the pin→drift logic:
+        // only upstream[0] is pinned, the rest stay unpinned/Unknown.
+        for u in &mut c.upstreams {
+            u.pinned = None;
+        }
         c.upstreams[0].pinned = Some("v1.0.0".to_string());
         c
     }

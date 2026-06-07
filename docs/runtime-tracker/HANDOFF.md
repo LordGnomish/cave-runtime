@@ -1,11 +1,40 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- Copyright 2026 Cave Runtime contributors -->
 
-# cave-runtime-tracker — bootstrap handoff
+# cave-runtime-tracker — handoff
 
 **Date:** 2026-06-07
-**Branch:** `feature/cave-runtime-tracker` (worktree `../cave-runtime-tracker-bootstrap`)
-**Status:** ✅ shipped on the cave-runtime side. cave-home side: re-dispatch needed (see §3).
+**Branch:** `feature/cave-runtime-tracker` (bootstrap) → `feature/runtime-tracker-cont2`
+**Status:** ✅ Phase 0 live. Pinned, measuring, serving metrics, scheduled.
+
+---
+
+## 0. cont2 — what changed since bootstrap (2026-06-07)
+
+The bootstrap shipped a report-only scaffold whose registry had **no pins**,
+so every row reported `unknown`. cont2 turned it into a real, running drift +
+port-depth tracker:
+
+| Area | cont2 delta |
+|------|-------------|
+| **Pins** | 51 curated `CURATED_PINS` stamped from each crate's `parity.manifest.toml [upstream] version`. Report is now a real delta, not all-unknown. |
+| **First live delta** | **81 tracked — 8 in-sync · 46 behind · 27 unknown** (1 unresolved). e.g. KEDA v2.16.1→v2.20.0, Cilium v1.19.3→v1.19.4, k8s v1.36.0→v1.36.1; in-sync: OpenBao, Crossplane, Apache Iceberg/DataFusion, Argo Rollouts/Workflows, CoreDNS, Tetragon. |
+| **`measure`** | tokei port-depth: shallow-clone headline upstreams → `tokei` → `cave_code/upstream_code`. Generic over `LocSource` (offline-tested); `TokeiLoc` clones into temp + `rm`s immediately. e.g. cave-net 1.00% of cilium (45 236 / 4 510 790), cave-docdb 7.53% of FerretDB. |
+| **`metrics`** | pure `render_prometheus` → `/metrics` exposition (`_tracked`, `_status`, `_drift`, `_upstream_loc`, `_cave_loc`, `_port_ratio`). |
+| **`serve`** | axum `/metrics` + `/healthz` daemon on **:9103** (9101/9102 are the cave autopilots). Read-only, renders cached `latest.json` (+ `latest-measure.json`) each scrape. |
+| **`daily-progress-<date>.md`** | richer human digest: behind table + in-sync roll-call + LOC depth table. First real one committed under `docs/runtime-tracker/`. |
+| **launchd** | pure `AgentSpec::render` (plutil-lints). Two agents installed: `com.gnomish.cave-runtime-tracker` (calendar 06:30, `report --measure`, GITHUB_TOKEN baked) + `com.gnomish.cave-runtime-tracker-metrics` (KeepAlive `serve`). Both visible in `launchctl list \| grep tracker`. |
+| **Correctness fixes from the live run** | (1) `clastix-labs/kamaji` 404s — real repo is `clastix/kamaji` (manifest slug was aspirational). (2) `tags?per_page=1` returned junk (kafka→`show`, twenty→`sdk/v2.9.1`); now `pick_latest_semver_tag` over a page of 100 → real `4.3.0` / `53.1.0`. |
+| **Tests** | 29 → **57** (55 lib + 2 integ), clippy clean. |
+
+**Install state (live now):** `~/.local/bin/cave-runtime-tracker` (release),
+both plists loaded, metrics daemon answering on `127.0.0.1:9103/metrics`.
+The token is baked into the *installed* daily plist only; the committed
+`deploy/launchd/*.plist` references are **token-free**.
+
+**Not pushed.** Merged `--no-ff` to local `main`. Phase 1 (auto-bump / port-loop
+on drift) remains future work — every report still carries
+`phase_0_no_auto_bump: true`.
 
 ---
 

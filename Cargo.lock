@@ -2450,6 +2450,7 @@ name = "cave-runtime-tracker"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "axum 0.8.9",
  "chrono",
  "clap",
  "reqwest",
@@ -2459,6 +2460,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tower 0.5.3",
  "tracing",
 ]
 
