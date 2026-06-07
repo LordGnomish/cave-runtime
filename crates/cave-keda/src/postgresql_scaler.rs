@@ -75,8 +75,11 @@ impl PostgreSqlScaler {
 /// Port of `escapePostgreConnectionParameter`: leave space-free values bare,
 /// otherwise backslash-escape single quotes and wrap the value in quotes.
 pub fn escape_connection_parameter(s: &str) -> String {
-    // RED placeholder — real escaping added in GREEN step.
-    s.to_string()
+    if !s.contains(' ') {
+        return s.to_string();
+    }
+    let escaped = s.replace('\'', "\\'");
+    format!("'{escaped}'")
 }
 
 impl ScalerTrait for PostgreSqlScaler {
