@@ -12,8 +12,6 @@
 //! supplied wall-clock second, so the whole module is deterministic and unit
 //! testable without a real clock.
 
-// RED stub — real implementation lands in the GREEN commit.
-
 use crate::backend::StorageBackend;
 use serde_json::Value;
 use std::sync::Mutex;
@@ -86,25 +84,53 @@ impl OpLog {
     }
 
     /// Mint the next monotonic timestamp for the given wall-clock second.
-    pub fn next_ts(&self, _secs: u32) -> BsonTimestamp {
-        BsonTimestamp { secs: 0, inc: 0 }
+    ///
+    /// Within the same (or an older) second the ordinal advances; a newer
+    /// second resets the ordinal to 1. The result is always strictly greater
+    /// than the previous one, even if `secs` moves backwards.
+    pub fn next_ts(&self, secs: u32) -> BsonTimestamp {
+        let mut clock = self.clock.lock().unwrap();
+        let next = if secs > clock.secs {
+            BsonTimestamp { secs, inc: 1 }
+        } else {
+            BsonTimestamp {
+                secs: clock.secs,
+                inc: clock.inc + 1,
+            }
+        };
+        *clock = next;
+        next
     }
 
     /// Append an entry, minting its timestamp; returns the assigned ts.
     pub fn append(
         &self,
-        _op: OpType,
-        _ns: &str,
-        _o: Value,
-        _o2: Option<Value>,
-        _secs: u32,
+        op: OpType,
+        ns: &str,
+        o: Value,
+        o2: Option<Value>,
+        secs: u32,
     ) -> BsonTimestamp {
-        BsonTimestamp { secs: 0, inc: 0 }
+        let ts = self.next_ts(secs);
+        self.entries.lock().unwrap().push(OplogEntry {
+            ts,
+            op,
+            ns: ns.to_string(),
+            o,
+            o2,
+        });
+        ts
     }
 
     /// Entries strictly after `after` (or all entries when `None`).
-    pub fn tail(&self, _after: Option<BsonTimestamp>) -> Vec<OplogEntry> {
-        Vec::new()
+    pub fn tail(&self, after: Option<BsonTimestamp>) -> Vec<OplogEntry> {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| after.map(|a| e.ts > a).unwrap_or(true))
+            .cloned()
+            .collect()
     }
 
     /// Number of recorded entries.
@@ -129,20 +155,48 @@ impl Default for OpLog {
     }
 }
 
+/// Collection name from a `db.collection` namespace (drops the db prefix).
+fn collection_of(ns: &str) -> &str {
+    ns.split_once('.').map(|(_, c)| c).unwrap_or(ns)
+}
+
 /// Apply one oplog entry to a backend (idempotent for i/u/d).
-pub async fn apply_entry(
-    _backend: &dyn StorageBackend,
-    _entry: &OplogEntry,
-) -> Result<(), String> {
-    Ok(())
+///
+/// Returns `true` if a data operation was applied, `false` for `n`/`c` no-ops.
+pub async fn apply_entry(backend: &dyn StorageBackend, entry: &OplogEntry) -> Result<bool, String> {
+    let coll = collection_of(&entry.ns);
+    match entry.op {
+        OpType::Insert => {
+            backend.insert(coll, entry.o.clone()).await?;
+            Ok(true)
+        }
+        OpType::Update => {
+            let selector = entry.o2.clone().unwrap_or_else(|| Value::Object(Default::default()));
+            backend.update(coll, &selector, &entry.o).await?;
+            Ok(true)
+        }
+        OpType::Delete => {
+            backend.delete(coll, &entry.o).await?;
+            Ok(true)
+        }
+        OpType::Noop | OpType::Command => Ok(false),
+    }
 }
 
 /// Replay a sequence of oplog entries onto a backend; returns ops applied.
+///
+/// `n`/`c` entries are skipped and do not count toward the applied total.
 pub async fn replicate(
-    _backend: &dyn StorageBackend,
-    _entries: &[OplogEntry],
+    backend: &dyn StorageBackend,
+    entries: &[OplogEntry],
 ) -> Result<u64, String> {
-    Ok(0)
+    let mut applied = 0u64;
+    for entry in entries {
+        if apply_entry(backend, entry).await? {
+            applied += 1;
+        }
+    }
+    Ok(applied)
 }
 
 #[cfg(test)]
