@@ -1,5 +1,7 @@
 # parity.manifest.toml — cave-portal
 #
+# Related ADR: docs/adr/ADR-011-RUNTIME-cave-portal.md (Runtime sovereign variant, 2026-06-07)
+#
 # Upstream: backstage/backstage  https://github.com/backstage/backstage
 # Pinned: v1.50.3 (source_sha pins the tag so reproducibility audits
 # can re-resolve identically). Backstage is the developer-portal
