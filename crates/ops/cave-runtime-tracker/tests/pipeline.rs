@@ -32,9 +32,17 @@ async fn full_pipeline_emits_markdown_with_every_subsystem() {
     assert!(summary.unresolved.is_empty(), "all repos should resolve");
     assert_eq!(summary.total(), cfg.upstreams.len());
     assert!(summary.results.iter().all(|r| r.latest.as_deref() == Some("v9.9.9")));
-    // No pins in the default registry → everything is Unknown drift,
-    // which is the honest "we haven't recorded our port version" state.
-    assert_eq!(summary.count(DriftStatus::Unknown), cfg.upstreams.len());
+    // The registry now ships curated pins (cont2): pinned rows whose
+    // baseline differs from the fetched v9.9.9 are Behind; the remaining
+    // unpinned rows are honestly Unknown. Together they cover every row,
+    // and the Behind count equals the number of pinned rows.
+    let pinned = cfg.upstreams.iter().filter(|u| u.pinned.is_some()).count();
+    assert!(pinned >= 50, "expected curated pins in the default registry");
+    assert_eq!(summary.count(DriftStatus::Behind), pinned);
+    assert_eq!(
+        summary.count(DriftStatus::Behind) + summary.count(DriftStatus::Unknown),
+        cfg.upstreams.len()
+    );
 
     let report = DailyReport::assemble(summary);
     let md = report.to_markdown();
