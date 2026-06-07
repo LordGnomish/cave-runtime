@@ -67,7 +67,8 @@ impl FileSet {
 }
 
 /// Find the first balanced top-level `{...}` or `[...]` block in `raw`.
-fn extract_json_block(raw: &str) -> Option<String> {
+/// Shared with [`crate::router`], which parses the L1 routing JSON the same way.
+pub(crate) fn extract_json_block(raw: &str) -> Option<String> {
     let bytes = raw.as_bytes();
     let start = bytes.iter().position(|&b| b == b'{' || b == b'[')?;
     let open = bytes[start];

@@ -13,6 +13,93 @@
 //! a [`default_context_tokens`] heuristic keyed on how far from parity the
 //! subsystem is — the further behind, the larger the window.
 
+use crate::codegen::extract_json_block;
+use crate::error::{AutopilotError, Result};
+use serde::Deserialize;
+
+/// Lower / upper bounds for the coder's context window (tokens).
+const CTX_MIN: u32 = 4096;
+const CTX_MAX: u32 = 65536;
+
+/// The router's structured verdict for one subsystem.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouterDecision {
+    /// Which upstream surface to port next (one cohesive, well-scoped chunk).
+    pub surface: String,
+    /// Context window the L2 coder should run with.
+    pub context_tokens: u32,
+    /// True when this is an architectural/strategic call → escalate to L4 human
+    /// rather than auto-coding it.
+    pub needs_human: bool,
+    /// Short justification, surfaced in the daily report.
+    pub rationale: String,
+}
+
+/// Raw shape the model is asked to emit. `context_tokens` is optional so we can
+/// fall back to the completion-keyed heuristic when the model omits it.
+#[derive(Debug, Deserialize)]
+struct RawDecision {
+    #[serde(default)]
+    surface: String,
+    #[serde(default)]
+    context_tokens: Option<u32>,
+    #[serde(default)]
+    needs_human: bool,
+    #[serde(default)]
+    rationale: String,
+}
+
+/// System prompt pinning the router to a terse JSON contract.
+pub fn router_system_prompt() -> &'static str {
+    "You are the routing tier of an autonomous Rust porting pipeline. \
+     Given an under-complete subsystem, choose the single highest-value upstream \
+     surface to port next. Reply with ONLY a JSON object: \
+     {\"surface\":\"<short name>\",\"context_tokens\":<int>,\"needs_human\":<bool>,\"rationale\":\"<one line>\"}. \
+     Set needs_human=true only for architectural/strategic decisions that should \
+     not be auto-coded. Pick context_tokens proportional to the surface size."
+}
+
+/// Build the per-task routing prompt.
+pub fn build_router_prompt(subsystem: &str, completion: f64, upstream: Option<&str>) -> String {
+    let up = upstream.unwrap_or("unknown");
+    format!(
+        "Subsystem `{subsystem}` is {completion:.2} complete (upstream {up}). \
+         Pick the next surface to port and estimate the context window the coder needs."
+    )
+}
+
+/// Heuristic context window keyed on distance-from-parity: linearly interpolate
+/// between [`CTX_MIN`] (at/above parity) and [`CTX_MAX`] (greenfield). Further
+/// behind ⇒ larger window.
+pub fn default_context_tokens(completion: f64) -> u32 {
+    let gap = (1.0 - completion).clamp(0.0, 1.0);
+    let span = (CTX_MAX - CTX_MIN) as f64;
+    let raw = CTX_MIN as f64 + gap * span;
+    (raw.round() as u32).clamp(CTX_MIN, CTX_MAX)
+}
+
+/// Parse the model's routing output into a [`RouterDecision`]. `completion`
+/// drives the context fallback when the model omits `context_tokens`.
+pub fn parse_router_decision(raw: &str, completion: f64) -> Result<RouterDecision> {
+    let json = extract_json_block(raw)
+        .ok_or_else(|| AutopilotError::Llm("no JSON router decision found".into()))?;
+    let r: RawDecision = serde_json::from_str(&json)
+        .map_err(|e| AutopilotError::Llm(format!("router decision parse: {e}")))?;
+    if r.surface.trim().is_empty() {
+        return Err(AutopilotError::Llm("router decision has empty surface".into()));
+    }
+    let context_tokens = r
+        .context_tokens
+        .map(|t| t.clamp(CTX_MIN, CTX_MAX))
+        .unwrap_or_else(|| default_context_tokens(completion));
+    Ok(RouterDecision {
+        surface: r.surface.trim().to_string(),
+        context_tokens,
+        needs_human: r.needs_human,
+        rationale: r.rationale.trim().to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
