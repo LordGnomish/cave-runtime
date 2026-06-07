@@ -99,9 +99,7 @@ pub fn generate_cloud_event_subject(
     object_type: &str,
     object_name: &str,
 ) -> String {
-    // RED placeholder — real subject format added in GREEN step.
-    let _ = (object_namespace, object_type);
-    format!("/{cluster_name}/{object_name}")
+    format!("/{cluster_name}/{object_namespace}/{object_type}/{object_name}")
 }
 
 /// A fully-built CloudEvent in structured-content shape.
