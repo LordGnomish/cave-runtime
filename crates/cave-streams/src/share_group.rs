@@ -178,9 +178,12 @@ impl SharePartition {
             AcknowledgeType::Accept => rec.state = RecordState::Acknowledged,
             AcknowledgeType::Reject => rec.state = RecordState::Archived,
             AcknowledgeType::Release => {
-                // RED placeholder — poison-pill guard not yet ported.
-                let _ = max;
-                rec.state = RecordState::Available;
+                // Out of delivery attempts → archive (poison-pill guard).
+                rec.state = if rec.delivery_count >= max {
+                    RecordState::Archived
+                } else {
+                    RecordState::Available
+                };
             }
         }
         rec.acquired_by = None;
@@ -213,7 +216,14 @@ impl SharePartition {
     /// Slide the SPSO forward over a contiguous prefix of terminal records,
     /// dropping their tracking entries.
     fn advance_start_offset(&mut self) {
-        // RED placeholder — SPSO sliding over the terminal prefix not yet ported.
+        while let Some(rec) = self.records.get(&self.start_offset) {
+            if rec.state.is_terminal() {
+                self.records.remove(&self.start_offset);
+                self.start_offset += 1;
+            } else {
+                break;
+            }
+        }
     }
 
     fn count(&self, state: RecordState) -> usize {
