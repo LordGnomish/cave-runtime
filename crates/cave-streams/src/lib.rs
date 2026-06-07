@@ -49,6 +49,7 @@ pub mod pulsar_geo_replication;
 pub mod pulsar_io_connectors;
 pub mod pulsar_managed_ledger;
 pub mod pulsar_topic;
+pub mod pulsar_transactions;
 pub mod pulsar_wire;
 pub mod quota;
 pub mod routes;
