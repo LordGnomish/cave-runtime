@@ -171,9 +171,32 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
             ]
         })
         .collect();
+    // streaming-ray-2 — Pulsar transaction-coordinator status machine +
+    // Kafka share-group record states. Reference panel backed by the
+    // cave-streams /api/streams/{pulsar/transactions,share-groups}/preview
+    // endpoints (src/pulsar_transactions.rs + src/share_group.rs).
+    let txn_rows: Vec<Vec<String>> = vec![
+        vec!["OPEN".into(), "COMMITTING, ABORTING".into(), "producer may add partitions/subs".into()],
+        vec!["COMMITTING".into(), "COMMITTED".into(), "buffered messages becoming visible".into()],
+        vec!["COMMITTED".into(), "— (terminal)".into(), "messages published, max-read advanced".into()],
+        vec!["ABORTING".into(), "ABORTED".into(), "buffered messages being discarded".into()],
+        vec!["ABORTED".into(), "— (terminal)".into(), "messages dropped, txn remembered".into()],
+    ];
+    let share_rows: Vec<Vec<String>> = vec![
+        vec!["AVAILABLE".into(), "free to acquire".into()],
+        vec!["ACQUIRED".into(), "held under acquisition lock (delivery_count++)".into()],
+        vec!["ACKNOWLEDGED".into(), "ACCEPTed — terminal, SPSO reclaims".into()],
+        vec!["ARCHIVED".into(), "REJECTed or out of delivery attempts — terminal".into()],
+    ];
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Topics ({n_t})</h2>{t_tbl}</section>
-<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Consumer groups ({n_g})</h2>{g_tbl}</section>"#,
+<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Consumer groups ({n_g})</h2>{g_tbl}</section>
+<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Pulsar transactions (PIP-31)</h2>
+<p class="text-sm text-gray-600 mb-3">Transaction-coordinator status machine — POST
+<code>/api/streams/pulsar/transactions/preview</code>. Aborted writes never surface to readers.</p>{x_tbl}</section>
+<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Kafka share groups (KIP-932)</h2>
+<p class="text-sm text-gray-600 mb-3">Share-partition record states — POST
+<code>/api/streams/share-groups/preview</code>. The SPSO slides over the terminal prefix.</p>{s_tbl}</section>"#,
         n_t = topics.len(),
         n_g = groups.len(),
         t_tbl = table(
@@ -186,6 +209,8 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
             ],
             &g_rows,
         ),
+        x_tbl = table(&["status", "legal next", "meaning"], &txn_rows),
+        s_tbl = table(&["record state", "meaning"], &share_rows),
     );
     Ok(page_shell_full(
         ctx,
@@ -321,5 +346,23 @@ mod tests {
         assert!(html.contains("orders-consumer"));
         assert!(!html.contains("evil-topic"));
         assert!(!html.contains("evil-consumer"));
+    }
+
+    #[test]
+    fn render_includes_streaming_ray_2_panels() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/streams/src/components/Topics/TopicsPage.tsx",
+            "TopicsPage",
+            "acme"
+        );
+        let s = AdminState::seeded();
+        let html = render(&s, &ctx(&[Permission::StreamsRead])).unwrap();
+        // Pulsar transactions panel + Kafka share-groups panel.
+        assert!(html.contains("Pulsar transactions (PIP-31)"));
+        assert!(html.contains("/api/streams/pulsar/transactions/preview"));
+        assert!(html.contains("Kafka share groups (KIP-932)"));
+        assert!(html.contains("/api/streams/share-groups/preview"));
+        assert!(html.contains("COMMITTING"));
+        assert!(html.contains("ARCHIVED"));
     }
 }

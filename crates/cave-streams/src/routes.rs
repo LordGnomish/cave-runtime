@@ -21,8 +21,9 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
     let connect = Arc::new(crate::connect::ConnectCluster::new());
 
     Router::new()
-        // ── Health ─────────────────────────────────────────────────────────
+        // ── Health + metrics ───────────────────────────────────────────────
         .route("/api/streams/health", get(health))
+        .route("/api/streams/metrics", get(metrics_endpoint))
 
         // ── Schema Registry ────────────────────────────────────────────────
         .route("/subjects", get(list_subjects))
@@ -90,6 +91,12 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
         .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{sub}/resetCursor",
                post(pulsar_reset_cursor))
 
+        // ── Pulsar transactions (PIP-31 TC + buffer) ───────────────────────
+        .route("/api/streams/pulsar/transactions/preview", post(pulsar_txn_preview))
+
+        // ── Kafka share groups (KIP-932) ───────────────────────────────────
+        .route("/api/streams/share-groups/preview", post(share_group_preview))
+
         .with_state((state, connect))
 }
 
@@ -113,6 +120,14 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
             "tenants": pulsar_tenants,
         },
     }))
+}
+
+/// Prometheus text exposition — live broker/Pulsar gauges + preview counters.
+async fn metrics_endpoint(State((s, _)): State<AppState>) -> impl IntoResponse {
+    (
+        [("content-type", "text/plain; version=0.0.4")],
+        crate::metrics::render_prometheus(&s),
+    )
 }
 
 // ── Schema Registry handlers ──────────────────────────────────────────────────
@@ -818,4 +833,121 @@ fn connector_to_json(c: &Connector) -> serde_json::Value {
             "task": t.id.task,
         })).collect::<Vec<_>>(),
     })
+}
+
+// ── Pulsar transactions (PIP-31) preview ──────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct TxnPreviewRequest {
+    #[serde(default)]
+    coordinator_id: u64,
+    txns: Vec<TxnPreviewTxn>,
+}
+
+#[derive(serde::Deserialize)]
+struct TxnPreviewTxn {
+    #[serde(default)]
+    messages: Vec<String>,
+    /// "commit" (default) or "abort".
+    #[serde(default)]
+    outcome: String,
+}
+
+/// Drives a real [`TransactionCoordinator`] + [`TransactionBuffer`] through the
+/// requested transactions and reports the reader-visible result — the
+/// two-phase-commit invariant that aborted writes never surface.
+async fn pulsar_txn_preview(Json(req): Json<TxnPreviewRequest>) -> impl IntoResponse {
+    use crate::pulsar_transactions::{TransactionBuffer, TransactionCoordinator};
+    crate::metrics::inc_txn_preview();
+    let mut tc = TransactionCoordinator::new(req.coordinator_id);
+    let mut buf = TransactionBuffer::new();
+    let mut statuses = Vec::new();
+    for (i, t) in req.txns.iter().enumerate() {
+        let txn_id = tc.new_transaction(60_000, 0);
+        for (seq, m) in t.messages.iter().enumerate() {
+            buf.append(txn_id, seq as u64, m.clone().into_bytes());
+        }
+        let outcome = if t.outcome == "abort" { "abort" } else { "commit" };
+        if outcome == "abort" {
+            let _ = tc.abort(&txn_id);
+            let _ = buf.abort(&txn_id);
+        } else {
+            let _ = tc.commit(&txn_id);
+            let _ = buf.commit(&txn_id);
+        }
+        statuses.push(json!({
+            "index": i,
+            "txn_id": txn_id.to_string(),
+            "outcome": outcome,
+            "status": format!("{:?}", tc.get_txn_meta(&txn_id).map(|m| m.status).unwrap_or(crate::pulsar_transactions::TxnStatus::Open)),
+        }));
+    }
+    let visible: Vec<String> = buf
+        .committed()
+        .iter()
+        .map(|m| String::from_utf8_lossy(&m.payload).to_string())
+        .collect();
+    Json(json!({
+        "coordinator_id": req.coordinator_id,
+        "transactions": statuses,
+        "visible_messages": visible,
+        "max_read_position": buf.max_read_position(),
+    }))
+}
+
+// ── Kafka share groups (KIP-932) preview ──────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct ShareGroupPreviewRequest {
+    log_end_offset: u64,
+    #[serde(default = "default_max_delivery")]
+    max_delivery_count: u32,
+    #[serde(default = "default_lock_ms")]
+    lock_ms: u64,
+    #[serde(default)]
+    acks: Vec<ShareAck>,
+}
+
+fn default_max_delivery() -> u32 {
+    5
+}
+fn default_lock_ms() -> u64 {
+    30_000
+}
+
+#[derive(serde::Deserialize)]
+struct ShareAck {
+    member: String,
+    offset: u64,
+    /// "accept" | "release" | "reject"
+    kind: String,
+}
+
+/// Drives a real [`SharePartition`]: acquires the whole log for `m-default`,
+/// applies the requested per-offset acknowledgements, and reports the
+/// resulting SPSO + state counts.
+async fn share_group_preview(Json(req): Json<ShareGroupPreviewRequest>) -> impl IntoResponse {
+    use crate::share_group::{AcknowledgeType, SharePartition};
+    crate::metrics::inc_share_preview();
+    let mut p = SharePartition::new(0, req.max_delivery_count, req.lock_ms);
+    let acquired = p.acquire("m-default", req.log_end_offset as usize, req.log_end_offset, 0);
+    let mut applied = 0usize;
+    for a in &req.acks {
+        let kind = match a.kind.as_str() {
+            "release" => AcknowledgeType::Release,
+            "reject" => AcknowledgeType::Reject,
+            _ => AcknowledgeType::Accept,
+        };
+        if p.acknowledge(&a.member, a.offset, kind, 0).is_ok() {
+            applied += 1;
+        }
+    }
+    Json(json!({
+        "acquired": acquired,
+        "applied_acks": applied,
+        "start_offset": p.start_offset(),
+        "available": p.available_count(),
+        "acquired_count": p.acquired_count(),
+        "archived": p.archived_count(),
+    }))
 }

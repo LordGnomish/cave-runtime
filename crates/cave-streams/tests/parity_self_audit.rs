@@ -18,7 +18,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-06-07";
 const FLOOR_FILL_RATIO: f64 = 0.0;
 
 fn workspace_root() -> PathBuf {
