@@ -1022,6 +1022,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-autopilot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.8.9",
+ "chrono",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cave-backup"
 version = "0.1.0"
 dependencies = [

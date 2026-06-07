@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-autopilot — 7/24 autonomous code-generation orchestrator.
+#
+# Runs as a macOS LaunchAgent daemon. Reads tracker state (parity-index.json
+# emitted by cave-runtime-tracker / cave-home-tracker), ranks under-complete
+# subsystems into a priority queue, and dispatches each as a TDD port job
+# through a tiered LLM escalation ladder:
+#   L1 router (Mellum2)  -> L2 local coder (Qwen3-Coder-Next)
+#   -> L3 Claude API     -> L4 human (Burak).
+# Charter compliance (strict TDD, no-stub, honest LOC) is enforced before any
+# local merge. Push is NEVER performed by the daemon (human gate).
+#
+# Single-binary mandate: one `cave-autopilot` binary, sub-command driven.
+
+[package]
+name = "cave-autopilot"
+description = "7/24 autonomous code-gen orchestrator: tracker-driven task queue, tiered local-LLM + Claude escalation, worktree TDD exec, Charter-compliance gate, LaunchAgent daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "cave-autopilot"
+path = "src/bin/cave-autopilot.rs"
