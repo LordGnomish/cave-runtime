@@ -1932,6 +1932,44 @@ enum StreamsCmd {
         #[command(subcommand)]
         cmd: ConnectCmd,
     },
+    /// Pulsar transactions (PIP-31) — transaction coordinator + buffer
+    PulsarTxn {
+        #[command(subcommand)]
+        cmd: PulsarTxnCmd,
+    },
+    /// Kafka share groups (KIP-932) — queue-style consumption
+    ShareGroup {
+        #[command(subcommand)]
+        cmd: ShareGroupCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum PulsarTxnCmd {
+    /// Preview a run of transactions: report which messages become visible
+    /// (committed) and which stay buffered-then-discarded (aborted).
+    Preview {
+        /// Number of single-message transactions to commit
+        #[arg(long, default_value_t = 2)]
+        commits: u64,
+        /// Number of single-message transactions to abort
+        #[arg(long, default_value_t = 1)]
+        aborts: u64,
+    },
+}
+
+#[derive(Subcommand)]
+enum ShareGroupCmd {
+    /// Preview acquire+acknowledge over a log; report the resulting
+    /// share-partition start offset (SPSO) and per-state record counts.
+    Preview {
+        /// Log end offset — records `0..records` are acquired
+        #[arg(long, default_value_t = 5)]
+        records: u64,
+        /// Number of leading records to ACCEPT
+        #[arg(long, default_value_t = 3)]
+        accept: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3802,6 +3840,32 @@ async fn run(cli: Cli) -> Result<()> {
                     c.post(
                         &format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{subscription}/resetCursor"),
                         json!({ "position": position }),
+                    ).await
+                }
+            },
+            StreamsCmd::PulsarTxn { cmd } => match cmd {
+                PulsarTxnCmd::Preview { commits, aborts } => {
+                    let mut txns = Vec::new();
+                    for i in 0..commits {
+                        txns.push(json!({ "messages": [format!("c{i}")], "outcome": "commit" }));
+                    }
+                    for i in 0..aborts {
+                        txns.push(json!({ "messages": [format!("a{i}")], "outcome": "abort" }));
+                    }
+                    c.post(
+                        "/api/streams/pulsar/transactions/preview",
+                        json!({ "coordinator_id": 1, "txns": txns }),
+                    ).await
+                }
+            },
+            StreamsCmd::ShareGroup { cmd } => match cmd {
+                ShareGroupCmd::Preview { records, accept } => {
+                    let acks: Vec<_> = (0..accept.min(records))
+                        .map(|o| json!({ "member": "m-default", "offset": o, "kind": "accept" }))
+                        .collect();
+                    c.post(
+                        "/api/streams/share-groups/preview",
+                        json!({ "log_end_offset": records, "acks": acks }),
                     ).await
                 }
             },
