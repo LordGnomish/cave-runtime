@@ -54,6 +54,34 @@ pub struct GenerateResponse {
     pub done: bool,
 }
 
+/// Request body for `POST /api/pull` (non-streaming).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct PullRequest {
+    pub name: String,
+    pub stream: bool,
+}
+
+/// Final object of a non-streaming `/api/pull` (carries `status` or `error`).
+#[derive(Debug, Clone, Deserialize)]
+struct PullResponse {
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    error: String,
+}
+
+/// Concrete model names resolved for the two local tiers, plus whether each
+/// fell back from its aspirational named checkpoint to the resident model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedTiers {
+    /// L1 router model actually available.
+    pub router: String,
+    /// L2 coder model actually available.
+    pub coder: String,
+    pub router_fell_back: bool,
+    pub coder_fell_back: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct TagsResponse {
     #[serde(default)]
@@ -118,6 +146,54 @@ impl OllamaClient {
         }
     }
 
+    /// Pure builder for a non-streaming `/api/pull` request body.
+    pub fn build_pull_request(model: &str) -> PullRequest {
+        PullRequest {
+            name: model.to_string(),
+            stream: false,
+        }
+    }
+
+    /// True iff a non-streaming `/api/pull` body reports completion. Ollama
+    /// returns `{"status":"success"}` on a finished pull and `{"error":...}` on
+    /// a missing/unreachable model; mid-stream `status` values (e.g.
+    /// `"pulling manifest"`) are not treated as success.
+    pub fn pull_succeeded(body: &str) -> bool {
+        match serde_json::from_str::<PullResponse>(body) {
+            Ok(r) => r.error.is_empty() && r.status == "success",
+            Err(_) => false,
+        }
+    }
+
+    /// Resolve both local tiers against the installed model list. Each tier
+    /// prefers its aspirational named model and falls back to the resident
+    /// coding model when that checkpoint isn't pulled — never silently failing a
+    /// tier just because the MoE name isn't on disk.
+    pub fn resolve_tiers(
+        installed: &[String],
+        named_router: &str,
+        named_coder: &str,
+        resident_fallback: &str,
+    ) -> ResolvedTiers {
+        let has = |m: &str| installed.iter().any(|x| x == m);
+        let (router, router_fell_back) = if has(named_router) {
+            (named_router.to_string(), false)
+        } else {
+            (resident_fallback.to_string(), true)
+        };
+        let (coder, coder_fell_back) = if has(named_coder) {
+            (named_coder.to_string(), false)
+        } else {
+            (resident_fallback.to_string(), true)
+        };
+        ResolvedTiers {
+            router,
+            coder,
+            router_fell_back,
+            coder_fell_back,
+        }
+    }
+
     /// List installed model names via `/api/tags`.
     pub async fn list_models(&self) -> Result<Vec<String>> {
         let url = format!("{}/api/tags", self.base_url);
@@ -136,6 +212,58 @@ impl OllamaClient {
     /// True if any model is installed (used as a liveness probe).
     pub async fn is_up(&self) -> bool {
         self.list_models().await.is_ok()
+    }
+
+    /// Pull a model via `POST /api/pull` (non-streaming). Returns `Ok(())` only
+    /// when Ollama reports `status: success`; an aspirational model that isn't
+    /// in the registry yields an error the caller can swallow into a fallback.
+    pub async fn pull(&self, model: &str) -> Result<()> {
+        let req = Self::build_pull_request(model);
+        let url = format!("{}/api/pull", self.base_url);
+        let body = self
+            .http
+            .post(&url)
+            .json(&req)
+            .send()
+            .await
+            .map_err(|e| AutopilotError::Llm(format!("ollama /api/pull: {e}")))?
+            .text()
+            .await
+            .map_err(|e| AutopilotError::Llm(format!("ollama pull body: {e}")))?;
+        if Self::pull_succeeded(&body) {
+            Ok(())
+        } else {
+            Err(AutopilotError::Llm(format!("pull {model} did not succeed: {body}")))
+        }
+    }
+
+    /// List installed models, attempt to pull the named tier checkpoints if
+    /// they're missing, then resolve the concrete L1/L2 models — falling back to
+    /// the resident model for any tier whose named checkpoint can't be pulled.
+    pub async fn ensure_tiers(
+        &self,
+        named_router: &str,
+        named_coder: &str,
+        resident_fallback: &str,
+    ) -> Result<ResolvedTiers> {
+        let mut installed = self.list_models().await?;
+        for named in [named_router, named_coder] {
+            if !installed.iter().any(|m| m == named) {
+                tracing::info!("pulling aspirational tier model {named}");
+                match self.pull(named).await {
+                    Ok(()) => installed.push(named.to_string()),
+                    Err(e) => tracing::warn!(
+                        "could not pull {named} ({e}); falling back to {resident_fallback}"
+                    ),
+                }
+            }
+        }
+        Ok(Self::resolve_tiers(
+            &installed,
+            named_router,
+            named_coder,
+            resident_fallback,
+        ))
     }
 
     /// Run a non-streaming generation and return the completion text.
