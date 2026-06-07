@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-31";
+const TODAY: &str = "2026-06-07";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 
 /// Walk up from the crate manifest dir until we find the workspace-root

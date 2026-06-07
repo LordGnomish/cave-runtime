@@ -38,15 +38,15 @@ url      = "https://github.com/twentyhq/twenty"
 # Counts (mapped + partial + skipped + unmapped) sum to `total`.
 # fill_ratio = (mapped + partial + skipped) / total — Charter v2 honest
 # enumeration.
-mapped_count   = 26
+mapped_count   = 29
 partial_count  = 0
 skipped_count  = 13
 unmapped_count = 0
-total          = 39
+total          = 42
 fill_ratio     = 1.0000
-honest_ratio   = 0.6667
+honest_ratio   = 0.6905
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-31"
+last_audit     = "2026-06-07"
 infra_only     = false
 
 [module]
@@ -187,6 +187,29 @@ notes    = "Attachment workspace-entity — name + fullPath + derived fileCatego
 upstream = "packages/twenty-server/src/modules/connected-account/standard-objects/connected-account.workspace-entity.ts"
 local    = "src/models/connected_account.rs"
 notes    = "ConnectedAccount workspace-entity — accountOwner + provider (ConnectedAccountProvider: google/microsoft/imap_smtp_caldav/oidc/saml/email_group/app, exact wire casing) + handle/handleAliases/scopes/tokens + credential-health state machine (mark_auth_failed sets authFailedAt, record_refresh clears it) + owns_handle/all_handles. New mapped 2026-05-31. IMAP/Gmail sync worker that consumes these credentials stays scope-cut (messaging-sync ray)."
+
+# ─── 2026-06-07 honest-uplift cont: +3 [[mapped]] backend modules ────────────
+# Strict-TDD ports grounded against twentyhq/twenty @ v2.6.0 source (SHA
+# bad1f200…). Three backend modules that were absent from the original
+# v2.6.0 enumeration: the task-target polymorphic link (twin of the already-
+# mapped note-target), the Dashboard standard-object + shared ActorMetadata
+# audit composite, and the contact-creation-manager pure util layer (ported
+# verbatim against its upstream __tests__ spec vectors).
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/task/standard-objects/task-target.workspace-entity.ts"
+local    = "src/models/task_target.rs"
+notes    = "TaskTarget workspace-entity — the polymorphic link joining a Task to one CRM record. Upstream relation fan-out (task + targetPerson/targetCompany/targetOpportunity) collapsed to a single (target_kind,target_id) pair per the attachment/note-target idiom. Target set is Person/Company/Opportunity only — task-target has no targetLead. New mapped 2026-06-07 (absent from the v2.6.0 enumeration; twin of the mapped note-target)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/dashboard/standard-objects/dashboard.workspace-entity.ts"
+local    = "src/models/dashboard.rs"
+notes    = "Dashboard workspace-entity — title (nullable, lone search field per SEARCH_FIELDS_FOR_DASHBOARD) + pageLayoutId + float position + createdBy/updatedBy ActorMetadata + reorder/rename behaviors. searchVector holds the lowercased title text fed to Postgres to_tsvector (the tsvector itself is a DB GENERATED column). Bundles the shared ActorMetadata composite (packages/twenty-shared/src/types/composite-types/actor.composite-type.ts) — ActorSource (10-variant FieldActorSource: EMAIL/CALENDAR/WORKFLOW/AGENT/API/IMPORT/MANUAL/SYSTEM/WEBHOOK/APPLICATION) + ActorContext{provider?}. New mapped 2026-06-07."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/contact-creation-manager/utils/"
+local    = "src/contact_creation.rs"
+notes    = "contact-creation-manager pure util layer — line-by-line ports of extractDomainFromLink, getDomainNameFromHandle, getCompanyNameFromDomainName, getFirstNameAndLastNameFromHandleAndDisplayName, hasPrimaryEmailChanged, computeChangedAdditionalEmails. The two domain helpers replicate Twenty's psl (Public Suffix List) dependency with a faithful PSL algorithm (exception > longest exact/wildcard > default `*` prevailing rule); single-label TLDs are covered by the default rule, so only multi-label public suffixes (curated IANA ICANN subset) + sample wildcard/exception rules are embedded. All upstream __tests__/*.spec.ts vectors mirrored verbatim. New mapped 2026-06-07. The auto-companies-and-contacts creation job/worker that orchestrates these utils stays scope-cut (messaging-sync ray)."
 
 # ─── Skipped — alt-language / browser-UI / vendor scaffold (11) ──────────────
 
