@@ -99,6 +99,37 @@ fn norm_tag(tag: &str) -> &str {
     t.strip_prefix('v').unwrap_or(t)
 }
 
+/// Parse a *pure* version tag (`v?` + dotted decimals, nothing else) into
+/// its numeric components. Rejects component-prefixed tags such as
+/// `sdk/v2.9.1`, `python-0.4.0`, `kafka-0.7.2`, `knative-v1.22.0`,
+/// `RELEASE.2025-…` and pre-release suffixes like `1.2.0-rc1` — exactly
+/// the noise that pollutes a repo's raw tag list.
+fn semver_core(tag: &str) -> Option<Vec<u64>> {
+    let core = tag.trim().strip_prefix('v').unwrap_or(tag.trim());
+    if core.is_empty() {
+        return None;
+    }
+    let parts: Vec<u64> = core
+        .split('.')
+        .map(|p| p.parse::<u64>().ok())
+        .collect::<Option<Vec<u64>>>()?;
+    (!parts.is_empty()).then_some(parts)
+}
+
+/// From a repo's raw tag list, pick the highest *clean* semver tag,
+/// returning it verbatim (original `v`/casing preserved). `None` when no
+/// tag is a pure version — the caller then keeps the first-tag fallback.
+///
+/// This is what turns a `tags`-only repo's drift from junk (`apache/kafka`
+/// → `show`, `twentyhq/twenty` → `sdk/v2.9.1`) into the real latest
+/// release (`4.3.0`, `v2.9.0`).
+pub fn pick_latest_semver_tag(tags: &[String]) -> Option<String> {
+    tags.iter()
+        .filter_map(|t| semver_core(t).map(|core| (core, t)))
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, t)| t.clone())
+}
+
 /// Async release fetcher. Implementors return the latest release/tag for
 /// a `org/repo`, or `None` when it cannot be determined (offline, rate
 /// limited, no releases). Returning `None` keeps the daily report
@@ -154,16 +185,26 @@ impl ReleaseFetcher for GithubFetcher {
         {
             return Some(tag.to_string());
         }
-        // 2. tags — repos with git tags but no GitHub release objects.
-        let tags_url = format!("{}/repos/{}/tags?per_page=1", self.api_base, repo);
+        // 2. tags — repos with git tags but no GitHub release objects
+        //    (apache/kafka, apache/datafusion, twentyhq/twenty, …). Pull a
+        //    page and pick the highest *clean* semver tag; the raw list is
+        //    not version-ordered and is polluted with component tags
+        //    (`sdk/v…`, `python-…`, `kafka-0.7.…`).
+        let tags_url = format!("{}/repos/{}/tags?per_page=100", self.api_base, repo);
         if let Some(body) = self.get_json(&tags_url).await
-            && let Some(name) = body
-                .as_array()
-                .and_then(|a| a.first())
-                .and_then(|t| t.get("name"))
-                .and_then(|v| v.as_str())
+            && let Some(arr) = body.as_array()
         {
-            return Some(name.to_string());
+            let names: Vec<String> = arr
+                .iter()
+                .filter_map(|t| t.get("name").and_then(|v| v.as_str()).map(String::from))
+                .collect();
+            // Prefer the best semver tag; fall back to the first listed.
+            if let Some(best) = pick_latest_semver_tag(&names) {
+                return Some(best);
+            }
+            if let Some(first) = names.into_iter().next() {
+                return Some(first);
+            }
         }
         None
     }
@@ -185,7 +226,7 @@ pub fn default_registry() -> Vec<Upstream> {
         U::new("kube-proxy", "kubernetes/kubernetes", "cave-kube-proxy", "Kubernetes Core", 1, "Service VIPs, iptables/ipvs datapath"),
         U::new("containerd", "containerd/containerd", "cave-cri", "Kubernetes Core", 1, "container lifecycle, OCI images, cgroups"),
         U::new("etcd", "etcd-io/etcd", "cave-etcd", "Kubernetes Core", 1, "KV store, MVCC, watch, leases, raft"),
-        U::new("Kamaji", "clastix-labs/kamaji", "cave-kamaji", "Kubernetes Core", 2, "multi-tenant hosted control planes"),
+        U::new("Kamaji", "clastix/kamaji", "cave-kamaji", "Kubernetes Core", 2, "multi-tenant hosted control planes"),
         U::new("KubeVirt", "kubevirt/kubevirt", "cave-kubevirt", "virtualization", 4, "VM-as-pod, virt-launcher, live migration"),
         // ── Networking / mesh ─────────────────────────────────────────
         U::new("Cilium", "cilium/cilium", "cave-net", "networking", 1, "eBPF CNI, LB, NetworkPolicy, DSR"),
@@ -286,7 +327,7 @@ pub const CURATED_PINS: &[(&str, &str)] = &[
     ("kubernetes/kubernetes", "v1.36.0"),
     ("containerd/containerd", "v2.2.3"),
     ("etcd-io/etcd", "v3.6.10"),
-    ("clastix-labs/kamaji", "v1.0.0"),
+    ("clastix/kamaji", "v1.0.0"),
     ("kubevirt/kubevirt", "v1.8.2"),
     ("cilium/cilium", "v1.19.3"),
     ("cilium/tetragon", "v1.7.0"),
@@ -378,7 +419,7 @@ mod tests {
         let repos: Vec<String> = default_registry().into_iter().map(|u| u.repo).collect();
         for must in [
             "kubernetes/kubernetes",
-            "clastix-labs/kamaji",
+            "clastix/kamaji",
             "knative/serving",
             "argoproj/argo-events",
             "cilium/cilium",
@@ -419,7 +460,7 @@ mod tests {
         };
         // A representative pin from each major area, matching the manifests.
         assert_eq!(pin("kubernetes/kubernetes").as_deref(), Some("v1.36.0"));
-        assert_eq!(pin("clastix-labs/kamaji").as_deref(), Some("v1.0.0"));
+        assert_eq!(pin("clastix/kamaji").as_deref(), Some("v1.0.0"));
         assert_eq!(pin("cilium/cilium").as_deref(), Some("v1.19.3"));
         assert_eq!(pin("openbao/openbao").as_deref(), Some("v2.5.4"));
         assert_eq!(pin("kedacore/keda").as_deref(), Some("v2.16.1"));
@@ -466,6 +507,45 @@ mod tests {
                 "curated pin {repo} has no matching registry row"
             );
         }
+    }
+
+    #[test]
+    fn pick_latest_semver_tag_handles_noisy_lists() {
+        // apache/kafka: bare numerics mixed with junk → highest numeric.
+        let kafka = vec![
+            "show".to_string(),
+            "kafka-0.7.2-incubating".to_string(),
+            "4.2.0".to_string(),
+            "4.3.0".to_string(),
+            "4.2.1".to_string(),
+        ];
+        assert_eq!(pick_latest_semver_tag(&kafka).as_deref(), Some("4.3.0"));
+
+        // twentyhq/twenty: component-prefixed sdk tags must be ignored.
+        let twenty = vec![
+            "sdk/v2.9.1".to_string(),
+            "v2.9.0".to_string(),
+            "v2.8.3".to_string(),
+        ];
+        assert_eq!(pick_latest_semver_tag(&twenty).as_deref(), Some("v2.9.0"));
+
+        // datafusion: numeric tags alongside a python sub-project tag.
+        let df = vec!["python-0.4.0".to_string(), "53.1.0".to_string(), "52.5.0".to_string()];
+        assert_eq!(pick_latest_semver_tag(&df).as_deref(), Some("53.1.0"));
+
+        // Nothing clean → None (caller keeps its first-tag fallback).
+        let messy = vec!["RELEASE.2025-10-15".to_string(), "nightly".to_string()];
+        assert_eq!(pick_latest_semver_tag(&messy), None);
+    }
+
+    #[test]
+    fn semver_core_rejects_prefixed_and_prerelease() {
+        assert_eq!(super::semver_core("v1.2.3"), Some(vec![1, 2, 3]));
+        assert_eq!(super::semver_core("4.2.0"), Some(vec![4, 2, 0]));
+        assert!(super::semver_core("sdk/v2.9.1").is_none());
+        assert!(super::semver_core("1.2.0-rc1").is_none());
+        assert!(super::semver_core("knative-v1.22.0").is_none());
+        assert!(super::semver_core("RELEASE.2025-10-15").is_none());
     }
 
     #[test]

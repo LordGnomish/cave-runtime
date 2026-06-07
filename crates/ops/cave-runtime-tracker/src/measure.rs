@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 /// `cave-runtime-tracker measure --repo org/name`.
 pub const DEFAULT_MEASURE_REPOS: &[&str] = &[
     "kubernetes/kubernetes",
-    "clastix-labs/kamaji",
+    "clastix/kamaji",
     "cilium/cilium",
     "openbao/openbao",
     "kedacore/keda",
