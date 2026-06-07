@@ -25,6 +25,7 @@ pub mod opportunity;
 pub mod person;
 pub mod pipeline_step;
 pub mod task;
+pub mod task_target;
 pub mod user;
 pub mod view;
 pub mod workspace;
@@ -38,6 +39,7 @@ pub use calendar_event::{
 };
 pub use company::Company;
 pub use connected_account::{ConnectedAccount, ConnectedAccountProvider};
+pub use task_target::{TaskTarget, TaskTargetKind};
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
 pub use lead::{Lead, LeadStatus};
