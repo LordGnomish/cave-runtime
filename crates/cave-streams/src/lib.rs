@@ -57,6 +57,7 @@ pub mod schema_evolution;
 pub mod schema_registry;
 pub mod segment_log;
 pub mod server;
+pub mod share_group;
 pub mod tenant;
 pub mod tiered_storage;
 pub mod transactions;
