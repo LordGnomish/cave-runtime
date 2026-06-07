@@ -1,0 +1,587 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-runtime-tracker.yaml — reference config for the daily upstream
+# drift tracker. Regenerate the upstream list any time with:
+#
+#     cave-runtime-tracker config > cave-runtime-tracker.yaml
+#
+# To make a row's drift verdict meaningful, set `pinned:` to the upstream
+# tag your cave-* crate currently ports (e.g. `pinned: v1.19.3`). Rows
+# left `pinned: null` report as "unknown" — honest, but not actionable.
+#
+# Override `output_dir`, `github_api` (for GHE), and `request_timeout_secs`
+# as needed. Set GITHUB_TOKEN in the environment to lift the 60 req/h
+# unauthenticated GitHub rate limit (the registry has ~70 distinct repos).
+output_dir: ~/Library/Application Support/cave-runtime/runtime-tracker
+github_api: https://api.github.com
+request_timeout_secs: 20
+emit_latest: true
+upstreams:
+- name: kube-apiserver
+  repo: kubernetes/kubernetes
+  cave_module: cave-apiserver
+  category: Kubernetes Core
+  phase: 1
+  track: resource CRUD, admission, RBAC, watch/list
+  pinned: null
+- name: kube-scheduler
+  repo: kubernetes/kubernetes
+  cave_module: cave-scheduler
+  category: Kubernetes Core
+  phase: 1
+  track: filter/score/bind, affinity, taints
+  pinned: null
+- name: kubelet
+  repo: kubernetes/kubernetes
+  cave_module: cave-kubelet
+  category: Kubernetes Core
+  phase: 1
+  track: pod lifecycle, node status, CSI/CNI
+  pinned: null
+- name: kube-controller-manager
+  repo: kubernetes/kubernetes
+  cave_module: cave-controller-manager
+  category: Kubernetes Core
+  phase: 1
+  track: Deployment/RS/STS/DS, HPA, GC, SA, CSR, PV
+  pinned: null
+- name: cloud-controller-manager
+  repo: kubernetes/cloud-provider
+  cave_module: cave-cloud-controller-manager
+  category: Kubernetes Core
+  phase: 1
+  track: Node/Service/Route controllers
+  pinned: null
+- name: kube-proxy
+  repo: kubernetes/kubernetes
+  cave_module: cave-kube-proxy
+  category: Kubernetes Core
+  phase: 1
+  track: Service VIPs, iptables/ipvs datapath
+  pinned: null
+- name: containerd
+  repo: containerd/containerd
+  cave_module: cave-cri
+  category: Kubernetes Core
+  phase: 1
+  track: container lifecycle, OCI images, cgroups
+  pinned: null
+- name: etcd
+  repo: etcd-io/etcd
+  cave_module: cave-etcd
+  category: Kubernetes Core
+  phase: 1
+  track: KV store, MVCC, watch, leases, raft
+  pinned: null
+- name: Kamaji
+  repo: clastix/kamaji
+  cave_module: cave-kamaji
+  category: Kubernetes Core
+  phase: 2
+  track: multi-tenant hosted control planes
+  pinned: null
+- name: KubeVirt
+  repo: kubevirt/kubevirt
+  cave_module: cave-kubevirt
+  category: virtualization
+  phase: 4
+  track: VM-as-pod, virt-launcher, live migration
+  pinned: null
+- name: Cilium
+  repo: cilium/cilium
+  cave_module: cave-net
+  category: networking
+  phase: 1
+  track: eBPF CNI, LB, NetworkPolicy, DSR
+  pinned: null
+- name: Cilium Hubble
+  repo: cilium/hubble
+  cave_module: cave-forensics
+  category: networking
+  phase: 2
+  track: L3-L7 flow observability
+  pinned: null
+- name: Tetragon
+  repo: cilium/tetragon
+  cave_module: cave-forensics
+  category: security
+  phase: 3
+  track: eBPF runtime enforcement
+  pinned: null
+- name: CoreDNS
+  repo: coredns/coredns
+  cave_module: cave-dns
+  category: networking
+  phase: 1
+  track: cluster DNS, plugins, zone files
+  pinned: null
+- name: Istio
+  repo: istio/istio
+  cave_module: cave-mesh
+  category: networking
+  phase: 1
+  track: sidecar/ambient mesh, mTLS, traffic policy
+  pinned: null
+- name: Linkerd
+  repo: linkerd/linkerd2
+  cave_module: cave-mesh
+  category: networking
+  phase: 2
+  track: lightweight mTLS service mesh
+  pinned: null
+- name: Kong
+  repo: Kong/kong
+  cave_module: cave-gateway
+  category: networking
+  phase: 1
+  track: API gateway, plugins, Gateway API
+  pinned: null
+- name: Knative Serving
+  repo: knative/serving
+  cave_module: cave-knative
+  category: serverless
+  phase: 4
+  track: scale-to-zero, revisions, KPA autoscaling
+  pinned: null
+- name: Knative Eventing
+  repo: knative/eventing
+  cave_module: cave-knative
+  category: serverless
+  phase: 4
+  track: brokers, triggers, event sources
+  pinned: null
+- name: Knative func
+  repo: knative/func
+  cave_module: cave-knative
+  category: serverless
+  phase: 4
+  track: function build/deploy templates
+  pinned: null
+- name: ArgoCD
+  repo: argoproj/argo-cd
+  cave_module: cave-deploy
+  category: gitops
+  phase: 1
+  track: app sync, sync windows, helm/kustomize
+  pinned: null
+- name: Argo Rollouts
+  repo: argoproj/argo-rollouts
+  cave_module: cave-rollouts
+  category: gitops
+  phase: 1
+  track: canary/blue-green, analysis
+  pinned: null
+- name: Argo Workflows
+  repo: argoproj/argo-workflows
+  cave_module: cave-workflows
+  category: gitops
+  phase: 3
+  track: DAG/steps, cron, semaphore/mutex
+  pinned: null
+- name: Argo Events
+  repo: argoproj/argo-events
+  cave_module: cave-events
+  category: gitops
+  phase: 3
+  track: event sources, sensors, triggers
+  pinned: null
+- name: Knative + Tekton (Pipelines)
+  repo: tektoncd/pipeline
+  cave_module: cave-pipelines
+  category: gitops
+  phase: 3
+  track: Task/Pipeline/PipelineRun
+  pinned: null
+- name: Crossplane
+  repo: crossplane/crossplane
+  cave_module: cave-crossplane
+  category: infrastructure
+  phase: 1
+  track: XRD/Composition, claims, providers
+  pinned: null
+- name: KEDA
+  repo: kedacore/keda
+  cave_module: cave-keda
+  category: serverless
+  phase: 3
+  track: event-driven autoscaling, scalers, ScaledObject
+  pinned: null
+- name: Karpenter
+  repo: kubernetes-sigs/karpenter
+  cave_module: cave-karpenter
+  category: node-autoscaling
+  phase: 3
+  track: just-in-time nodes, consolidation
+  pinned: null
+- name: cert-manager
+  repo: cert-manager/cert-manager
+  cave_module: cave-certs
+  category: operations
+  phase: 1
+  track: ACME, issuers, certificate lifecycle
+  pinned: null
+- name: Harbor
+  repo: goharbor/harbor
+  cave_module: cave-registry
+  category: registry
+  phase: 1
+  track: OCI registry, replication, scanning
+  pinned: null
+- name: Pulp
+  repo: pulp/pulpcore
+  cave_module: cave-registry
+  category: registry
+  phase: 2
+  track: content repositories, publications
+  pinned: null
+- name: Buildah
+  repo: containers/buildah
+  cave_module: cave-scaffold
+  category: build
+  phase: 2
+  track: OCI image build without daemon
+  pinned: null
+- name: Sigstore cosign
+  repo: sigstore/cosign
+  cave_module: cave-sign
+  category: security
+  phase: 1
+  track: artifact signing, verification, attestations
+  pinned: null
+- name: Sigstore policy-controller
+  repo: sigstore/policy-controller
+  cave_module: cave-admission
+  category: security
+  phase: 1
+  track: admission-time signature policy
+  pinned: null
+- name: Trivy
+  repo: aquasecurity/trivy
+  cave_module: cave-scan
+  category: security
+  phase: 3
+  track: image/fs/IaC vulnerability scanning
+  pinned: null
+- name: DependencyTrack
+  repo: DependencyTrack/dependency-track
+  cave_module: cave-sbom
+  category: security
+  phase: 3
+  track: SBOM ingest, component analysis
+  pinned: null
+- name: OPA
+  repo: open-policy-agent/opa
+  cave_module: cave-policy
+  category: security
+  phase: 1
+  track: Rego eval, bundles, decisions
+  pinned: null
+- name: OPA Gatekeeper
+  repo: open-policy-agent/gatekeeper
+  cave_module: cave-policy
+  category: security
+  phase: 1
+  track: ConstraintTemplate, audit
+  pinned: null
+- name: Kyverno
+  repo: kyverno/kyverno
+  cave_module: cave-policy
+  category: security
+  phase: 2
+  track: policy-as-yaml, mutate/validate/generate
+  pinned: null
+- name: Keycloak
+  repo: keycloak/keycloak
+  cave_module: cave-auth
+  category: identity
+  phase: 1
+  track: OIDC/SAML, realms, brokering
+  pinned: null
+- name: SPIFFE/SPIRE
+  repo: spiffe/spire
+  cave_module: cave-identity
+  category: identity
+  phase: 2
+  track: workload identity, SVIDs, attestation
+  pinned: null
+- name: OpenBao
+  repo: openbao/openbao
+  cave_module: cave-vault
+  category: secrets
+  phase: 1
+  track: KV/transit/PKI, dynamic secrets
+  pinned: null
+- name: External Secrets Operator
+  repo: external-secrets/external-secrets
+  cave_module: cave-vault
+  category: secrets
+  phase: 1
+  track: external secret sync
+  pinned: null
+- name: Sealed Secrets
+  repo: bitnami-labs/sealed-secrets
+  cave_module: cave-vault
+  category: secrets
+  phase: 1
+  track: asymmetric-encrypted secrets in git
+  pinned: null
+- name: Falco
+  repo: falcosecurity/falco
+  cave_module: cave-falco
+  category: security
+  phase: 2
+  track: syscall rules, runtime threat detection
+  pinned: null
+- name: Prometheus
+  repo: prometheus/prometheus
+  cave_module: cave-metrics
+  category: observability
+  phase: 1
+  track: TSDB, PromQL, scrape, alerting rules
+  pinned: null
+- name: prometheus-operator
+  repo: prometheus-operator/prometheus-operator
+  cave_module: cave-metrics
+  category: observability
+  phase: 1
+  track: ServiceMonitor/PrometheusRule CRDs
+  pinned: null
+- name: Thanos
+  repo: thanos-io/thanos
+  cave_module: cave-metrics
+  category: observability
+  phase: 2
+  track: long-term storage, global query, dedup
+  pinned: null
+- name: Cortex
+  repo: cortexproject/cortex
+  cave_module: cave-metrics
+  category: observability
+  phase: 2
+  track: multi-tenant horizontally-scalable Prometheus
+  pinned: null
+- name: Grafana
+  repo: grafana/grafana
+  cave_module: cave-dashboard
+  category: observability
+  phase: 1
+  track: dashboards, panels, datasources
+  pinned: null
+- name: Loki
+  repo: grafana/loki
+  cave_module: cave-logs
+  category: observability
+  phase: 1
+  track: log aggregation, LogQL, query scheduler
+  pinned: null
+- name: Tempo
+  repo: grafana/tempo
+  cave_module: cave-trace
+  category: observability
+  phase: 1
+  track: trace storage, TraceQL, spanmetrics
+  pinned: null
+- name: OpenTelemetry Collector
+  repo: open-telemetry/opentelemetry-collector
+  cave_module: cave-tracing
+  category: observability
+  phase: 1
+  track: receivers/processors/exporters
+  pinned: null
+- name: Pyroscope
+  repo: grafana/pyroscope
+  cave_module: cave-profiler
+  category: operations
+  phase: 3
+  track: continuous profiling
+  pinned: null
+- name: Grafana OnCall
+  repo: grafana/oncall
+  cave_module: cave-incidents
+  category: observability
+  phase: 3
+  track: on-call schedules, escalation
+  pinned: null
+- name: k6
+  repo: grafana/k6
+  cave_module: cave-slo
+  category: operations
+  phase: 3
+  track: load testing, thresholds
+  pinned: null
+- name: CloudNativePG
+  repo: cloudnative-pg/cloudnative-pg
+  cave_module: cave-rdbms-operator
+  category: database
+  phase: 2
+  track: Postgres operator, failover, backup
+  pinned: null
+- name: FerretDB
+  repo: FerretDB/FerretDB
+  cave_module: cave-docdb
+  category: database
+  phase: 2
+  track: MongoDB-compatible document DB
+  pinned: null
+- name: Valkey
+  repo: valkey-io/valkey
+  cave_module: cave-cache
+  category: cache
+  phase: 2
+  track: in-memory KV, replication
+  pinned: null
+- name: MinIO
+  repo: minio/minio
+  cave_module: cave-store
+  category: storage
+  phase: 2
+  track: S3-compatible object storage
+  pinned: null
+- name: OpenSearch
+  repo: opensearch-project/OpenSearch
+  cave_module: cave-search
+  category: search
+  phase: 2
+  track: inverted index, query DSL
+  pinned: null
+- name: Apache Kafka
+  repo: apache/kafka
+  cave_module: cave-streams
+  category: messaging
+  phase: 2
+  track: log segments, partitions, consumer groups
+  pinned: null
+- name: Apache Pulsar
+  repo: apache/pulsar
+  cave_module: cave-streams
+  category: messaging
+  phase: 2
+  track: topics, subscriptions, tiered storage
+  pinned: null
+- name: Strimzi
+  repo: strimzi/strimzi-kafka-operator
+  cave_module: cave-streams
+  category: messaging
+  phase: 2
+  track: Kafka operator CRDs
+  pinned: null
+- name: Apache Iceberg
+  repo: apache/iceberg-rust
+  cave_module: cave-iceberg
+  category: lakehouse
+  phase: 2
+  track: table format, snapshots, REST catalog
+  pinned: null
+- name: Apache DataFusion
+  repo: apache/datafusion
+  cave_module: cave-datafusion
+  category: lakehouse
+  phase: 2
+  track: SQL planner, physical execution
+  pinned: null
+- name: LiteLLM
+  repo: BerriAI/litellm
+  cave_module: cave-llm-gateway
+  category: ai
+  phase: 2
+  track: provider routing, budgets, rerank/embeddings
+  pinned: null
+- name: Ollama
+  repo: ollama/ollama
+  cave_module: cave-local-llm
+  category: ai
+  phase: 2
+  track: local model serving, GGUF, templates
+  pinned: null
+- name: vLLM
+  repo: vllm-project/vllm
+  cave_module: cave-local-llm
+  category: ai
+  phase: 2
+  track: paged-attention serving, sampler, spec decode
+  pinned: null
+- name: MLX
+  repo: ml-explore/mlx
+  cave_module: cave-mlx
+  category: ai
+  phase: 2
+  track: Apple-silicon array framework, RNG
+  pinned: null
+- name: Hermes (agent)
+  repo: NousResearch/Hermes-Function-Calling
+  cave_module: cave-hermes
+  category: ai
+  phase: 3
+  track: function-calling agent loop
+  pinned: null
+- name: Presidio
+  repo: microsoft/presidio
+  cave_module: cave-pii
+  category: ai
+  phase: 2
+  track: PII detection/anonymization
+  pinned: null
+- name: Langfuse
+  repo: langfuse/langfuse
+  cave_module: cave-ai-obs
+  category: ai
+  phase: 2
+  track: LLM tracing/eval
+  pinned: null
+- name: OpenCost
+  repo: opencost/opencost
+  cave_module: cave-cost
+  category: operations
+  phase: 3
+  track: k8s cost allocation, cloud rates
+  pinned: null
+- name: Velero
+  repo: vmware-tanzu/velero
+  cave_module: cave-backup
+  category: operations
+  phase: 3
+  track: cluster backup/restore, volume snapshots
+  pinned: null
+- name: Chaos Mesh
+  repo: chaos-mesh/chaos-mesh
+  cave_module: cave-chaos
+  category: operations
+  phase: 3
+  track: fault injection, schedules
+  pinned: null
+- name: DevLake
+  repo: apache/incubator-devlake
+  cave_module: cave-devlake
+  category: operations
+  phase: 3
+  track: DORA metrics, data collection
+  pinned: null
+- name: Uptime Kuma
+  repo: louislam/uptime-kuma
+  cave_module: cave-uptime
+  category: operations
+  phase: 3
+  track: uptime monitors, status pages
+  pinned: null
+- name: Backstage
+  repo: backstage/backstage
+  cave_module: cave-portal
+  category: devex
+  phase: 1
+  track: service catalog, software templates
+  pinned: null
+- name: Unleash
+  repo: Unleash/unleash
+  cave_module: cave-flags
+  category: devex
+  phase: 1
+  track: feature flags, strategies
+  pinned: null
+- name: Twenty
+  repo: twentyhq/twenty
+  cave_module: cave-crm
+  category: crm
+  phase: 4
+  track: CRM objects, pipelines, workflows
+  pinned: null

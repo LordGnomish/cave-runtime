@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! Daily report emitters — a human-readable `.md` digest grouped by
+//! category and a machine `.json` record with the same data.
+//!
+//! The JSON layout is stable so a future cave-portal admin page and the
+//! daily LaunchAgent can evolve independently.
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use crate::error::TrackerResult;
+use crate::poll::PollSummary;
+use crate::registry::DriftStatus;
+
+/// One full daily report.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyReport {
+    pub schema_version: u32,
+    pub generated_at_utc: String,
+    pub totals: Totals,
+    pub poll: PollSummary,
+    /// Phase 0 mandate banner — repeated in JSON so downstream tooling
+    /// cannot mistake a drift report for an executed upgrade.
+    pub phase_0_no_auto_bump: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Totals {
+    pub tracked: usize,
+    pub in_sync: usize,
+    pub behind: usize,
+    pub unknown: usize,
+}
+
+impl DailyReport {
+    pub fn assemble(poll: PollSummary) -> Self {
+        let totals = Totals {
+            tracked: poll.total(),
+            in_sync: poll.count(DriftStatus::InSync),
+            behind: poll.count(DriftStatus::Behind),
+            unknown: poll.count(DriftStatus::Unknown),
+        };
+        Self {
+            schema_version: 1,
+            generated_at_utc: chrono::Utc::now().to_rfc3339(),
+            totals,
+            poll,
+            phase_0_no_auto_bump: true,
+        }
+    }
+
+    pub fn to_json(&self) -> TrackerResult<String> {
+        Ok(serde_json::to_string_pretty(self)?)
+    }
+
+    pub fn to_markdown(&self) -> String {
+        let mut md = String::new();
+        md.push_str(&format!(
+            "# cave-runtime-tracker — daily upstream drift ({})\n\n",
+            self.generated_at_utc
+        ));
+        md.push_str(&format!("- tracked subsystems: **{}**\n", self.totals.tracked));
+        md.push_str(&format!("- ✅ in-sync: {}\n", self.totals.in_sync));
+        md.push_str(&format!("- ⚠️ behind: {}\n", self.totals.behind));
+        md.push_str(&format!("- ❔ unknown (unpinned / unresolved): {}\n", self.totals.unknown));
+        md.push_str("- phase 0: **report only, no auto-bump**\n\n");
+
+        if !self.poll.unresolved.is_empty() {
+            md.push_str(&format!(
+                "> {} repo(s) could not be resolved this run (offline / rate-limited): {}\n\n",
+                self.poll.unresolved.len(),
+                self.poll.unresolved.join(", ")
+            ));
+        }
+
+        // Group rows by category, categories alphabetised, rows by name.
+        let mut by_cat: BTreeMap<&str, Vec<&crate::poll::PollResult>> = BTreeMap::new();
+        for r in &self.poll.results {
+            by_cat.entry(r.upstream.category.as_str()).or_default().push(r);
+        }
+        for (cat, mut rows) in by_cat {
+            rows.sort_by(|a, b| a.upstream.name.cmp(&b.upstream.name));
+            md.push_str(&format!("## {cat}\n\n"));
+            md.push_str("| Subsystem | cave module | upstream | pinned | latest | status |\n");
+            md.push_str("|-----------|-------------|----------|--------|--------|--------|\n");
+            for r in rows {
+                md.push_str(&format!(
+                    "| {} | `{}` | [{}](https://github.com/{}) | {} | {} | {} |\n",
+                    r.upstream.name,
+                    r.upstream.cave_module,
+                    r.upstream.repo,
+                    r.upstream.repo,
+                    r.upstream.pinned.as_deref().unwrap_or("—"),
+                    r.latest.as_deref().unwrap_or("—"),
+                    r.status.badge(),
+                ));
+            }
+            md.push('\n');
+        }
+        md
+    }
+
+    /// Write `daily-<stamp>.{md,json}` into `dir`, plus `latest.json`
+    /// when `emit_latest`. Returns the (json, md) paths written.
+    pub fn write_to_dir(
+        &self,
+        dir: &Path,
+        stamp: &str,
+        emit_latest: bool,
+    ) -> TrackerResult<(PathBuf, PathBuf)> {
+        std::fs::create_dir_all(dir)?;
+        let json = self.to_json()?;
+        let json_path = dir.join(format!("daily-{stamp}.json"));
+        let md_path = dir.join(format!("daily-{stamp}.md"));
+        std::fs::write(&json_path, &json)?;
+        std::fs::write(&md_path, self.to_markdown())?;
+        if emit_latest {
+            std::fs::write(dir.join("latest.json"), &json)?;
+        }
+        Ok((json_path, md_path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::TrackerConfig;
+
+    fn report() -> DailyReport {
+        let cfg = TrackerConfig::default_config();
+        DailyReport::assemble(PollSummary::from_registry_only(&cfg))
+    }
+
+    #[test]
+    fn totals_sum_to_tracked() {
+        let r = report();
+        assert_eq!(
+            r.totals.in_sync + r.totals.behind + r.totals.unknown,
+            r.totals.tracked
+        );
+    }
+
+    #[test]
+    fn markdown_has_title_totals_and_a_table_header() {
+        let md = report().to_markdown();
+        assert!(md.contains("# cave-runtime-tracker"));
+        assert!(md.contains("tracked subsystems:"));
+        assert!(md.contains("| Subsystem | cave module |"));
+        assert!(md.contains("no auto-bump"));
+    }
+
+    #[test]
+    fn json_is_pretty_and_round_trips() {
+        let r = report();
+        let j = r.to_json().unwrap();
+        assert!(j.contains("\n  \"schema_version\""));
+        let v: serde_json::Value = serde_json::from_str(&j).unwrap();
+        assert_eq!(v["schema_version"], 1);
+        assert_eq!(v["phase_0_no_auto_bump"], true);
+    }
+
+    #[test]
+    fn write_to_dir_emits_md_json_and_latest() {
+        let dir = tempfile::tempdir().unwrap();
+        let r = report();
+        let (jp, mp) = r.write_to_dir(dir.path(), "2026-06-07", true).unwrap();
+        assert!(jp.exists() && mp.exists());
+        assert!(dir.path().join("latest.json").exists());
+    }
+
+    #[test]
+    fn write_to_dir_skips_latest_when_disabled() {
+        let dir = tempfile::tempdir().unwrap();
+        report().write_to_dir(dir.path(), "2026-06-07", false).unwrap();
+        assert!(!dir.path().join("latest.json").exists());
+    }
+}
