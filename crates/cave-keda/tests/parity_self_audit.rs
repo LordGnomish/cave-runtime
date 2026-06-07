@@ -3,7 +3,7 @@
 //
 //! Charter v2 self-audit — cave-keda must carry an honest, measured
 //! `fill_ratio` against upstream kedacore/keda v2.16.1, a pinned
-//! `source_sha` for reproducibility, the 2026-05-19 close-out audit
+//! `source_sha` for reproducibility, the 2026-06-07 close-out audit
 //! date, `parity_ratio_source = "manifest"`, a workspace-member
 //! listing, 100% AGPL SPDX header coverage, no stub macros in
 //! `src/`, and 7+ first-class scalers wired through the public API.
@@ -13,7 +13,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-06-07";
 const FLOOR_FILL_RATIO: f64 = 0.55;
 const PINNED_VERSION: &str = "v2.16.1";
 

@@ -5,17 +5,23 @@
 #   - ScaledObject + ScaledJob CRD models with cooldown/pause/idle/scaling-strategy
 #   - Scaler trait + replicas_from_metric helper
 #   - TriggerAuthentication (Secret + Env resolution + inline fallback)
-#   - 14 scalers — CPU/Memory, Cron (with built-in 5-field validator),
+#   - 16 scalers — CPU/Memory, Cron (with built-in 5-field validator),
 #     HTTP (pending-request), Kafka (per-partition lag), Prometheus (value),
 #     Redis (list/stream length), AWS SQS, Azure Service Bus, Azure
-#     Event Hub, GCP Pub/Sub, NATS JetStream, Etcd, Datadog
+#     Event Hub, GCP Pub/Sub, NATS JetStream, Etcd, Datadog, RabbitMQ
+#     (queue-length / message-rate), PostgreSQL (SQL query result)
+#   - HPA generation (newHPAForScaledObject: external-metric specs, replica
+#     bounds, paused pinning, scale-target ref) — extends the HPA path
+#   - CloudEvents emission (operator-side event emitter: source/subject/type
+#     format + structured-content envelope)
 #   - ScalingModifiers formula evaluator (max / min / sum + activation_target)
 #   - Hibernation schedules (cron-based weekday-locked windows)
 #
 # Out of MVP (see [[skipped]] below): full CEL expression engine
 # (reuses cave-apiserver CEL when it lands), New Relic + Splunk +
-# Dynatrace + Selenium Grid + CloudEvents scalers (low-signal niches),
-# WASM scaler plugin runtime (needs wasmtime), HPA-direct integration.
+# Dynatrace + Selenium Grid scalers (low-signal niches), CloudEvents-as-a-
+# scaling-source (distinct from emission; waits on cave-knative eventing),
+# WASM scaler plugin runtime (needs wasmtime).
 
 [upstream]
 org         = "kedacore"
@@ -29,26 +35,26 @@ source_sha  = "v2.16.1"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9545  # mapped / (mapped + partial + unmapped) = 21/22
-honest_ratio        = 0.7500  # mapped / total = 21/28
-last_audit          = "2026-05-19"
+fill_ratio          = 0.9615  # mapped / (mapped + partial + unmapped) = 25/26
+honest_ratio        = 0.8065  # mapped / total = 25/31
+last_audit          = "2026-06-07"
 infra_only          = false
-mapped_count        = 21
+mapped_count        = 25
 partial_count       = 1
-skipped_count       = 6
+skipped_count       = 5
 unmapped_count      = 0
-total               = 28
+total               = 31
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (21) + partial (1) + unmapped (0) = 22 in-scope subsystems
-#   21 / 22 = 0.9545
+#   mapped (25) + partial (1) + unmapped (0) = 26 in-scope subsystems
+#   25 / 26 = 0.9615
 #
 # Supplementary LOC measurement (transparency):
-#   impl_lines               = ~1380 (cave-keda src/, excl #[cfg(test)])
-#   upstream_in_scope_lines  = ~2400 (sum of subsystem in-scope LOC)
-#   ~1380 / ~2400            = ~0.58 (LOC basis)
+#   impl_lines               = ~1830 (cave-keda src/, excl #[cfg(test)])
+#   upstream_in_scope_lines  = ~3100 (sum of subsystem in-scope LOC)
+#   ~1830 / ~3100            = ~0.59 (LOC basis)
 #
-# Per-subsystem in-scope LOC against v2.16.1 (Phase 2):
+# Per-subsystem in-scope LOC against v2.16.1 (Phase 2 + this wave):
 #   pkg/apis/keda/v1alpha1/scaledobject_types.go               200 / 220
 #   pkg/apis/keda/v1alpha1/scaledjob_types.go                  150 / 175
 #   pkg/apis/keda/v1alpha1/triggerauthentication_types.go       60 /  65
@@ -68,6 +74,10 @@ total               = 28
 #   pkg/scalers/nats_jetstream_scaler.go                        60 / 200
 #   pkg/scalers/etcd_scaler.go                                  60 / 180
 #   pkg/scalers/datadog_scaler.go                               60 / 220
+#   pkg/scalers/rabbitmq_scaler.go (queueLength/messageRate)   140 / 600
+#   pkg/scalers/postgresql_scaler.go                           110 / 300
+#   pkg/eventemitter/cloudevent_http_handler.go (+helpers)     140 / 320
+#   controllers/keda/hpa.go (spec-gen subset)                 160 / 350
 #   pkg/scaling/scaledobject_modifiers.go (CEL subset)         110 / 280
 #   pkg/scaling/scaledobject_hibernation.go                    180 / 250
 #  ─────────────────────────────────────
@@ -149,6 +159,22 @@ upstream = "pkg/scalers/datadog_scaler.go"
 local    = "src/datadog_scaler.rs"
 
 [[files]]
+upstream = "pkg/scalers/rabbitmq_scaler.go"
+local    = "src/rabbitmq_scaler.rs"
+
+[[files]]
+upstream = "pkg/scalers/postgresql_scaler.go"
+local    = "src/postgresql_scaler.rs"
+
+[[files]]
+upstream = "pkg/eventemitter/cloudevent_http_handler.go"
+local    = "src/cloudevents.rs"
+
+[[files]]
+upstream = "controllers/keda/hpa.go"
+local    = "src/hpa.rs"
+
+[[files]]
 upstream = "pkg/scaling/scaledobject_modifiers.go"
 local    = "src/scaling_modifiers.rs"
 
@@ -202,6 +228,26 @@ file          = "src/scaling_modifiers.rs"
 upstream_name = "scaling.Hibernation.Decide"
 local_name    = "Hibernation::decide_at"
 file          = "src/hibernation.rs"
+
+[[functions]]
+upstream_name = "scalers.rabbitMQScaler.GetMetricsAndActivity"
+local_name    = "RabbitMqScaler::is_active"
+file          = "src/rabbitmq_scaler.rs"
+
+[[functions]]
+upstream_name = "scalers.postgreSQLScaler.GetMetricsAndActivity"
+local_name    = "PostgreSqlScaler::is_active"
+file          = "src/postgresql_scaler.rs"
+
+[[functions]]
+upstream_name = "eventemitter.CloudEventHTTPHandler.EmitEvent"
+local_name    = "CloudEventEmitter::emit"
+file          = "src/cloudevents.rs"
+
+[[functions]]
+upstream_name = "controllers.keda.ScaledObjectReconciler.newHPAForScaledObject"
+local_name    = "build_hpa"
+file          = "src/hpa.rs"
 
 # ── Mapped subsystems (Charter v2 [[mapped]] block) ─────────────────────────
 
@@ -310,6 +356,26 @@ name = "hibernation-schedules"
 upstream = "pkg/scaling/scaledobject_hibernation.go"
 note = "Cron-based weekday-locked hibernation windows; per-day calendar evaluator handles cross-midnight + weekend exclusion."
 
+[[mapped]]
+name = "rabbitmq-scaler"
+upstream = "pkg/scalers/rabbitmq_scaler.go"
+note = "QueueLength + MessageRate modes; excludeUnacknowledged ready-only selection; sum/avg/max regex composition; activation on messages (QueueLength) or rate-OR-messages."
+
+[[mapped]]
+name = "postgresql-scaler"
+upstream = "pkg/scalers/postgresql_scaler.go"
+note = "Scalar-query scaler; buildConnArray libpq params + escapePostgreConnectionParameter; activation on num > activationTargetQueryValue."
+
+[[mapped]]
+name = "cloudevents-emission"
+upstream = "pkg/eventemitter/cloudevent_http_handler.go"
+note = "Operator-side CloudEvents emitter: source /<cluster>/<kedaNs>/keda + subject /<cluster>/<ns>/<type>/<name>, 12 keda.*.v1 CloudEventType strings, structured-content envelope with EmitData{reason,message}. Distinct from the (skipped) CloudEvents-as-source scaler."
+
+[[mapped]]
+name = "hpa-generation"
+upstream = "controllers/keda/hpa.go"
+note = "newHPAForScaledObject spec transform: keda-hpa-<name> naming, GetHPAMin/MaxReplicas (1/100 defaults), External-metric specs (AverageValue, s%d- names, *1000 milli targets), paused min==max pinning, ScaleTargetRef. Cluster apply stays in cave-controller-manager."
+
 # ── Partial subsystems ──────────────────────────────────────────────────────
 
 [[partial]]
@@ -340,14 +406,9 @@ upstream = "pkg/scaling/cache + wasm_runtime"
 reason = "WebAssembly scaler plugin runtime — requires wasmtime; conflicts with the Ambient-only mandate that removed wasmtime from the workspace dep tree."
 
 [[skipped]]
-name = "hpa-direct"
-upstream = "pkg/scaling/hpa"
-reason = "Direct HPA CRD generation — cave-controller-manager owns HPA path; we expose replica recommendations directly."
-
-[[skipped]]
 name = "cloudevents-source-scaler"
 upstream = "pkg/scalers/cloudevents_*.go"
-reason = "CloudEvents-as-source scaler — deferred until cave-knative eventing surface stabilises."
+reason = "CloudEvents-as-source scaler (scaling ON received CloudEvents) — distinct from the now-mapped CloudEvents emission; deferred until cave-knative eventing surface stabilises."
 
 # ── Portal / cavectl / observability tracks (Charter v2 4-track) ───────────
 
@@ -358,4 +419,4 @@ status       = "partial"
 loc          = 3198
 priority     = "P0"
 notes        = "cave-portal /admin/keda live since 2026-05-12; ScaledObject/ScaledJob/TriggerAuth CRUD + 64-scaler catalog (see portal-keda-real-ui-2026-05-12)."
-last_audit   = "2026-05-19"
+last_audit   = "2026-06-07"
