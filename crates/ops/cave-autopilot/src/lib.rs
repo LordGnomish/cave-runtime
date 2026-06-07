@@ -43,6 +43,7 @@ pub mod metrics;
 pub mod ollama;
 pub mod queue;
 pub mod report;
+pub mod router;
 pub mod tracker;
 pub mod worktree;
 
