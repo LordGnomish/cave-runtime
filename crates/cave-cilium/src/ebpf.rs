@@ -96,7 +96,7 @@ impl ElfObject {
         if b.len() < 64 {
             return Err(ElfError::TooSmall(b.len()));
         }
-        if &b[0..4] != [0x7f, b'E', b'L', b'F'] {
+        if b[0..4] != [0x7f, b'E', b'L', b'F'] {
             return Err(ElfError::BadMagic);
         }
         // EI_CLASS == 2 (64-bit), EI_DATA == 1 (little-endian).

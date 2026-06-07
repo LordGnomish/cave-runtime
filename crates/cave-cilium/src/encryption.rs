@@ -246,7 +246,7 @@ pub mod pqc {
         for (i, lane) in lanes.iter_mut().enumerate() {
             *lane = 0x811c_9dc5 ^ (i as u32).wrapping_mul(0x9e37_79b1);
         }
-        let mut absorb = |label: u8, data: &[u8], lanes: &mut [u32; 8]| {
+        let absorb = |label: u8, data: &[u8], lanes: &mut [u32; 8]| {
             // Length-prefix + label for domain separation.
             let header = [label, (data.len() & 0xff) as u8, (data.len() >> 8) as u8];
             for &byte in header.iter().chain(data.iter()) {
@@ -309,7 +309,7 @@ fn base64_decode(input: &str) -> Option<Vec<u8>> {
         }
     };
     let bytes: Vec<u8> = input.bytes().filter(|&b| b != b'=').collect();
-    if input.contains('=') && input.len() % 4 != 0 {
+    if input.contains('=') && !input.len().is_multiple_of(4) {
         return None;
     }
     let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
