@@ -233,6 +233,80 @@ impl RaftBackend {
         self.log.write().unwrap().append(term, op)
     }
 
+    /// Highest term in the local log (0 if empty). Used by the election
+    /// up-to-date check (Raft §5.4.1).
+    pub fn last_log_term(&self) -> u64 {
+        self.log.read().unwrap().last_term()
+    }
+
+    /// Leader side of replication: the log tail strictly after `after_index`,
+    /// ready to ship in an AppendEntries RPC.
+    pub fn log_entries_from(&self, after_index: u64) -> Vec<LogEntry> {
+        self.log.read().unwrap().entries_after(after_index)
+    }
+
+    /// Follower side of replication — the AppendEntries receiver (Raft §5.3).
+    ///
+    /// * Consistency check: unless `prev_log_index == 0`, the local log must
+    ///   contain an entry at `prev_log_index` whose term equals
+    ///   `prev_log_term`; otherwise the append is rejected (returns `false`)
+    ///   and the log is left untouched.
+    /// * Conflict resolution: for each incoming entry, if an existing entry at
+    ///   the same index has a different term, the local log is truncated from
+    ///   that index before appending (§5.3). Matching entries are skipped, so
+    ///   retransmits are idempotent.
+    /// * Commit advance: `commit_index` is raised to
+    ///   `min(leader_commit, index of the last entry now in the log)`.
+    ///
+    /// Returns `true` when the entries were accepted.
+    pub fn append_entries(
+        &self,
+        prev_log_index: u64,
+        prev_log_term: u64,
+        entries: Vec<LogEntry>,
+        leader_commit: u64,
+    ) -> Result<bool, RaftStorageError> {
+        let mut log = self.log.write().unwrap();
+
+        // §5.3 consistency check.
+        if prev_log_index > 0 {
+            match log.get(prev_log_index) {
+                Some(e) if e.term == prev_log_term => {}
+                _ => return Ok(false),
+            }
+        }
+
+        for entry in entries {
+            match log.get(entry.index) {
+                // Already present and consistent — skip (idempotent).
+                Some(existing) if existing.term == entry.term => continue,
+                // Conflict: drop this entry and everything after it, then append.
+                Some(_) => {
+                    log.truncate(entry.index);
+                    log.append(entry.term, entry.op);
+                }
+                // New entry beyond the tail — append (indices are contiguous).
+                None => {
+                    log.append(entry.term, entry.op);
+                }
+            }
+        }
+
+        let last_index = log.last_index();
+        drop(log);
+
+        if leader_commit > 0 {
+            let new_commit = leader_commit.min(last_index);
+            // A heartbeat may carry an older commit than we already have; only
+            // ever move commit_index forward.
+            let mut s = self.state.write().unwrap();
+            if new_commit > s.commit_index {
+                s.commit_index = new_commit;
+            }
+        }
+        Ok(true)
+    }
+
     /// Move `commit_index` forward. Errors if the caller tries to
     /// regress it past `last_applied`.
     pub fn mark_committed(&self, new_commit: u64) -> Result<(), RaftStorageError> {
@@ -670,6 +744,35 @@ mod tests {
         assert!(dst.get("kv/a").unwrap().is_none());
         assert_eq!(dst.get("kv/b").unwrap(), Some(b"2".to_vec()));
         assert_eq!(dst.get("kv/c").unwrap(), Some(b"3".to_vec()));
+    }
+
+    #[test]
+    fn append_entries_appends_commits_and_applies() {
+        let f = RaftBackend::new();
+        f.bump_term(2);
+        assert_eq!(f.last_log_term(), 0);
+        let entries = vec![
+            LogEntry { index: 1, term: 2, op: LogOp::Put { path: "kv/a".into(), value: b"1".to_vec() } },
+            LogEntry { index: 2, term: 2, op: LogOp::Put { path: "kv/b".into(), value: b"2".to_vec() } },
+        ];
+        assert!(f.append_entries(0, 0, entries, 2).unwrap());
+        assert_eq!(f.last_log_index(), 2);
+        assert_eq!(f.last_log_term(), 2);
+        assert_eq!(f.commit_index(), 2);
+        assert_eq!(f.log_entries_from(1).len(), 1);
+        f.apply_committed().unwrap();
+        assert_eq!(f.get("kv/a").unwrap(), Some(b"1".to_vec()));
+        assert_eq!(f.get("kv/b").unwrap(), Some(b"2".to_vec()));
+    }
+
+    #[test]
+    fn append_entries_commit_never_exceeds_local_tail() {
+        // Heartbeat advertises a leader_commit ahead of what we've received.
+        let f = RaftBackend::new();
+        f.bump_term(1);
+        let e = vec![LogEntry { index: 1, term: 1, op: LogOp::Noop }];
+        assert!(f.append_entries(0, 0, e, 99).unwrap());
+        assert_eq!(f.commit_index(), 1, "commit clamped to local last index");
     }
 
     #[test]
