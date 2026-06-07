@@ -19,16 +19,20 @@
 pub mod aws_sqs_scaler;
 pub mod azure_eventhub_scaler;
 pub mod azure_servicebus_scaler;
+pub mod cloudevents;
 pub mod cpu_memory_scaler;
 pub mod cron_scaler;
 pub mod datadog_scaler;
 pub mod etcd_scaler;
 pub mod gcp_pubsub_scaler;
 pub mod hibernation;
+pub mod hpa;
 pub mod http_scaler;
 pub mod kafka_scaler;
 pub mod nats_jetstream_scaler;
+pub mod postgresql_scaler;
 pub mod prometheus_scaler;
+pub mod rabbitmq_scaler;
 pub mod redis_scaler;
 pub mod scaledjob;
 pub mod scaledobject;
@@ -39,16 +43,27 @@ pub mod trigger_authentication;
 pub use aws_sqs_scaler::AwsSqsScaler;
 pub use azure_eventhub_scaler::AzureEventHubScaler;
 pub use azure_servicebus_scaler::{AzureServiceBusEntity, AzureServiceBusScaler};
+pub use cloudevents::{
+    CloudEvent, CloudEventEmitter, CloudEventType, EmitData, EventData,
+    generate_cloud_event_source, generate_cloud_event_subject,
+};
 pub use cpu_memory_scaler::{CpuScaler, MemoryScaler, ResourceMetricType};
 pub use cron_scaler::{CronScaler, validate_cron};
 pub use datadog_scaler::DatadogScaler;
 pub use etcd_scaler::EtcdScaler;
 pub use gcp_pubsub_scaler::GcpPubSubScaler;
 pub use hibernation::{Hibernation, HibernationDecision, HibernationSchedule};
+pub use hpa::{
+    ExternalMetricSpec, HpaMetricTargetType, HpaSpec, HpaTrigger, ScaleTargetRef, build_hpa,
+    default_hpa_name, generate_metric_in_mili, generate_metric_name_with_index, hpa_max_replicas,
+    hpa_min_replicas, hpa_name,
+};
 pub use http_scaler::HttpScaler;
 pub use kafka_scaler::KafkaScaler;
 pub use nats_jetstream_scaler::NatsJetStreamScaler;
+pub use postgresql_scaler::{PostgreSqlScaler, escape_connection_parameter};
 pub use prometheus_scaler::PrometheusScaler;
+pub use rabbitmq_scaler::{QueueInfo, RabbitMqMode, RabbitMqOperation, RabbitMqScaler};
 pub use redis_scaler::{RedisDataType, RedisScaler};
 pub use scaledjob::{ScaledJob, ScalingStrategy};
 pub use scaledobject::ScaledObject;

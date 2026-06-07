@@ -53,17 +53,6 @@
       "upstream": "prometheus/alertmanager",
       "upstream_version": "v0.26.0"
     },
-    "cave-apigw": {
-      "cave_src_loc": null,
-      "manifest_filled": null,
-      "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
-      "stubs": null,
-      "tier": "C",
-      "upstream": null,
-      "upstream_version": null
-    },
     "cave-apiserver": {
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "labels/selector + fields/selector + namespacelifecycle + admission chain + limitranger + resourcequota (v1.36.0)",
@@ -511,17 +500,6 @@
       "upstream": null,
       "upstream_version": null
     },
-    "cave-dependency-track": {
-      "cave_src_loc": null,
-      "manifest_filled": null,
-      "note": "added by disk-overlay; not in audit doc",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
-      "stubs": null,
-      "tier": "C",
-      "upstream": null,
-      "upstream_version": null
-    },
     "cave-deploy": {
       "cave_src_loc": 4743,
       "honest_ratio": 0.6316,
@@ -887,18 +865,18 @@
     },
     "cave-keda": {
       "cave_src_loc": 1145,
-      "honest_ratio": 0.75,
-      "last_audit_disk": "2026-05-19",
+      "honest_ratio": 0.8065,
+      "last_audit_disk": "2026-06-07",
       "manifest_filled": true,
-      "mapped_count": 21,
+      "mapped_count": 25,
       "note": null,
-      "parity_ratio": 0.9545,
+      "parity_ratio": 0.9615,
       "parity_ratio_source": "manifest",
       "partial_count": 1,
-      "skipped_count": 6,
+      "skipped_count": 5,
       "stubs": null,
       "tier": "C",
-      "total_count": 28,
+      "total_count": 31,
       "unmapped_count": 0,
       "upstream": "kedacore/keda",
       "upstream_version": "v2.12.0"
@@ -1847,7 +1825,7 @@
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
     "flipped": 95,
-    "injected": 15,
+    "injected": 13,
     "new_filled": 95,
     "phantoms": 0,
     "ratio_overrides": 64
