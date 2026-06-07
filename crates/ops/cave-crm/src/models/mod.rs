@@ -18,6 +18,7 @@ pub mod calendar_event;
 pub mod company;
 pub mod connected_account;
 pub mod custom_field;
+pub mod dashboard;
 pub mod custom_object;
 pub mod lead;
 pub mod message;
@@ -39,6 +40,7 @@ pub use calendar_event::{
 };
 pub use company::Company;
 pub use connected_account::{ConnectedAccount, ConnectedAccountProvider};
+pub use dashboard::{ActorContext, ActorMetadata, ActorSource, Dashboard};
 pub use task_target::{TaskTarget, TaskTargetKind};
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
