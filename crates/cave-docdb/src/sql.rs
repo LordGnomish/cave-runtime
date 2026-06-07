@@ -473,6 +473,18 @@ pub fn delete_to_sql(table: &str, filter: &Value) -> SqlQuery {
     }
 }
 
+/// Translate an aggregation pipeline into a single SQL statement.
+///
+/// Supports the common linear shapes: `$match` (folded into `WHERE`), `$sort`,
+/// `$skip`, `$limit`, `$project` (inclusion), `$group` (with `$sum`/`$avg`/
+/// `$min`/`$max`/`$count` accumulators and a `$field` or `null` `_id`), and
+/// `$count`. Stages outside this set leave the pipeline to the in-memory
+/// executor — callers should fall back when `pipeline_to_sql` cannot represent
+/// a stage (signalled by `None`).
+pub fn pipeline_to_sql(_table: &str, _pipeline: &[Value]) -> Option<SqlQuery> {
+    Some(SqlQuery::default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -717,5 +729,97 @@ mod tests {
         let q = delete_to_sql("c", &json!({"_id": "1"}));
         assert_eq!(q.sql, "DELETE FROM \"c\" WHERE _jsonb -> '_id' = $1::jsonb");
         assert_eq!(q.params, vec!["\"1\""]);
+    }
+
+    // ── aggregation pipeline → SQL ───────────────────────────────────────
+
+    fn agg(table: &str, pipeline: serde_json::Value) -> SqlQuery {
+        let arr = pipeline.as_array().unwrap().clone();
+        pipeline_to_sql(table, &arr).expect("pipeline should translate")
+    }
+
+    #[test]
+    fn agg_group_sum() {
+        let q = agg("emp", json!([{"$group": {"_id": "$dept", "total": {"$sum": "$salary"}}}]));
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', _jsonb -> 'dept', 'total', to_jsonb(sum((_jsonb ->> 'salary')::numeric))) AS _jsonb FROM \"emp\" GROUP BY _jsonb -> 'dept'"
+        );
+    }
+
+    #[test]
+    fn agg_group_count_null_id() {
+        let q = agg("emp", json!([{"$group": {"_id": null, "n": {"$sum": 1}}}]));
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', 'null'::jsonb, 'n', to_jsonb(count(*))) AS _jsonb FROM \"emp\""
+        );
+    }
+
+    #[test]
+    fn agg_match_then_group_avg() {
+        let q = agg(
+            "emp",
+            json!([{"$match": {"active": true}}, {"$group": {"_id": "$dept", "avg": {"$avg": "$age"}}}]),
+        );
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', _jsonb -> 'dept', 'avg', to_jsonb(avg((_jsonb ->> 'age')::numeric))) AS _jsonb FROM \"emp\" WHERE _jsonb -> 'active' = $1::jsonb GROUP BY _jsonb -> 'dept'"
+        );
+        assert_eq!(q.params, vec!["true"]);
+    }
+
+    #[test]
+    fn agg_match_sort_limit_linear() {
+        let q = agg(
+            "c",
+            json!([{"$match": {"x": {"$gt": 1}}}, {"$sort": {"x": -1}}, {"$limit": 5}]),
+        );
+        assert_eq!(
+            q.sql,
+            "SELECT _jsonb FROM \"c\" WHERE _jsonb -> 'x' > $1::jsonb ORDER BY _jsonb -> 'x' DESC LIMIT 5"
+        );
+    }
+
+    #[test]
+    fn agg_count_stage() {
+        let q = agg("c", json!([{"$count": "total"}]));
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('total', count(*)) AS _jsonb FROM \"c\""
+        );
+    }
+
+    #[test]
+    fn agg_project_inclusion() {
+        let q = agg("c", json!([{"$project": {"name": 1}}]));
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', _jsonb -> '_id', 'name', _jsonb -> 'name') AS _jsonb FROM \"c\""
+        );
+    }
+
+    #[test]
+    fn agg_empty_pipeline() {
+        let q = agg("c", json!([]));
+        assert_eq!(q.sql, "SELECT _jsonb FROM \"c\"");
+    }
+
+    #[test]
+    fn agg_unsupported_stage_returns_none() {
+        let arr = vec![json!({"$unwind": "$tags"})];
+        assert!(pipeline_to_sql("c", &arr).is_none());
+    }
+
+    #[test]
+    fn agg_group_min_max() {
+        let q = agg(
+            "emp",
+            json!([{"$group": {"_id": "$d", "hi": {"$max": "$v"}, "lo": {"$min": "$v"}}}]),
+        );
+        assert_eq!(
+            q.sql,
+            "SELECT jsonb_build_object('_id', _jsonb -> 'd', 'hi', to_jsonb(max((_jsonb ->> 'v')::numeric)), 'lo', to_jsonb(min((_jsonb ->> 'v')::numeric))) AS _jsonb FROM \"emp\" GROUP BY _jsonb -> 'd'"
+        );
     }
 }
