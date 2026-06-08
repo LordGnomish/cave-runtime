@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-cilium"
+version = "0.1.0"
+edition = "2021"
+description = "Cilium control-plane port — eBPF loader, CiliumNetworkPolicy CRD + controller, cluster-pool IPAM, Hubble observability, no-sidecar L7 mesh, WireGuard/IPsec PQC-ready encryption"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+cave-ebpf-common = { path = "../cave-ebpf-common" }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+thiserror = "1"
+ipnet = "2"

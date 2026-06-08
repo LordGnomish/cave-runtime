@@ -454,6 +454,30 @@
       "upstream_url": "https://github.com/danny-avila/LibreChat",
       "upstream_version": "v0.7.6"
     },
+    "cave-cilium": {
+      "cave_src_loc": null,
+      "crate_dir": "crates/networking/cave-cilium",
+      "fill_ratio": 0.7667,
+      "honest_ratio": 0.7667,
+      "last_audit": "2026-06-07",
+      "last_audit_disk": "2026-06-07",
+      "last_commit": "4f6802522a4b4ac3946da124be08eed33201841a",
+      "last_commit_at": "2026-06-08T19:43:24+02:00",
+      "manifest_filled": null,
+      "mapped_count": 17,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.7667,
+      "parity_ratio_source": "manifest",
+      "partial_count": 4,
+      "skipped_count": 6,
+      "source_sha": "v1.19.4",
+      "stubs": null,
+      "tier": "C",
+      "total_count": 30,
+      "unmapped_count": 3,
+      "upstream": "cilium/cilium",
+      "upstream_version": "v1.19.4"
+    },
     "cave-cli": {
       "cave_src_loc": null,
       "crate_dir": "crates/ops/cave-cli",
@@ -1519,8 +1543,8 @@
       "honest_ratio": 0.8636,
       "last_audit": "2026-06-07",
       "last_audit_disk": "2026-06-07",
-      "last_commit": "889306a0129457122eb7070b40d0fdebb6e19f15",
-      "last_commit_at": "2026-06-08T19:41:40+02:00",
+      "last_commit": "91995e971e4819cde50e33bb392954eae2d5f232",
+      "last_commit_at": "2026-06-08T19:41:41+02:00",
       "manifest_filled": true,
       "mapped_count": 19,
       "note": "skeleton \u2014 needs real impl",
@@ -3169,10 +3193,10 @@
   "disk_overlay_at": "2026-05-27",
   "disk_overlay_stats": {
     "flipped": 100,
-    "injected": 16,
+    "injected": 17,
     "new_filled": 100,
     "phantoms": 0,
-    "ratio_overrides": 91
+    "ratio_overrides": 92
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
