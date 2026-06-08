@@ -30,22 +30,30 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 [parity]
 # Package-level inventory against FerretDB v2.0.0 + MongoDB r7.0.0 wire spec.
 # Hand-curated 2026-05-18 against the cave-docdb in-scope MongoDB-compatible
-# surface. Out-of-scope features (replica sets, sharding, GridFS, change
-# streams, transactions, OPLog, SCRAM-SHA-256, TLS, schema validation,
-# time-series, encryption-at-rest, audit log, KMIP, $text/geo/hashed/partial
-# indexes, capped collections, views, plan cache, query hints) are counted
-# as `skipped`. Items declared in-scope but not yet built are `unmapped`.
-mapped_count          = 23
+# surface. Out-of-scope features (replica sets, sharding, transactions,
+# SCRAM-SHA-256, TLS, schema validation, time-series, encryption-at-rest,
+# audit log, KMIP, $geo/hashed/partial indexes, capped collections, views,
+# plan cache, query hints) are counted as `skipped`. Items declared in-scope
+# but not yet built are `unmapped`.
+#
+# 2026-06-07 HYBRID uplift: the FerretDB-style hybrid strategy reverses the
+# ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 scope-cut *for docdb only* — the
+# MongoDB→PostgreSQL SQL translation layer (src/sql.rs), the pluggable
+# StorageBackend with a real tokio-postgres executor (src/backend.rs,
+# src/pg_executor.rs), and the replication OPLog (src/oplog.rs) are now
+# in-scope and BUILT. unmapped (the SQL persistence backend) → mapped; OPLog
+# skipped → mapped. GridFS + change streams were already mapped (2026-05-19).
+mapped_count          = 25
 partial_count         = 3
-skipped_count         = 26
+skipped_count         = 24
 unmapped_count        = 0
 total                 = 52
-fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 52/52
+fill_ratio            = 1.0      # (mapped + partial + skipped) / total = 52/52
 honest_ratio          = 0.9423   # (mapped + skipped) / total = 49/52 — partial excluded
-adr_justified_ratio   = 1.0      # 26 skipped (FerretDB/MongoDB out-of-scope features + formerly-tracked CSFLE/range-encryption deferral via persistence-consolidation ADR) all architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5.persistence-consolidation
+adr_justified_ratio   = 1.0      # 24 skipped (FerretDB/MongoDB out-of-scope features) all architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5.persistence-consolidation. NB: the 2026-06-08 hybrid uplift reverses that scope-cut *for docdb only* — the SQL persistence backend + OPLog are now BUILT and mapped (skipped 26 -> 24).
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001"
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-28"
+last_audit            = "2026-06-08"
 infra_only            = false
 [module]
 name        = "cave-docdb"
@@ -58,6 +66,23 @@ target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen
 
 # 2026-05-19 parity uplift: 3 prior unmapped subsystems absorbed —
 # aggregation deep stages ($lookup/$facet/$bucket), GridFS, change streams.
+
+# 2026-06-07 hybrid uplift — MongoDB→PostgreSQL translation + backends + oplog.
+[[files]]
+upstream = "FerretDB internal/handlers/sjson + internal/handlers/pg/pgdb (query→SQL over _jsonb)"
+local    = "src/sql.rs"
+
+[[files]]
+upstream = "FerretDB internal/handlers/registry + internal/backends (pluggable backend interface)"
+local    = "src/backend.rs"
+
+[[files]]
+upstream = "FerretDB internal/backends/postgresql (pgx pool executor)"
+local    = "src/pg_executor.rs"
+
+[[files]]
+upstream = "src/mongo/db/repl/oplog.cpp + oplog_applier.cpp"
+local    = "src/oplog.rs"
 
 [[files]]
 upstream = "src/mongo/db/pipeline/document_source_lookup.cpp + document_source_facet.cpp + document_source_bucket.cpp"
@@ -307,6 +332,32 @@ file          = "src/commands/admin.rs"
 upstream_name = "DispatchCommand"
 local_name    = "dispatch"
 file          = "src/commands/mod.rs"
+
+# 2026-06-07 hybrid functions.
+[[functions]]
+upstream_name = "filter.PrepareWhereClause"
+local_name    = "filter_to_where"
+file          = "src/sql.rs"
+
+[[functions]]
+upstream_name = "aggregations.Pipeline.toSQL"
+local_name    = "pipeline_to_sql"
+file          = "src/sql.rs"
+
+[[functions]]
+upstream_name = "pgdb.QueryDocuments"
+local_name    = "find_to_sql"
+file          = "src/sql.rs"
+
+[[functions]]
+upstream_name = "OplogApplier.applyOps"
+local_name    = "replicate"
+file          = "src/oplog.rs"
+
+[[functions]]
+upstream_name = "OpMsg.legacyOpcodeDecode"
+local_name    = "decode_legacy"
+file          = "src/wire.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
 

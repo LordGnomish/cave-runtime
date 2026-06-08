@@ -23,10 +23,18 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+async-trait = { workspace = true }
 bytes = "1"
 regex = "1"
 hex = "0.4"
 sha2 = { workspace = true }
+tokio-postgres = { workspace = true, optional = true }
+
+[features]
+# Real PostgreSQL backend (cave-pg / cave-rdbms wire) via tokio-postgres.
+# Off by default so the unit suite stays hermetic; the translation layer and
+# the in-memory backend need no database.
+pg = ["dep:tokio-postgres"]
 
 [dev-dependencies]
 proptest = "1"

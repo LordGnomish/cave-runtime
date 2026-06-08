@@ -72,6 +72,7 @@ pub fn create_router(state: Arc<DocDbState>) -> Router {
         .route("/api/docdb/stats", get(engine_stats))
         .route("/api/docdb/server/info", get(server_info))
         .route("/api/docdb/server/port", get(server_port))
+        .route("/api/docdb/sql/translate", post(sql_translate))
         .with_state(state)
 }
 
@@ -363,4 +364,32 @@ async fn server_info() -> ApiResult<Value> {
 async fn server_port(State(state): State<Arc<DocDbState>>) -> ApiResult<Value> {
     let port = state.wire_port.load(Ordering::SeqCst);
     Ok(Json(serde_json::json!({ "port": port })))
+}
+
+/// Translate a MongoDB query or aggregation pipeline into PostgreSQL SQL.
+///
+/// Exposes the hybrid translation layer ([`crate::sql`]) for inspection and for
+/// driving an external PostgreSQL (cave-pg) backend.
+async fn sql_translate(
+    State(_state): State<Arc<DocDbState>>,
+    Json(req): Json<SqlTranslateRequest>,
+) -> ApiResult<SqlTranslateResponse> {
+    let q = if let Some(pipeline) = req.pipeline.as_ref() {
+        crate::sql::pipeline_to_sql(&req.collection, pipeline)
+            .ok_or_else(|| err_bad_request("pipeline contains a stage not translatable to SQL"))?
+    } else {
+        let filter = req.filter.clone().unwrap_or(Value::Object(Default::default()));
+        crate::sql::find_to_sql(
+            &req.collection,
+            &filter,
+            req.projection.as_ref(),
+            req.sort.as_ref(),
+            req.skip,
+            req.limit,
+        )
+    };
+    Ok(Json(SqlTranslateResponse {
+        sql: q.sql,
+        params: q.params,
+    }))
 }
