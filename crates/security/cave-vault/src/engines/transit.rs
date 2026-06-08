@@ -695,6 +695,33 @@ pub async fn generate_data_key(
     Ok(VaultResponse::new().with_data(response))
 }
 
+/// Seal a freshly-generated data key in a **post-quantum** envelope. A random
+/// `bits`-wide data key is wrapped under an ML-KEM-768 encapsulation (public)
+/// key via the KEM-DEM construction in [`crate::core::pqc_seal`] (encapsulate →
+/// HKDF-SHA256 → AES-256-GCM). Returns the one-time plaintext data key — used
+/// immediately to encrypt the caller's payload and never persisted — and the
+/// [`PqcWrappedKey`](crate::core::pqc_seal::PqcWrappedKey) envelope to store at
+/// rest.
+///
+/// Where [`generate_data_key`] wraps the data key with a classical AES transit
+/// key, this path's key-establishment is quantum-safe: an adversary recording
+/// the envelope today cannot recover the data key later, even with a quantum
+/// computer, without the ML-KEM-768 decapsulation key. Wrapping needs only the
+/// public key, so the issuing operator need not hold the unwrap key.
+pub fn pqc_envelope_data_key(
+    bits: u32,
+    ml_kem_public_key: &[u8],
+) -> VaultResult<(Vec<u8>, crate::core::pqc_seal::PqcWrappedKey)> {
+    let rng = SystemRandom::new();
+    let key_len = (bits / 8) as usize;
+    let mut data_key = vec![0u8; key_len];
+    rng.fill(&mut data_key)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    let wrapped =
+        crate::core::pqc_seal::PqcSealKeypair::seal_wrap_to_public(ml_kem_public_key, &data_key)?;
+    Ok((data_key, wrapped))
+}
+
 pub async fn export_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
@@ -888,5 +915,44 @@ mod tests {
         let sig = pair.sign(message);
         let public_key = UnparsedPublicKey::new(&ED25519, pair.public_key().as_ref());
         assert!(public_key.verify(message, sig.as_ref()).is_ok());
+    }
+
+    #[test]
+    fn pqc_envelope_data_key_roundtrips_through_ml_kem() {
+        use crate::core::pqc_seal::PqcSealKeypair;
+        let kp = PqcSealKeypair::generate();
+        let (data_key, wrapped) = pqc_envelope_data_key(256, &kp.public_key_bytes()).unwrap();
+        assert_eq!(data_key.len(), 32);
+        // The envelope holds an ML-KEM ciphertext, not the plaintext key.
+        assert_ne!(wrapped.ciphertext, data_key);
+        // The decapsulation-key holder recovers exactly the data key.
+        assert_eq!(kp.seal_unwrap(&wrapped).unwrap(), data_key);
+    }
+
+    #[test]
+    fn pqc_envelope_tamper_is_rejected() {
+        use crate::core::pqc_seal::PqcSealKeypair;
+        let kp = PqcSealKeypair::generate();
+        let (_dk, wrapped) = pqc_envelope_data_key(256, &kp.public_key_bytes()).unwrap();
+        let mut bad = wrapped.clone();
+        bad.ciphertext[0] ^= 0xff;
+        assert!(kp.seal_unwrap(&bad).is_err());
+    }
+
+    #[test]
+    fn pqc_envelope_rejects_malformed_public_key() {
+        assert!(pqc_envelope_data_key(256, &[0u8; 10]).is_err());
+    }
+
+    #[test]
+    fn pqc_envelope_wrong_keypair_cannot_recover() {
+        use crate::core::pqc_seal::PqcSealKeypair;
+        let issuer = PqcSealKeypair::generate();
+        let other = PqcSealKeypair::generate();
+        let (data_key, wrapped) = pqc_envelope_data_key(256, &issuer.public_key_bytes()).unwrap();
+        match other.seal_unwrap(&wrapped) {
+            Err(_) => {}
+            Ok(v) => assert_ne!(v, data_key),
+        }
     }
 }

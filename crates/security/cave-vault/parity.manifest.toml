@@ -48,7 +48,7 @@ unmapped_count = 0
 total          = 48
 fill_ratio     = 1.0000
 honest_ratio   = 0.5625
-last_audit     = "2026-05-23"
+last_audit     = "2026-06-07"
 parity_ratio_source = "manifest"
 infra_only     = false
 
@@ -450,8 +450,8 @@ note         = "Token issuance, renewal, revocation; root / batch / service kind
 
 [[mapped]]
 upstream_pkg = "openbao:vault/{core,policy,audit,lease,shamir,seal}/"
-local_files  = ["src/core/policy.rs", "src/core/audit.rs", "src/core/lease.rs", "src/core/seal.rs", "src/shamir.rs", "src/core/wrapping.rs"]
-note         = "Policy engine, audit broker, lease manager, Shamir unseal, response wrapping"
+local_files  = ["src/core/policy.rs", "src/core/audit.rs", "src/core/lease.rs", "src/core/seal.rs", "src/shamir.rs", "src/core/wrapping.rs", "src/core/pqc_seal.rs"]
+note         = "Policy engine, audit broker, lease manager, Shamir unseal, response wrapping. 2026-06-07 DEPTH (count-neutral): src/core/pqc_seal.rs adds a charter PQC-ready seal-wrap — ML-KEM-768 (FIPS 203) KEM-DEM hybrid envelope (encapsulate→HKDF-SHA256→AES-256-GCM) wrapping the barrier master key, with AutoSealType::MlKem768 + PqcSeal auto-unseal + Shamir recovery shares. Charter extension (not an OpenBao package), so it raises depth, not the OpenBao parity ratio. Real lattice math via vetted RustCrypto ml-kem 0.3.2."
 
 [[mapped]]
 upstream_pkg = "openbao:vault/api/sys/"
@@ -461,7 +461,7 @@ note         = "/v1/sys/* endpoints — health, mounts, auth, policies, audit"
 [[mapped]]
 upstream_pkg = "openbao:physical/{file,inmem,raft}/"
 local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs", "src/storage/raft.rs"]
-note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, path-traversal guarded) + in-memory backend + Raft-replicated backend (append-only log w/ term + index, propose/commit/apply pipeline, vote per Raft §5.1, snapshot install + log replay, idempotent delete, configurable inner state-machine Backend). Remaining backends (s3/consul/etcd/gcs/postgresql) tracked as unmapped."
+note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, path-traversal guarded) + in-memory backend + Raft-replicated backend (append-only log w/ term + index, propose/commit/apply pipeline, vote per Raft §5.1, snapshot install + log replay, idempotent delete, configurable inner state-machine Backend). 2026-06-07 DEPTH (count-neutral): added the AppendEntries replication primitive (append_entries §5.3 consistency check + conflict-truncation + idempotent retransmit + commit advance; log_entries_from; last_log_term) so a multi-node HA cluster is drivable through the public API — covered by tests/raft_consensus.rs (3-node elect→propose→replicate→quorum-commit→converge + minority-not-committed safety). Remaining backends (s3/consul/etcd/gcs/postgresql) tracked as unmapped."
 
 # ─── Skipped (11) ───────────────────────────────────────────────────────────
 
@@ -802,7 +802,7 @@ reason        = "Prometheus exporter — Cave metrics stack absorbs via observab
 [self_audit]
 test_file     = "src/parity_self_audit.rs"
 floor         = 0.95
-last_run      = "2026-05-23"
+last_run      = "2026-06-07"
 report_file   = "PARITY_REPORT.md"
 
 [observability]
