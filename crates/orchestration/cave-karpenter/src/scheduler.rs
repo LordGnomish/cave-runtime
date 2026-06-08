@@ -54,7 +54,10 @@ pub fn schedule_first_match(pools: &[NodePool], pod_reqs: &[(String, String)]) -
     }
 }
 
-fn pool_satisfies(pool: &NodePool, pod_reqs: &[(String, String)]) -> bool {
+/// True if every `(label, value)` in `pod_reqs` is compatible with the
+/// NodePool's template requirements. Exposed so the provisioning controller
+/// can route a pending pod to the NodePool it satisfies (workload-aware).
+pub fn pool_satisfies(pool: &NodePool, pod_reqs: &[(String, String)]) -> bool {
     for (k, v) in pod_reqs {
         if !requirement_satisfies(&pool.template.spec.requirements, k, v) {
             return false;

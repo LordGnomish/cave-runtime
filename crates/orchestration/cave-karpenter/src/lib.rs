@@ -12,12 +12,16 @@
 //!   binpack              — first-fit-decreasing instance assignment with
 //!                          topology spread + taint-intolerance + in-flight
 //!                          reservation
+//!   consolidation        — Delete/Replace/NoOp consolidation engine with
+//!                          multi-node binary-search merge-to-fewer
 //!   disruption           — consolidation / drift / expiration decisions
 //!                          with Budget enforcement
+//!   provisioning         — workload-aware Reconcile: pending pods →
+//!                          NodePool first-match → binpack → launch
 //!   nodeclaim_lifecycle  — launch / drain / terminate over a
 //!                          CloudProvider abstraction
-//!   provider             — CloudProvider trait + StaticProvider +
-//!                          Hetzner/Azure NodeClass envelopes
+//!   provider             — CloudProvider trait + ProviderRegistry +
+//!                          AWS/GCP/Azure/Hetzner NodeClass envelopes
 //!
 //! 4-track status (honest):
 //!   Backend   2/4 — scaffold + Phase 2 deep-port (disruption, lifecycle,
@@ -28,11 +32,13 @@
 
 pub mod batcher;
 pub mod binpack;
+pub mod consolidation;
 pub mod disruption;
 pub mod drain;
 pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod provider;
+pub mod provisioning;
 pub mod scheduler;
 pub mod store;
 
