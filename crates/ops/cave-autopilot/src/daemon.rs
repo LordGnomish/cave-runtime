@@ -19,13 +19,15 @@ use crate::charter::{self, CommitKind};
 use crate::codegen::{self, FileSet};
 use crate::config::AutopilotConfig;
 use crate::error::{AutopilotError, Result};
+use crate::executor::{LlmSmokeExecutor, SmokeOutcome, SmokeSpec};
 use crate::metrics::{MetricsSnapshot, SharedMetrics};
+use crate::ollama::OllamaClient;
 use crate::queue::TaskQueue;
 use crate::tracker::TrackerState;
 use crate::worktree::WorktreeJob;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// What the daemon should do this tick.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +152,70 @@ impl Daemon {
             m.idle = mode == RunMode::Idle;
         }
         Ok((mode, tracker))
+    }
+
+    /// Whether the daemon should run the operational startup smoke this boot.
+    pub fn should_run_startup_smoke(&self) -> bool {
+        self.cfg.startup_smoke
+    }
+
+    /// The spec for the operational liveness smoke: ask the local coder to write
+    /// a real standalone `cave-test-autopilot` crate (a function + its test) and
+    /// `cargo test` it. The retry budget tracks the configured local-LLM budget.
+    pub fn smoke_spec(&self) -> SmokeSpec {
+        SmokeSpec {
+            crate_name: "cave-test-autopilot".to_string(),
+            task_desc: "an integer add(a, b) function returning a + b".to_string(),
+            max_retries: self.cfg.max_local_retries,
+        }
+    }
+
+    /// Record one operational smoke outcome into metrics. This is deliberately
+    /// *not* a real port task: it bumps the smoke counters and the local-coder
+    /// LLM-call tally and stamps liveness, but never touches `tasks_completed` /
+    /// `tasks_failed`, so the dashboard can't read a liveness probe as a crate
+    /// that actually reached parity.
+    pub fn record_smoke(&self, outcome: &SmokeOutcome) {
+        let mut m = self.metrics.lock().expect("metrics mutex");
+        m.smoke_runs += 1;
+        if outcome.passed {
+            m.smoke_passed += 1;
+        }
+        m.record_llm_call("l2_coder");
+        m.last_task_unix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+    }
+
+    /// Run one operational LLM smoke dispatch end-to-end against the live Ollama
+    /// server: resolve the L2 coder tier (named MoE → resident fallback), ask it
+    /// to write + test a real crate in a throwaway workdir, and record the
+    /// outcome. This is the heartbeat that proves the local-LLM pipeline runs
+    /// unattended — separate from the (multi-week) real per-crate port executor.
+    pub async fn dispatch_smoke(&self) -> Result<SmokeOutcome> {
+        let client = OllamaClient::new(&self.cfg.ollama_url);
+        if !client.is_up().await {
+            return Err(AutopilotError::Llm(format!(
+                "ollama unreachable at {}",
+                self.cfg.ollama_url
+            )));
+        }
+        let tiers = client
+            .ensure_tiers(
+                &self.cfg.model_l1_router,
+                &self.cfg.model_l2_coder,
+                &self.cfg.model_fallback,
+            )
+            .await?;
+        let spec = self.smoke_spec();
+        let workdir = self.cfg.worktree_root.join("smoke");
+        std::fs::create_dir_all(&workdir)?;
+        let _ = std::fs::remove_dir_all(workdir.join(&spec.crate_name));
+        let exec = LlmSmokeExecutor::new(client, &tiers.coder);
+        let outcome = exec.run(&spec, &workdir).await?;
+        self.record_smoke(&outcome);
+        Ok(outcome)
     }
 
     /// Execute the deterministic mock task end-to-end: worktree → scaffold →
@@ -277,13 +343,32 @@ impl Daemon {
             }
         });
 
-        let mut ticker =
-            tokio::time::interval(std::time::Duration::from_secs(self.cfg.tick_interval_secs));
         tracing::info!(
             instance = %self.cfg.instance,
             port,
             "cave-autopilot daemon started"
         );
+
+        // Operational liveness: run one end-to-end LLM smoke on startup so the
+        // daemon visibly processes its first task (local-coder → compile → test)
+        // instead of only monitoring. A smoke failure is logged, not fatal — the
+        // scheduler still comes up.
+        if self.should_run_startup_smoke() {
+            tracing::info!("running operational startup smoke dispatch");
+            match self.dispatch_smoke().await {
+                Ok(o) => tracing::info!(
+                    model = %o.model,
+                    attempts = o.attempts,
+                    passed = o.passed,
+                    "startup smoke complete: {}",
+                    o.detail
+                ),
+                Err(e) => tracing::warn!("startup smoke dispatch failed (non-fatal): {e}"),
+            }
+        }
+
+        let mut ticker =
+            tokio::time::interval(std::time::Duration::from_secs(self.cfg.tick_interval_secs));
 
         loop {
             tokio::select! {
@@ -384,6 +469,59 @@ mod tests {
     fn idle_does_not_work_tasks() {
         assert!(!RunMode::Idle.works_tasks());
         assert!(!RunMode::Halt.works_tasks());
+    }
+
+    #[test]
+    fn smoke_spec_uses_config_retries_and_names_a_cave_test_crate() {
+        let cfg = AutopilotConfig::for_instance("cave-runtime");
+        let retries = cfg.max_local_retries;
+        let d = Daemon::new(cfg);
+        let spec = d.smoke_spec();
+        assert!(spec.crate_name.starts_with("cave-test"));
+        assert!(!spec.task_desc.is_empty());
+        assert_eq!(spec.max_retries, retries);
+    }
+
+    #[test]
+    fn should_run_startup_smoke_follows_config_flag() {
+        let mut cfg = AutopilotConfig::default();
+        cfg.startup_smoke = false;
+        assert!(!Daemon::new(cfg).should_run_startup_smoke());
+        let mut cfg2 = AutopilotConfig::default();
+        cfg2.startup_smoke = true;
+        assert!(Daemon::new(cfg2).should_run_startup_smoke());
+    }
+
+    #[test]
+    fn record_smoke_bumps_runs_without_inflating_port_completions() {
+        use crate::executor::SmokeOutcome;
+        let d = Daemon::new(AutopilotConfig::default());
+        let ok = SmokeOutcome {
+            crate_name: "cave-test-autopilot".into(),
+            model: "qwen".into(),
+            attempts: 1,
+            generated: true,
+            passed: true,
+            detail: "ok".into(),
+        };
+        let bad = SmokeOutcome {
+            passed: false,
+            attempts: 3,
+            ..ok.clone()
+        };
+        d.record_smoke(&ok);
+        d.record_smoke(&bad);
+        let m = d.metrics.lock().unwrap();
+        assert_eq!(m.smoke_runs, 2);
+        assert_eq!(m.smoke_passed, 1);
+        // The smoke loop exercises the local coder tier.
+        assert!(m.llm_calls.get("l2_coder").copied().unwrap_or(0) >= 2);
+        // Liveness timestamp is stamped.
+        assert!(m.last_task_unix > 0);
+        // Honesty guard: a smoke run is NOT a ported crate — real port
+        // completion/failure counters stay untouched.
+        assert_eq!(m.tasks_completed, 0);
+        assert_eq!(m.tasks_failed, 0);
     }
 
     #[test]

@@ -35,6 +35,11 @@ pub struct MetricsSnapshot {
     pub idle: bool,
     /// Unix seconds of the last task the daemon worked (0 if none yet).
     pub last_task_unix: u64,
+    /// Operational LLM smoke dispatches attempted (liveness proof of the
+    /// local-coder → compile → test loop). Distinct from real port tasks.
+    pub smoke_runs: u64,
+    /// Operational LLM smoke dispatches whose `cargo test` passed.
+    pub smoke_passed: u64,
 }
 
 impl MetricsSnapshot {
@@ -53,6 +58,8 @@ impl MetricsSnapshot {
             mean_completion: 0.0,
             idle: false,
             last_task_unix: 0,
+            smoke_runs: 0,
+            smoke_passed: 0,
         }
     }
 
@@ -89,6 +96,8 @@ impl MetricsSnapshot {
         g("cave_autopilot_escalation_rate", "Fraction of finished tasks that reached Claude", "gauge", format!("{:.4}", self.escalation_rate()));
         g("cave_autopilot_idle", "1 if daemon is in idle/monitor mode", "gauge", if self.idle { "1".into() } else { "0".into() });
         g("cave_autopilot_last_task_timestamp_seconds", "Unix time of last worked task", "gauge", self.last_task_unix.to_string());
+        g("cave_autopilot_smoke_runs_total", "Operational LLM smoke dispatches attempted", "counter", self.smoke_runs.to_string());
+        g("cave_autopilot_smoke_passed_total", "Operational LLM smoke dispatches that passed cargo test", "counter", self.smoke_passed.to_string());
 
         // Per-tier LLM call counts as a labelled family.
         s.push_str("# HELP cave_autopilot_llm_calls_total LLM calls per escalation tier\n");
@@ -165,6 +174,17 @@ mod tests {
         assert!(out.contains("cave_autopilot_tasks_completed_total{instance=\"cave-runtime\"} 3"));
         assert!(out.contains("cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l2_coder\"} 2"));
         assert!(out.contains("cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l3_claude\"} 1"));
+    }
+
+    #[test]
+    fn prometheus_exposes_smoke_counters() {
+        let mut m = MetricsSnapshot::new("cave-runtime");
+        m.smoke_runs = 2;
+        m.smoke_passed = 1;
+        let out = m.render_prometheus();
+        assert!(out.contains("# TYPE cave_autopilot_smoke_runs_total counter"));
+        assert!(out.contains("cave_autopilot_smoke_runs_total{instance=\"cave-runtime\"} 2"));
+        assert!(out.contains("cave_autopilot_smoke_passed_total{instance=\"cave-runtime\"} 1"));
     }
 
     #[test]

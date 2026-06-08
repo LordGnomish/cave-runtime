@@ -55,6 +55,17 @@ pub struct AutopilotConfig {
     pub max_local_retries: u32,
     /// Seconds between scheduler ticks in the daemon loop.
     pub tick_interval_secs: u64,
+    /// Run one end-to-end LLM smoke dispatch on daemon startup, proving the
+    /// local-coder → compile → `cargo test` loop is operational before the
+    /// scheduler settles into its tick cadence. Defaults to `true`; serde
+    /// defaults it so pre-cont3 config files (which lack the key) still load.
+    #[serde(default = "default_startup_smoke")]
+    pub startup_smoke: bool,
+}
+
+/// Default for [`AutopilotConfig::startup_smoke`] when a config file omits it.
+fn default_startup_smoke() -> bool {
+    true
 }
 
 impl Default for AutopilotConfig {
@@ -98,6 +109,7 @@ impl AutopilotConfig {
             min_free_disk_gb: 5,
             max_local_retries: 5,
             tick_interval_secs: 300,
+            startup_smoke: true,
         }
     }
 
@@ -216,5 +228,26 @@ mod tests {
         let mut c = AutopilotConfig::default();
         c.completion_threshold = 1.5;
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn startup_smoke_defaults_true() {
+        assert!(AutopilotConfig::default().startup_smoke);
+    }
+
+    #[test]
+    fn old_config_without_startup_smoke_still_loads() {
+        // A pre-cont3 config file has no `startup_smoke` line. With
+        // `deny_unknown_fields` we must NOT reject it — serde(default) fills the
+        // missing field with `true`.
+        let full = AutopilotConfig::default().to_toml().unwrap();
+        let old: String = full
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("startup_smoke"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!old.contains("startup_smoke"));
+        let back: AutopilotConfig = toml::from_str(&old).unwrap();
+        assert!(back.startup_smoke);
     }
 }
