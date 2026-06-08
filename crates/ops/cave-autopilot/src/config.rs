@@ -55,6 +55,17 @@ pub struct AutopilotConfig {
     pub max_local_retries: u32,
     /// Seconds between scheduler ticks in the daemon loop.
     pub tick_interval_secs: u64,
+    /// Run one end-to-end LLM smoke dispatch on daemon startup, proving the
+    /// local-coder → compile → `cargo test` loop is operational before the
+    /// scheduler settles into its tick cadence. Defaults to `true`; serde
+    /// defaults it so pre-cont3 config files (which lack the key) still load.
+    #[serde(default = "default_startup_smoke")]
+    pub startup_smoke: bool,
+}
+
+/// Default for [`AutopilotConfig::startup_smoke`] when a config file omits it.
+fn default_startup_smoke() -> bool {
+    true
 }
 
 impl Default for AutopilotConfig {
@@ -98,6 +109,7 @@ impl AutopilotConfig {
             min_free_disk_gb: 5,
             max_local_retries: 5,
             tick_interval_secs: 300,
+            startup_smoke: true,
         }
     }
 
