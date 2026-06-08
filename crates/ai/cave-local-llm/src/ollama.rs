@@ -6,6 +6,7 @@
 /// Overridden at runtime by OLLAMA_MODEL env var or CLI --model flag.
 pub const DEFAULT_MODEL: &str = "qwen3-coder-next:Q4_K_M";
 
+use base64::Engine as _;
 use futures::{Stream, StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,14 @@ pub type OllamaResult<T> = Result<T, OllamaError>;
 
 /// Boxed, pinned stream of `T` items from an Ollama streaming endpoint.
 pub type OllamaStream<T> = Pin<Box<dyn Stream<Item = OllamaResult<T>> + Send>>;
+
+/// Base64-encode raw image bytes for the `images` field of a generate/chat
+/// request. Cite api/types.go `ImageData []byte` — Ollama serialises raw image
+/// bytes as standard base64 strings on the wire for multimodal models (llava,
+/// llama3.2-vision, …).
+pub fn encode_image(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
 
 // ── Request / response types ──────────────────────────────────────────────────
 
@@ -60,6 +69,11 @@ pub struct GenerateRequest {
     /// duration strings ("5m", "1h", "24h") or "-1" for indefinite.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_alive: Option<String>,
+    /// Base64-encoded images for multimodal models. Cite api/types.go
+    /// `GenerateRequest.Images []ImageData`. Use [`encode_image`] to build
+    /// entries from raw bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,13 +103,89 @@ pub struct GenerateChunk {
     pub total_duration: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    /// Base64-encoded images for multimodal chat. Cite api/types.go
+    /// `Message.Images []ImageData`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<String>>,
+    /// Tool calls emitted by the model in an assistant turn. Cite
+    /// api/types.go `Message.ToolCalls []ToolCall`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    /// Name of the tool this message is a result for. Cite api/types.go
+    /// `Message.ToolName`. Set on `role: "tool"` messages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    /// ID of the originating tool call. Cite api/types.go `Message.ToolCallID`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+// ── Tool / function calling types — cite api/types.go ─────────────────────────
+
+/// A tool the model may call. Cite api/types.go `Tool { Type, Function }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tool {
+    /// Tool kind; currently always `"function"`.
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    pub function: ToolFunction,
+}
+
+impl Tool {
+    /// Build a `function`-type tool from a name, description, and a JSON-Schema
+    /// `parameters` object (cite api/types.go `ToolFunctionParameters`, modelled
+    /// here as a `serde_json::Value` schema for fidelity without over-typing).
+    pub fn function(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: serde_json::Value,
+    ) -> Self {
+        Self {
+            tool_type: "function".to_string(),
+            function: ToolFunction {
+                name: name.into(),
+                description: Some(description.into()),
+                parameters,
+            },
+        }
+    }
+}
+
+/// Cite api/types.go `ToolFunction { Name, Description, Parameters }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunction {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// JSON-Schema parameter spec.
+    pub parameters: serde_json::Value,
+}
+
+/// A tool invocation produced by the model. Cite api/types.go
+/// `ToolCall { ID, Function ToolCallFunction }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub function: ToolCallFunction,
+}
+
+/// Cite api/types.go `ToolCallFunction { Index, Name, Arguments }`. Arguments
+/// is a free-form JSON object (upstream `ToolCallFunctionArguments`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallFunction {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<i32>,
+    pub name: String,
+    #[serde(default)]
+    pub arguments: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -103,6 +193,9 @@ pub struct ChatRequest {
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<serde_json::Value>,
+    /// Tools the model may call. Cite api/types.go `ChatRequest.Tools`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -350,6 +443,7 @@ mod tests {
             stream: Some(false),
             options: None,
             keep_alive: None,
+            images: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"stream\":false"));
@@ -379,5 +473,130 @@ mod tests {
         let tags: TagsResponse = serde_json::from_str(raw).unwrap();
         assert_eq!(tags.models.len(), 1);
         assert_eq!(tags.models[0].name, "qwen2.5-coder:32b");
+    }
+
+    // ── Multimodal (image input) — cite api/types.go GenerateRequest.Images,
+    //    Message.Images []ImageData (base64-encoded over the wire). ────────────
+    #[test]
+    fn test_encode_image_base64() {
+        // 0x89 'P' 'N' 'G' -> standard base64
+        assert_eq!(encode_image(b"\x89PNG"), "iVBORw==");
+    }
+
+    #[test]
+    fn test_generate_request_serializes_images_when_set() {
+        let req = GenerateRequest {
+            model: "llava".into(),
+            prompt: "describe this".into(),
+            stream: Some(false),
+            options: None,
+            keep_alive: None,
+            images: Some(vec![encode_image(b"\x89PNG")]),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(
+            json.contains("\"images\":[\"iVBORw==\"]"),
+            "expected base64 image array, got {json}"
+        );
+    }
+
+    #[test]
+    fn test_generate_request_omits_images_when_none() {
+        let req = GenerateRequest {
+            model: "m".into(),
+            prompt: "p".into(),
+            stream: None,
+            options: None,
+            keep_alive: None,
+            images: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("images"), "images must be omitted, got {json}");
+    }
+
+    #[test]
+    fn test_chat_message_with_images_serializes() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: "what is in this picture".into(),
+            images: Some(vec!["YWJj".into()]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"images\":[\"YWJj\"]"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_message_without_images_omits_field() {
+        let m = ChatMessage {
+            role: "assistant".into(),
+            content: "ok".into(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("images"), "got {json}");
+    }
+
+    // ── Tool / function calling — cite api/types.go Tool, ToolFunction,
+    //    ToolCall, ToolCallFunction; ChatRequest.Tools, Message.ToolCalls. ─────
+    #[test]
+    fn test_chat_request_serializes_tools() {
+        let tool = Tool::function(
+            "get_weather",
+            "Get current weather for a city",
+            serde_json::json!({
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"]
+            }),
+        );
+        let req = ChatRequest {
+            model: "qwen3".into(),
+            messages: vec![ChatMessage {
+                role: "user".into(),
+                content: "weather in Paris".into(),
+                ..Default::default()
+            }],
+            tools: Some(vec![tool]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"tools\":["), "got {json}");
+        assert!(json.contains("\"type\":\"function\""), "got {json}");
+        assert!(json.contains("\"name\":\"get_weather\""), "got {json}");
+        assert!(json.contains("\"required\":[\"city\"]"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_request_omits_tools_when_none() {
+        let req = ChatRequest {
+            model: "m".into(),
+            messages: vec![],
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("tools"), "got {json}");
+    }
+
+    #[test]
+    fn test_chat_response_deserializes_tool_calls() {
+        let raw = r#"{"model":"qwen3","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"get_weather","arguments":{"city":"Paris"}}}]},"done":true}"#;
+        let resp: ChatResponse = serde_json::from_str(raw).unwrap();
+        let calls = resp.message.tool_calls.expect("tool_calls present");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].function.name, "get_weather");
+        assert_eq!(calls[0].function.arguments["city"], "Paris");
+    }
+
+    #[test]
+    fn test_tool_result_message_serializes_tool_name() {
+        let m = ChatMessage {
+            role: "tool".into(),
+            content: "{\"temp\":15}".into(),
+            tool_name: Some("get_weather".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"tool_name\":\"get_weather\""), "got {json}");
     }
 }

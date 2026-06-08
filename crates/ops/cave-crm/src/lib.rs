@@ -22,15 +22,19 @@
 //! # }
 //! ```
 
+pub mod contact_creation;
+pub mod graphql_resolver;
 pub mod graphql_schema;
 pub mod indexes;
 pub mod models;
 pub mod routes;
 pub mod store;
+pub mod timeline;
 pub mod webhook;
 pub mod workflow;
 
 pub use store::{ConvertedLead, CrmStore};
+pub use timeline::{merge_recent, timeline_for_target, TimelineActivity, TimelineEntry, TimelineItemKind};
 pub use webhook::{WebhookBus, WebhookDelivery, WebhookOperation, WebhookSubscription};
 pub use workflow::{Workflow, WorkflowRun, WorkflowRunStatus, WorkflowStep, WorkflowStepType, WorkflowStore};
 

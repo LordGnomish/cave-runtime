@@ -532,6 +532,22 @@ async fn graphql_schema(
     )
 }
 
+#[derive(Deserialize)]
+pub struct GraphQlRequest {
+    pub query: String,
+}
+
+/// `POST /api/crm/{workspace_id}/graphql` — execute a read query against the
+/// workspace's records via the in-memory resolver runtime. Mirrors Twenty's
+/// GraphQL endpoint (findOne / findMany Connection envelope).
+async fn graphql_query(
+    State(s): State<Arc<CrmStore>>,
+    Path(ws_id): Path<Uuid>,
+    Json(req): Json<GraphQlRequest>,
+) -> impl IntoResponse {
+    Json(s.graphql_query(ws_id, &req.query).await)
+}
+
 pub fn create_router(state: Arc<CrmStore>) -> Router {
     Router::new()
         .route("/api/crm/health", get(health))
@@ -604,5 +620,6 @@ pub fn create_router(state: Arc<CrmStore>) -> Router {
             "/api/crm/{workspace_id}/graphql-schema",
             get(graphql_schema),
         )
+        .route("/api/crm/{workspace_id}/graphql", post(graphql_query))
         .with_state(state)
 }

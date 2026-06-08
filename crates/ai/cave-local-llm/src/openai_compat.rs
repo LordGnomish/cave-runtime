@@ -15,9 +15,12 @@
 //! gateway). It does not host the surface; cave's HTTP-server portal lives
 //! in cave-portal-api.
 
-use crate::ollama::{OllamaClient, OllamaError, OllamaResult};
+use crate::ollama::{OllamaClient, OllamaError, OllamaResult, OllamaStream};
+use futures::{Stream, StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError};
+use tokio_util::io::StreamReader;
 use tracing::instrument;
 
 /// Cite: OpenAI `POST /v1/chat/completions` — `messages` is the canonical
@@ -141,6 +144,36 @@ pub struct OpenAiEmbeddingResponse {
     pub usage: OpenAiUsage,
 }
 
+// ── Streaming chunk types — cite docs/openai.md SSE `chat.completion.chunk` ───
+
+/// One incremental delta in a streaming chat completion.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct OpenAiDelta {
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpenAiChatChunkChoice {
+    pub index: u32,
+    #[serde(default)]
+    pub delta: OpenAiDelta,
+    #[serde(default)]
+    pub finish_reason: Option<String>,
+}
+
+/// A single `chat.completion.chunk` SSE frame.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpenAiChatChunk {
+    pub id: String,
+    pub object: String,
+    pub created: u64,
+    pub model: String,
+    pub choices: Vec<OpenAiChatChunkChoice>,
+}
+
 /// Cite: OpenAI `GET /v1/models`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct OpenAiModelEntry {
@@ -226,6 +259,36 @@ impl OpenAiCompatClient {
         Ok(response.json().await?)
     }
 
+    /// Streaming chat completion (`POST /v1/chat/completions`, `stream: true`).
+    ///
+    /// Returns a stream of `chat.completion.chunk` frames; each carries a
+    /// `delta` with a partial `content` token. The upstream `data: [DONE]`
+    /// sentinel ends the stream (it is filtered out, not surfaced as an item).
+    #[instrument(skip(self, req), fields(model = %req.model))]
+    pub async fn chat_completions_stream(
+        &self,
+        req: OpenAiChatRequest,
+    ) -> OllamaResult<OllamaStream<OpenAiChatChunk>> {
+        let mut req = req;
+        req.stream = Some(true);
+
+        let mut rb = self
+            .client
+            .post(format!("{}/v1/chat/completions", self.base_url))
+            .json(&req);
+        if let Some((k, v)) = self.auth_header() {
+            rb = rb.header(k, v);
+        }
+        let response = rb.send().await?;
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(OllamaError::Api { status, body });
+        }
+
+        Ok(Box::pin(build_sse_stream(response)))
+    }
+
     /// Cite: OpenAI `POST /v1/completions`.
     #[instrument(skip(self, req), fields(model = %req.model))]
     pub async fn completions(
@@ -284,6 +347,44 @@ impl OpenAiCompatClient {
         let body: OpenAiModelList = response.json().await?;
         Ok(body.data)
     }
+}
+
+// ── SSE parsing ───────────────────────────────────────────────────────────────
+
+/// Parse one SSE line into a chat chunk.
+///
+/// Returns `None` for blank lines, comment lines (`:` prefix), non-`data:`
+/// fields, and the `data: [DONE]` terminator. Returns `Some(Ok(chunk))` for a
+/// JSON `data:` payload, or `Some(Err(..))` if that payload fails to parse.
+fn parse_sse_line(line: &str) -> Option<OllamaResult<OpenAiChatChunk>> {
+    let line = line.trim();
+    if line.is_empty() || line.starts_with(':') {
+        return None;
+    }
+    let data = line.strip_prefix("data:")?.trim();
+    if data == "[DONE]" {
+        return None;
+    }
+    Some(serde_json::from_str::<OpenAiChatChunk>(data).map_err(OllamaError::Json))
+}
+
+/// Convert a reqwest `Response` body into a stream of parsed SSE chat chunks.
+fn build_sse_stream(
+    response: reqwest::Response,
+) -> impl Stream<Item = OllamaResult<OpenAiChatChunk>> + Send {
+    let byte_stream = response
+        .bytes_stream()
+        .map_err(std::io::Error::other);
+
+    let reader = StreamReader::new(byte_stream);
+    let framed = FramedRead::new(reader, LinesCodec::new());
+
+    framed.filter_map(|line_result: Result<String, LinesCodecError>| {
+        futures::future::ready(match line_result {
+            Err(e) => Some(Err(OllamaError::StreamDecode(e.to_string()))),
+            Ok(line) => parse_sse_line(&line),
+        })
+    })
 }
 
 #[cfg(test)]
@@ -401,5 +502,37 @@ mod tests {
         let h = c.auth_header().unwrap();
         assert_eq!(h.0, "Authorization");
         assert_eq!(h.1, "Bearer k");
+    }
+
+    // ── Streaming — cite docs/openai.md: SSE `chat.completion.chunk` frames
+    //    delimited by `data: ` lines, terminated by `data: [DONE]`. ────────────
+    #[test]
+    fn chat_chunk_deserializes_delta() {
+        let raw = r#"{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1700000000,"model":"qwen3","choices":[{"index":0,"delta":{"content":"He"},"finish_reason":null}]}"#;
+        let c: OpenAiChatChunk = serde_json::from_str(raw).unwrap();
+        assert_eq!(c.choices[0].delta.content.as_deref(), Some("He"));
+        assert!(c.choices[0].finish_reason.is_none());
+    }
+
+    #[test]
+    fn parse_sse_line_extracts_data_chunk() {
+        let line = r#"data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":{"content":"hi"}}]}"#;
+        match parse_sse_line(line) {
+            Some(Ok(chunk)) => {
+                assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("hi"))
+            }
+            other => panic!("expected Some(Ok(chunk)), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_sse_line_done_terminates() {
+        assert!(parse_sse_line("data: [DONE]").is_none());
+    }
+
+    #[test]
+    fn parse_sse_line_ignores_blank_and_comments() {
+        assert!(parse_sse_line("").is_none());
+        assert!(parse_sse_line(": keep-alive comment").is_none());
     }
 }

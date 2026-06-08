@@ -1,12 +1,12 @@
 # cave-local-llm — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2 boundary uplift 2026-05-21
-**Upstream:** ollama/ollama @ v0.3.0 (MIT)
+**Status:** 8/8 PASS — Charter v2; honest_ratio uplift 2026-05-30 (strict-TDD)
+**Upstream:** ollama/ollama @ v0.3.0 (MIT); contract re-validated vs HEAD 11be8f6a
 **source_sha:** v0.3.0
-**fill_ratio:** 1.0000 (27/27)
-**honest_ratio:** 0.9259 (25/27)
+**fill_ratio:** 1.0000 (31/31)
+**honest_ratio:** 0.9677 (30/31)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-21
+**last_audit:** 2026-05-30
 
 ## Headline
 
@@ -27,9 +27,13 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 
 | Module                  | Subsystem                            | Status   | Cite                                |
 |-------------------------|--------------------------------------|----------|-------------------------------------|
-| `src/ollama.rs`         | /api/{version,tags,generate,chat}    | mapped   | api/types.go                        |
+| `src/ollama.rs`         | /api/{version,tags,generate,chat} + multimodal images + tool calling | mapped   | api/types.go                        |
 | `src/ollama_extras.rs`  | /api/{show,copy,delete,embed,ps}     | mapped   | api/types.go                        |
-| `src/openai_compat.rs`  | /v1/{chat,completions,embeddings,models} | mapped | docs/openai.md                    |
+| `src/openai_compat.rs`  | /v1/{chat,completions,embeddings,models} + SSE chat streaming | mapped | docs/openai.md                    |
+| `src/gguf.rs`           | GGUF header + metadata reader (no tensor data) | mapped   | fs/ggml/{ggml,gguf}.go              |
+| `src/quant.rs`          | GGUF FileType quant helpers (Q4/Q5/Q8, bits/weight, size) | mapped | fs/ggml/type.go                 |
+| `src/modelfile.rs`      | Modelfile parser (FROM/PARAMETER/TEMPLATE/SYSTEM/ADAPTER/LICENSE/MESSAGE + multiline + round-trip) | mapped | parser/parser.go |
+| `src/ollama_extras.rs` (create) | /api/create client builder from a parsed Modelfile | mapped | api/types.go::CreateRequest |
 | `src/prompt_template.rs`| `{{ var }}` / `{{ if }}` / `{{ range }}` subset | mapped | docs/template.md           |
 | `src/backend.rs`        | InferenceBackend trait + adapters    | mapped   | (cave-side abstraction)             |
 | `src/manifest.rs`       | model manifest reader                | mapped   | derived                             |
@@ -40,8 +44,7 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 | `src/metrics.rs`        | prometheus-client gauges/counters    | mapped   | derived                             |
 | `src/bin/cave-local-llm.rs` | one-shot CLI                     | mapped   | derived                             |
 | `src/bin/cave-local-llm-daemon.rs` | daemon supervisor binary  | mapped   | derived                             |
-| daemon graceful shutdown        | signal handling             | partial  | (cave-runtime owns SIGTERM hook)    |
-| /v1 streaming response          | stream:true response shape  | partial  | docs/openai.md                      |
+| daemon graceful shutdown        | SIGINT/full drain (SIGTERM + stop-file done) | partial  | (cave-runtime owns the host signal hook) |
 
 ## Scope cuts (counted as `skipped`)
 

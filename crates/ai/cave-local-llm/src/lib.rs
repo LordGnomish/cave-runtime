@@ -37,3 +37,12 @@ pub mod queue;
 
 /// Re-exports the scheduler module for enforcing guardrails and execution policies.
 pub mod scheduler;
+
+/// Pure-Rust GGUF header + metadata reader (no tensor data, no inference).
+pub mod gguf;
+
+/// GGUF quantization file-type helpers (Q4/Q5/Q8 …) — names, bits/weight, size.
+pub mod quant;
+
+/// Pure-Rust Modelfile parser (FROM/PARAMETER/TEMPLATE/SYSTEM/ADAPTER/LICENSE/MESSAGE).
+pub mod modelfile;

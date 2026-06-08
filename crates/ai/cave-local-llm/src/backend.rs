@@ -142,6 +142,7 @@ impl InferenceBackend for OllamaBackend {
                     .map(|m| ChatMessage {
                         role: m.role,
                         content: m.content,
+                        ..Default::default()
                     })
                     .collect(),
                 stream: Some(false),
@@ -150,6 +151,7 @@ impl InferenceBackend for OllamaBackend {
                 } else {
                     Some(serde_json::Value::Object(options))
                 },
+                tools: None,
             };
             let r = self.client.chat(chat_req).await?;
             Ok(BackendChatResponse {

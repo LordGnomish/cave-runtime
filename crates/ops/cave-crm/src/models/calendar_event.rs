@@ -70,6 +70,103 @@ impl CalendarEvent {
     }
 }
 
+/// Canonical RSVP response status — Twenty's
+/// `CalendarEventParticipantResponseStatus` (RFC 5545 PARTSTAT). The
+/// workspace-entity stores this as a string; the typed enum is the value the
+/// Google / Microsoft / CalDAV import drivers normalize external states into.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum Rsvp {
+    NeedsAction,
+    Declined,
+    Tentative,
+    Accepted,
+}
+
+impl Rsvp {
+    /// Canonical SCREAMING_SNAKE_CASE wire token.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Rsvp::NeedsAction => "NEEDS_ACTION",
+            Rsvp::Declined => "DECLINED",
+            Rsvp::Tentative => "TENTATIVE",
+            Rsvp::Accepted => "ACCEPTED",
+        }
+    }
+
+    /// Parse a stored `responseStatus` string back into the enum, defaulting
+    /// to `NeedsAction` for anything unrecognised.
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "ACCEPTED" => Rsvp::Accepted,
+            "DECLINED" => Rsvp::Declined,
+            "TENTATIVE" => Rsvp::Tentative,
+            _ => Rsvp::NeedsAction,
+        }
+    }
+
+    /// Normalize a Google Calendar `responseStatus`
+    /// (`accepted`/`declined`/`tentative`/`needsAction`).
+    pub fn from_google(s: &str) -> Self {
+        match s {
+            "accepted" => Rsvp::Accepted,
+            "declined" => Rsvp::Declined,
+            "tentative" => Rsvp::Tentative,
+            _ => Rsvp::NeedsAction,
+        }
+    }
+
+    /// Normalize a Microsoft Graph attendee `status.response`
+    /// (`accepted`/`declined`/`tentativelyAccepted`/`organizer`/`none`).
+    pub fn from_microsoft(s: &str) -> Self {
+        match s {
+            "accepted" | "organizer" => Rsvp::Accepted,
+            "declined" => Rsvp::Declined,
+            "tentativelyAccepted" => Rsvp::Tentative,
+            _ => Rsvp::NeedsAction,
+        }
+    }
+
+    /// Normalize an iCalendar/CalDAV `PARTSTAT`
+    /// (`ACCEPTED`/`DECLINED`/`TENTATIVE`/`NEEDS-ACTION`/`DELEGATED`).
+    pub fn from_caldav_partstat(s: &str) -> Self {
+        match s {
+            "ACCEPTED" => Rsvp::Accepted,
+            "DECLINED" => Rsvp::Declined,
+            "TENTATIVE" => Rsvp::Tentative,
+            _ => Rsvp::NeedsAction,
+        }
+    }
+}
+
+/// Per-event attendance roll-up across the canonical RSVP states.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AttendanceTally {
+    pub accepted: usize,
+    pub declined: usize,
+    pub tentative: usize,
+    pub needs_action: usize,
+}
+
+impl AttendanceTally {
+    pub fn of(attendees: &[CalendarEventAttendee]) -> Self {
+        let mut t = Self::default();
+        for a in attendees {
+            match a.rsvp() {
+                Rsvp::Accepted => t.accepted += 1,
+                Rsvp::Declined => t.declined += 1,
+                Rsvp::Tentative => t.tentative += 1,
+                Rsvp::NeedsAction => t.needs_action += 1,
+            }
+        }
+        t
+    }
+
+    pub fn total(&self) -> usize {
+        self.accepted + self.declined + self.tentative + self.needs_action
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CalendarEventAttendee {
     pub id: Uuid,
@@ -94,10 +191,24 @@ impl CalendarEventAttendee {
             person_id: None,
             email: email.into(),
             display_name: String::new(),
-            response_status: "INVITED".to_string(),
+            response_status: Rsvp::NeedsAction.as_str().to_string(),
             is_organizer: false,
             created_at: Utc::now(),
         }
+    }
+
+    /// Typed view of the stored `response_status` string.
+    pub fn rsvp(&self) -> Rsvp {
+        Rsvp::parse(&self.response_status)
+    }
+
+    /// Apply an RSVP response, returning the previous status. Mirrors the
+    /// provider-driven overwrite semantics in Twenty's sync (no local
+    /// conflict resolution — the latest response wins).
+    pub fn respond(&mut self, status: Rsvp) -> Rsvp {
+        let prev = self.rsvp();
+        self.response_status = status.as_str().to_string();
+        prev
     }
 }
 
@@ -114,9 +225,79 @@ mod tests {
     }
 
     #[test]
-    fn attendee_defaults_invited() {
+    fn attendee_defaults_needs_action() {
+        // Twenty v2.6.0 CalendarEventParticipant.responseStatus defaults to
+        // NEEDS_ACTION (RFC 5545 PARTSTAT canonical).
         let a = CalendarEventAttendee::new(Uuid::nil(), Uuid::nil(), "a@b.c");
-        assert_eq!(a.response_status, "INVITED");
+        assert_eq!(a.response_status, "NEEDS_ACTION");
+        assert_eq!(a.rsvp(), Rsvp::NeedsAction);
         assert!(!a.is_organizer);
+    }
+
+    #[test]
+    fn rsvp_serializes_screaming_snake() {
+        assert_eq!(
+            serde_json::to_string(&Rsvp::NeedsAction).unwrap(),
+            "\"NEEDS_ACTION\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Rsvp::Accepted).unwrap(),
+            "\"ACCEPTED\""
+        );
+    }
+
+    #[test]
+    fn respond_transitions_status() {
+        let mut a = CalendarEventAttendee::new(Uuid::nil(), Uuid::nil(), "a@b.c");
+        let prev = a.respond(Rsvp::Accepted);
+        assert_eq!(prev, Rsvp::NeedsAction);
+        assert_eq!(a.rsvp(), Rsvp::Accepted);
+        assert_eq!(a.response_status, "ACCEPTED");
+        // Re-respond reflects the latest provider-driven state.
+        a.respond(Rsvp::Declined);
+        assert_eq!(a.rsvp(), Rsvp::Declined);
+    }
+
+    #[test]
+    fn rsvp_normalizes_google_response() {
+        assert_eq!(Rsvp::from_google("accepted"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_google("declined"), Rsvp::Declined);
+        assert_eq!(Rsvp::from_google("tentative"), Rsvp::Tentative);
+        assert_eq!(Rsvp::from_google("needsAction"), Rsvp::NeedsAction);
+        assert_eq!(Rsvp::from_google(""), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn rsvp_normalizes_microsoft_response() {
+        assert_eq!(Rsvp::from_microsoft("accepted"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_microsoft("tentativelyAccepted"), Rsvp::Tentative);
+        assert_eq!(Rsvp::from_microsoft("organizer"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_microsoft("none"), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn rsvp_normalizes_caldav_partstat() {
+        assert_eq!(Rsvp::from_caldav_partstat("ACCEPTED"), Rsvp::Accepted);
+        assert_eq!(Rsvp::from_caldav_partstat("NEEDS-ACTION"), Rsvp::NeedsAction);
+        assert_eq!(Rsvp::from_caldav_partstat("DELEGATED"), Rsvp::NeedsAction);
+    }
+
+    #[test]
+    fn attendance_tally_counts_by_status() {
+        let ev = Uuid::new_v4();
+        let mut a = CalendarEventAttendee::new(Uuid::nil(), ev, "a@b.c");
+        a.respond(Rsvp::Accepted);
+        let mut b = CalendarEventAttendee::new(Uuid::nil(), ev, "b@b.c");
+        b.respond(Rsvp::Declined);
+        let mut c = CalendarEventAttendee::new(Uuid::nil(), ev, "c@b.c");
+        c.respond(Rsvp::Accepted);
+        let d = CalendarEventAttendee::new(Uuid::nil(), ev, "d@b.c"); // needs action
+
+        let tally = AttendanceTally::of(&[a, b, c, d]);
+        assert_eq!(tally.accepted, 2);
+        assert_eq!(tally.declined, 1);
+        assert_eq!(tally.tentative, 0);
+        assert_eq!(tally.needs_action, 1);
+        assert_eq!(tally.total(), 4);
     }
 }

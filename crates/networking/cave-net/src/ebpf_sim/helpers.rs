@@ -63,6 +63,17 @@ pub struct Helpers {
     pub clock: MockClock,
     pub cpu_id: u32,
     perf_events: Arc<Mutex<Vec<Vec<u8>>>>,
+    /// `bpf_get_prandom_u32()` state. A test-injected queue is drained
+    /// first (for deterministic port-allocation tests), then we fall
+    /// back to a splitmix64 PRNG so untouched callers still get a
+    /// varied-but-reproducible stream.
+    prandom: Arc<Mutex<PrandomState>>,
+}
+
+#[derive(Debug)]
+struct PrandomState {
+    queue: std::collections::VecDeque<u32>,
+    state: u64,
 }
 
 impl Default for Helpers {
@@ -71,6 +82,11 @@ impl Default for Helpers {
             clock: MockClock::default(),
             cpu_id: 0,
             perf_events: Arc::new(Mutex::new(Vec::new())),
+            prandom: Arc::new(Mutex::new(PrandomState {
+                queue: std::collections::VecDeque::new(),
+                // Non-zero seed; deterministic across runs.
+                state: 0x9E37_79B9_7F4A_7C15,
+            })),
         }
     }
 }
@@ -115,6 +131,33 @@ impl Helpers {
 
     pub fn perf_events_len(&self) -> usize {
         self.perf_events.lock().expect("perf events poisoned").len()
+    }
+
+    /// `bpf_get_prandom_u32()`. Returns the next test-injected value if
+    /// one is queued, otherwise advances a splitmix64 PRNG. Cilium's
+    /// datapath uses this for SNAT port selection and random backend
+    /// selection — see `nat_sim` / `lb_sim`.
+    pub fn get_prandom_u32(&self) -> u32 {
+        let mut p = self.prandom.lock().expect("prandom poisoned");
+        if let Some(v) = p.queue.pop_front() {
+            return v;
+        }
+        // splitmix64
+        p.state = p.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = p.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        ((z ^ (z >> 31)) >> 32) as u32
+    }
+
+    /// Inject one value to be returned by the next `get_prandom_u32`.
+    /// Lets a test pin SNAT port selection / random backend choice.
+    pub fn push_prandom(&self, value: u32) {
+        self.prandom
+            .lock()
+            .expect("prandom poisoned")
+            .queue
+            .push_back(value);
     }
 }
 

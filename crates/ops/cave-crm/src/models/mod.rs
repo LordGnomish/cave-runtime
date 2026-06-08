@@ -12,26 +12,44 @@
 
 pub mod activity;
 pub mod api_key;
+pub mod attachment;
+pub mod blocklist;
 pub mod calendar_event;
 pub mod company;
+pub mod connected_account;
 pub mod custom_field;
+pub mod dashboard;
 pub mod custom_object;
 pub mod lead;
+pub mod message;
 pub mod opportunity;
 pub mod person;
 pub mod pipeline_step;
 pub mod task;
+pub mod task_target;
 pub mod user;
 pub mod view;
 pub mod workspace;
 
 pub use activity::{Activity, ActivityKind, ActivityTarget, ActivityTargetKind, Note};
 pub use api_key::ApiKey;
-pub use calendar_event::{CalendarEvent, CalendarEventAttendee, CalendarEventVisibility};
+pub use attachment::{Attachment, AttachmentTargetKind, FileCategory};
+pub use blocklist::Blocklist;
+pub use calendar_event::{
+    AttendanceTally, CalendarEvent, CalendarEventAttendee, CalendarEventVisibility, Rsvp,
+};
 pub use company::Company;
+pub use connected_account::{ConnectedAccount, ConnectedAccountProvider};
+pub use dashboard::{ActorContext, ActorMetadata, ActorSource, Dashboard};
+pub use task_target::{TaskTarget, TaskTargetKind};
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
 pub use lead::{Lead, LeadStatus};
+pub use message::{
+    Message, MessageChannel, MessageChannelMessageAssociation, MessageChannelSyncStatus,
+    MessageChannelType, MessageChannelVisibility, MessageDirection, MessageParticipant,
+    MessageParticipantRole, MessageThread,
+};
 pub use opportunity::{Opportunity, OpportunityStatus};
 pub use person::Person;
 pub use pipeline_step::PipelineStep;
