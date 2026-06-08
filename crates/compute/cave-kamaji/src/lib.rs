@@ -6,12 +6,18 @@
 //! It handles tenant lifecycle operations via Axum routes and maintains tenant state in memory.
 
 pub mod cluster_api;
+pub mod components;
+pub mod connection;
 pub mod datastore;
+pub mod ds_setup;
+pub mod isolation;
 pub mod konnectivity;
 pub mod kubeadm;
 pub mod lifecycle;
+pub mod manager;
 pub mod models;
 pub mod pod_mgmt;
+pub mod reconcile;
 pub mod routes;
 pub mod status;
 pub mod webhook;
@@ -63,5 +69,14 @@ pub fn router(state: Arc<KamajiState>) -> Router {
             "/api/kamaji/tenants/{id}/kubeconfig",
             post(routes::get_kubeconfig),
         )
+        .route(
+            "/api/kamaji/tenants/{id}/components",
+            get(routes::get_components),
+        )
+        .route(
+            "/api/kamaji/tenants/{id}/reconcile-plan",
+            get(routes::get_reconcile_plan),
+        )
+        .route("/api/kamaji/tenants/{id}/status", get(routes::get_status))
         .with_state(state)
 }
