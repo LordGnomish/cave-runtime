@@ -1,0 +1,20 @@
+  44 warning: unused variable: `mount`
+  26 warning: unused import: `Permission`
+  19 warning: unused import: `std::collections::HashMap`
+  16 warning: unused import: `delete`
+  12 warning: unused import: `Serialize`
+  11 warning: unused import: `std::sync::Arc`
+   9 warning: unused variable: `state`
+   9 warning: unused variable: `pulp_id`
+   9 warning: unused import: `crate::portal_test_ctx`
+   8 warning: unused variable: `panel`
+   7 warning: unused imports: `delete` and `put`
+   6 warning: unused import: `async_trait::async_trait`
+   5 warning: variable does not need to be mutable
+   5 warning: unused variable: `headers`
+   5 warning: unused variable: `config`
+   5 warning: unused import: `uuid::Uuid`
+   4 warning: unused variable: `i`
+   4 warning: unused variable: `ctx`
+   4 warning: unused import: `warn`
+   4 warning: unused import: `chrono::Utc`
