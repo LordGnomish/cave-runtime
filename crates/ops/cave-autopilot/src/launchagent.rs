@@ -26,9 +26,20 @@ pub struct PlistSpec {
     pub config_path: String,
     pub log_dir: String,
     pub claude_token_budget: u64,
+    /// `PATH` exported to the daemon. launchd starts agents with a minimal
+    /// environment that lacks Homebrew and the rustup/cargo bins, so the daemon
+    /// (which shells out to `cargo` and `git`) would fail to find them. We pin a
+    /// PATH that covers Homebrew, `~/.cargo/bin`, and the system dirs.
+    pub tool_path: String,
 }
 
 impl PlistSpec {
+    /// The default `PATH` for the daemon: Homebrew + cargo + system dirs.
+    pub fn default_tool_path() -> String {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/gnomish".into());
+        format!("/opt/homebrew/bin:/opt/homebrew/sbin:{home}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+    }
+
     /// Derive a spec from a config + the installed binary + config-file paths.
     pub fn from_config(cfg: &AutopilotConfig, binary_path: &str, config_path: &str) -> Self {
         Self {
@@ -41,6 +52,7 @@ impl PlistSpec {
                 std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())
             ),
             claude_token_budget: cfg.claude_daily_token_budget,
+            tool_path: Self::default_tool_path(),
         }
     }
 
@@ -64,6 +76,8 @@ impl PlistSpec {
     </array>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PATH</key>
+        <string>{path}</string>
         <key>RUST_LOG</key>
         <string>info</string>
         <key>CAVE_AUTOPILOT_CLAUDE_TOKEN_BUDGET</key>
@@ -88,6 +102,7 @@ impl PlistSpec {
             cfg = self.config_path,
             budget = self.claude_token_budget,
             logdir = self.log_dir,
+            path = self.tool_path,
         )
     }
 }
@@ -198,6 +213,7 @@ mod tests {
             config_path: "/Users/gnomish/.config/cave-autopilot/cave-runtime.toml".into(),
             log_dir: "/Users/gnomish/Library/Logs".into(),
             claude_token_budget: 2_000_000,
+            tool_path: PlistSpec::default_tool_path(),
         }
     }
 
@@ -212,6 +228,25 @@ mod tests {
         assert!(p.contains("<string>cave-runtime</string>"));
         assert!(p.contains("CAVE_AUTOPILOT_CLAUDE_TOKEN_BUDGET"));
         assert!(p.contains("<string>2000000</string>"));
+    }
+
+    #[test]
+    fn plist_exports_path_with_cargo_and_system_dirs() {
+        let p = spec().render();
+        // The daemon shells out to `cargo` and `git`; launchd's minimal env has
+        // neither on PATH, so the plist must export one.
+        assert!(p.contains("<key>PATH</key>"));
+        assert!(p.contains("/opt/homebrew/bin"));
+        assert!(p.contains("/usr/bin"));
+        assert!(p.contains(".cargo/bin"));
+    }
+
+    #[test]
+    fn default_tool_path_includes_homebrew_and_cargo() {
+        let path = PlistSpec::default_tool_path();
+        assert!(path.contains("/opt/homebrew/bin"));
+        assert!(path.contains(".cargo/bin"));
+        assert!(path.split(':').any(|seg| seg == "/usr/bin"));
     }
 
     #[test]
