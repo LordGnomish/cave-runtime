@@ -112,7 +112,10 @@ pub fn assemble_crate(crate_name: &str, lib_src: &str) -> FileSet {
          version = \"0.1.0\"\n\
          edition = \"2021\"\n\
          license = \"AGPL-3.0-or-later\"\n\n\
-         [dependencies]\n"
+         [dependencies]\n\n\
+         # Stand alone even when scaffolded inside a parent cargo workspace\n\
+         # (e.g. the autopilot worktree root under cave-runtime).\n\
+         [workspace]\n"
     );
     let lib = if lib_src.contains("SPDX-License-Identifier") {
         lib_src.to_string()
@@ -310,6 +313,22 @@ mod tests {
         assert!(lib.content.contains("fn add"));
         // Every path is scoped under the crate dir — no escapes.
         assert!(fs.files.iter().all(|f| f.path.starts_with("cave-test-autopilot/")));
+    }
+
+    #[test]
+    fn assembled_crate_opts_out_of_parent_workspace() {
+        // The smoke crate is written under the repo's worktree root, which sits
+        // inside the cave-runtime cargo workspace. Without an empty [workspace]
+        // table cargo refuses to build it ("believes it's in a workspace when
+        // it's not"). The generated manifest must stand alone anywhere.
+        let src = "pub fn a()->i32{1}\n#[test] fn t(){assert_eq!(a(),1);}";
+        let fs = assemble_crate("cave-test-autopilot", src);
+        let cargo = fs
+            .files
+            .iter()
+            .find(|f| f.path.ends_with("Cargo.toml"))
+            .unwrap();
+        assert!(cargo.content.contains("[workspace]"));
     }
 
     #[test]
