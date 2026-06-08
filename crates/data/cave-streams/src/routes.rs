@@ -23,6 +23,7 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
     Router::new()
         // ── Health ─────────────────────────────────────────────────────────
         .route("/api/streams/health", get(health))
+        .route("/api/streams/metrics", get(metrics))
 
         // ── Schema Registry ────────────────────────────────────────────────
         .route("/subjects", get(list_subjects))
@@ -113,6 +114,15 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
             "tenants": pulsar_tenants,
         },
     }))
+}
+
+/// `GET /api/streams/metrics` — Prometheus text exposition (version 0.0.4):
+/// live Kafka/Pulsar gauges plus the streaming-ray-2 preview counters.
+async fn metrics(State((s, _)): State<AppState>) -> impl IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        crate::metrics::render_prometheus(&s),
+    )
 }
 
 // ── Schema Registry handlers ──────────────────────────────────────────────────
