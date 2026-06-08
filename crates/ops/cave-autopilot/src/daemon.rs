@@ -387,6 +387,59 @@ mod tests {
     }
 
     #[test]
+    fn smoke_spec_uses_config_retries_and_names_a_cave_test_crate() {
+        let cfg = AutopilotConfig::for_instance("cave-runtime");
+        let retries = cfg.max_local_retries;
+        let d = Daemon::new(cfg);
+        let spec = d.smoke_spec();
+        assert!(spec.crate_name.starts_with("cave-test"));
+        assert!(!spec.task_desc.is_empty());
+        assert_eq!(spec.max_retries, retries);
+    }
+
+    #[test]
+    fn should_run_startup_smoke_follows_config_flag() {
+        let mut cfg = AutopilotConfig::default();
+        cfg.startup_smoke = false;
+        assert!(!Daemon::new(cfg).should_run_startup_smoke());
+        let mut cfg2 = AutopilotConfig::default();
+        cfg2.startup_smoke = true;
+        assert!(Daemon::new(cfg2).should_run_startup_smoke());
+    }
+
+    #[test]
+    fn record_smoke_bumps_runs_without_inflating_port_completions() {
+        use crate::executor::SmokeOutcome;
+        let d = Daemon::new(AutopilotConfig::default());
+        let ok = SmokeOutcome {
+            crate_name: "cave-test-autopilot".into(),
+            model: "qwen".into(),
+            attempts: 1,
+            generated: true,
+            passed: true,
+            detail: "ok".into(),
+        };
+        let bad = SmokeOutcome {
+            passed: false,
+            attempts: 3,
+            ..ok.clone()
+        };
+        d.record_smoke(&ok);
+        d.record_smoke(&bad);
+        let m = d.metrics.lock().unwrap();
+        assert_eq!(m.smoke_runs, 2);
+        assert_eq!(m.smoke_passed, 1);
+        // The smoke loop exercises the local coder tier.
+        assert!(m.llm_calls.get("l2_coder").copied().unwrap_or(0) >= 2);
+        // Liveness timestamp is stamped.
+        assert!(m.last_task_unix > 0);
+        // Honesty guard: a smoke run is NOT a ported crate — real port
+        // completion/failure counters stay untouched.
+        assert_eq!(m.tasks_completed, 0);
+        assert_eq!(m.tasks_failed, 0);
+    }
+
+    #[test]
     fn df_parse_picks_avail_column() {
         let macos = "Filesystem 1024-blocks Used Avail Capacity Mounted on\n/dev/disk3s5 970000000 460000000 463000000 52% /System/Volumes/Data";
         // 463000000 KiB / 1024 / 1024 ≈ 441 GiB

@@ -168,6 +168,17 @@ mod tests {
     }
 
     #[test]
+    fn prometheus_exposes_smoke_counters() {
+        let mut m = MetricsSnapshot::new("cave-runtime");
+        m.smoke_runs = 2;
+        m.smoke_passed = 1;
+        let out = m.render_prometheus();
+        assert!(out.contains("# TYPE cave_autopilot_smoke_runs_total counter"));
+        assert!(out.contains("cave_autopilot_smoke_runs_total{instance=\"cave-runtime\"} 2"));
+        assert!(out.contains("cave_autopilot_smoke_passed_total{instance=\"cave-runtime\"} 1"));
+    }
+
+    #[test]
     fn escalation_rate_computes() {
         let mut m = MetricsSnapshot::new("x");
         m.tasks_completed = 8;
