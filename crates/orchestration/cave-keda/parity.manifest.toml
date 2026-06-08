@@ -33,22 +33,22 @@ source_sha  = "v2.16.1"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 1.0     # (mapped + partial + skipped) / total = 28/28 — all in-scope subsystems addressed (mapped, partial-with-justification, or ADR-skipped)
-honest_ratio        = 0.8571  # mapped / total = 24/28 (strict accounting, partials excluded)
-adr_justified_ratio = 1.0      # 3 skipped (wasm-scaler needs wasmtime (Ambient-only mandate removed it), hpa-direct→cave-controller-manager, cloudevents-source→cave-knative) + 1 partial (CEL → reuses cave-apiserver CEL engine when it lands) all architecturally justified
+fill_ratio          = 1.0     # (mapped + partial + skipped) / total = 31/31 — all in-scope subsystems addressed (mapped, partial-with-justification, or ADR-skipped)
+honest_ratio        = 0.9032  # mapped / total = 28/31 (strict accounting, partials excluded)
+adr_justified_ratio = 1.0      # 2 skipped (wasm-scaler needs wasmtime (Ambient-only mandate removed it), cloudevents-source→cave-knative) + 1 partial (CEL → reuses cave-apiserver CEL engine when it lands) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-30"
+last_audit          = "2026-06-08"
 infra_only          = false
-mapped_count        = 24
+mapped_count        = 28
 partial_count       = 1
-skipped_count       = 3
+skipped_count       = 2
 unmapped_count      = 0
-total               = 28
+total               = 31
 
 # fill_ratio derivation (Charter v2, charter-aligned 100-pct basis per ADR-RUNTIME-PARITY-100-PCT-001):
-#   (mapped 24 + partial 1 + skipped 3) / total 28 = 28/28 = 1.0
+#   (mapped 28 + partial 1 + skipped 2) / total 31 = 31/31 = 1.0
 #   Zero unmapped — every in-scope subsystem is either ported, has a documented partial,
-#   or is ADR-justified as out of scope. honest_ratio (0.8571) preserves the strict
+#   or is ADR-justified as out of scope. honest_ratio (0.9032) preserves the strict
 #   accounting (mapped/total) for transparency.
 #
 # Supplementary LOC measurement (transparency):
@@ -351,6 +351,32 @@ name = "hibernation-schedules"
 upstream = "pkg/scaling/scaledobject_hibernation.go"
 note = "Cron-based weekday-locked hibernation windows; per-day calendar evaluator handles cross-midnight + weekend exclusion."
 
+# 2026-06-08 — ported from FLAT feature/keda-real-impl (was crates/cave-keda)
+
+[[mapped]]
+name = "rabbitmq-scaler"
+upstream = "pkg/scalers/rabbitmq_scaler.go"
+local = "src/rabbitmq_scaler.rs"
+note = "QueueLength + MessageRate modes; excludeUnacknowledged ready-only selection; sum/avg/max regex composition; activation on messages (QueueLength) or rate-OR-messages."
+
+[[mapped]]
+name = "postgresql-scaler"
+upstream = "pkg/scalers/postgresql_scaler.go"
+local = "src/postgresql_scaler.rs"
+note = "Scalar-query scaler; buildConnArray libpq params + escapePostgreConnectionParameter; activation on num > activationTargetQueryValue."
+
+[[mapped]]
+name = "cloudevents-emission"
+upstream = "pkg/eventemitter/cloudevent_http_handler.go"
+local = "src/cloudevents.rs"
+note = "Operator-side CloudEvents emitter: source /<cluster>/<kedaNs>/keda + subject /<cluster>/<ns>/<type>/<name>, 12 keda.*.v1 CloudEventType strings, structured-content envelope with EmitData{reason,message}. Distinct from the (skipped) CloudEvents-as-source scaler."
+
+[[mapped]]
+name = "hpa-generation"
+upstream = "controllers/keda/hpa.go"
+local = "src/hpa.rs"
+note = "newHPAForScaledObject spec transform: keda-hpa-<name> naming, GetHPAMin/MaxReplicas (1/100 defaults), External-metric specs (AverageValue, s%d- names, *1000 milli targets), paused min==max pinning, ScaleTargetRef. Cluster apply stays in cave-controller-manager."
+
 # ── Partial subsystems ──────────────────────────────────────────────────────
 
 [[partial]]
@@ -364,11 +390,6 @@ note = "Max/Min/Sum formula evaluator covers the common case; full CEL evaluatio
 name = "wasm-scaler-runtime"
 upstream = "pkg/scaling/cache + wasm_runtime"
 reason = "WebAssembly scaler plugin runtime — requires wasmtime; conflicts with the Ambient-only mandate that removed wasmtime from the workspace dep tree."
-
-[[skipped]]
-name = "hpa-direct"
-upstream = "pkg/scaling/hpa"
-reason = "Direct HPA CRD generation — cave-controller-manager owns HPA path; we expose replica recommendations directly."
 
 [[skipped]]
 name = "cloudevents-source-scaler"

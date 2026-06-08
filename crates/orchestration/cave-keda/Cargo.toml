@@ -1,6 +1,6 @@
 [package]
 name = "cave-keda"
-description = "CAVE KEDA — event-driven autoscaler (scaffold; impl pending)."
+description = "CAVE KEDA — event-driven autoscaler — KEDA parity (ScaledObject/ScaledJob, 16 scalers, TriggerAuth, HPA generation, CloudEvents emission)."
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -15,6 +15,7 @@ license.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]
