@@ -1,4 +1,5 @@
 # parity.manifest.toml — cave-llm-gateway
+# Related ADR: docs/adr/ADR-013-RUNTIME-cave-llm-gateway.md (Runtime sovereign variant, local-first routing, 2026-06-08)
 # Upstream: BerriAI/litellm  https://github.com/BerriAI/litellm  pinned v1.85.1
 #
 # cave-llm-gateway is an OpenAI-compatible LLM proxy with:

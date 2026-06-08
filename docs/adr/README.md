@@ -39,6 +39,8 @@ to provider-equal examples.
 | [ADR-009-RUNTIME](ADR-009-RUNTIME-cave-hermes.md) | cave-hermes sovereign local LLM gateway over Ollama — Azure OpenAI dropped |
 | [ADR-010-RUNTIME](ADR-010-RUNTIME-ci-pipeline.md) | Multi-dimensional future-proof CI pipeline (Argo Workflows, ~47 stage) |
 | [ADR-011-RUNTIME](ADR-011-RUNTIME-cave-portal.md) | cave-portal sovereign developer portal — Rust-native Backstage parity, single-binary (Backstage runtime dropped) |
+| [ADR-012-RUNTIME](ADR-012-RUNTIME-multi-tier-tenancy.md) | Multi-tier tenancy hybrid — cave-kamaji (Hard, dedicated CP) + cave-vcluster (ephemeral PR) + namespace/cave-policy (Soft) |
+| [ADR-013-RUNTIME](ADR-013-RUNTIME-cave-llm-gateway.md) | cave-llm-gateway sovereign unified LLM gateway — Rust-native LiteLLM parity, local-first routing (Azure OpenAI demoted) |
 | [ADR-001-COLLISION-2026-06-07](ADR-001-COLLISION-2026-06-07.md) | ADR-001 numbering collision reconciliation (Hetzner vs. bare-metal — **decision pending**) |
 
 ### Runtime stack & consolidation

@@ -1,4 +1,5 @@
 # parity.manifest.toml — cave-kamaji
+# Related ADR: docs/adr/ADR-012-RUNTIME-multi-tier-tenancy.md (Hard tier dedicated CP; hybrid w/ cave-vcluster, 2026-06-08)
 # Upstream: clastix-labs/kamaji  https://github.com/clastix-labs/kamaji  pinned v1.0.0
 #
 # cave-kamaji ports the Kamaji surface for Kubernetes hosted-control-plane
