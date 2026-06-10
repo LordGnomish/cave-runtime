@@ -138,6 +138,21 @@ LiteLLM konseptleri:
 - **cave-hermes MultiGateway bridge** + cave-llm-tracker bench wire + cavectl
   `llm-gateway` subcommand (4-track ship).
 
+### 6. Provider credentials (cave-vault) + per-call identity (cave-auth SPIFFE)
+- **External provider API anahtarları cave-vault'tan çözülür** — LiteLLM'in env-var /
+  config-dosyası secret modeli yerine, cave-llm-gateway external backend credential'larını
+  (Anthropic / OpenAI / Mistral / generic OpenAI-compat key'leri) **cave-vault** üzerinden
+  runtime'da çeker; anahtar plaintext config'te veya binary image'ında tutulmaz
+  (PQC-seal auto-unseal — [[cave-vault-pqc-seal-2026-06-07]]). `restricted`/local
+  yol cave-hermes'e gittiği için external credential gerektirmez.
+- **Her inference çağrısı SPIFFE identity taşır** — gateway, çağıran tenant/workload'ın
+  **cave-auth SPIFFE SVID**'ini (ADR-006-RUNTIME) doğrular ve classification + ABAC
+  routing kararını bu identity'ye bağlar. Token metering ve cost ledger attribution'ı
+  per-SPIFFE-identity yapılır → tenant'lar arası kimlik/maliyet karışması yok.
+- **Defense-in-depth:** classification routing (§2) **hangi** backend'in seçileceğine,
+  cave-auth SPIFFE identity **kimin** çağırdığına, cave-vault ise **hangi credential**'ın
+  kullanılacağına karar verir; üç katman birbirinden bağımsız zorlanır.
+
 > **LiteLLM runtime'ı (Python servisi) çalıştırılmaz** — Charter §5 single-binary
 > mandate gereği kategorik kapsam-dışı. Operatör isterse kendi sorumluluğunda yan
 > tarafta upstream LiteLLM koşabilir; bu Runtime catalogue'un sovereign default'u
@@ -147,6 +162,12 @@ LiteLLM konseptleri:
 - **cave-hermes** (ADR-009-RUNTIME) — local Ollama parity gateway; `restricted`
   routing hedefi + MultiGateway bridge.
 - **cave-metrics** — token/cost metering Prometheus exposition + observability track.
+- **cave-vault** ([[cave-vault-pqc-seal-2026-06-07]]) — external provider credential
+  store (PQC-seal auto-unseal); anahtarlar config/image'te plaintext tutulmaz.
+- **cave-auth** (ADR-006-RUNTIME) — per-call SPIFFE SVID doğrulama + ABAC; routing/
+  metering kararı çağıran identity'ye bağlanır.
+- **cave-trace** — OTel/Tempo izleme (Langfuse-eşdeğeri observability callback);
+  her çağrı classification + SPIFFE identity ile span'lenir.
 - **cave-llm-tracker** (ADR-152) — daily always-latest upstream bench wire.
 - **ADR-153** (cave-llm-gateway MVP) — bu ADR'ın MVP öncülü; charter-binding genişletme.
 
@@ -237,6 +258,8 @@ dokümante.
 - [ADR-001](ADR-001-sovereign-bare-metal-hosting.md) — sovereignty + single-binary charter (§5)
 - [ADR-005-RUNTIME](ADR-005-RUNTIME-buildah.md) — SLSA-L4 hermetic build (supply-chain denetlenebilirliği)
 - [ADR-009-RUNTIME](ADR-009-RUNTIME-cave-hermes.md) — cave-hermes local Ollama gateway (restricted routing hedefi)
+- [ADR-006-RUNTIME](ADR-006-RUNTIME-cave-auth.md) — cave-auth SPIFFE/ABAC (per-call identity + routing/metering binding)
+- **Platform ADR-014** — Zero-Trust Network Architecture (Cilium+Istio ambient mTLS/SPIFFE fabric; gateway↔backend trafiği) *(yalnızca platform katalog; runtime md variant yok)*
 - [ADR-153](ADR-153_LLM_Gateway_MVP.md) — cave-llm-gateway MVP (öncül)
 - [ADR-152](ADR-152_LLM_Tracker_Daily_Always_Latest.md) — cave-llm-tracker daily always-latest (bench wire)
 - [ADR-RUNTIME-UPSTREAM-MIRROR-001](ADR-RUNTIME-UPSTREAM-MIRROR-001-platform-runtime-mirror.md) — platform → runtime mirror (cloud-default demote)
