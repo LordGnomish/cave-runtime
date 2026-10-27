@@ -214,6 +214,8 @@ pub enum Permission {
     IcebergRead,
     MlflowRead,
     LiteLlmRead,
+    /// Read the Hermes agent-orchestration admin view.
+    HermesRead,
 }
 
 impl Permission {
@@ -344,6 +346,7 @@ impl Permission {
             Permission::IcebergRead => "iceberg.catalog.read",
             Permission::MlflowRead => "mlflow.experiment.read",
             Permission::LiteLlmRead => "litellm.proxy.read",
+            Permission::HermesRead => "hermes.agent.read",
         }
     }
 }

@@ -240,6 +240,7 @@ const SECTIONS: &[NavSection] = &[
             ),
             item("Pipelines", "/admin/pipelines", "🔧", TENANT_AND_PLATFORM),
             item("LiteLLM", "/admin/litellm", "🤖", TENANT_AND_PLATFORM),
+            item("Hermes", "/admin/hermes", "🦾", TENANT_AND_PLATFORM),
             item("Local LLM", "/admin/local-llm", "🧠", PLATFORM_ONLY),
         ],
     },

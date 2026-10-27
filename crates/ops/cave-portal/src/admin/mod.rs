@@ -133,6 +133,9 @@ pub mod iceberg;
 pub mod litellm;
 pub mod mlflow;
 
+// ── 2026-06-01 cave-hermes Backend close-out: agent orchestration view ──
+pub mod hermes;
+
 // ── 2026-05-15 cave-auth deep push (sub-agent A6): account + auth_admin ──
 pub mod account;
 pub mod auth_admin;
@@ -296,6 +299,7 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::IcebergRead,
         Permission::MlflowRead,
         Permission::LiteLlmRead,
+        Permission::HermesRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -1862,6 +1866,13 @@ async fn litellm_handler(
     let ctx = extract_ctx_from_query(q);
     litellm::render(&s, &ctx).map(Html).map_err(err_to_response)
 }
+async fn hermes_handler(
+    AxumState(_s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    hermes::render(&ctx).map(Html).map_err(err_to_response)
+}
 async fn litellm_models_handler(
     AxumState(s): AxumState<Arc<AdminState>>,
     Query(q): Query<AdminQuery>,
@@ -2353,6 +2364,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         )
         .route("/admin/mlflow/deployments", get(mlflow_deployments_handler))
         .route("/admin/litellm", get(litellm_handler))
+        .route("/admin/hermes", get(hermes_handler))
         .route("/admin/litellm/models", get(litellm_models_handler))
         .route("/admin/litellm/routes", get(litellm_routes_handler))
         .route("/admin/litellm/api-keys", get(litellm_api_keys_handler))
