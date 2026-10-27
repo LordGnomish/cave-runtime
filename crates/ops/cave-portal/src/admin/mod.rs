@@ -79,6 +79,7 @@ pub mod lakehouse;
 /// + toast notifications. See `layout/mod.rs` for the entry points.
 pub mod layout;
 pub mod ledger;
+pub mod embed;
 pub mod llm_gateway;
 pub mod local_llm;
 pub mod logs;
@@ -254,6 +255,7 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::KnativeRead,
         Permission::LlmGatewayRead,
         Permission::LocalLlmRead,
+        Permission::EmbedRead,
         Permission::TrackerRead,
         Permission::UpstreamRead,
         Permission::ContainerScanRead,
@@ -1191,6 +1193,13 @@ async fn local_llm_handler(
     local_llm::render(&s, &ctx)
         .map(Html)
         .map_err(err_to_response)
+}
+async fn embed_handler(
+    AxumState(_s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    embed::render(&ctx).map(Html).map_err(err_to_response)
 }
 async fn tracker_handler(
     AxumState(s): AxumState<Arc<AdminState>>,
@@ -2262,6 +2271,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/knative", get(knative_handler))
         .route("/admin/llm-gateway", get(llm_gateway_handler))
         .route("/admin/local-llm", get(local_llm_handler))
+        .route("/admin/embed", get(embed_handler))
         .route("/admin/tracker", get(tracker_handler))
         .route("/admin/upstream", get(upstream_handler))
         .route("/admin/container-scan", get(container_scan_handler))
