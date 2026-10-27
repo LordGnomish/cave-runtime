@@ -405,6 +405,7 @@ const NAV=[
   {type:'link',id:'overview',label:'Overview',icon:'⊞'},
   {type:'link',id:'progress',label:'Runtime Progress',icon:'📈'},
   {type:'link',id:'upstream',label:'Upstream',icon:'📡'},
+  {type:'link',id:'agent',label:'Agent (Jarvis)',icon:'🤖'},
   // 2026-05-14 dedup: the inline "Decisions" tab was the third UI
   // showing the same docs/adr content. Removed in favour of the
   // top-level "📜 ADR Browser" sidebar link that points at the
@@ -641,6 +642,7 @@ function go(page){
   if(page==='overview') window.location.hash='#/';
   else if(page==='progress') window.location.hash='#/progress';
   else if(page==='upstream') window.location.hash='#/upstream';
+  else if(page==='agent') window.location.hash='#/agent';
   else window.location.hash='#/m/'+page;
   renderPage();
   renderNav();
@@ -652,6 +654,7 @@ window.addEventListener('hashchange',()=>{
   if(!h||h==='#/'||h==='#'){S.page='overview';}
   else if(h==='#/progress'){S.page='progress';}
   else if(h==='#/upstream'){S.page='upstream';}
+  else if(h==='#/agent'){S.page='agent';}
   // 2026-05-14: legacy `#/adrs` and `#/adr/NNN` bookmarks redirect.
   else if(h==='#/adrs'){window.location='/admin/adr';return;}
   else if(h.startsWith('#/adr/')){window.location='/admin/adr/'+h.slice(6);return;}
@@ -707,7 +710,7 @@ function renderNav(){
   }
   // 2026-05-14: `adrs` + `adr:NNN` removed — SPA breadcrumb never
   // sees those pages now because go() redirects them to /admin/adr.
-  const bcMap={overview:'Overview',progress:'Runtime Progress',upstream:'Upstream'};
+  const bcMap={overview:'Overview',progress:'Runtime Progress',upstream:'Upstream',agent:'Agent (Jarvis)'};
   const label=bcMap[S.page]||MODS[S.page]?.name||S.page;
   document.getElementById('sidebar-nav').innerHTML=h;
   document.getElementById('bc').textContent=label;
@@ -720,10 +723,91 @@ function renderPage(){
   if(S.page==='overview') c.innerHTML=renderOverview();
   else if(S.page==='progress') loadProgress(c);
   else if(S.page==='upstream') c.innerHTML=renderUpstream();
+  else if(S.page==='agent') loadAgent(c);
   // 2026-05-14: `adrs` + `adr:NNN` dispatch paths removed — go() and
   // the hashchange handler now redirect to /admin/adr before the SPA
   // ever sees these pages.
   else c.innerHTML=renderMod(MODS[S.page]);
+}
+
+// ── Feature: Agent (OpenJarvis local-first) ─────────────────────────────────
+// Fetches /api/agent once: capability summary, dual upstream pins, switchable
+// backends, and the self-improvement change surface.
+
+function loadAgent(c){
+  c.innerHTML=`
+    <div class="page-hdr">
+      <div class="page-title">🤖 Agent (Jarvis) <span id="agent-ind" style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:10px">loading…</span></div>
+      <div class="page-sub">Local-first OpenJarvis personal agent — complements the Hermes enterprise path. ADR-RUNTIME-OPENJARVIS-ADOPTION-001 + ADR-SELF-IMPROVE-001.</div>
+    </div>
+    <div id="agent-body"><div style="padding:40px;text-align:center;color:var(--text-muted)">Fetching /api/agent…</div></div>
+  `;
+  fetchAgent();
+}
+
+async function fetchAgent(){
+  const ind=document.getElementById('agent-ind');
+  try{
+    const r=await fetch('/api/agent');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const body=document.getElementById('agent-body');
+    if(!body) return;
+    body.innerHTML=renderAgentBody(d);
+    if(ind) ind.textContent='';
+  }catch(e){
+    const body=document.getElementById('agent-body');
+    if(body) body.innerHTML=`<div style="padding:40px;text-align:center;color:var(--red)">Fetch failed: ${esc(String(e.message||e))}</div>`;
+    if(ind) ind.textContent='error';
+  }
+}
+
+function renderAgentBody(d){
+  const up=d.upstream||{};
+  const oj=up.openjarvis||{}, hm=up.hermes||{};
+  const si=d.self_improve||{};
+  const backends=(d.backends||[]).map(b=>`
+    <tr>
+      <td style="font-weight:500">${esc(b.backend)}</td>
+      <td style="color:var(--text-muted)">${esc(b.model)}</td>
+      <td>${esc(b.device)}</td>
+      <td>${b.local?'<span style="color:var(--green)">local</span>':'<span style="color:var(--red)">remote</span>'}</td>
+      <td>${b.priority}</td>
+    </tr>`).join('');
+  const prims=(d.primitives||[]).map(p=>`<span class="chip">${esc(p)}</span>`).join(' ');
+  const surface=(si.mutable_surface||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ');
+  return `
+    <div class="card" style="margin-bottom:14px">
+      <h2 style="margin-top:0">Positioning</h2>
+      <div style="color:var(--text-muted)">${esc(d.positioning||'')}</div>
+      <div style="margin-top:8px">host crate: <code>${esc(d.host_crate||'')}</code></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h2 style="margin-top:0">Dual upstream</h2>
+      <div>OpenJarvis — <a href="${esc(oj.repo||'')}" target="_blank" rel="noopener">${esc(oj.version||'')}</a> · ${esc(oj.license||'')}</div>
+      <div>Hermes — <a href="${esc(hm.repo||'')}" target="_blank" rel="noopener">${esc(hm.version||'')}</a> · ${esc(hm.license||'')}</div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h2 style="margin-top:0">Primitives</h2>
+      <div>${prims}</div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h2 style="margin-top:0">Self-improvement</h2>
+      <div>observe: ${(si.observe||[]).map(esc).join(', ')}</div>
+      <div>tune: ${esc(si.tune||'')}</div>
+      <div>upstream watch: ${esc(si.upstream_watch||'')}</div>
+      <div style="margin-top:8px">mutable change surface: ${surface}</div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Switchable backends</h2>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="text-align:left;color:var(--text-muted);font-size:12px">
+          <th>backend</th><th>model</th><th>device</th><th>endpoint</th><th>priority</th>
+        </tr></thead>
+        <tbody>${backends}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 // ── Feature: Runtime Progress ───────────────────────────────────────────────
