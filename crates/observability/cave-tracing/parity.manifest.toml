@@ -59,13 +59,54 @@ source_root = "src"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.0    # populated by the strict-TDD engine ports below
-honest_ratio        = 0.0
-adr_justified_ratio = 0.0    # no ADR scope-cut inflation; honest measure only
+fill_ratio          = 0.5      # (mapped 6 + partial 0 + skipped 2) / 16
+honest_ratio        = 0.375    # (mapped 6 + partial 0) / 16 — measured, honest
+adr_justified_ratio = 0.0      # no ADR scope-cut inflation; honest measure only
 last_audit          = "2026-05-28"
 infra_only          = false
-mapped_count        = 0
+mapped_count        = 6
 partial_count       = 0
 skipped_count       = 2
-unmapped_count      = 14
+unmapped_count      = 8
 total               = 16
+
+# 2026-05-28 honest uplift (strict-TDD, branch claude/cave-tracing-honest-2026-05-28):
+#   Six Alloy engine subsystems line-ported RED→GREEN against grafana/alloy
+#   v1.5.0 (45 new tests across tests/alloy_*_tdd.rs):
+#     syntax-token      → src/alloy/token.rs       (6 tests)
+#     syntax-scanner    → src/alloy/scanner.rs     (11 tests)
+#     syntax-ast        → src/alloy/ast.rs         (4 tests)
+#     syntax-parser     → src/alloy/parser.rs      (10 tests)
+#     component-registry→ src/alloy/component.rs   (6 tests)
+#     component-graph   → src/alloy/graph.rs        (8 tests)
+#   honest_ratio 0.0 (unmeasured Jaeger stub) → 0.375 (6/16 measured).
+#   8 subsystems remain honestly UNMAPPED (syntax vm/encoding/printer; the
+#   otelcol/prometheus/loki/discovery component families; http-ui-debug) —
+#   real gaps, not scope-cut. 2 are skipped categorically (clustering →
+#   cave-ha; cloud-integrations long tail). No ADR justification is claimed:
+#   adr_justified_ratio stays 0.0 so fill_ratio is not inflated to 1.0.
+
+# Mapped engine subsystems (Alloy Go source → cave src):
+[[files]]
+upstream = "syntax/token/token.go"
+local    = "src/alloy/token.rs"
+
+[[files]]
+upstream = "syntax/scanner/scanner.go"
+local    = "src/alloy/scanner.rs"
+
+[[files]]
+upstream = "syntax/ast/ast.go"
+local    = "src/alloy/ast.rs"
+
+[[files]]
+upstream = "syntax/parser/internal.go"
+local    = "src/alloy/parser.rs"
+
+[[files]]
+upstream = "internal/component/registry.go"
+local    = "src/alloy/component.rs"
+
+[[files]]
+upstream = "internal/runtime/internal/dag/dag.go"
+local    = "src/alloy/graph.rs"

@@ -34,6 +34,9 @@
 /// docs for the layering. Upstream: grafana/alloy v1.5.0 (Apache-2.0).
 pub mod alloy;
 
+/// `cavectl alloy …` command surface over the Alloy engine.
+pub mod cli;
+
 /// Re-export of the batch processing module.
 ///
 /// Contains `BatchSpanProcessor` and related configuration types like

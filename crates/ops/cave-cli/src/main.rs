@@ -522,6 +522,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: FalcoCmd,
     },
+    /// cave-tracing (Grafana Alloy) CLI parity — Alloy/River config validate/parse/tokenize (in-process).
+    Alloy {
+        #[command(subcommand)]
+        cmd: AlloyCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -928,6 +933,27 @@ enum FalcoCmd {
     /// Print observability dashboards + alert YAML.
     Observability,
     /// Print cave-falco upstream version.
+    Version,
+}
+
+#[derive(Subcommand)]
+enum AlloyCmd {
+    /// Parse an Alloy/River config file and report diagnostics.
+    Validate {
+        /// Path to the `.alloy` config file.
+        path: String,
+    },
+    /// Summarise an Alloy config's block/attribute structure.
+    Parse {
+        /// Path to the `.alloy` config file.
+        path: String,
+    },
+    /// Tokenize an Alloy config file and list the token stream.
+    Tokens {
+        /// Path to the `.alloy` config file.
+        path: String,
+    },
+    /// Print the tracked grafana/alloy upstream version.
     Version,
 }
 #[derive(Subcommand)]
@@ -4991,6 +5017,18 @@ source_root = "src"
                 FalcoCmd::Version => FalcoSubcommand::Version,
             };
             let out = falco_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-falco: {e}"))?;
+            print!("{out}");
+            Ok(())
+        }
+        Commands::Alloy { cmd } => {
+            use cave_tracing::cli::{dispatch as alloy_dispatch, AlloySubcommand};
+            let sub = match cmd {
+                AlloyCmd::Validate { path } => AlloySubcommand::Validate { path },
+                AlloyCmd::Parse { path } => AlloySubcommand::Parse { path },
+                AlloyCmd::Tokens { path } => AlloySubcommand::Tokens { path },
+                AlloyCmd::Version => AlloySubcommand::Version,
+            };
+            let out = alloy_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-tracing: {e}"))?;
             print!("{out}");
             Ok(())
         }
