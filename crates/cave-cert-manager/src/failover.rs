@@ -17,6 +17,125 @@
 //! the failover machinery never needs to know how any individual issuer
 //! signs.
 
+use crate::error::{CertManagerError, CertManagerResult};
+use crate::issuer::IssueOutcome;
+use crate::models::IssuerRef;
+use chrono::{DateTime, Duration, Utc};
+use std::collections::HashMap;
+
+/// An ordered list of issuers plus the cooldown applied to a failed
+/// issuer before it is retried.
+#[derive(Debug, Clone)]
+pub struct FailoverPolicy {
+    /// Issuers in descending preference — index 0 is the primary.
+    pub issuers: Vec<IssuerRef>,
+    /// Seconds a failed issuer is parked before it becomes eligible
+    /// again. `0` disables the cooldown (every issuer is always
+    /// eligible).
+    pub cooldown_seconds: i64,
+}
+
+impl FailoverPolicy {
+    pub fn new(issuers: Vec<IssuerRef>, cooldown_seconds: i64) -> Self {
+        Self {
+            issuers,
+            cooldown_seconds,
+        }
+    }
+
+    /// Issuers not currently in cooldown, in preference order.
+    pub fn eligible<'a>(&'a self, state: &FailoverState, now: DateTime<Utc>) -> Vec<&'a IssuerRef> {
+        self.issuers
+            .iter()
+            .filter(|r| !state.in_cooldown(&r.name, self.cooldown_seconds, now))
+            .collect()
+    }
+
+    /// The most-preferred eligible issuer, or `None` if every issuer is
+    /// in cooldown (or the policy is empty).
+    pub fn next_issuer<'a>(
+        &'a self,
+        state: &FailoverState,
+        now: DateTime<Utc>,
+    ) -> Option<&'a IssuerRef> {
+        self.eligible(state, now).into_iter().next()
+    }
+
+    /// Try each eligible issuer in preference order until one succeeds.
+    ///
+    /// `f` performs the actual issuance for a given issuer. On `Err` the
+    /// issuer is parked in cooldown and the next eligible issuer is
+    /// tried; on `Ok` the issuer's prior failure is cleared and the
+    /// `(issuer, outcome)` pair is returned. If no issuer is eligible
+    /// returns [`CertManagerError::NoEligibleIssuer`]; if every eligible
+    /// issuer fails returns [`CertManagerError::AllIssuersFailed`].
+    pub fn attempt<F>(
+        &self,
+        state: &mut FailoverState,
+        now: DateTime<Utc>,
+        mut f: F,
+    ) -> CertManagerResult<(IssuerRef, IssueOutcome)>
+    where
+        F: FnMut(&IssuerRef) -> CertManagerResult<IssueOutcome>,
+    {
+        let eligible: Vec<IssuerRef> =
+            self.eligible(state, now).into_iter().cloned().collect();
+        if eligible.is_empty() {
+            return Err(CertManagerError::NoEligibleIssuer);
+        }
+        let mut tried = 0usize;
+        let mut last_error = String::new();
+        for iref in &eligible {
+            tried += 1;
+            match f(iref) {
+                Ok(outcome) => {
+                    state.record_success(&iref.name);
+                    return Ok((iref.clone(), outcome));
+                }
+                Err(e) => {
+                    last_error = e.to_string();
+                    state.record_failure(&iref.name, now);
+                }
+            }
+        }
+        Err(CertManagerError::AllIssuersFailed { tried, last_error })
+    }
+}
+
+/// Mutable failover bookkeeping — the last failure time per issuer name.
+#[derive(Debug, Clone, Default)]
+pub struct FailoverState {
+    failures: HashMap<String, DateTime<Utc>>,
+}
+
+impl FailoverState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Park `issuer_name` in cooldown starting at `now`.
+    pub fn record_failure(&mut self, issuer_name: &str, now: DateTime<Utc>) {
+        self.failures.insert(issuer_name.to_string(), now);
+    }
+
+    /// Clear any recorded failure for `issuer_name` (it recovered).
+    pub fn record_success(&mut self, issuer_name: &str) {
+        self.failures.remove(issuer_name);
+    }
+
+    /// Whether `issuer_name` is still inside its cooldown window. A
+    /// `cooldown_seconds` of `0` means an issuer is never parked.
+    pub fn in_cooldown(&self, issuer_name: &str, cooldown_seconds: i64, now: DateTime<Utc>) -> bool {
+        if cooldown_seconds <= 0 {
+            return false;
+        }
+        match self.failures.get(issuer_name) {
+            Some(failed_at) => now < *failed_at + Duration::seconds(cooldown_seconds),
+            None => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

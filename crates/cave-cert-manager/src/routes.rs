@@ -97,6 +97,10 @@ pub fn create_router(state: CertState) -> Router {
             "/api/cert/{tenant}/cluster-issuers",
             get(list_cluster_issuers).post(create_cluster_issuer),
         )
+        .route(
+            "/api/cert/{tenant}/failover/select",
+            post(failover_select),
+        )
         .with_state(state)
 }
 
@@ -385,6 +389,48 @@ fn serialise_result(r: &ReconcileResult) -> serde_json::Value {
                 serde_json::json!({"kind": "Failed", "certificate_id": certificate_id, "message": message}),
         }).collect::<Vec<_>>(),
     })
+}
+
+/// Body for `POST /api/cert/{tenant}/failover/select` — a stateless
+/// preview that resolves an ordered issuer-preference list plus the
+/// known per-issuer failure timestamps into the next eligible issuer.
+/// No state mutation, so a poller / dry-run can call it freely.
+#[derive(Deserialize)]
+struct FailoverSelectBody {
+    issuers: Vec<crate::models::IssuerRef>,
+    cooldown_seconds: i64,
+    /// issuer name → last-failure RFC 3339 timestamp.
+    #[serde(default)]
+    failures: std::collections::BTreeMap<String, chrono::DateTime<Utc>>,
+}
+
+async fn failover_select(
+    Path(_tenant): Path<String>,
+    Json(body): Json<FailoverSelectBody>,
+) -> impl IntoResponse {
+    let policy = crate::failover::FailoverPolicy::new(body.issuers, body.cooldown_seconds);
+    let mut state = crate::failover::FailoverState::new();
+    for (name, at) in &body.failures {
+        state.record_failure(name, *at);
+    }
+    let now = Utc::now();
+    let selected = policy.next_issuer(&state, now).map(|r| {
+        serde_json::json!({"name": r.name, "kind": format!("{:?}", r.kind), "group": r.group})
+    });
+    let eligible: Vec<String> = policy
+        .eligible(&state, now)
+        .into_iter()
+        .map(|r| r.name.clone())
+        .collect();
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "selected": selected,
+            "eligible": eligible,
+            "cooldown_seconds": policy.cooldown_seconds,
+        })),
+    )
+        .into_response()
 }
 
 fn error_body(e: &CertManagerError) -> serde_json::Value {

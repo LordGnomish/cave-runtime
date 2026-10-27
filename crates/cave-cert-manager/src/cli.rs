@@ -64,6 +64,13 @@ pub fn certificate_revoke_path(tenant: &str, id: &str) -> String {
     format!("/api/cert/{}/certificates/{}/revoke", tenant, id)
 }
 
+/// `cavectl cert failover-select <tenant>` — POST an ordered issuer
+/// preference list + known per-issuer failure timestamps and get back
+/// the next eligible issuer (multi-issuer failover preview).
+pub fn failover_select_path(tenant: &str) -> String {
+    format!("/api/cert/{}/failover/select", tenant)
+}
+
 /// `cavectl cert metrics` — Prometheus exposition surface. Mounted
 /// at the conventional `/metrics` path so any scraper config can
 /// reach it without extra wiring.
@@ -147,6 +154,15 @@ mod tests {
     }
 
     #[test]
+    fn failover_select_path_includes_tenant_and_suffix() {
+        assert_eq!(
+            failover_select_path("t-1"),
+            "/api/cert/t-1/failover/select"
+        );
+        assert!(failover_select_path("t-1").ends_with("/failover/select"));
+    }
+
+    #[test]
     fn all_builders_share_api_cert_prefix() {
         let tenant = "tenant-x";
         let id = "00000000-0000-0000-0000-000000000000";
@@ -160,6 +176,7 @@ mod tests {
             certificate_verify_path(tenant, id),
             certificate_revoke_path(tenant, id),
             requests_path(tenant),
+            failover_select_path(tenant),
         ] {
             assert!(
                 p.starts_with("/api/cert/"),

@@ -746,6 +746,16 @@ enum CertCmd {
         tenant: String,
         id: String,
     },
+    /// Preview multi-issuer failover: resolve an ordered issuer list
+    /// (descending preference) into the next eligible issuer.
+    Failover {
+        tenant: String,
+        /// Comma-separated issuer names in descending preference.
+        issuers: String,
+        /// Cooldown window (seconds) a failed issuer is parked.
+        #[arg(long, default_value_t = 300)]
+        cooldown_seconds: i64,
+    },
     /// Surface cert-manager control-plane health.
     Health,
     /// Dump the Prometheus exposition for cert-manager metrics.
@@ -4849,6 +4859,25 @@ source_root = "src"
             CertCmd::Verify { tenant, id } => {
                 c.get(&format!("/api/cert/{}/certificates/{}/verify", tenant, id))
                     .await
+            }
+            CertCmd::Failover {
+                tenant,
+                issuers,
+                cooldown_seconds,
+            } => {
+                let issuer_refs: Vec<serde_json::Value> = issuers
+                    .split(',')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(|name| {
+                        json!({"name": name, "kind": "ClusterIssuer", "group": "cert-manager.io"})
+                    })
+                    .collect();
+                c.post(
+                    &format!("/api/cert/{}/failover/select", tenant),
+                    json!({"issuers": issuer_refs, "cooldown_seconds": cooldown_seconds}),
+                )
+                .await
             }
             CertCmd::Metrics => c.get("/metrics").await,
         },

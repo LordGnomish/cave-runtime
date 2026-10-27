@@ -65,6 +65,12 @@ pub enum CertManagerError {
 
     #[error("certificate {0} not yet ready")]
     NotReady(String),
+
+    #[error("no eligible issuer — every issuer in the failover policy is in cooldown or the policy is empty")]
+    NoEligibleIssuer,
+
+    #[error("all {tried} issuer(s) in the failover policy failed — last error: {last_error}")]
+    AllIssuersFailed { tried: usize, last_error: String },
 }
 
 pub type CertManagerResult<T> = Result<T, CertManagerError>;
