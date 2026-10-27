@@ -28,10 +28,11 @@
 //! time.
 
 use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// A single tagged artifact considered by the retention run.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Candidate {
     pub repository: String,
     pub tag: String,
@@ -79,6 +80,23 @@ impl Selector {
     }
     pub fn label(decoration: Decoration, pattern: &str) -> Self {
         Self { kind: SelectorKind::Label, decoration, pattern: pattern.to_string() }
+    }
+
+    /// Build a [`Selector`] from the Harbor API
+    /// [`RetentionSelector`](super::harbor::RetentionSelector) model. An
+    /// unknown kind falls back to doublestar and an unknown decoration to
+    /// `matches`, matching upstream's permissive parsing.
+    fn from_harbor(model: &super::harbor::RetentionSelector) -> Self {
+        let kind = match model.kind.as_str() {
+            "regexp" => SelectorKind::Regexp,
+            "label" => SelectorKind::Label,
+            _ => SelectorKind::Doublestar,
+        };
+        let decoration = match model.decoration.as_str() {
+            "excludes" => Decoration::Excludes,
+            _ => Decoration::Matches,
+        };
+        Self { kind, decoration, pattern: model.pattern.clone() }
     }
 
     /// Raw (pre-decoration) test of the pattern against a tag string.
@@ -150,6 +168,29 @@ pub struct Rule {
 }
 
 impl Rule {
+    /// Build a [`Rule`] from the Harbor API model, returning `None` for an
+    /// unrecognised template or a count template missing its integer param.
+    fn from_harbor(model: &super::harbor::RetentionRule) -> Option<Self> {
+        let p = |key: &str| -> Option<i64> {
+            model.params.get(key).and_then(|v| v.as_i64())
+        };
+        let template = match model.template.as_str() {
+            "latestPushedK" => Template::LatestPushedK(p("latestPushedK")? as usize),
+            "latestPulledN" => Template::LatestPulledN(p("latestPulledN")? as usize),
+            "nDaysSinceLastPush" => Template::NDaysSinceLastPush(p("nDaysSinceLastPush")?),
+            "nDaysSinceLastPull" => Template::NDaysSinceLastPull(p("nDaysSinceLastPull")?),
+            "always" => Template::Always,
+            _ => return None,
+        };
+        let tag_selectors = model.tag_selectors.iter().map(Selector::from_harbor).collect();
+        let scope_selectors = model
+            .scope_selectors
+            .get("repository")
+            .map(|v| v.iter().map(Selector::from_harbor).collect())
+            .unwrap_or_default();
+        Some(Self { disabled: model.disabled, template, scope_selectors, tag_selectors })
+    }
+
     /// Candidates this rule's selectors pick out.
     fn select<'a>(&self, candidates: &'a [Candidate]) -> Vec<&'a Candidate> {
         candidates
@@ -221,7 +262,7 @@ pub struct Policy {
 }
 
 /// Result of a retention run.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RetentionOutcome {
     /// Tags kept (retained-by-a-rule plus tags out of every rule's scope).
     pub retained: Vec<Candidate>,
@@ -230,6 +271,20 @@ pub struct RetentionOutcome {
 }
 
 impl Policy {
+    /// Build an executable engine [`Policy`] from the Harbor API
+    /// [`RetentionPolicy`](super::harbor::RetentionPolicy) model. Disabled
+    /// rules and rules whose template/params can't be resolved are dropped
+    /// (upstream treats an unrecognised template as a no-op rule).
+    pub fn from_harbor(model: &super::harbor::RetentionPolicy) -> Self {
+        let rules = model
+            .rules
+            .iter()
+            .filter(|r| !r.disabled)
+            .filter_map(Rule::from_harbor)
+            .collect();
+        Self { rules }
+    }
+
     /// Partition `candidates` into retain/delete per the OR processor.
     pub fn evaluate(&self, candidates: &[Candidate], now: DateTime<Utc>) -> RetentionOutcome {
         use std::collections::BTreeSet;

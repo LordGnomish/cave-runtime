@@ -83,6 +83,7 @@ pub fn router(state: Arc<RegistryState>) -> Router {
             get(get_retention_by_id).put(update_retention_policy),
         )
         .route("/api/v2.0/retentions/{retention_id}/executions", post(execute_retention))
+        .route("/api/v2.0/retentions/preview", post(preview_retention))
         // Immutable tag rules
         .route(
             "/api/v2.0/projects/{project_name}/immutabletagrules",
@@ -485,6 +486,24 @@ async fn execute_retention(
     Json(_body): Json<serde_json::Value>,
 ) -> StatusCode {
     StatusCode::CREATED
+}
+
+/// Dry-run / "what-if" preview: given a retention policy and the current set of
+/// tags, run the engine and return the retain/delete partition without deleting
+/// anything. Mirrors Harbor's retention dry-run.
+#[derive(serde::Deserialize)]
+struct RetentionPreviewRequest {
+    policy: RetentionPolicy,
+    candidates: Vec<crate::harbor::retention::Candidate>,
+}
+
+async fn preview_retention(
+    State(_state): State<Arc<RegistryState>>,
+    Json(req): Json<RetentionPreviewRequest>,
+) -> impl IntoResponse {
+    let engine = crate::harbor::retention::Policy::from_harbor(&req.policy);
+    let outcome = engine.evaluate(&req.candidates, Utc::now());
+    (StatusCode::OK, Json(outcome))
 }
 
 // ── Immutable Tag Rules ───────────────────────────────────────────────────────
