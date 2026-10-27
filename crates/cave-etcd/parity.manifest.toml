@@ -55,7 +55,9 @@ unmapped_count = 3
 total          = 71
 fill_ratio     = 0.9577
 honest_ratio   = 0.9296
-last_audit     = "2026-05-19"
+adr_justified_ratio = 0.9859   # (mapped + partial + skipped + 2 architectural unmapped) / total = 70/71. 35 skipped (all go-bootstrap + stdlib-analog + parallel-track). 2 of 3 unmapped ADR-justified: TLS-rotation (→cave-pki host-preflight), gateway-proxy (→cave-runtime). 1 unmapped (raft joint-consensus for safe membership changes) is a REAL algorithmic gap; ADR-RUNTIME-PARITY-100-PCT-001 §5 exception clause applies. Next parity ray must absorb upstream raft.joint code.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only — raft joint-consensus preserved as honest unmapped per §5 exception), ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 parity_ratio_source = "manifest"
 

@@ -56,7 +56,9 @@ unmapped_count = 1
 total          = 29
 fill_ratio     = 0.9655
 honest_ratio   = 0.9655
-last_audit     = "2026-05-19"
+adr_justified_ratio = 0.9655   # 7 skipped (go-bootstrap + stdlib-analog + test-harness + parallel-track metrics) are ADR-justified; 1 unmapped (preemption-victim-recovery — transient apiserver failure during eviction leaks victim state) is a REAL correctness gap that ADR-RUNTIME-PARITY-100-PCT-001 §5 explicitly excludes from categorical justification. Next parity ray must absorb the upstream pkg/scheduler/framework/preemption recovery loop.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only — preemption-victim-recovery preserved as honest unmapped per §5 exception), ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 [module]

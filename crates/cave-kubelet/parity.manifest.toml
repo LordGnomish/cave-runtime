@@ -43,7 +43,9 @@ unmapped_count = 1
 total          = 39
 fill_ratio     = 0.9744
 honest_ratio   = 0.9487
-last_audit     = "2026-05-19"
+adr_justified_ratio = 1.0      # 9 skipped (go-bootstrap, stdlib-analog, parallel-track) + 1 unmapped (Windows host-process containers — out-of-launch-scope: Hetzner + Azure Linux only) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 [module]

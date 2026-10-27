@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-test-autopilot"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+
+# Stand alone even when scaffolded inside a parent cargo workspace
+# (e.g. the autopilot worktree root under cave-runtime).
+[workspace]

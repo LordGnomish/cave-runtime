@@ -1,0 +1,356 @@
+# parity.manifest.toml — cave-bench
+# Charter v2 deep-port close 2026-05-23.
+#
+# Dual upstream:
+# - aquasecurity/kube-bench  https://github.com/aquasecurity/kube-bench  v0.15.5
+# - kubescape/kubescape      https://github.com/kubescape/kubescape       v4.0.8
+# Both Apache-2.0 (compatible with cave-runtime AGPL-3.0-or-later).
+#
+# cave-bench is the K8s security benchmark crate: CIS K8s Benchmark from
+# kube-bench, NSA Hardening Guide + MITRE ATT&CK mapping from kubescape.
+# It hosts the check engine (BinOp + TestItem + CisRule + CisContext),
+# four CIS control catalogues (master / node / etcd / control-plane),
+# the NSA control catalogue (32 controls) and MITRE technique catalogue
+# (30 techniques across 10 tactics), plus a profile manager, scan runner,
+# scheduler, finding store, axum HTTP routes, observability shapes, and
+# a `cavectl bench` CLI surface.
+#
+# Per ADR-RUNTIME-bench the runtime stack uses cave-bench as the single
+# entry-point for compliance scans. Live-introspection (cri, kube-proxy,
+# K8s API watches) live in their dedicated crates; cave-bench is *file-
+# and manifest-* oriented.
+
+[upstream]
+# Primary upstream — kube-bench CIS engine.
+org           = "aquasecurity"
+repo          = "kube-bench"
+version       = "v0.15.5"
+name          = "kube-bench"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/aquasecurity/kube-bench"
+source_sha    = "13c5a2bed634b4f324ad54ba2942f4a77fc802e0"
+
+[[upstreams]]
+org           = "kubescape"
+repo          = "kubescape"
+version       = "v4.0.8"
+name          = "kubescape"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/kubescape/kubescape"
+source_sha    = "d7539c2264560a8685f59e89a731d6de833258a6"
+
+[module]
+name          = "cave-bench"
+description   = "kube-bench v0.15.5 (CIS) + kubescape v4.0.8 (NSA + MITRE) dual deep-port"
+source_root   = "src"
+
+[parity]
+fill_ratio            = 0.9697
+honest_ratio          = 0.6970
+mapped_count          = 23
+partial_count         = 0
+skipped_count         = 9
+unmapped_count        = 1
+total                 = 33
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-23"
+infra_only            = false
+
+# ─── MAPPED subsystems (kube-bench origin) ─────────────────────────────────
+
+[[mapped]]
+name = "cis_check_engine"
+upstream = "kube-bench check/check.go + check/test.go"
+local_files = ["src/cis_engine.rs"]
+note = "BinOp + TestItem + CisRule + Logic + CisContext + evaluate_rule + load_rules_yaml (12 unit tests)."
+
+[[mapped]]
+name = "cis_master_controls"
+upstream = "kube-bench cfg/cis-1.10/master.yaml"
+local_files = ["src/cis_master.rs"]
+note = "30+ master-node checks 1.1.*/1.2.*/1.3.*/1.4.* with builders + 6 unit tests."
+
+[[mapped]]
+name = "cis_node_controls"
+upstream = "kube-bench cfg/cis-1.10/node.yaml"
+local_files = ["src/cis_node.rs"]
+note = "21 worker-node checks 4.1.*/4.2.* with file_mode + flag_eq/neq/gte + 3 unit tests."
+
+[[mapped]]
+name = "cis_etcd_controls"
+upstream = "kube-bench cfg/cis-1.10/etcd.yaml"
+local_files = ["src/cis_etcd.rs"]
+note = "9 etcd checks 2.* covering peer/client TLS + data-dir perms."
+
+[[mapped]]
+name = "cis_control_plane_controls"
+upstream = "kube-bench cfg/cis-1.10/controlplane.yaml"
+local_files = ["src/cis_control_plane.rs"]
+note = "7 control-plane checks 3.* including audit-policy + scheduler bind-address."
+
+[[mapped]]
+name = "cis_rule_yaml_loader"
+upstream = "kube-bench check/loader.go"
+local_files = ["src/cis_engine.rs"]
+note = "load_rules_yaml() parses upstream kube-bench cfg/*.yaml (groups[].checks[])."
+
+[[mapped]]
+name = "cis_value_sources"
+upstream = "kube-bench check/test.go::TestItem.flag/path/permissions"
+local_files = ["src/cis_engine.rs"]
+note = "ValueSource::{Flag,Path,FileMode,FileOwner,FileExists} matches kube-bench Test surfaces."
+
+[[mapped]]
+name = "cis_test_operators"
+upstream = "kube-bench check/test.go::Op {eq,noteq,gt,gte,lt,lte,has,nothave,bitmask}"
+local_files = ["src/cis_engine.rs"]
+note = "BinOp enum reproduces all 11 kube-bench operators + regex + valid_elements."
+
+# ─── MAPPED subsystems (kubescape origin) ──────────────────────────────────
+
+[[mapped]]
+name = "nsa_control_catalogue"
+upstream = "kubescape/regolibrary frameworks/NSA.json"
+local_files = ["src/kubescape_nsa.rs"]
+note = "32 NSA controls (C-0001..C-0086) with predicates + NsaManifestFacts evaluator."
+
+[[mapped]]
+name = "nsa_manifest_facts_evaluator"
+upstream = "kubescape core/cautils/sessionObj.go + rules-runner predicates"
+local_files = ["src/kubescape_nsa.rs"]
+note = "NsaManifestFacts struct (28 booleans + counts) + evaluate_control() predicate dispatch."
+
+[[mapped]]
+name = "mitre_attck_for_k8s"
+upstream = "kubescape/regolibrary frameworks/MITRE.json"
+local_files = ["src/kubescape_mitre.rs"]
+note = "30 ATT&CK techniques across 10 tactics (T1190..T1496) with detection guidance."
+
+[[mapped]]
+name = "mitre_tactic_taxonomy"
+upstream = "kubescape/regolibrary mitre.json + ATT&CK Matrix for K8s"
+local_files = ["src/kubescape_mitre.rs"]
+note = "Tactic enum: 10 variants (Initial Access → Impact) + group_by_tactic helper."
+
+# ─── MAPPED subsystems (cross-upstream) ────────────────────────────────────
+
+[[mapped]]
+name = "scan_runner_sequential"
+upstream = "kube-bench cmd/run.go + kubescape core/cautils/scanInfo.go"
+local_files = ["src/runner.rs"]
+note = "run_profile() dispatches CIS/NSA/MITRE per-framework; smoke_run + findings_by_host."
+
+[[mapped]]
+name = "scan_runner_modes"
+upstream = "kube-bench cmd/run.go parallel flag"
+local_files = ["src/runner.rs"]
+note = "RunMode::{Sequential,Parallel} + ScanInput; parallel reduces to sequential when in-process (no async fanout needed for in-memory check eval)."
+
+[[mapped]]
+name = "report_json"
+upstream = "kube-bench cmd/output.go JSON formatter"
+local_files = ["src/report.rs"]
+note = "Format::Json renders summary + findings via serde_json::to_string_pretty."
+
+[[mapped]]
+name = "report_sarif"
+upstream = "kubescape core/printer/v2/sarifPrinter.go"
+local_files = ["src/report.rs"]
+note = "Format::Sarif emits SARIF 2.1.0 Log/Run/Tool/Driver/Result with proper level mapping."
+
+[[mapped]]
+name = "report_html_markdown"
+upstream = "kube-bench cmd/output.go + kubescape htmlPrinter"
+local_files = ["src/report.rs"]
+note = "Format::{Html,Markdown} render structured tables; HTML escapes user content."
+
+[[mapped]]
+name = "profile_manager"
+upstream = "kube-bench cfg/config.yaml::target_mapping + kubescape pkg/policyhandler/policyhandler.go"
+local_files = ["src/profile.rs"]
+note = "5 builtin profiles: cis-1.9, cis-1.10, nsa-2025, mitre-attck-k8s, soc2-cc-7."
+
+[[mapped]]
+name = "scheduled_scan_dag"
+upstream = "kube-bench job pattern + kubescape cronJobs/operatorJob"
+local_files = ["src/scheduler.rs"]
+note = "ScheduledScan + DagNode (CisMaster→CisNode→CisEtcd→Nsa→Report→Notify); minimal cron matcher."
+
+[[mapped]]
+name = "schedule_registry"
+upstream = "kubescape operator scheduledScanConfig CRD"
+local_files = ["src/scheduler.rs"]
+note = "DashMap-backed ScheduleRegistry add/remove/get/list/due_at."
+
+[[mapped]]
+name = "finding_store"
+upstream = "kubescape core/cautils/SessionObj.AllResources + sqlite-cache"
+local_files = ["src/store.rs"]
+note = "FindingStore record/get/list_summaries/list_failures/list_for_profile; SharedStore = Arc<FindingStore>."
+
+[[mapped]]
+name = "http_routes"
+upstream = "kubescape core/cautils/getter/restapi.go"
+local_files = ["src/api.rs", "src/lib.rs"]
+note = "axum: POST /scan + GET /findings + /failures + /profiles + /checks + /schedules + /observability/*."
+
+[[mapped]]
+name = "observability_metrics"
+upstream = "kube-bench metrics/ + kubescape pkg/prom/"
+local_files = ["src/observability.rs"]
+note = "9 metric names (cave_bench_*) + 8 dashboard panels + 5 alert rules + Prometheus YAML emitter."
+
+[[mapped]]
+name = "cli_subcommand"
+upstream = "kube-bench cmd/run.go + kubescape cmd/scan/"
+local_files = ["src/cli.rs"]
+note = "BenchSubcommand + dispatch(): scan/profiles/checks/schedules/observability — orchestrator wires `cavectl bench`."
+
+# ─── SKIPPED subsystems (scope_cut to sibling crate or Phase 2) ────────────
+
+[[skipped]]
+name = "container_runtime_introspection"
+reason = "Live CRI/containerd process flag enumeration is a runtime concern; cave-cri owns CRI sockets and ps-style introspection that would populate CisContext.flags at scan time."
+scope_cut_target = "cave-cri"
+
+[[skipped]]
+name = "kubelet_api_live_watch"
+reason = "kubelet /pods + /config endpoints require host-port access + bearer-token; live introspection lives in cave-kubelet, not cave-bench."
+scope_cut_target = "cave-kubelet"
+
+[[skipped]]
+name = "kube_apiserver_live_watch"
+reason = "K8s API watch for live manifest evaluation is owned by cave-apiserver client; cave-bench evaluates static manifests handed in by callers."
+scope_cut_target = "cave-apiserver"
+
+[[skipped]]
+name = "kubescape_helm_chart_install"
+reason = "Operator deployment + Helm install glue lives in cave-deploy; cave-bench publishes the scan API only."
+scope_cut_target = "cave-deploy"
+
+[[skipped]]
+name = "kubescape_vuln_scan_integration"
+reason = "kubescape v4 fans out to Trivy for image CVE scans — cave-trivy owns the scanner; cave-bench imports cve_critical_count via NsaManifestFacts."
+scope_cut_target = "cave-trivy"
+
+[[skipped]]
+name = "kubescape_compliance_report_sync"
+reason = "Compliance reports cross-link to cave-portal-api dashboards; report routing is portal-side, not bench-side."
+scope_cut_target = "cave-portal-api"
+
+[[skipped]]
+name = "notification_delivery_transports"
+reason = "Slack/PagerDuty/Webhook transport implementations are cave-noti / cave-oncall responsibility; cave-bench only declares NotifyAction enum."
+scope_cut_target = "cave-noti"
+
+[[skipped]]
+name = "open_policy_agent_rego_eval"
+reason = "kubescape uses OPA Rego to evaluate controls. cave-policy is the OPA evaluator crate; cave-bench's NSA controls use compiled Rust predicates."
+scope_cut_target = "cave-policy"
+
+[[skipped]]
+name = "regolibrary_artifact_sync"
+reason = "Periodic refresh of kubescape/regolibrary control JSONs from upstream is a build-time concern handled by cave-upstream-watchd."
+scope_cut_target = "cave-upstream-watchd"
+
+# ─── UNMAPPED (honest gap) ─────────────────────────────────────────────────
+
+[[unmapped]]
+name = "kube-bench_plugin_marketplace"
+reason = "kube-bench supports custom-plugin checks via Go-plugin .so loading. Pure-Rust pluginization (WASM or shared-lib) is a Phase 2 design item; no clean owner yet."
+
+# ─── Legacy file/function/test/surface mappings (back-compat) ──────────────
+
+[[files]]
+upstream = "check/check.go"
+local    = "src/cis_engine.rs"
+
+[[files]]
+upstream = "cfg/cis-1.10/master.yaml"
+local    = "src/cis_master.rs"
+
+[[files]]
+upstream = "cfg/cis-1.10/node.yaml"
+local    = "src/cis_node.rs"
+
+[[files]]
+upstream = "cfg/cis-1.10/etcd.yaml"
+local    = "src/cis_etcd.rs"
+
+[[files]]
+upstream = "cfg/cis-1.10/controlplane.yaml"
+local    = "src/cis_control_plane.rs"
+
+[[files]]
+upstream = "kubescape regolibrary/frameworks/NSA.json"
+local    = "src/kubescape_nsa.rs"
+
+[[files]]
+upstream = "kubescape regolibrary/frameworks/MITRE.json"
+local    = "src/kubescape_mitre.rs"
+
+[[functions]]
+upstream_name = "check.Run"
+local_name    = "evaluate_rule"
+file          = "src/cis_engine.rs"
+
+[[functions]]
+upstream_name = "check.loadRules"
+local_name    = "load_rules_yaml"
+file          = "src/cis_engine.rs"
+
+[[functions]]
+upstream_name = "kubescape.Scan"
+local_name    = "run_profile"
+file          = "src/runner.rs"
+
+[[functions]]
+upstream_name = "sarifPrinter.Print"
+local_name    = "to_sarif"
+file          = "src/report.rs"
+
+[[functions]]
+upstream_name = "kubescape.MITRE.GroupByTactic"
+local_name    = "group_by_tactic"
+file          = "src/kubescape_mitre.rs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/scan"
+local_path    = "/api/bench/scan"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/findings"
+local_path    = "/api/bench/findings"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/profiles"
+local_path    = "/api/bench/profiles"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/checks"
+local_path    = "/api/bench/checks"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kube-bench run"
+local_path    = "cavectl bench scan"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kubescape scan framework nsa"
+local_path    = "cavectl bench scan --profile nsa-2025"
+
+[portal_ui]
+upstream_ui  = "kubescape Portal (kubescape.io) + Aqua kube-bench dashboards"
+upstream_url = "https://kubescape.io/"
+status       = "scaffold"
+loc          = 90
+priority     = "P2"
+notes        = "Portal panels shipped via src/observability.rs; portal-api consumer wired post-merge."
+last_audit   = "2026-05-23"

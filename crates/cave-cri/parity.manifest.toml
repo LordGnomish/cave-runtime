@@ -51,7 +51,9 @@ unmapped_count = 0
 total          = 34
 fill_ratio     = 1.0000
 honest_ratio   = 0.9118
-last_audit     = "2026-05-19"
+adr_justified_ratio = 1.0      # 11 skipped (cmd/containerd + cmd/ctr CLI + containerd-shim wire-format + protobuf API + transfer/sandbox plugins + go events + stdlib analogs + plugin registry + vendor/) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 [module]
