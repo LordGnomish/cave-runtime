@@ -47,6 +47,7 @@ pub fn create_router(state: Arc<RdbmsState>) -> Router {
         .route("/api/rdbms/server/port", get(server_port))
         .route("/api/rdbms/server/info", get(server_info))
         .route("/api/rdbms/explain", post(explain))
+        .route("/api/rdbms/access-methods", get(access_methods))
         .with_state(state)
 }
 
@@ -195,6 +196,28 @@ async fn explain(
     Json(ExplainResponse {
         plan: format!("PLAN: {}", req.sql),
     })
+}
+
+/// `pg_am`-style registry of the implemented index access methods. Mirrors the
+/// rows `SELECT amname, amtype FROM pg_am` returns on upstream PostgreSQL, plus
+/// a short capability note per method.
+async fn access_methods() -> impl IntoResponse {
+    Json(serde_json::json!({
+        "access_methods": [
+            {"amname": "btree", "amtype": "i", "module": "storage::index::btree",
+             "capabilities": "ordered equality + range scan, duplicate posting lists"},
+            {"amname": "hash", "amtype": "i", "module": "storage::index::hash",
+             "capabilities": "equality probe, Litwin linear-hashing bucket growth"},
+            {"amname": "gist", "amtype": "i", "module": "storage::index::gist",
+             "capabilities": "interval R-tree: overlap / containment, balanced picksplit"},
+            {"amname": "gin", "amtype": "i", "module": "storage::index::gin",
+             "capabilities": "inverted entry tree: @> (intersection), && (union)"},
+            {"amname": "brin", "amtype": "i", "module": "storage::index::brin",
+             "capabilities": "minmax page-range summaries, lossy range pruning"}
+        ],
+        "wal": {"module": "storage::wal", "checksum": "crc32c", "lsn": "XLogRecPtr byte offset"},
+        "mvcc": {"module": "storage::mvcc", "visibility": "HeapTupleSatisfiesMVCC + snapshots + clog"}
+    }))
 }
 
 #[cfg(test)]
