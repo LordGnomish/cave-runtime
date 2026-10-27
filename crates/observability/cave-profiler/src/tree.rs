@@ -9,8 +9,10 @@
 //! max-nodes truncation (`minValue`), folded/collapsed output (`WriteCollapsed`)
 //! and A/B diffing (`flamegraph_diff.go`).
 
+use serde::{Deserialize, Serialize};
+
 /// A single node in the profiling tree.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
     pub name: String,
     /// Samples attributed directly to this frame.
@@ -154,7 +156,7 @@ fn truncate_children(nodes: &mut Vec<Node>, min: i64) {
 /// A node in an A/B diff flame graph: the same frame's `total` weight on the
 /// left (baseline) and right (comparison) side. Ports the alignment in
 /// `pkg/model/flamegraph_diff.go`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiffNode {
     pub name: String,
     pub left: i64,
