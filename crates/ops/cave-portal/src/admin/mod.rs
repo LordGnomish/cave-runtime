@@ -56,6 +56,7 @@ pub mod deploy;
 pub mod devlake;
 pub mod dns;
 pub mod docdb;
+pub mod ebpf;
 pub mod erp;
 pub mod etcd;
 pub mod forensics;
@@ -622,6 +623,14 @@ fn urlencode_query(s: &str) -> String {
         }
     }
     out
+}
+
+async fn ebpf_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ebpf::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
 async fn rdbms_handler(
@@ -2200,6 +2209,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/cloud-controller", get(cloud_controller_handler))
         .route("/admin/kamaji", get(kamaji_handler))
         .route("/admin/net", get(net_handler))
+        .route("/admin/ebpf", get(ebpf_handler))
         .route("/admin/rdbms", get(rdbms_handler))
         .route("/admin/docdb", get(docdb_handler))
         .route("/admin/cache", get(cache_handler))
