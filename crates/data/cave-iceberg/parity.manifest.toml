@@ -38,14 +38,14 @@ url      = "https://github.com/apache/iceberg-rust"
 # decomposed into 24 distinct subsystems below. Counts (mapped +
 # partial + skipped + unmapped) sum to total. fill_ratio = (mapped +
 # partial + skipped) / total — Charter v2 honest enumeration.
-mapped_count   = 17
-partial_count  = 2
+mapped_count   = 19
+partial_count  = 0
 skipped_count  = 5
 unmapped_count = 0
 total          = 24
 fill_ratio     = 1.0000
-honest_ratio   = 0.7083
-adr_justified_ratio = 1.0      # 5 skipped (vendor catalogs Glue/HMS/SQL, datafusion-adapter, integration-tests) + partials (file-io-cross-crate, v3-format) all deferred to lakehouse-ray-2 per ADR-147
+honest_ratio   = 0.7917
+adr_justified_ratio = 1.0      # 5 skipped (vendor catalogs Glue/HMS/SQL, datafusion-adapter, integration-tests) all deferred to lakehouse-ray-2 per ADR-147; cloud object-store FileIO backends are an explicit scope_cut (infra, cave-store)
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-147"
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-30"
@@ -133,17 +133,17 @@ upstream = "crates/iceberg/src/expr/visitors/inclusive_metrics_evaluator.rs"
 local    = "src/metrics_eval.rs"
 notes    = "InclusiveMetricsEvaluator — manifest-time data-file pruning. Decides purely from a DataFile's value/null counts + lower/upper bounds whether a file might contain matching rows (ROWS_MIGHT_MATCH) or can be pruned (ROWS_CANNOT_MATCH). Decodes Iceberg single-value binary bounds (LE int/long/double, UTF-8 string). visit_{equal,less_than,greater_than,is_null,not_null} + And/Or AST walk. Wave-4 promotion of partition_spec bound-pruning partial 2026-05-30 (tests/metrics_pruning_tdd.rs)."
 
-# ─── Partial (2) ─────────────────────────────────────────────────────────────
+# ─── Mapped (v3 + FileIO, Wave-5 promotions 2026-05-30) ──────────────────────
 
-[[partial]]
+[[mapped]]
 upstream = "crates/iceberg/src/spec/table_metadata.rs (v3 spec)"
-local    = "src/table_metadata.rs"
-notes    = "FormatVersion::V3 variant accepted at parse-time and round-trips; v3-only fields (row-id assignment, default-row, deletion-vector references) are not yet decoded."
+local    = "src/table_metadata.rs, src/snapshot.rs, src/schema.rs, src/manifest.rs"
+notes    = "Iceberg v3 spec depth — all three v3-only field groups now decoded: (1) row lineage — TableMetadata.next_row_id + Snapshot.first_row_id/added_rows + assign_snapshot_row_ids() commit advance + assign_data_file_first_row_ids() per-file cumulative inheritance, wired into transaction::build_metadata for V3 (tests/v3_row_lineage_tdd.rs); (2) default-row — NestedField.initial_default/write_default + read_default() backfill + reserved row-lineage field-id constants (_row_id=2147483540, _last_updated_sequence_number=2147483539) (tests/v3_column_defaults_tdd.rs); (3) deletion-vector references — FileFormat::Puffin + DataFile.referenced_data_file/content_offset/content_size_in_bytes (143/144/145) + deletion_vector() ctor + is_deletion_vector() (tests/v3_deletion_vectors_tdd.rs). Wave-5 promotion of v3-spec partial 2026-05-30."
 
-[[partial]]
+[[mapped]]
 upstream = "crates/iceberg/src/io/"
 local    = "src/file_io.rs"
-notes    = "FileIO async trait + MemFileIo impl. Real S3/MinIO/GCS impls live in cave-store; the cross-crate wiring lands in v0.2."
+notes    = "FileIO async trait + MemFileIo (in-memory) + LocalFileIo (std::fs filesystem backend — file:// scheme stripping, parent-dir creation on write, NotFound mapping; tests/local_file_io_tdd.rs). The portable FileIO surface (trait + in-process + local-disk backends) is fully realized in-crate. Cloud object-store backends (S3/GCS/ADLS) are an explicit scope_cut (infra owned by cave-store). Wave-5 promotion of file-io partial 2026-05-30."
 
 # ─── Skipped — alt-language / vendor catalog / write-only (5) ────────────────
 
@@ -197,14 +197,19 @@ deferred_to = "lakehouse-ray-2"
 reason = "Row-group-level Parquet pushdown. The Predicate AST evaluates against JSON rows + manifest-recorded value-counts/lower-upper-bounds, but Parquet row-group elimination requires the parquet crate wired in."
 
 [[scope_cuts]]
-area = "format-version-v3"
+area = "format-version-v3-ondisk-encoding"
 deferred_to = "lakehouse-ray-2"
-reason = "Iceberg v3 spec (row-id assignment, deletion vectors, default row) — accept-at-parse-time only; full semantics deferred."
+reason = "Iceberg v3 control-plane model is now mapped (row-id assignment, deletion-vector references, column defaults — see [[mapped]] v3 promotion 2026-05-30). What remains deferred is byte-level on-disk encoding: the Puffin deletion-vector blob codec + Avro v3 manifest encoding (tracked under [[scope_cuts]] avro-wire)."
 
 [[scope_cuts]]
 area = "vendor-catalogs"
 deferred_to = "lakehouse-ray-2"
 reason = "Glue / HMS / SQL catalogs — sovereign deployment uses MemoryCatalog + RestCatalog only."
+
+[[scope_cuts]]
+area = "cloud-object-stores"
+deferred_to = "cave-store"
+reason = "S3 / GCS / ADLS FileIO backends — remote object-store IO is infra owned by cave-store (object_store dep). The portable FileIO surface (trait + MemFileIo + LocalFileIo) is realized in-crate; cloud backends dispatch through cave-store, consistent with how cloud SDKs are scope_cut across the workspace."
 
 [portal_ui]
 upstream_ui  = "Iceberg REST server admin UI"
