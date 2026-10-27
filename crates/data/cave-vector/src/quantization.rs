@@ -141,11 +141,11 @@ impl ProductQuantizer {
     }
 }
 
-fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum()
 }
 
-fn nearest_centroid(v: &[f32], centroids: &[Vec<f32>]) -> usize {
+pub(crate) fn nearest_centroid(v: &[f32], centroids: &[Vec<f32>]) -> usize {
     let mut best = 0;
     let mut best_d = f32::MAX;
     for (i, c) in centroids.iter().enumerate() {
@@ -168,7 +168,7 @@ fn next_unit(state: &mut u64) -> f64 {
 }
 
 /// k-means with k-means++ seeding. Empty clusters keep their prior centroid.
-fn kmeans(points: &[Vec<f32>], k: usize, iters: usize, rng: &mut u64) -> Vec<Vec<f32>> {
+pub(crate) fn kmeans(points: &[Vec<f32>], k: usize, iters: usize, rng: &mut u64) -> Vec<Vec<f32>> {
     let n = points.len();
     let dim = points.first().map(|p| p.len()).unwrap_or(0);
     if n == 0 {
