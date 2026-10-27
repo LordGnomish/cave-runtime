@@ -8,11 +8,22 @@
 
 use super::digest::{Digest, DigestAlgorithm, DigestError};
 use super::writer::Writer;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+
+/// Persisted per-blob metadata — the durable half of containerd's bolt
+/// `content` bucket (labels + created-at). Stored in `<root>/metadata.json`
+/// so the load-bearing `containerd.io/gc.ref.content.*` labels survive a
+/// restart instead of being dropped by the directory-walk rebuild.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PersistedMeta {
+    labels: HashMap<String, String>,
+    created_at_unix: i64,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -133,6 +144,7 @@ impl LocalStore {
             in_use: Arc::new(RwLock::new(HashMap::new())),
         };
         store.scan_existing()?;
+        store.overlay_persisted_metadata()?;
         Ok(store)
     }
 
@@ -140,6 +152,66 @@ impl LocalStore {
     /// `ingest/` directory.
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Path of the persisted metadata sidecar.
+    fn metadata_path(&self) -> PathBuf {
+        self.root.join("metadata.json")
+    }
+
+    /// Overlay labels + created-at from `<root>/metadata.json` onto the
+    /// freshly-scanned index. Only entries whose blob still exists on
+    /// disk are touched, so a stale metadata row for a deleted blob is
+    /// harmless and gets dropped on the next persist.
+    fn overlay_persisted_metadata(&self) -> Result<(), StoreError> {
+        let path = self.metadata_path();
+        let bytes = match fs::read(&path) {
+            Ok(b) if !b.is_empty() => b,
+            Ok(_) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(StoreError::Io(e)),
+        };
+        let persisted: HashMap<String, PersistedMeta> = serde_json::from_slice(&bytes)
+            .map_err(|e| StoreError::Io(std::io::Error::other(format!("metadata: {e}"))))?;
+        let mut idx = self.index.write().unwrap();
+        for (wire, meta) in persisted {
+            let Ok(digest) = Digest::parse(&wire) else {
+                continue;
+            };
+            if let Some(info) = idx.get_mut(&digest) {
+                info.labels = meta.labels;
+                if meta.created_at_unix != 0 {
+                    info.created_at_unix = meta.created_at_unix;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Flush the durable half of every index entry to the sidecar.
+    /// Called after a metadata mutation while holding no index lock.
+    fn persist_metadata(&self) -> Result<(), StoreError> {
+        let snapshot: HashMap<String, PersistedMeta> = {
+            let idx = self.index.read().unwrap();
+            idx.iter()
+                .map(|(d, info)| {
+                    (
+                        d.to_string(),
+                        PersistedMeta {
+                            labels: info.labels.clone(),
+                            created_at_unix: info.created_at_unix,
+                        },
+                    )
+                })
+                .collect()
+        };
+        let bytes = serde_json::to_vec_pretty(&snapshot)
+            .map_err(|e| StoreError::Io(std::io::Error::other(format!("metadata: {e}"))))?;
+        let path = self.metadata_path();
+        let tmp = path.with_extension("json.tmp");
+        fs::write(&tmp, &bytes)?;
+        fs::rename(&tmp, &path)?;
+        Ok(())
     }
 
     /// Filesystem path for a stored blob.
@@ -301,11 +373,15 @@ impl ContentStore for LocalStore {
         if removed.is_none() {
             return Err(StoreError::NotFound(digest.to_string()));
         }
-        match fs::remove_file(self.blob_path(digest)) {
+        let unlink = match fs::remove_file(self.blob_path(digest)) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(StoreError::Io(e)),
-        }
+        };
+        // Drop the blob's row from the sidecar so a re-put can't inherit
+        // stale labels.
+        self.persist_metadata()?;
+        unlink
     }
 
     fn count(&self) -> usize {
@@ -317,11 +393,16 @@ impl ContentStore for LocalStore {
     }
 
     fn label_blob(&self, digest: &Digest, key: String, value: String) -> Result<(), StoreError> {
-        let mut idx = self.index.write().unwrap();
-        let info = idx
-            .get_mut(digest)
-            .ok_or_else(|| StoreError::NotFound(digest.to_string()))?;
-        info.labels.insert(key, value);
+        {
+            let mut idx = self.index.write().unwrap();
+            let info = idx
+                .get_mut(digest)
+                .ok_or_else(|| StoreError::NotFound(digest.to_string()))?;
+            info.labels.insert(key, value);
+        }
+        // Durable: the gc.ref labels the walker follows must survive a
+        // restart (containerd's bolt content bucket behaviour).
+        self.persist_metadata()?;
         Ok(())
     }
 }
