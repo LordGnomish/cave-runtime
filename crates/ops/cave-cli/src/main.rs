@@ -217,6 +217,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: AiObsCmd,
     },
+    /// On-device agent runtime (OpenJarvis primitives + self-improve loop)
+    Agent {
+        #[command(subcommand)]
+        cmd: AgentCmd,
+    },
     /// Developer portal info (Backstage replacement)
     Portal {
         #[command(subcommand)]
@@ -2597,6 +2602,27 @@ enum AiObsCmd {
 }
 
 #[derive(Subcommand)]
+enum AgentCmd {
+    /// Agent runtime health
+    Health,
+    /// List registered tools (catalog)
+    Tools,
+    /// Invoke a tool: cavectl agent invoke calc --args '{"op":"add","a":2,"b":3}'
+    Invoke {
+        /// Tool name
+        tool: String,
+        /// JSON arguments object (default `{}`)
+        #[arg(long, default_value = "{}")]
+        args: String,
+    },
+    /// Decompose a goal into a plan: cavectl agent plan "fetch then clean then summarise"
+    Plan {
+        /// Goal text
+        goal: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum PortalCmd {
     /// Show developer portal status
     Status,
@@ -4095,6 +4121,28 @@ async fn run(cli: Cli) -> Result<()> {
             AiObsCmd::Traces => c.get("/api/ai-obs/traces").await,
             AiObsCmd::Costs => c.get("/api/ai-obs/costs").await,
             AiObsCmd::Models => c.get("/api/ai-obs/models").await,
+        },
+
+        // ── Agent (OpenJarvis primitives) ──────────────────────────────────────
+        Commands::Agent { cmd } => match cmd {
+            AgentCmd::Health => c.get("/api/agent/health").await,
+            AgentCmd::Tools => c.get("/api/agent/tools").await,
+            AgentCmd::Invoke { tool, args } => {
+                let parsed: serde_json::Value = serde_json::from_str(&args)
+                    .map_err(|e| anyhow::anyhow!("--args must be valid JSON: {e}"))?;
+                c.post(
+                    "/api/agent/invoke",
+                    serde_json::json!({ "tool": tool, "args": parsed }),
+                )
+                .await
+            }
+            AgentCmd::Plan { goal } => {
+                c.post(
+                    "/api/agent/plan",
+                    serde_json::json!({ "goal": goal.join(" ") }),
+                )
+                .await
+            }
         },
 
         // ── Portal ────────────────────────────────────────────────────────────

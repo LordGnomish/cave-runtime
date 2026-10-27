@@ -887,6 +887,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-agent"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.9",
+ "chrono",
+ "hex",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "cave-ai-obs"
 version = "0.1.0"
 dependencies = [
@@ -2329,6 +2345,7 @@ dependencies = [
  "axum-server",
  "base64 0.22.1",
  "cave-admission",
+ "cave-agent",
  "cave-ai-obs",
  "cave-alerts",
  "cave-apiserver",
