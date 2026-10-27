@@ -62,6 +62,9 @@ pub struct AcmeIssuer {
     pub http_plans: HashMap<String, Http01Plan>,
     /// Per-zone DNS-01 plans (zone → plan).
     pub dns_plans: HashMap<String, Dns01Plan>,
+    /// Out-of-tree webhook DNS solvers, keyed by API group. Empty by
+    /// default; cave-net registers transports at runtime.
+    pub webhook_solvers: crate::webhook_dns::WebhookSolverRegistry,
 }
 
 impl AcmeIssuer {
@@ -224,19 +227,35 @@ impl AcmeIssuer {
                 );
             }
             AcmeChallengeSolver::Dns01 { provider } => {
-                let zone = match provider {
-                    DnsProvider::CaveDns { zone } => zone.clone(),
-                    DnsProvider::Webhook { .. } => {
-                        return Err(CertManagerError::AcmeChallenge {
-                            challenge_id,
-                            reason: "webhook DNS provider is Phase 2".into(),
-                        });
-                    }
-                };
                 let key_auth = key_authorization(&token, jwk);
                 // Cite: RFC 8555 §8.4 — TXT value = base64url(SHA-256(key_auth))
                 let digest = URL_SAFE_NO_PAD.encode(Sha256::digest(key_auth.as_bytes()));
-                let record_name = format!("_acme-challenge.{}", domain.trim_end_matches('.'));
+                let (zone, record_name) = match provider {
+                    DnsProvider::CaveDns { zone } => (
+                        zone.clone(),
+                        format!("_acme-challenge.{}", domain.trim_end_matches('.')),
+                    ),
+                    // Out-of-tree webhook solver — build the canonical
+                    // ChallengeRequest (Present) and route it through the
+                    // in-process webhook registry. cave-net carries the
+                    // apiserver transport; the FQDN convention is shared.
+                    DnsProvider::Webhook {
+                        group_name,
+                        solver_name,
+                    } => {
+                        let ch = crate::webhook_dns::ChallengeRequest::for_dns01(
+                            &challenge_id,
+                            domain,
+                            &digest,
+                            tenant,
+                        );
+                        self.webhook_solvers.dispatch(group_name, &ch);
+                        (
+                            format!("{group_name}/{solver_name}"),
+                            ch.resolved_fqdn,
+                        )
+                    }
+                };
                 self.dns_plans.insert(
                     zone.clone(),
                     Dns01Plan {
