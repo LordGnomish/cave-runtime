@@ -51,12 +51,12 @@ source_root   = "src"
 
 [parity]
 fill_ratio            = 1.0
-honest_ratio          = 0.6154
-adr_justified_ratio   = 1.0      # 20 [[skipped]] (19 cross-crate/Phase-2 + kyverno_engine_response_stream wire-format-detail formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified
+honest_ratio          = 0.6538
+adr_justified_ratio   = 1.0      # 18 [[skipped]] (17 cross-crate/Phase-2 + kyverno_engine_response_stream wire-format-detail formalized 2026-05-28) all cite parallel-track cave-* targets or wire-format details + ADR-justified. 2026-05-30: pkg/policyexception skipped→mapped (src/kyverno/exception.rs) + pkg/controllers/cleanup skipped→partial (src/kyverno/cleanup.rs, reconciler deferred)
 adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001, ADR-RUNTIME-CLI-CONSOLIDATION-001, ADR-RUNTIME-SANDBOX-NO-FFI-001"
-mapped_count          = 29
-partial_count         = 3
-skipped_count         = 20
+mapped_count          = 30
+partial_count         = 4
+skipped_count         = 18
 unmapped_count        = 0
 total                 = 52
 parity_ratio_source   = "manifest"
@@ -142,7 +142,7 @@ upstream = "internal/runtime/init/init.go"
 local    = "src/error.rs"
 notes    = "PolicyError enum + runtime init wiring"
 
-# ---- Kyverno engine (7) ----
+# ---- Kyverno engine (8) ----
 [[mapped]]
 upstream = "kyverno: pkg/engine/engine.go"
 local    = "src/kyverno/mod.rs"
@@ -178,6 +178,11 @@ upstream = "kyverno: pkg/engine/variables/jmespath.go"
 local    = "src/kyverno/jmespath.rs"
 notes    = "JMESPath variable substitution (35k+ LoC — biggest single module)"
 
+[[mapped]]
+upstream = "kyverno: pkg/engine/handlers/exceptions/handler.go + api/kyverno/v2 PolicyException"
+local    = "src/kyverno/exception.rs"
+notes    = "PolicyException matching — name + match-scope + any/all conditions (2026-05-30, was skipped). CRD controller (status/RBAC namespace enrollment) stays Phase-2"
+
 # ---- Admission / Gatekeeper compat (4) ----
 [[mapped]]
 upstream = "k8s.io/api: admission/v1/types.go"
@@ -210,12 +215,17 @@ upstream = "internal/policy/eval/eval.go"
 local    = "src/engine/eval.rs"
 notes    = "Legacy policy evaluator used by cave-runtime admission webhook"
 
-# ─── PARTIAL surfaces (3) ───────────────────────────────────────────────────
+# ─── PARTIAL surfaces (4) ───────────────────────────────────────────────────
 
 [[partial]]
 upstream = "topdown/partial.go"
-local    = "src/rego/eval.rs"
-notes    = "Partial evaluation — limited to constant folding + dead-rule elim; full residual generation deferred"
+local    = "src/rego/partial.rs"
+notes    = "Partial evaluation — residual query generation for conjunctive queries (ground-conjunct folding: true→drop, false→unsat; unknown/taint classification; default unknown=input). Rule inlining into support modules + negation residuals + known-var substitution still deferred (2026-05-30)"
+
+[[partial]]
+upstream = "kyverno: pkg/controllers/cleanup/controller.go"
+local    = "src/kyverno/cleanup.rs"
+notes    = "CleanupPolicy schedule + selection — 5-field CronSchedule (*, */step, a-b, lists; dom/dow OR; next_after) + selects_for_cleanup (match−exclude, conditions-gated). Reconciler loop (informer list + delete API + status) stays Phase-2 controller-runtime (2026-05-30, was skipped)"
 
 [[partial]]
 upstream = "gatekeeper: pkg/mutation/*.go"
@@ -227,7 +237,7 @@ upstream = "kyverno: pkg/policyreport/*.go"
 local    = "src/kyverno/mod.rs"
 notes    = "PolicyReport emission — events generated but PolicyReport CRD persistence deferred (cave-portal-api owns)"
 
-# ─── SKIPPED surfaces (20) ──────────────────────────────────────────────────
+# ─── SKIPPED surfaces (18) ──────────────────────────────────────────────────
 
 [[skipped]]
 upstream      = "plugins/discovery/plugin.go"
@@ -280,19 +290,9 @@ scope_cut_to  = "cave-status"
 reason        = "OPA status plugin emits to remote endpoint; cave-status is the canonical status sink"
 
 [[skipped]]
-upstream      = "kyverno: pkg/controllers/cleanup/*"
-scope_cut_to  = "cave-policy-cleanup (Phase 2)"
-reason        = "CleanupPolicy controller — full lifecycle reconciler deferred until k8s-controller-runtime port"
-
-[[skipped]]
 upstream      = "kyverno: pkg/controllers/policy/*"
 scope_cut_to  = "cave-policy-controller (Phase 2)"
 reason        = "Background-scan + policy-status reconciler — depends on k8s-controller-runtime port"
-
-[[skipped]]
-upstream      = "kyverno: pkg/policyexception/*"
-scope_cut_to  = "cave-policy-exception (Phase 2)"
-reason        = "PolicyException CRD lifecycle — deferred until exception-namespace-RBAC story lands"
 
 [[skipped]]
 upstream      = "kyverno: cmd/cli/kubectl-kyverno/*"
