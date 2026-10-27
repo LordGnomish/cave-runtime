@@ -23,16 +23,16 @@ url      = "https://github.com/BerriAI/litellm"
 [parity]
 ratio                = 1.0
 fill_ratio           = 1.0
-honest_ratio         = 0.6522   # (mapped + partial) / total = 30/46
+honest_ratio         = 0.6739   # (mapped + partial) / total = 31/46
 adr_justified_ratio  = 1.00     # every [[partial]] + [[skipped]] cites one of the 8 standard scope-cut labels from the umbrella ADR
 adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-153"
 parity_ratio_source  = "manifest"
 last_audit           = "2026-05-24"
 source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
 infra_only           = false
-mapped_count         = 27
+mapped_count         = 28
 partial_count        = 3
-skipped_count        = 16
+skipped_count        = 15
 unmapped_count       = 0
 total                = 46
 
@@ -151,6 +151,10 @@ local    = "src/providers/replicate.rs"
 [[files]]
 upstream = "litellm/llms/huggingface/chat/transformation.py"
 local    = "src/providers/huggingface.rs"
+
+[[files]]
+upstream = "litellm/rerank_api/main.py"
+local    = "src/embeddings.rs"
 
 [[files]]
 upstream = "litellm/secret_managers/main.py"
@@ -285,6 +289,16 @@ local_path    = "/v1/models"
 
 [[surfaces]]
 kind          = "http"
+upstream_path = "/v1/embeddings"
+local_path    = "/v1/embeddings"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/rerank"
+local_path    = "/v1/rerank"
+
+[[surfaces]]
+kind          = "http"
 upstream_path = "/model/info"
 local_path    = "/api/llm-gateway/providers"
 
@@ -339,6 +353,13 @@ name = "provider-replicate-huggingface"
 # Replicate predictions-poll adapter (src/providers/replicate.rs) +
 # HuggingFace text-generation adapter (src/providers/huggingface.rs).
 # Both members fully ported with pure request/response transforms.
+
+[[mapped]]
+name = "endpoint-embeddings-rerank"
+# /v1/embeddings (OpenAI-shaped, forwarded by OpenAI/local/Mistral
+# backends via LlmProvider::embed) + /v1/rerank (Cohere /v2/rerank
+# transform via LlmProvider::rerank). Types + transforms in
+# src/embeddings.rs; routes mounted in src/routes.rs.
 
 [[mapped]]
 name = "provider-vertex-google"
@@ -443,11 +464,6 @@ reason = "images/generations, images/edits — MVP cut"
 cut_to = "cave-llm-gateway-images"
 
 [[skipped]]
-name   = "endpoint-embeddings-rerank"
-reason = "v1/embeddings, v1/rerank — MVP cut"
-cut_to = "cave-llm-gateway-embeddings"
-
-[[skipped]]
 name   = "endpoint-batch"
 reason = "batch + files (large async OpenAI batch jobs) — MVP cut"
 cut_to = "cave-llm-gateway-batch"
@@ -506,8 +522,8 @@ reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plu
 
 [[scope_cuts]]
 group   = "non-text-endpoints"
-members = ["endpoint-audio", "endpoint-images", "endpoint-embeddings-rerank", "endpoint-batch"]
-reason  = "MVP is chat-completions only; audio/image/embeddings/batch ship as sibling crates"
+members = ["endpoint-audio", "endpoint-images", "endpoint-batch"]
+reason  = "MVP is chat-completions + embeddings/rerank; audio/image/batch ship as sibling crates"
 
 [[scope_cuts]]
 group   = "owned-by-other-cave-crates"

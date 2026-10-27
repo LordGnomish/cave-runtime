@@ -2,6 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! LLM provider abstraction — OpenAI, Anthropic, local models.
 
+use crate::embeddings::{EmbeddingRequest, EmbeddingResponse, RerankRequest, RerankResponse};
 use crate::error::{GatewayError, GatewayResult};
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, Usage};
 use async_trait::async_trait;
@@ -17,6 +18,58 @@ pub trait LlmProvider: Send + Sync {
     fn supported_models(&self) -> Vec<String>;
     async fn complete(&self, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse>;
     async fn health_check(&self) -> bool;
+
+    /// Generate embeddings. Defaults to "unsupported"; OpenAI-compatible
+    /// backends override this to forward to `/v1/embeddings`.
+    async fn embed(&self, _req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        Err(GatewayError::InvalidRequest(format!(
+            "provider '{}' does not support embeddings",
+            self.name()
+        )))
+    }
+
+    /// Rerank documents. Defaults to "unsupported"; Cohere overrides this to
+    /// forward to `/v2/rerank`.
+    async fn rerank(&self, _req: &RerankRequest) -> GatewayResult<RerankResponse> {
+        Err(GatewayError::InvalidRequest(format!(
+            "provider '{}' does not support rerank",
+            self.name()
+        )))
+    }
+}
+
+/// Shared OpenAI-compatible embeddings forwarder used by the OpenAI / local /
+/// Mistral backends (all expose `/v1/embeddings` with identical wire shape).
+pub(crate) async fn forward_openai_embeddings(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: Option<&str>,
+    provider_name: &str,
+    req: &EmbeddingRequest,
+) -> GatewayResult<EmbeddingResponse> {
+    let url = format!("{}/v1/embeddings", base_url.trim_end_matches('/'));
+    let mut builder = client.post(&url).json(req);
+    if let Some(key) = api_key {
+        builder = builder.bearer_auth(key);
+    }
+    let resp = builder
+        .send()
+        .await
+        .map_err(|e| GatewayError::ProviderUnavailable {
+            provider: provider_name.to_string(),
+            reason: e.to_string(),
+        })?;
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(GatewayError::UpstreamError { status, body });
+    }
+    resp.json::<EmbeddingResponse>()
+        .await
+        .map_err(|e| GatewayError::ProviderUnavailable {
+            provider: provider_name.to_string(),
+            reason: format!("deserialize: {e}"),
+        })
 }
 
 // ── Provider config ───────────────────────────────────────────────────────────
@@ -151,6 +204,17 @@ impl LlmProvider for OpenAiProvider {
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    async fn embed(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        forward_openai_embeddings(
+            &self.client,
+            &self.config.base_url,
+            self.config.api_key.as_deref(),
+            &self.config.name,
+            req,
+        )
+        .await
     }
 }
 
@@ -355,6 +419,17 @@ impl LlmProvider for LocalProvider {
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    async fn embed(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        forward_openai_embeddings(
+            &self.client,
+            &self.config.base_url,
+            self.config.api_key.as_deref(),
+            &self.config.name,
+            req,
+        )
+        .await
     }
 }
 

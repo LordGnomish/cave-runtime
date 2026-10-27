@@ -5,6 +5,7 @@
 use crate::GatewayState;
 use crate::alias::{AliasRegistry, ModelAlias};
 use crate::api_keys::{ApiKeyStore, Scope};
+use crate::embeddings::{EmbeddingRequest, RerankRequest};
 use crate::error::GatewayError;
 use crate::openai::{ChatCompletionRequest, ModelList, ModelObject, OpenAIError};
 use crate::rate_limit::RateLimit;
@@ -37,6 +38,8 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
     Router::new()
         // OpenAI-compatible endpoints
         .route("/v1/chat/completions", post(chat_completions))
+        .route("/v1/embeddings", post(embeddings))
+        .route("/v1/rerank", post(rerank))
         .route("/v1/models", get(list_models))
         .route("/v1/models/{model}", get(get_model))
         // Admin — providers
@@ -134,6 +137,41 @@ async fn chat_completions(
             )
                 .into_response()
         }
+    }
+}
+
+async fn embeddings(
+    State(s): State<AppState>,
+    Json(req): Json<EmbeddingRequest>,
+) -> impl IntoResponse {
+    match s.router.embed(&req).await {
+        Ok(resp) => Json(serde_json::to_value(resp).unwrap()).into_response(),
+        Err(GatewayError::InvalidRequest(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(OpenAIError::invalid_request(&msg)).unwrap()),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::to_value(OpenAIError::server_error(&e.to_string())).unwrap()),
+        )
+            .into_response(),
+    }
+}
+
+async fn rerank(State(s): State<AppState>, Json(req): Json<RerankRequest>) -> impl IntoResponse {
+    match s.router.rerank(&req).await {
+        Ok(resp) => Json(serde_json::to_value(resp).unwrap()).into_response(),
+        Err(GatewayError::InvalidRequest(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(OpenAIError::invalid_request(&msg)).unwrap()),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::to_value(OpenAIError::server_error(&e.to_string())).unwrap()),
+        )
+            .into_response(),
     }
 }
 

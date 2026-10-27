@@ -9,6 +9,7 @@
 //! `usage.tokens.{input,output}_tokens`. We translate both directions so the
 //! gateway exposes a uniform OpenAI `ChatCompletionResponse`.
 
+use crate::embeddings::{from_cohere_rerank, to_cohere_rerank_body, RerankRequest, RerankResponse};
 use crate::error::{GatewayError, GatewayResult};
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, Usage};
 use crate::provider::{LlmProvider, ProviderConfig};
@@ -179,6 +180,36 @@ impl LlmProvider for CohereProvider {
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    async fn rerank(&self, req: &RerankRequest) -> GatewayResult<RerankResponse> {
+        let url = format!("{}/v2/rerank", self.base().trim_end_matches('/'));
+        let api_key = self.config.api_key.as_deref().unwrap_or("");
+        let body = to_cohere_rerank_body(req);
+        let resp = self
+            .client
+            .post(&url)
+            .bearer_auth(api_key)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: e.to_string(),
+            })?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(GatewayError::UpstreamError { status, body });
+        }
+        let val: serde_json::Value =
+            resp.json()
+                .await
+                .map_err(|e| GatewayError::ProviderUnavailable {
+                    provider: self.config.name.clone(),
+                    reason: format!("deserialize: {e}"),
+                })?;
+        Ok(from_cohere_rerank(&val, &req.model))
     }
 }
 

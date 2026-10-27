@@ -10,6 +10,111 @@
 //! testable units; the provider trait gains `embed` / `rerank` methods that
 //! forward to the resolved backend.
 
+use crate::openai::Usage;
+use serde::{Deserialize, Serialize};
+
+// ── Embeddings ────────────────────────────────────────────────────────────────
+
+/// OpenAI `input` accepts either a single string or an array of strings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingRequest {
+    pub model: String,
+    pub input: EmbeddingInput,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingData {
+    pub object: String,
+    pub embedding: Vec<f32>,
+    pub index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingResponse {
+    pub object: String,
+    pub data: Vec<EmbeddingData>,
+    pub model: String,
+    pub usage: Usage,
+}
+
+/// Collapse the polymorphic `input` field into a flat list of strings, the
+/// form every embedding backend ultimately consumes.
+pub fn normalize_input(input: &EmbeddingInput) -> Vec<String> {
+    match input {
+        EmbeddingInput::Single(s) => vec![s.clone()],
+        EmbeddingInput::Multiple(v) => v.clone(),
+    }
+}
+
+// ── Rerank ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankRequest {
+    pub model: String,
+    pub query: String,
+    pub documents: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_n: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankResult {
+    pub index: usize,
+    pub relevance_score: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankResponse {
+    pub model: String,
+    pub results: Vec<RerankResult>,
+}
+
+/// Build the Cohere `/v2/rerank` request body from a generic rerank request.
+pub fn to_cohere_rerank_body(req: &RerankRequest) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "model": req.model,
+        "query": req.query,
+        "documents": req.documents,
+    });
+    if let Some(n) = req.top_n {
+        body["top_n"] = serde_json::json!(n);
+    }
+    body
+}
+
+/// Decode a Cohere `/v2/rerank` response into the gateway rerank shape,
+/// preserving Cohere's relevance ordering.
+pub fn from_cohere_rerank(val: &serde_json::Value, model: &str) -> RerankResponse {
+    let results = val["results"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .map(|r| RerankResult {
+                    index: r["index"].as_u64().unwrap_or(0) as usize,
+                    relevance_score: r["relevance_score"].as_f64().unwrap_or(0.0) as f32,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    RerankResponse {
+        model: model.to_string(),
+        results,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

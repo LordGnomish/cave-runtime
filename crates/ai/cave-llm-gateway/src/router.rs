@@ -256,6 +256,36 @@ impl GatewayRouter {
     pub fn provider_names(&self) -> Vec<String> {
         self.providers.list()
     }
+
+    /// Resolve the backend for `model` and forward an embeddings request.
+    pub async fn embed(
+        &self,
+        req: &crate::embeddings::EmbeddingRequest,
+    ) -> GatewayResult<crate::embeddings::EmbeddingResponse> {
+        let (provider_name, _) = self.resolve_model(&req.model);
+        let provider = self.providers.get(&provider_name).ok_or_else(|| {
+            GatewayError::ProviderUnavailable {
+                provider: provider_name.clone(),
+                reason: "not registered".into(),
+            }
+        })?;
+        provider.embed(req).await
+    }
+
+    /// Resolve the backend for `model` and forward a rerank request.
+    pub async fn rerank(
+        &self,
+        req: &crate::embeddings::RerankRequest,
+    ) -> GatewayResult<crate::embeddings::RerankResponse> {
+        let (provider_name, _) = self.resolve_model(&req.model);
+        let provider = self.providers.get(&provider_name).ok_or_else(|| {
+            GatewayError::ProviderUnavailable {
+                provider: provider_name.clone(),
+                reason: "not registered".into(),
+            }
+        })?;
+        provider.rerank(req).await
+    }
 }
 
 #[cfg(test)]

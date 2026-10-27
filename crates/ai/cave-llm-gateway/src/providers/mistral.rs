@@ -7,9 +7,10 @@
 //! the `/v1/models` endpoint, which returns the same JSON shape with the
 //! Mistral catalog.
 
+use crate::embeddings::{EmbeddingRequest, EmbeddingResponse};
 use crate::error::{GatewayError, GatewayResult};
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
-use crate::provider::{LlmProvider, ProviderConfig};
+use crate::provider::{forward_openai_embeddings, LlmProvider, ProviderConfig};
 use async_trait::async_trait;
 
 pub const DEFAULT_BASE_URL: &str = "https://api.mistral.ai";
@@ -26,6 +27,14 @@ impl MistralProvider {
             .build()
             .expect("reqwest client");
         Self { config, client }
+    }
+
+    fn base(&self) -> &str {
+        if self.config.base_url.is_empty() {
+            DEFAULT_BASE_URL
+        } else {
+            self.config.base_url.as_str()
+        }
     }
 }
 
@@ -93,6 +102,18 @@ impl LlmProvider for MistralProvider {
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    async fn embed(&self, req: &EmbeddingRequest) -> GatewayResult<EmbeddingResponse> {
+        // Mistral exposes OpenAI-shaped /v1/embeddings (mistral-embed model).
+        forward_openai_embeddings(
+            &self.client,
+            self.base(),
+            self.config.api_key.as_deref(),
+            &self.config.name,
+            req,
+        )
+        .await
     }
 }
 
