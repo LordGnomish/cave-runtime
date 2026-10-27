@@ -42,6 +42,7 @@ use axum::Router;
 pub struct State {
     pub findings: store::SharedStore,
     pub schedules: Arc<scheduler::ScheduleRegistry>,
+    pub custom: Arc<custom::CustomRegistry>,
 }
 
 /// Create the axum router for this module.

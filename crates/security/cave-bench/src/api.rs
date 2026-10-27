@@ -18,7 +18,22 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/bench/schedules", get(list_schedules))
         .route("/api/bench/observability/panels", get(panels))
         .route("/api/bench/observability/alerts", get(alerts))
+        .route("/api/bench/custom", get(list_custom).post(post_custom))
         .with_state(state)
+}
+
+/// Backend: validate + register a custom framework JSON document into state.
+/// Returns the number of controls registered.
+pub fn register_custom_framework(state: &State, framework_json: &str) -> crate::error::Result<usize> {
+    let spec = crate::custom::CustomFrameworkSpec::from_json(framework_json)?;
+    let n = spec.controls.len();
+    state.custom.register(spec)?;
+    Ok(n)
+}
+
+/// Backend: list the ids of all registered custom frameworks.
+pub fn list_custom_frameworks(state: &State) -> Vec<String> {
+    state.custom.list_ids()
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -92,11 +107,30 @@ async fn list_checks() -> Json<serde_json::Value> {
     let cis_meta: Vec<_> = crate::runner::cis_pairs().into_iter().map(|(c, _)| c).collect();
     let nsa_meta: Vec<_> = crate::kubescape_nsa::nsa_controls().into_iter().map(|c| c.check).collect();
     let mitre_meta: Vec<_> = crate::kubescape_mitre::mitre_techniques().into_iter().map(|t| t.check).collect();
+    let security_meta: Vec<_> = crate::kubescape_security::security_controls().into_iter().map(|c| c.check).collect();
     Json(serde_json::json!({
         "cis": cis_meta,
         "nsa": nsa_meta,
         "mitre": mitre_meta,
+        "security": security_meta,
     }))
+}
+
+async fn list_custom(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "frameworks": list_custom_frameworks(&state),
+        "count": state.custom.count(),
+    }))
+}
+
+async fn post_custom(
+    extract::State(state): extract::State<Arc<State>>,
+    body: String,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    match register_custom_framework(&state, &body) {
+        Ok(n) => Ok(Json(serde_json::json!({"registered": true, "controls": n}))),
+        Err(e) => Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()})))),
+    }
 }
 
 async fn list_schedules(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
