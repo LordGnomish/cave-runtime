@@ -2682,6 +2682,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cave-tools"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "cave-trace"
 version = "0.1.0"
 dependencies = [
