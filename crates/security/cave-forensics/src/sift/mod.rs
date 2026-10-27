@@ -16,4 +16,5 @@
 //! and ranks candidate root causes — exactly the consumer role the
 //! crate plays in the runtime-security stack.
 
+pub mod crashloop;
 pub mod error_pattern;
