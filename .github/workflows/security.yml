@@ -46,12 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # cargo-audit tracks recent rustc releases (0.22.2 needs >= 1.88), so
+      # this job runs on latest stable. The workspace MSRV (1.85) is still
+      # enforced by ci.yml.
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.85"
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci-1.85
+          shared-key: security-stable
       - name: Install cargo-audit
         run: cargo install --locked cargo-audit
       - name: Run cargo-audit
