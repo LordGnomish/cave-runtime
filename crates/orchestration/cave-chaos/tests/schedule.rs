@@ -3,13 +3,13 @@
 //! Failing tests for experiment scheduling logic.
 //! The schedule module is NEW (not in origin/main).
 
-use cave_chaos::schedule::{
-    cron_field_matches, is_cron_due, next_cron_run, validate_cron_expression, CronField,
-    ScheduledRunDecision,
-};
 use cave_chaos::models::ExperimentSchedule;
-use uuid::Uuid;
+use cave_chaos::schedule::{
+    CronField, ScheduledRunDecision, cron_field_matches, is_cron_due, next_cron_run,
+    validate_cron_expression,
+};
 use chrono::{TimeZone, Utc};
+use uuid::Uuid;
 
 // ─── cron field parsing ───────────────────────────────────────────────────────
 
@@ -117,7 +117,11 @@ fn next_cron_run_daily_midnight() {
     assert!(next > morning);
     // Should be within 24 hours
     let diff_hours = (next - morning).num_hours();
-    assert!(diff_hours <= 24, "next midnight should be within 24h (got {}h)", diff_hours);
+    assert!(
+        diff_hours <= 24,
+        "next midnight should be within 24h (got {}h)",
+        diff_hours
+    );
 }
 
 // ─── ScheduledRunDecision ─────────────────────────────────────────────────────

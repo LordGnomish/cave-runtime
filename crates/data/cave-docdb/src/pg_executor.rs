@@ -74,7 +74,12 @@ impl SqlExecutor for PgExecutor {
             .map(|s| s as &(dyn ToSql + Sync))
             .collect();
 
-        if query.sql.trim_start().to_ascii_uppercase().starts_with("SELECT") {
+        if query
+            .sql
+            .trim_start()
+            .to_ascii_uppercase()
+            .starts_with("SELECT")
+        {
             let rows = self
                 .client
                 .query(&query.sql, &params)

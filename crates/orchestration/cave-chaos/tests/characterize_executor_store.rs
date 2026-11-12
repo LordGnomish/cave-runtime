@@ -10,11 +10,15 @@ use cave_chaos::models::{
     ExperimentStatus, ExperimentType, SafetyGuard,
 };
 use cave_chaos::store::ChaosStore;
+use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
-fn make_run_experiment(exp_type: ExperimentType, namespace: &str, duration_secs: u32) -> ChaosExperiment {
+fn make_run_experiment(
+    exp_type: ExperimentType,
+    namespace: &str,
+    duration_secs: u32,
+) -> ChaosExperiment {
     ChaosExperiment {
         id: Uuid::new_v4(),
         name: "char-executor".into(),

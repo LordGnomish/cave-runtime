@@ -11,8 +11,8 @@
 //!
 //! Pure decision logic only — no NRDB network call.
 
-use cave_keda::scaler::ScalerTrait;
 use cave_keda::newrelic_scaler::{NewRelicScaler, NrdbValue};
+use cave_keda::scaler::ScalerTrait;
 
 // ─── executeNewRelicQuery result extraction ─────────────────────────────────
 
@@ -34,13 +34,19 @@ fn extract_metric_picks_first_float_of_first_row() {
 #[test]
 fn extract_metric_uses_only_first_row() {
     let results = vec![vec![NrdbValue::Float(1.0)], vec![NrdbValue::Float(99.0)]];
-    assert_eq!(NewRelicScaler::extract_metric(&results, false).unwrap(), 1.0);
+    assert_eq!(
+        NewRelicScaler::extract_metric(&results, false).unwrap(),
+        1.0
+    );
 }
 
 #[test]
 fn extract_metric_empty_results_no_data_error_false_returns_zero() {
     let results: Vec<Vec<NrdbValue>> = vec![];
-    assert_eq!(NewRelicScaler::extract_metric(&results, false).unwrap(), 0.0);
+    assert_eq!(
+        NewRelicScaler::extract_metric(&results, false).unwrap(),
+        0.0
+    );
 }
 
 #[test]
@@ -52,7 +58,10 @@ fn extract_metric_empty_results_no_data_error_true_errors() {
 #[test]
 fn extract_metric_no_float_in_row_no_data_error_false_returns_zero() {
     let results = vec![vec![NrdbValue::Str("x".to_string())]];
-    assert_eq!(NewRelicScaler::extract_metric(&results, false).unwrap(), 0.0);
+    assert_eq!(
+        NewRelicScaler::extract_metric(&results, false).unwrap(),
+        0.0
+    );
 }
 
 #[test]

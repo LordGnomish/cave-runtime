@@ -24,13 +24,21 @@ use std::collections::{BTreeMap, HashMap};
 ///
 /// Panics if vectors have different lengths (caller responsibility).
 pub fn dot_product(v1: &[f64], v2: &[f64]) -> f64 {
-    assert_eq!(v1.len(), v2.len(), "dot_product: vectors must have equal length");
+    assert_eq!(
+        v1.len(),
+        v2.len(),
+        "dot_product: vectors must have equal length"
+    );
     v1.iter().zip(v2.iter()).map(|(a, b)| a * b).sum()
 }
 
 /// L2 (Euclidean) distance between two equal-length vectors.
 pub fn euclidean_distance(v1: &[f64], v2: &[f64]) -> f64 {
-    assert_eq!(v1.len(), v2.len(), "euclidean_distance: vectors must have equal length");
+    assert_eq!(
+        v1.len(),
+        v2.len(),
+        "euclidean_distance: vectors must have equal length"
+    );
     v1.iter()
         .zip(v2.iter())
         .map(|(a, b)| (a - b).powi(2))
@@ -43,14 +51,22 @@ pub fn euclidean_distance(v1: &[f64], v2: &[f64]) -> f64 {
 /// Returns 0.0 if either vector is the zero vector (undefined similarity).
 /// Result is clamped to [-1, 1] to handle floating-point drift.
 pub fn cosine_similarity(v1: &[f64], v2: &[f64]) -> f64 {
-    if v1.is_empty() || v2.is_empty() { return 0.0; }
-    assert_eq!(v1.len(), v2.len(), "cosine_similarity: vectors must have equal length");
+    if v1.is_empty() || v2.is_empty() {
+        return 0.0;
+    }
+    assert_eq!(
+        v1.len(),
+        v2.len(),
+        "cosine_similarity: vectors must have equal length"
+    );
 
     let dot = dot_product(v1, v2);
     let norm1: f64 = v1.iter().map(|x| x * x).sum::<f64>().sqrt();
     let norm2: f64 = v2.iter().map(|x| x * x).sum::<f64>().sqrt();
 
-    if norm1 == 0.0 || norm2 == 0.0 { return 0.0; }
+    if norm1 == 0.0 || norm2 == 0.0 {
+        return 0.0;
+    }
     (dot / (norm1 * norm2)).clamp(-1.0, 1.0)
 }
 
@@ -62,7 +78,9 @@ pub fn cosine_similarity(v1: &[f64], v2: &[f64]) -> f64 {
 /// The vector is indexed by sorted vocabulary entries (deterministic order).
 pub fn tfidf_vector(text: &str, corpus: &[String], tenant: &TenantId) -> Vec<f64> {
     let vocab = build_vocab(corpus, tenant);
-    if vocab.is_empty() { return Vec::new(); }
+    if vocab.is_empty() {
+        return Vec::new();
+    }
 
     let n_docs = corpus.len() as f64;
     let text_tokens = tokenize(text, tenant);
@@ -75,7 +93,9 @@ pub fn tfidf_vector(text: &str, corpus: &[String], tenant: &TenantId) -> Vec<f64
         .iter()
         .map(|term| {
             let tf = *text_tf.get(*term).unwrap_or(&0) as f64;
-            if tf == 0.0 { return 0.0; }
+            if tf == 0.0 {
+                return 0.0;
+            }
             let doc_len = text_tokens.len().max(1) as f64;
             let tf_norm = tf / doc_len;
             let df = *df_map.get(*term).unwrap_or(&0) as f64;

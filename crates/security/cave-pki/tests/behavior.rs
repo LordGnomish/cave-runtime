@@ -79,18 +79,20 @@ fn chain_for_returns_leaf_first_root_last_ordering() {
     assert_eq!(chain[2].kind, CaKind::Root);
 
     assert_eq!(chain[0].serial, tenant_serial, "leaf is first");
-    assert_eq!(
-        chain[2].serial,
-        ca.root_serial().unwrap(),
-        "root is last"
-    );
+    assert_eq!(chain[2].serial, ca.root_serial().unwrap(), "root is last");
     assert_eq!(
         chain[2].issuer_serial, None,
         "root is self-anchored (no issuer reference)"
     );
     // Each non-root element references the next element up as its issuer.
-    assert_eq!(chain[0].issuer_serial.as_deref(), Some(chain[1].serial.as_str()));
-    assert_eq!(chain[1].issuer_serial.as_deref(), Some(chain[2].serial.as_str()));
+    assert_eq!(
+        chain[0].issuer_serial.as_deref(),
+        Some(chain[1].serial.as_str())
+    );
+    assert_eq!(
+        chain[1].issuer_serial.as_deref(),
+        Some(chain[2].serial.as_str())
+    );
 }
 
 /// Cite: RFC 5280 §5.3.1 + acme/api/revoke_test.go::Test_validateReasonCode —

@@ -38,7 +38,11 @@ fn schema_history_rejects_cross_tenant_record() {
     let mut r = make_record(1);
     r.tenant_id = "other-tenant".into();
     let err = hist.record(r).unwrap_err();
-    assert!(err.to_string().contains("cross-tenant"), "should be cross-tenant: {}", err);
+    assert!(
+        err.to_string().contains("cross-tenant"),
+        "should be cross-tenant: {}",
+        err
+    );
 }
 
 #[test]
@@ -76,5 +80,9 @@ fn schema_history_empty_ddl_rejected() {
     let mut r = make_record(1);
     r.ddl = "".into();
     let err = hist.record(r).unwrap_err();
-    assert!(err.to_string().contains("ddl"), "should mention ddl: {}", err);
+    assert!(
+        err.to_string().contains("ddl"),
+        "should mention ddl: {}",
+        err
+    );
 }

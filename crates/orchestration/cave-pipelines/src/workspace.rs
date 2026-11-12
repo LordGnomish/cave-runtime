@@ -53,7 +53,11 @@ impl WorkspaceManager {
         let base_dir = std::env::temp_dir()
             .join("cave-pipelines")
             .join(run_id.to_string());
-        Self { run_id, workspaces: HashMap::new(), base_dir }
+        Self {
+            run_id,
+            workspaces: HashMap::new(),
+            base_dir,
+        }
     }
 
     /// Bind a slice of workspace assignments for a pipeline run.
@@ -88,12 +92,13 @@ impl WorkspaceManager {
             WorkspaceBinding::Secret { secret_name, .. } => {
                 self.base_dir.join(format!("secret-{secret_name}"))
             }
-            WorkspaceBinding::Projected { .. } => {
-                self.base_dir.join(format!("projected-{name}"))
-            }
+            WorkspaceBinding::Projected { .. } => self.base_dir.join(format!("projected-{name}")),
         };
 
-        Ok(ResolvedWorkspace { name: name.to_string(), path })
+        Ok(ResolvedWorkspace {
+            name: name.to_string(),
+            path,
+        })
     }
 
     pub fn get_path(&self, name: &str) -> WorkspaceResult<&PathBuf> {
@@ -142,7 +147,10 @@ mod tests {
         let mut mgr = WorkspaceManager::new(id);
         let assignments = vec![WorkspaceAssignment {
             name: "source".to_string(),
-            binding: WorkspaceBinding::EmptyDir { medium: None, size_limit: None },
+            binding: WorkspaceBinding::EmptyDir {
+                medium: None,
+                size_limit: None,
+            },
         }];
         mgr.bind_workspaces(&assignments).await.unwrap();
         let path = mgr.get_path("source").unwrap();
@@ -157,7 +165,10 @@ mod tests {
         let assignments = vec![
             WorkspaceAssignment {
                 name: "src".to_string(),
-                binding: WorkspaceBinding::EmptyDir { medium: None, size_limit: None },
+                binding: WorkspaceBinding::EmptyDir {
+                    medium: None,
+                    size_limit: None,
+                },
             },
             WorkspaceAssignment {
                 name: "cache".to_string(),

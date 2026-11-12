@@ -14,7 +14,9 @@
 //! enum mirrored below, and cave-hermes' `MultiGateway::register` takes
 //! an `Arc<dyn LlmGateway>` whose trait signature this module documents.
 
-use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage, MessageContent, Role};
+use crate::openai::{
+    ChatCompletionRequest, ChatCompletionResponse, ChatMessage, MessageContent, Role,
+};
 use serde::{Deserialize, Serialize};
 
 /// Mirror of `cave_hermes::prompt::ProviderKind`. Kept in lockstep with
@@ -217,7 +219,8 @@ mod tests {
     #[test]
     fn to_hermes_response_extracts_text_from_first_choice() {
         use crate::openai::Usage;
-        let resp = ChatCompletionResponse::simple("gpt-4o", "hi back".to_string(), Usage::new(3, 5));
+        let resp =
+            ChatCompletionResponse::simple("gpt-4o", "hi back".to_string(), Usage::new(3, 5));
         let h = to_hermes_response(&resp, HermesProviderKind::OpenAi, 42);
         assert_eq!(h.text, "hi back");
         assert_eq!(h.provider, HermesProviderKind::OpenAi);

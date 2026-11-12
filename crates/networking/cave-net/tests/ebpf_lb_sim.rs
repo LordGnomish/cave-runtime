@@ -39,7 +39,10 @@ fn svc_with_backends(maps: &mut LbMaps, n: u16, algo: LbAlgo) {
         .map(|i| {
             (
                 i as u32,
-                LbBackend { address: u32::from_be_bytes([10, 1, 0, i as u8]), port: 8080 },
+                LbBackend {
+                    address: u32::from_be_bytes([10, 1, 0, i as u8]),
+                    port: 8080,
+                },
             )
         })
         .collect();
@@ -54,7 +57,10 @@ fn jhash_3words_is_deterministic_and_seed_sensitive() {
     let h2 = jhash_3words(1, 2, 3, HASH_INIT4_SEED);
     assert_eq!(h1, h2, "pure function");
     // Different seed -> (almost surely) different hash.
-    assert_ne!(jhash_3words(1, 2, 3, 0), jhash_3words(1, 2, 3, HASH_INIT4_SEED));
+    assert_ne!(
+        jhash_3words(1, 2, 3, 0),
+        jhash_3words(1, 2, 3, HASH_INIT4_SEED)
+    );
     assert_eq!(HASH_INIT4_SEED, 0xcafe);
     assert_eq!(LB_MAGLEV_LUT_SIZE, 32749);
 }
@@ -147,6 +153,8 @@ fn forward_random_uses_helpers_prandom() {
     let h = Helpers::new();
     h.push_prandom(2); // -> slot 3 -> backend 3
     let t = client_tuple([10, 0, 0, 1], 5000, vip());
-    let x = maps.lb4_local_random(&t, h.get_prandom_u32()).expect("dnat");
+    let x = maps
+        .lb4_local_random(&t, h.get_prandom_u32())
+        .expect("dnat");
     assert_eq!(x.backend_id, 3);
 }

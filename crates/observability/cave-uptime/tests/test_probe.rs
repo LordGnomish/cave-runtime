@@ -3,8 +3,8 @@
 //! Tests for HTTP / TCP / DNS / Push probe execution and helpers.
 
 use cave_uptime::probe::{
-    HttpProbeConfig, ProbeError, build_probe_result, evaluate_push_probe,
-    execute_dns_probe, execute_http_probe, execute_tcp_probe,
+    HttpProbeConfig, ProbeError, build_probe_result, evaluate_push_probe, execute_dns_probe,
+    execute_http_probe, execute_tcp_probe,
 };
 use chrono::Utc;
 use uuid::Uuid;

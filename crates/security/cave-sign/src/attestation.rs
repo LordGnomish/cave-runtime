@@ -88,11 +88,7 @@ pub fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
 /// Sign an attestation, producing a DSSE envelope. `keyid` is opaque (we
 /// pass the SHA-256 of the public key for keypair signing; keyless flows
 /// substitute the certificate fingerprint).
-pub fn sign_attestation(
-    att: &Attestation,
-    keypair: &Keypair,
-    keyid: &str,
-) -> Result<DsseEnvelope> {
+pub fn sign_attestation(att: &Attestation, keypair: &Keypair, keyid: &str) -> Result<DsseEnvelope> {
     let stmt = InTotoStatement::new(att);
     let payload = serde_json::to_vec(&stmt)
         .map_err(|e| SignError::Attestation(format!("statement json: {}", e)))?;
@@ -165,10 +161,7 @@ pub fn build_slsa_provenance(
 }
 
 /// Build an OpenVEX 0.2.0 predicate JSON.
-pub fn build_vex_predicate(
-    author: &str,
-    statements: Vec<VexStatement>,
-) -> serde_json::Value {
+pub fn build_vex_predicate(author: &str, statements: Vec<VexStatement>) -> serde_json::Value {
     let now = chrono::Utc::now().to_rfc3339();
     serde_json::json!({
         "@context": "https://openvex.dev/ns/v0.2.0",
@@ -252,7 +245,10 @@ mod tests {
         env.payload = base64::engine::general_purpose::STANDARD.encode(decoded);
         let err = verify_envelope(&env, KeyAlgorithm::EcdsaP256, kp.public_key_bytes())
             .expect_err("must fail");
-        assert!(matches!(err, SignError::Verify(_) | SignError::Attestation(_)));
+        assert!(matches!(
+            err,
+            SignError::Verify(_) | SignError::Attestation(_)
+        ));
     }
 
     #[test]
@@ -290,7 +286,8 @@ mod tests {
             0,
             DsseSignature {
                 keyid: "bad".into(),
-                sig: base64::engine::general_purpose::STANDARD.encode(bad.sign(b"unrelated").unwrap()),
+                sig: base64::engine::general_purpose::STANDARD
+                    .encode(bad.sign(b"unrelated").unwrap()),
             },
         );
         verify_envelope(&env, KeyAlgorithm::EcdsaP256, good.public_key_bytes()).unwrap();

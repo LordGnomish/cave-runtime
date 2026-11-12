@@ -51,7 +51,10 @@ pub struct CostWindow {
 
 /// Compute per-model stats from a slice of generations.
 /// All generations in the slice are treated as belonging to the requested model.
-pub fn compute_model_stats(model: &str, generations: &[crate::trace_models::Generation]) -> ModelStats {
+pub fn compute_model_stats(
+    model: &str,
+    generations: &[crate::trace_models::Generation],
+) -> ModelStats {
     let count = generations.len() as u64;
     if count == 0 {
         return ModelStats {
@@ -192,7 +195,7 @@ pub fn top_models_by_cost(store: &TraceStore, n: usize) -> Vec<ModelStats> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_models::{Generation, TraceStatus, Trace};
+    use crate::trace_models::{Generation, Trace, TraceStatus};
     use crate::trace_store::TraceStore;
     use chrono::Utc;
     use uuid::Uuid;

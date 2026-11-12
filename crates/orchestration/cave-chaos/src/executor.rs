@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use std::collections::HashMap;
 use chrono::Utc;
+use std::collections::HashMap;
 
 use crate::models::{
     ChaosExperiment, ExperimentEvent, ExperimentResult, ExperimentStatus, ExperimentType,
@@ -75,10 +75,7 @@ impl ChaosExecutor {
         if guard.enabled {
             let ns = &experiment.target.namespace;
             if guard.protected_namespaces.iter().any(|n| n == ns) {
-                return Err(format!(
-                    "namespace '{}' is protected by safety guard",
-                    ns
-                ));
+                return Err(format!("namespace '{}' is protected by safety guard", ns));
             }
         }
         let errs = crate::engine::validate_experiment(experiment);
@@ -153,13 +150,13 @@ impl Default for ChaosExecutor {
 /// Simulate what an experiment does — generate realistic events and metrics.
 fn simulate_experiment(
     exp: &ChaosExperiment,
-) -> (Vec<ExperimentEvent>, HashMap<String, f64>, HashMap<String, f64>) {
+) -> (
+    Vec<ExperimentEvent>,
+    HashMap<String, f64>,
+    HashMap<String, f64>,
+) {
     let now = Utc::now();
-    let pod_name = format!(
-        "{}-pod-{}",
-        exp.target.namespace,
-        &exp.id.to_string()[..8]
-    );
+    let pod_name = format!("{}-pod-{}", exp.target.namespace, &exp.id.to_string()[..8]);
 
     // Realistic baseline metrics
     let mut metrics_before = HashMap::new();
@@ -285,11 +282,15 @@ fn simulate_experiment(
 mod tests {
     use super::*;
     use crate::models::{BlastRadius, ChaosTarget, ExperimentParams, SafetyGuard};
+    use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
-    use chrono::Utc;
 
-    fn make_experiment(exp_type: ExperimentType, namespace: &str, duration_secs: u32) -> ChaosExperiment {
+    fn make_experiment(
+        exp_type: ExperimentType,
+        namespace: &str,
+        duration_secs: u32,
+    ) -> ChaosExperiment {
         ChaosExperiment {
             id: Uuid::new_v4(),
             name: "executor-test".to_string(),
@@ -363,7 +364,10 @@ mod tests {
         let result = executor.execute(&mut exp);
         let before = result.metrics_before["p99_latency_ms"];
         let after = result.metrics_after["p99_latency_ms"];
-        assert!(after > before, "p99 latency should increase after network latency injection");
+        assert!(
+            after > before,
+            "p99 latency should increase after network latency injection"
+        );
     }
 
     #[test]

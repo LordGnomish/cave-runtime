@@ -255,7 +255,11 @@ mod tests {
         let m = ProjectMetrics::from_findings(&[finding(FindingSeverity::Critical)], 85.0);
         let e = evaluate(&sonar_way(), &m);
         assert_eq!(e.status, GateLevel::Error);
-        assert!(e.failures.iter().any(|f| f.metric == GateMetric::NewCriticalIssues));
+        assert!(
+            e.failures
+                .iter()
+                .any(|f| f.metric == GateMetric::NewCriticalIssues)
+        );
     }
 
     #[test]
@@ -263,7 +267,11 @@ mod tests {
         let m = ProjectMetrics::from_findings(&[], 70.0);
         let e = evaluate(&sonar_way(), &m);
         assert_eq!(e.status, GateLevel::Error);
-        assert!(e.failures.iter().any(|f| f.metric == GateMetric::CoveragePct));
+        assert!(
+            e.failures
+                .iter()
+                .any(|f| f.metric == GateMetric::CoveragePct)
+        );
     }
 
     #[test]

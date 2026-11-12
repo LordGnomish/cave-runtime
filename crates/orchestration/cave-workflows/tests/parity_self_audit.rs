@@ -145,7 +145,11 @@ fn assertion_8_no_stub_macros_in_src() {
             }
         }
     });
-    assert!(offenders.is_empty(), "stub gate failed: {}", offenders.join("\n"));
+    assert!(
+        offenders.is_empty(),
+        "stub gate failed: {}",
+        offenders.join("\n")
+    );
 }
 
 #[test]
@@ -155,8 +159,8 @@ fn assertion_9_workflows_surface_intact() {
     };
     use cave_workflows::store::WorkflowStore;
     use cave_workflows::workflow_crd::{
-        topo_order, Arguments, ContainerTemplate, DagTask, DagTemplate, Inputs, Outputs,
-        RetryStrategy, Template, TemplateBody, Workflow, WorkflowPhase, WorkflowSpec,
+        Arguments, ContainerTemplate, DagTask, DagTemplate, Inputs, Outputs, RetryStrategy,
+        Template, TemplateBody, Workflow, WorkflowPhase, WorkflowSpec, topo_order,
     };
     use std::collections::HashMap;
 

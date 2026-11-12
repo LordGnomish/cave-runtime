@@ -286,7 +286,10 @@ mod tests {
     fn default_deny_with_no_roles() {
         let store = RoleStore::new();
         let engine = PolicyEngine::new(store);
-        let resource = Resource { kind: ResourceKind::Server, name: "s".to_string() };
+        let resource = Resource {
+            kind: ResourceKind::Server,
+            name: "s".to_string(),
+        };
         assert!(!engine.is_allowed(&Uuid::new_v4(), &resource, Action::Connect));
     }
 
@@ -314,7 +317,12 @@ mod tests {
     #[test]
     fn connectable_kinds_returns_allowed_kinds() {
         let store = RoleStore::new();
-        let role = simple_role("db-access", ResourceKind::Database, Action::Connect, Effect::Allow);
+        let role = simple_role(
+            "db-access",
+            ResourceKind::Database,
+            Action::Connect,
+            Effect::Allow,
+        );
         let role_id = store.register(role).unwrap();
         let user_id = Uuid::new_v4();
         store.assign(RoleAssignment { user_id, role_id }).unwrap();

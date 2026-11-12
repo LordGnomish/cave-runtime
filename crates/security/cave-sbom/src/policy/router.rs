@@ -58,18 +58,18 @@ pub fn decide(violations: &[PolicyViolation]) -> Decision {
 
 /// Aggregate `(policy_uuid, violation_state)` counts. Useful for portfolio
 /// dashboards.
-pub fn group_by_policy(
-    violations: &[PolicyViolation],
-) -> BTreeMap<Uuid, PolicyDecisionSummary> {
+pub fn group_by_policy(violations: &[PolicyViolation]) -> BTreeMap<Uuid, PolicyDecisionSummary> {
     let mut map: BTreeMap<Uuid, PolicyDecisionSummary> = BTreeMap::new();
     for v in violations {
-        let entry = map.entry(v.policy_uuid).or_insert_with(|| PolicyDecisionSummary {
-            policy_uuid: v.policy_uuid,
-            policy_name: v.policy_name.clone(),
-            fail: 0,
-            warn: 0,
-            info: 0,
-        });
+        let entry = map
+            .entry(v.policy_uuid)
+            .or_insert_with(|| PolicyDecisionSummary {
+                policy_uuid: v.policy_uuid,
+                policy_name: v.policy_name.clone(),
+                fail: 0,
+                warn: 0,
+                info: 0,
+            });
         match v.violation_state {
             ViolationState::Fail => entry.fail += 1,
             ViolationState::Warn => entry.warn += 1,

@@ -59,7 +59,7 @@ pub use snapshot::{Snapshot, SnapshotRef};
 pub use sort_order::{NullOrder, SortDirection, SortField, SortOrder};
 pub use table::{Table, TableIdent};
 pub use table_metadata::{FormatVersion, TableMetadata, TableMetadataBuilder};
-pub use transaction::{rewrite_manifest, Transaction};
+pub use transaction::{Transaction, rewrite_manifest};
 pub use transform::Transform;
 pub use writer::{DataFileWriter, WriteOperation, WritePlan};
 

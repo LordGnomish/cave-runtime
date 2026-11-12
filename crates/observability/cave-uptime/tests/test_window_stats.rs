@@ -15,7 +15,11 @@ fn make_result_at(probe_id: Uuid, success: bool, latency_ms: u64, offset_secs: i
         success,
         latency_ms,
         status_code: if success { Some(200) } else { None },
-        error: if success { None } else { Some("err".to_string()) },
+        error: if success {
+            None
+        } else {
+            Some("err".to_string())
+        },
         checked_at: Utc::now() - ChronoDuration::seconds(offset_secs),
     }
 }
@@ -28,7 +32,11 @@ fn test_window_stats_all_success_24h() {
         .collect();
     // Only take those within 24h = 86400 seconds
     let stats = compute_window_stats(&results, UptimeWindow::Hours24);
-    assert!(stats.uptime_pct > 99.0, "expected ~100%, got {}", stats.uptime_pct);
+    assert!(
+        stats.uptime_pct > 99.0,
+        "expected ~100%, got {}",
+        stats.uptime_pct
+    );
     assert!(stats.total_checks > 0);
     assert_eq!(stats.failed_checks, 0);
     assert!(stats.avg_latency_ms > 0.0);
@@ -98,7 +106,11 @@ fn test_heartbeat_store_capacity_limit() {
         store.record(make_result_at(id, true, 50, i * 60));
     }
     let history = store.get_history(id, 100);
-    assert!(history.len() <= 5, "should be capped at 5, got {}", history.len());
+    assert!(
+        history.len() <= 5,
+        "should be capped at 5, got {}",
+        history.len()
+    );
 }
 
 #[test]

@@ -14,25 +14,27 @@
 
 use cave_portal::admin::iceberg::types::{IcebergTable, IcebergViewError};
 use cave_portal::admin::keda::types::{
-    KedaAuthRef, KedaScaledObjectDetail, KedaScaleTargetRef, KedaTrigger,
+    KedaAuthRef, KedaScaleTargetRef, KedaScaledObjectDetail, KedaTrigger,
 };
 use cave_portal::admin::litellm::types::{LiteLlmApiKey, LiteLlmModel, LiteLlmViewError};
 use cave_portal::admin::mlflow::types::{MlflowExperiment, MlflowViewError};
 use cave_portal::admin::permission::{AuthError, Permission, Persona, RequestCtx};
-use cave_portal::admin::state::{AdminState, ActivityEntry, scope, tally_by_kind};
-use cave_portal::admin::types::TenantId;
+use cave_portal::admin::state::{ActivityEntry, AdminState, scope, tally_by_kind};
 use cave_portal::admin::streams::connect;
+use cave_portal::admin::types::TenantId;
 use cave_portal::catalog::{
     CATALOG_SCHEMA_SQL, CatalogStore, Entity, EntityFilter, EntityMetadata, EntityRelation,
     Location, MemoryCatalogStore,
 };
-use cave_portal::dashboard::{get_dashboard, get_module_summary, get_nav, get_notifications, global_search, list_modules};
+use cave_portal::dashboard::{
+    get_dashboard, get_module_summary, get_nav, get_notifications, global_search, list_modules,
+};
 use cave_portal::models::{
     DashboardWidget, HealthStatus, LinkType, NavigationItem, Notification, NotificationSeverity,
     Service, ServiceLink, ServiceTier, UserPreference,
 };
 use cave_portal::plugins::ViewPersona;
-use cave_portal::{PortalState, MODULE_NAME, router};
+use cave_portal::{MODULE_NAME, PortalState, router};
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -122,10 +124,22 @@ fn user_preference_default_picks_dark_grid() {
 
 #[test]
 fn health_status_serializes_snake_case() {
-    assert_eq!(serde_json::to_string(&HealthStatus::Healthy).unwrap(), "\"healthy\"");
-    assert_eq!(serde_json::to_string(&HealthStatus::Degraded).unwrap(), "\"degraded\"");
-    assert_eq!(serde_json::to_string(&HealthStatus::Unhealthy).unwrap(), "\"unhealthy\"");
-    assert_eq!(serde_json::to_string(&HealthStatus::Unknown).unwrap(), "\"unknown\"");
+    assert_eq!(
+        serde_json::to_string(&HealthStatus::Healthy).unwrap(),
+        "\"healthy\""
+    );
+    assert_eq!(
+        serde_json::to_string(&HealthStatus::Degraded).unwrap(),
+        "\"degraded\""
+    );
+    assert_eq!(
+        serde_json::to_string(&HealthStatus::Unhealthy).unwrap(),
+        "\"unhealthy\""
+    );
+    assert_eq!(
+        serde_json::to_string(&HealthStatus::Unknown).unwrap(),
+        "\"unknown\""
+    );
 }
 
 #[test]
@@ -188,8 +202,10 @@ fn get_module_summary_known_id_returns_some() {
     let s = get_module_summary("secrets").expect("secrets is a known module");
     assert_eq!(s.module, "secrets");
     assert_eq!(s.category, "security");
-    assert!(s.upstream_replacement.to_lowercase().contains("trufflehog")
-        || s.upstream_replacement.to_lowercase().contains("gitleaks"));
+    assert!(
+        s.upstream_replacement.to_lowercase().contains("trufflehog")
+            || s.upstream_replacement.to_lowercase().contains("gitleaks")
+    );
 }
 
 #[test]
@@ -200,9 +216,18 @@ fn get_module_summary_unknown_id_returns_none() {
 #[test]
 fn get_module_summary_gateway_has_curated_kong_and_gravitee_features() {
     let s = get_module_summary("gateway").expect("gateway is known");
-    let upstreams = s.stats.get("upstreams").expect("gateway carries upstreams").as_array().unwrap();
-    let any_kong = upstreams.iter().any(|u| u.as_str().unwrap_or("").to_lowercase().contains("kong"));
-    let any_grav = upstreams.iter().any(|u| u.as_str().unwrap_or("").to_lowercase().contains("gravitee"));
+    let upstreams = s
+        .stats
+        .get("upstreams")
+        .expect("gateway carries upstreams")
+        .as_array()
+        .unwrap();
+    let any_kong = upstreams
+        .iter()
+        .any(|u| u.as_str().unwrap_or("").to_lowercase().contains("kong"));
+    let any_grav = upstreams
+        .iter()
+        .any(|u| u.as_str().unwrap_or("").to_lowercase().contains("gravitee"));
     assert!(any_kong, "kong missing");
     assert!(any_grav, "gravitee missing");
 }
@@ -219,10 +244,19 @@ fn get_nav_groups_in_canonical_category_order() {
     let nav = get_nav();
     let labels: Vec<_> = nav.iter().map(|g| g.label.as_str()).collect();
     // Order must respect the documented `category_order` constant.
-    let order = ["Security", "Observability", "Dev Tools", "Platform", "AI / Data"];
+    let order = [
+        "Security",
+        "Observability",
+        "Dev Tools",
+        "Platform",
+        "AI / Data",
+    ];
     let mut last_idx: i32 = -1;
     for label in labels {
-        let here = order.iter().position(|o| *o == label).expect("label should be canonical");
+        let here = order
+            .iter()
+            .position(|o| *o == label)
+            .expect("label should be canonical");
         assert!(here as i32 > last_idx, "out-of-order: {label}");
         last_idx = here as i32;
     }
@@ -231,7 +265,10 @@ fn get_nav_groups_in_canonical_category_order() {
 #[test]
 fn get_nav_security_group_contains_secrets_and_certs() {
     let nav = get_nav();
-    let sec = nav.iter().find(|g| g.label == "Security").expect("security group present");
+    let sec = nav
+        .iter()
+        .find(|g| g.label == "Security")
+        .expect("security group present");
     let ids: Vec<&str> = sec.items.iter().map(|i| i.id.as_str()).collect();
     assert!(ids.contains(&"secrets"));
     assert!(ids.contains(&"certs"));
@@ -266,10 +303,19 @@ fn global_search_no_match_returns_empty() {
 fn get_notifications_emits_at_least_one_critical_one_info_one_warning() {
     let ns = get_notifications();
     assert!(!ns.is_empty());
-    let has_crit = ns.iter().any(|n| matches!(n.severity, NotificationSeverity::Critical));
-    let has_warn = ns.iter().any(|n| matches!(n.severity, NotificationSeverity::Warning));
-    let has_info = ns.iter().any(|n| matches!(n.severity, NotificationSeverity::Info));
-    assert!(has_crit && has_warn && has_info, "missing severity variety: {ns:?}");
+    let has_crit = ns
+        .iter()
+        .any(|n| matches!(n.severity, NotificationSeverity::Critical));
+    let has_warn = ns
+        .iter()
+        .any(|n| matches!(n.severity, NotificationSeverity::Warning));
+    let has_info = ns
+        .iter()
+        .any(|n| matches!(n.severity, NotificationSeverity::Info));
+    assert!(
+        has_crit && has_warn && has_info,
+        "missing severity variety: {ns:?}"
+    );
 }
 
 // ── ui: embedded HTML self-check ─────────────────────────────────────────────
@@ -323,8 +369,14 @@ fn view_persona_equality_distinguishes_variants() {
 
 #[test]
 fn persona_from_roles_picks_first_known_match() {
-    assert_eq!(Persona::from_roles(&["unrelated", "platform_admin"]), Persona::PlatformAdmin);
-    assert_eq!(Persona::from_roles(&["tenant_admin", "platform_admin"]), Persona::TenantAdmin);
+    assert_eq!(
+        Persona::from_roles(&["unrelated", "platform_admin"]),
+        Persona::PlatformAdmin
+    );
+    assert_eq!(
+        Persona::from_roles(&["tenant_admin", "platform_admin"]),
+        Persona::TenantAdmin
+    );
     let empty: &[&str] = &[];
     assert_eq!(Persona::from_roles(empty), Persona::Anonymous);
     assert_eq!(Persona::from_roles(&["", "junk"]), Persona::Anonymous);
@@ -358,7 +410,12 @@ fn request_ctx_developer_grants_only_its_own_tenant() {
 fn request_ctx_authorise_rejects_missing_permission() {
     let ctx = RequestCtx::developer("acme", &[]);
     let err = ctx.authorise(Permission::EtcdRead).unwrap_err();
-    matches!(err, AuthError::MissingPermission { missing: "etcd.kv.read" });
+    matches!(
+        err,
+        AuthError::MissingPermission {
+            missing: "etcd.kv.read"
+        }
+    );
 }
 
 #[test]
@@ -406,9 +463,24 @@ fn scope_filters_to_target_tenant_only() {
     let acme = tenant("acme");
     let evil = tenant("evil");
     let rows = vec![
-        ActivityEntry { tenant: acme.clone(), when_unix: 1, kind: "create", summary: "a".into() },
-        ActivityEntry { tenant: evil.clone(), when_unix: 2, kind: "create", summary: "e".into() },
-        ActivityEntry { tenant: acme.clone(), when_unix: 3, kind: "delete", summary: "a2".into() },
+        ActivityEntry {
+            tenant: acme.clone(),
+            when_unix: 1,
+            kind: "create",
+            summary: "a".into(),
+        },
+        ActivityEntry {
+            tenant: evil.clone(),
+            when_unix: 2,
+            kind: "create",
+            summary: "e".into(),
+        },
+        ActivityEntry {
+            tenant: acme.clone(),
+            when_unix: 3,
+            kind: "delete",
+            summary: "a2".into(),
+        },
     ];
     let out = scope(&rows, &acme, |r| &r.tenant);
     assert_eq!(out.len(), 2);
@@ -427,10 +499,30 @@ fn tally_by_kind_groups_per_kind_and_skips_other_tenants() {
     let acme = tenant("acme");
     let evil = tenant("evil");
     let rows = vec![
-        ActivityEntry { tenant: acme.clone(), when_unix: 1, kind: "create", summary: "".into() },
-        ActivityEntry { tenant: acme.clone(), when_unix: 2, kind: "create", summary: "".into() },
-        ActivityEntry { tenant: acme.clone(), when_unix: 3, kind: "delete", summary: "".into() },
-        ActivityEntry { tenant: evil.clone(), when_unix: 4, kind: "create", summary: "".into() },
+        ActivityEntry {
+            tenant: acme.clone(),
+            when_unix: 1,
+            kind: "create",
+            summary: "".into(),
+        },
+        ActivityEntry {
+            tenant: acme.clone(),
+            when_unix: 2,
+            kind: "create",
+            summary: "".into(),
+        },
+        ActivityEntry {
+            tenant: acme.clone(),
+            when_unix: 3,
+            kind: "delete",
+            summary: "".into(),
+        },
+        ActivityEntry {
+            tenant: evil.clone(),
+            when_unix: 4,
+            kind: "create",
+            summary: "".into(),
+        },
     ];
     let acme_tally = tally_by_kind(&rows, &acme);
     assert_eq!(acme_tally.get("create").copied(), Some(2));
@@ -461,7 +553,10 @@ fn streams_connect_inspect_unknown_connector_returns_not_found() {
     let s = AdminState::seeded();
     let ctx = RequestCtx::developer("acme", &[Permission::StreamsRead]);
     let err = connect::inspect_connector(&s, &ctx, "zzzz-missing").unwrap_err();
-    assert!(matches!(err, connect::ConnectViewError::ConnectorNotFound(_)));
+    assert!(matches!(
+        err,
+        connect::ConnectViewError::ConnectorNotFound(_)
+    ));
 }
 
 #[test]
@@ -476,10 +571,7 @@ fn streams_connect_pause_without_admin_permission_is_refused() {
 #[test]
 fn streams_connect_restart_unknown_task_returns_not_found() {
     let s = AdminState::seeded();
-    let ctx = RequestCtx::developer(
-        "acme",
-        &[Permission::StreamsRead, Permission::StreamsAdmin],
-    );
+    let ctx = RequestCtx::developer("acme", &[Permission::StreamsRead, Permission::StreamsAdmin]);
     let err = connect::restart_task(&s, &ctx, "no-such", 99).unwrap_err();
     match err {
         connect::ConnectViewError::TaskNotFound { connector, task } => {
@@ -551,7 +643,10 @@ fn catalog_location_renames_type_to_type() {
 
 #[test]
 fn catalog_entity_relation_renames_type_field() {
-    let r = EntityRelation { type_: "ownedBy".into(), target_ref: "group:default/payments".into() };
+    let r = EntityRelation {
+        type_: "ownedBy".into(),
+        target_ref: "group:default/payments".into(),
+    };
     let json = serde_json::to_string(&r).unwrap();
     assert!(json.contains("\"type\":\"ownedBy\""));
     let back: EntityRelation = serde_json::from_str(&json).unwrap();
@@ -561,7 +656,10 @@ fn catalog_entity_relation_renames_type_field() {
 #[tokio::test]
 async fn memory_catalog_store_get_missing_returns_none() {
     let store = MemoryCatalogStore::new();
-    let got = store.entity_by_ref("component", "default", "missing-svc").await.unwrap();
+    let got = store
+        .entity_by_ref("component", "default", "missing-svc")
+        .await
+        .unwrap();
     assert!(got.is_none());
 }
 
@@ -624,7 +722,10 @@ fn keda_scaled_object_detail_round_trips() {
             kind: "cpu".into(),
             name: None,
             metadata: vec![("type".into(), "Utilization".into())],
-            auth_ref: Some(KedaAuthRef { name: "auth".into(), kind: "TriggerAuthentication".into() }),
+            auth_ref: Some(KedaAuthRef {
+                name: "auth".into(),
+                kind: "TriggerAuthentication".into(),
+            }),
             metric_type: "Utilization".into(),
             use_cached_metrics: false,
         }],

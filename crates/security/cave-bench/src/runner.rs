@@ -34,30 +34,48 @@ pub struct ScanInput {
 
 impl ScanInput {
     pub fn new(host: impl Into<String>) -> Self {
-        ScanInput { host: host.into(), ..Default::default() }
+        ScanInput {
+            host: host.into(),
+            ..Default::default()
+        }
     }
 }
 
 /// Execute one profile against ScanInput. Returns findings + summary.
-pub fn run_profile(profile: &Profile, target: &Target, input: &ScanInput, mode: RunMode) -> (Vec<Finding>, ScanSummary) {
+pub fn run_profile(
+    profile: &Profile,
+    target: &Target,
+    input: &ScanInput,
+    mode: RunMode,
+) -> (Vec<Finding>, ScanSummary) {
     let started = chrono::Utc::now().timestamp();
-    let id_set: std::collections::HashSet<&str> = profile.check_ids.iter().map(String::as_str).collect();
+    let id_set: std::collections::HashSet<&str> =
+        profile.check_ids.iter().map(String::as_str).collect();
     let mut findings = Vec::new();
 
     let _ = mode; // mode is informational — execution is in-memory deterministic
     // ── CIS ──
-    if profile.framework == Framework::CisK8s || matches!(profile.framework, Framework::SocControls) {
+    if profile.framework == Framework::CisK8s || matches!(profile.framework, Framework::SocControls)
+    {
         for (check, rule) in cis_pairs() {
             if !id_set.contains(check.id.as_str()) {
                 continue;
             }
             let bin = bin_for(&check.node_type);
-            findings.push(evaluate_rule(&rule, &check, &input.cis_context, bin, &input.host));
+            findings.push(evaluate_rule(
+                &rule,
+                &check,
+                &input.cis_context,
+                bin,
+                &input.host,
+            ));
         }
     }
 
     // ── NSA ──
-    if profile.framework == Framework::NsaHardening || matches!(profile.framework, Framework::SocControls) {
+    if profile.framework == Framework::NsaHardening
+        || matches!(profile.framework, Framework::SocControls)
+    {
         for c in nsa_controls() {
             if !id_set.contains(c.check.id.as_str()) {
                 continue;
@@ -67,7 +85,9 @@ pub fn run_profile(profile: &Profile, target: &Target, input: &ScanInput, mode: 
     }
 
     // ── MITRE (manifest evaluator emits Warn — review-only checks) ──
-    if profile.framework == Framework::MitreAttack || matches!(profile.framework, Framework::SocControls) {
+    if profile.framework == Framework::MitreAttack
+        || matches!(profile.framework, Framework::SocControls)
+    {
         for t in mitre_techniques() {
             if !id_set.contains(t.id.as_str()) {
                 continue;
@@ -76,7 +96,10 @@ pub fn run_profile(profile: &Profile, target: &Target, input: &ScanInput, mode: 
                 check_id: t.id.clone(),
                 verdict: Verdict::Warn,
                 host: input.host.clone(),
-                message: format!("{}: detection rule deployed — review correlated events", t.id),
+                message: format!(
+                    "{}: detection rule deployed — review correlated events",
+                    t.id
+                ),
                 evidence: Some(t.detection.clone()),
                 remediation: Some(t.check.remediation.clone()),
                 severity: t.check.severity,
@@ -88,7 +111,14 @@ pub fn run_profile(profile: &Profile, target: &Target, input: &ScanInput, mode: 
 
     let finished = chrono::Utc::now().timestamp();
     let scan_id = format!("scan-{started:x}");
-    let summary = ScanSummary::compute(&scan_id, &profile.id, target.clone(), &findings, started, finished);
+    let summary = ScanSummary::compute(
+        &scan_id,
+        &profile.id,
+        target.clone(),
+        &findings,
+        started,
+        finished,
+    );
     (findings, summary)
 }
 
@@ -161,7 +191,9 @@ mod tests {
         let p = find_profile("cis-1.10").unwrap();
         let t = Target::host_files("/etc/kubernetes", "n1");
         let mut input = ScanInput::new("n1");
-        input.cis_context.set_flag("apiserver", "--anonymous-auth", "false");
+        input
+            .cis_context
+            .set_flag("apiserver", "--anonymous-auth", "false");
         let (findings, _) = run_profile(&p, &t, &input, RunMode::Sequential);
         // The cis-1.2.1 finding must now be a Pass
         let f = findings.iter().find(|f| f.check_id == "cis-1.2.1").unwrap();

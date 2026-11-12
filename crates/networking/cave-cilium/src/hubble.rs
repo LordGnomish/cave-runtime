@@ -218,9 +218,7 @@ impl FlowFilter {
     /// field is a wildcard (does not constrain).
     pub fn matches(&self, f: &Flow) -> bool {
         let any = |list: &[u32], v: u32| list.is_empty() || list.contains(&v);
-        let any_str = |list: &[String], v: &str| {
-            list.is_empty() || list.iter().any(|s| s == v)
-        };
+        let any_str = |list: &[String], v: &str| list.is_empty() || list.iter().any(|s| s == v);
         any(&self.source_identity, f.source.identity)
             && any(&self.destination_identity, f.destination.identity)
             && (self.verdict.is_empty() || self.verdict.contains(&f.verdict))

@@ -17,9 +17,9 @@
 //!
 //! 2026-05-30 — Wave-4 honest TDD conversion.
 
+use cave_iceberg::expr::{Predicate, Term};
 use cave_iceberg::manifest::{DataFile, FileFormat};
 use cave_iceberg::metrics_eval::InclusiveMetricsEvaluator;
-use cave_iceberg::expr::{Predicate, Term};
 
 /// Build a DataFile carrying column stats for field-id `fid`.
 /// Bounds are Iceberg single-value binary, hex-encoded (as in the
@@ -30,10 +30,8 @@ fn file_with_i64_bounds(fid: i32, record_count: i64, lower: i64, upper: i64) -> 
     df.value_counts.insert(fid, record_count);
     df.null_value_counts.insert(fid, 0);
     // 8-byte little-endian, hex-encoded — Iceberg long single-value form.
-    df.lower_bounds
-        .insert(fid, hex::encode_le_i64(lower));
-    df.upper_bounds
-        .insert(fid, hex::encode_le_i64(upper));
+    df.lower_bounds.insert(fid, hex::encode_le_i64(lower));
+    df.upper_bounds.insert(fid, hex::encode_le_i64(upper));
     df
 }
 
@@ -132,7 +130,11 @@ fn is_not_null_all_null_is_pruned() {
     df.null_value_counts.insert(1, 100);
     let pred = Predicate::is_not_null(Term::ref_col("c"));
     let ev = InclusiveMetricsEvaluator::new(&pred, 1);
-    assert_eq!(ev.eval(&df), false, "is_not_null on all-null → cannot match");
+    assert_eq!(
+        ev.eval(&df),
+        false,
+        "is_not_null on all-null → cannot match"
+    );
 }
 
 #[test]
@@ -161,5 +163,9 @@ fn unknown_column_is_kept_conservatively() {
     let pred = Predicate::eq(Term::ref_col("other"), Term::lit(5));
     // field id 2 has no bounds in the file
     let ev = InclusiveMetricsEvaluator::new(&pred, 2);
-    assert_eq!(ev.eval(&df), true, "no stats for column → conservatively kept");
+    assert_eq!(
+        ev.eval(&df),
+        true,
+        "no stats for column → conservatively kept"
+    );
 }

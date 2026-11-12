@@ -134,7 +134,12 @@ mod tests {
 
     #[test]
     fn deletion_from_any_active_phase() {
-        for p in [XrPhase::Pending, XrPhase::Creating, XrPhase::Ready, XrPhase::Updating] {
+        for p in [
+            XrPhase::Pending,
+            XrPhase::Creating,
+            XrPhase::Ready,
+            XrPhase::Updating,
+        ] {
             assert_eq!(p.next(XrEvent::DeletionRequested), Some(XrPhase::Deleting));
         }
     }

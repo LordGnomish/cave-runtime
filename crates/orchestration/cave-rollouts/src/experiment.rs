@@ -115,7 +115,10 @@ impl Experiment {
     }
 
     pub fn abort(&mut self, reason: impl Into<String>, now: DateTime<Utc>) {
-        if matches!(self.phase, ExperimentPhase::Pending | ExperimentPhase::Running) {
+        if matches!(
+            self.phase,
+            ExperimentPhase::Pending | ExperimentPhase::Running
+        ) {
             self.phase = ExperimentPhase::Failed;
             self.message = Some(reason.into());
             self.finished_at = Some(now);

@@ -706,12 +706,8 @@ mod tests {
         let preemptor = pod_at("t", "new", 50, 1000, 0);
         let nominated = Arc::new(NominatedNodeMap::new());
         let handle = Arc::new(AsyncPreemptHandle::new());
-        let plug = DefaultPreemption::new(
-            DefaultPreemptionArgs::default(),
-            vec![],
-            nominated,
-            handle,
-        );
+        let plug =
+            DefaultPreemption::new(DefaultPreemptionArgs::default(), vec![], nominated, handle);
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
         let (_, st) = plug.post_filter(&preemptor, &snap, &filtered, &cs);

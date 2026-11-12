@@ -144,7 +144,10 @@ impl Environment {
         source: &serde_json::Value,
         patch: &Patch,
     ) -> CrossplaneResult<bool> {
-        debug_assert!(matches!(patch.patch_type, PatchType::ToEnvironmentFieldPath));
+        debug_assert!(matches!(
+            patch.patch_type,
+            PatchType::ToEnvironmentFieldPath
+        ));
         let (from, to) = match (&patch.from_field_path, &patch.to_field_path) {
             (Some(f), Some(t)) => (f, t),
             _ => return Ok(false),

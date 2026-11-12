@@ -137,11 +137,9 @@ fn validate_at(schema: &Value, value: &Value, path: &str) -> CrossplaneResult<()
 fn type_matches(t: &str, value: &Value) -> bool {
     match t {
         "string" => value.is_string(),
-        "integer" => value.as_i64().is_some()
-            || value
-                .as_f64()
-                .map(|f| f.fract() == 0.0)
-                .unwrap_or(false),
+        "integer" => {
+            value.as_i64().is_some() || value.as_f64().map(|f| f.fract() == 0.0).unwrap_or(false)
+        }
         "number" => value.is_number(),
         "boolean" => value.is_boolean(),
         "object" => value.is_object(),
@@ -238,7 +236,7 @@ mod tests {
     #[test]
     fn array_items() {
         let s = json!({"type":"array","items":{"type":"integer"},"minItems":1});
-        assert!(validate_spec(&s, &json!([1,2,3])).is_ok());
+        assert!(validate_spec(&s, &json!([1, 2, 3])).is_ok());
         assert!(validate_spec(&s, &json!([])).is_err());
         assert!(validate_spec(&s, &json!(["a"])).is_err());
     }

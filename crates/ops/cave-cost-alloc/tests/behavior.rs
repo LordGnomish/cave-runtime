@@ -12,7 +12,7 @@ use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 use cave_cost_alloc::allocator::{
-    allocate_costs, calculate_idle_costs, detect_anomalies, split_shared_costs, RawSpendEntry,
+    RawSpendEntry, allocate_costs, calculate_idle_costs, detect_anomalies, split_shared_costs,
 };
 use cave_cost_alloc::models::{
     AnomalySeverity, BudgetPeriod, BudgetPolicy, ComplianceStatus, CostCenter, CostLineItem,
@@ -187,13 +187,37 @@ fn test_split_shared_costs_custom_weights_normalized() {
 fn test_calculate_idle_costs_threshold_waste_and_tiers() {
     let util = vec![
         // util 2% (<5 → terminate), hourly $1
-        ("vol-dead".to_string(), ResourceType::StorageVolume, None, 2.0, 1.0),
+        (
+            "vol-dead".to_string(),
+            ResourceType::StorageVolume,
+            None,
+            2.0,
+            1.0,
+        ),
         // util 15% (<20 → downsize)
-        ("pod-small".to_string(), ResourceType::KubernetesPod, None, 15.0, 2.0),
+        (
+            "pod-small".to_string(),
+            ResourceType::KubernetesPod,
+            None,
+            15.0,
+            2.0,
+        ),
         // util 30% (>=20 → review) — still below threshold 50 so flagged idle
-        ("node-mid".to_string(), ResourceType::KubernetesNode, None, 30.0, 4.0),
+        (
+            "node-mid".to_string(),
+            ResourceType::KubernetesNode,
+            None,
+            30.0,
+            4.0,
+        ),
         // util 80% — above threshold, excluded
-        ("pod-busy".to_string(), ResourceType::KubernetesPod, None, 80.0, 5.0),
+        (
+            "pod-busy".to_string(),
+            ResourceType::KubernetesPod,
+            None,
+            80.0,
+            5.0,
+        ),
     ];
 
     let idle = calculate_idle_costs(&util, 50.0);
@@ -204,18 +228,20 @@ fn test_calculate_idle_costs_threshold_waste_and_tiers() {
     assert!((dead.wasted_cost_usd - 705.6).abs() < 1e-6);
     assert!(dead.recommendation.contains("terminate"));
 
-    assert!(idle
-        .iter()
-        .find(|r| r.resource_id == "pod-small")
-        .unwrap()
-        .recommendation
-        .contains("downsize"));
-    assert!(idle
-        .iter()
-        .find(|r| r.resource_id == "node-mid")
-        .unwrap()
-        .recommendation
-        .contains("review"));
+    assert!(
+        idle.iter()
+            .find(|r| r.resource_id == "pod-small")
+            .unwrap()
+            .recommendation
+            .contains("downsize")
+    );
+    assert!(
+        idle.iter()
+            .find(|r| r.resource_id == "node-mid")
+            .unwrap()
+            .recommendation
+            .contains("review")
+    );
     assert!(!idle.iter().any(|r| r.resource_id == "pod-busy"));
 }
 
@@ -313,10 +339,16 @@ fn test_forecast_spending_linear_trend_and_confidence() {
     let increasing: Vec<CostReport> = (1..=6).map(|i| report(cc, 100.0 * i as f64)).collect();
 
     let model = forecast_spending(cc, &increasing, 3);
-    assert!(model.trend_slope > 0.0, "monotonic-increasing history → positive slope");
+    assert!(
+        model.trend_slope > 0.0,
+        "monotonic-increasing history → positive slope"
+    );
     assert_eq!(model.forecast_points.len(), 3);
     assert_eq!(model.forecast_months, 3);
-    assert!((model.confidence - 0.85).abs() < 1e-9, "6 samples → 0.85 confidence");
+    assert!(
+        (model.confidence - 0.85).abs() < 1e-9,
+        "6 samples → 0.85 confidence"
+    );
 
     // 3 samples → 0.65
     let three: Vec<CostReport> = (1..=3).map(|i| report(cc, 100.0 * i as f64)).collect();
@@ -361,7 +393,7 @@ fn test_generate_chargeback_line_items_and_total() {
     let reports = vec![report_with_breakdown(
         cc.id,
         vec![
-            line_item(ResourceType::Compute, 10.0, 5.0), // 50
+            line_item(ResourceType::Compute, 10.0, 5.0),      // 50
             line_item(ResourceType::StorageVolume, 4.0, 2.5), // 10
         ],
     )];

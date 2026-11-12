@@ -85,11 +85,20 @@ pub struct SignatureLayer {
 pub struct SignatureAnnotations {
     #[serde(rename = "dev.cosignproject.cosign/signature")]
     pub signature_b64: String,
-    #[serde(rename = "dev.sigstore.cosign/certificate", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "dev.sigstore.cosign/certificate",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub certificate_pem: Option<String>,
-    #[serde(rename = "dev.sigstore.cosign/chain", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "dev.sigstore.cosign/chain",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub chain_pem: Option<String>,
-    #[serde(rename = "dev.sigstore.cosign/bundle", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "dev.sigstore.cosign/bundle",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub bundle_json: Option<String>,
 }
 
@@ -276,6 +285,9 @@ mod tests {
     #[test]
     fn signature_uri_format() {
         let r = img();
-        assert!(r.signature_uri().starts_with("ghcr.io/cave/runtime:sha256-"));
+        assert!(
+            r.signature_uri()
+                .starts_with("ghcr.io/cave/runtime:sha256-")
+        );
     }
 }

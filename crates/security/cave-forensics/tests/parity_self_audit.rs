@@ -100,7 +100,7 @@ fn assertion_8_gate_8_no_stub_macros() {
 #[test]
 fn assertion_9_surface_integrity_and_audit_date() {
     use cave_forensics::case::CaseStore;
-    use cave_forensics::enforcer::{Enforcer, EnforcementDecision};
+    use cave_forensics::enforcer::{EnforcementDecision, Enforcer};
     use cave_forensics::events::KernelEvent;
     use cave_forensics::events::process_exec::ProcessExecEvent;
     use cave_forensics::export::grpc_codec::{decode_events, encode_event};
@@ -109,7 +109,9 @@ fn assertion_9_surface_integrity_and_audit_date() {
     use cave_forensics::models::{EvidenceType, ForensicSeverity};
     use cave_forensics::observability::{alert_rules, dashboard_panels};
     use cave_forensics::process::{Credentials, Namespaces, Process};
-    use cave_forensics::tracing_policy::{KProbeSpec, PolicyKind, PolicyMeta, TracingPolicy, TracingPolicySpec};
+    use cave_forensics::tracing_policy::{
+        KProbeSpec, PolicyKind, PolicyMeta, TracingPolicy, TracingPolicySpec,
+    };
     use cave_forensics::{MODULE_NAME, State, router};
     use chrono::{TimeZone, Utc};
     use std::sync::Arc;
@@ -199,7 +201,10 @@ fn assertion_9_surface_integrity_and_audit_date() {
     let c = store.open("bash exec spike", "demo", ForensicSeverity::Critical);
     let c2 = store.ingest_event(c.id, &ev, "tetragon-agent").unwrap();
     assert_eq!(c2.evidence.len(), 1);
-    assert!(matches!(c2.evidence[0].evidence_type, EvidenceType::LogFile));
+    assert!(matches!(
+        c2.evidence[0].evidence_type,
+        EvidenceType::LogFile
+    ));
 
     // Observability artefacts.
     assert_eq!(dashboard_panels().len(), 8);

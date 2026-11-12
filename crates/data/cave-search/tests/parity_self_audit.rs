@@ -81,7 +81,8 @@ fn parity_honest_ratio_in_range() {
     assert!(
         honest <= fill + 1e-6,
         "honest_ratio ({}) must be <= fill_ratio ({})",
-        honest, fill
+        honest,
+        fill
     );
     assert!(
         honest >= 0.3,
@@ -96,7 +97,9 @@ fn parity_last_audit_is_2026() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert!(
-        when.as_deref().map(|s| s.starts_with("2026-")).unwrap_or(false),
+        when.as_deref()
+            .map(|s| s.starts_with("2026-"))
+            .unwrap_or(false),
         "[parity] last_audit must start with 2026- (got {:?})",
         when
     );
@@ -134,7 +137,10 @@ fn counts_sum_to_total_and_enough_mapped() {
         total,
         "mapped+partial+skipped+unmapped must equal total"
     );
-    assert_eq!(unmapped, 0, "unmapped_count must be 0 (every surface accounted for)");
+    assert_eq!(
+        unmapped, 0,
+        "unmapped_count must be 0 (every surface accounted for)"
+    );
     assert!(
         mapped >= 8,
         "expected >= 8 mapped Manticore subsystems (got {})",

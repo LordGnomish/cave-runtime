@@ -511,7 +511,10 @@ mod tests {
             images: None,
         };
         let json = serde_json::to_string(&req).unwrap();
-        assert!(!json.contains("images"), "images must be omitted, got {json}");
+        assert!(
+            !json.contains("images"),
+            "images must be omitted, got {json}"
+        );
     }
 
     #[test]

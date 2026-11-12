@@ -68,8 +68,7 @@ fn assertion_1_k8s_version_pinned() {
 #[test]
 fn assertion_2_source_sha_present() {
     let m = manifest_text();
-    let sha = extract_after(&m, "source_sha ")
-        .or_else(|| extract_after(&m, "source_sha="));
+    let sha = extract_after(&m, "source_sha ").or_else(|| extract_after(&m, "source_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap_or("").is_empty(),
         "[upstream] source_sha must be present and non-empty (Charter v2 G1)"
@@ -132,8 +131,12 @@ fn assertion_6_counts_sum_to_total() {
         mapped + partial + skipped + unmapped,
         total,
         "mapped+partial+skipped+unmapped ({}+{}+{}+{} = {}) must equal total {}",
-        mapped, partial, skipped, unmapped,
-        mapped + partial + skipped + unmapped, total
+        mapped,
+        partial,
+        skipped,
+        unmapped,
+        mapped + partial + skipped + unmapped,
+        total
     );
     assert!(
         unmapped == 0,
@@ -144,7 +147,9 @@ fn assertion_6_counts_sum_to_total() {
 // ─── Assertion 7: 100% AGPL SPDX header coverage in src/ + tests/ ───────────
 
 fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) {
-    if !dir.exists() { return; }
+    if !dir.exists() {
+        return;
+    }
     for entry in fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let p = entry.path();
@@ -174,7 +179,9 @@ fn assertion_7_agpl_spdx_header_coverage() {
     assert!(
         missing.is_empty(),
         "{}/{} files missing AGPL SPDX header:\n  {}",
-        missing.len(), files.len(), missing.join("\n  ")
+        missing.len(),
+        files.len(),
+        missing.join("\n  ")
     );
     assert!(!files.is_empty(), "expected to scan some .rs files");
 }
@@ -186,13 +193,20 @@ fn assertion_8_no_stub_macros_in_src() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut files = Vec::new();
     collect_rs(&root, &mut files);
-    let needles = ["todo!(", "unimplemented!(", "panic!(\"stub", "panic!(\"todo"];
+    let needles = [
+        "todo!(",
+        "unimplemented!(",
+        "panic!(\"stub",
+        "panic!(\"todo",
+    ];
     let mut hits = Vec::new();
     for f in &files {
         let text = fs::read_to_string(f).unwrap_or_default();
         for (n, line) in text.lines().enumerate() {
             let trimmed = line.trim_start();
-            if trimmed.starts_with("//") || trimmed.starts_with("///") { continue; }
+            if trimmed.starts_with("//") || trimmed.starts_with("///") {
+                continue;
+            }
             for needle in needles {
                 if line.contains(needle) {
                     hits.push(format!("{}:{}", f.display(), n + 1));
@@ -211,10 +225,10 @@ fn assertion_8_no_stub_macros_in_src() {
 
 #[test]
 fn assertion_9_admission_surface_intact() {
-    use cave_admission::{AdmissionState, router};
     use cave_admission::engine::{builtin_policies, evaluate_all_policies, matches_policy};
     use cave_admission::evaluator::PolicyEvaluator;
     use cave_admission::store::AdmissionStore;
+    use cave_admission::{AdmissionState, router};
     use std::sync::Arc;
 
     // AdmissionState + router construction works.
@@ -224,7 +238,10 @@ fn assertion_9_admission_surface_intact() {
     // Builtin policies are non-empty and all enabled.
     let policies = builtin_policies();
     assert!(!policies.is_empty(), "builtin_policies must be non-empty");
-    assert!(policies.iter().all(|p| p.enabled), "All builtin policies must be enabled");
+    assert!(
+        policies.iter().all(|p| p.enabled),
+        "All builtin policies must be enabled"
+    );
 
     // PolicyEvaluator is constructable.
     let _evaluator = PolicyEvaluator::new();
@@ -232,7 +249,10 @@ fn assertion_9_admission_surface_intact() {
     // AdmissionStore is constructable and seeds policies.
     let store = AdmissionStore::new();
     store.seed_default_policies();
-    assert!(store.list_policies().len() >= 5, "Seeded store must have >= 5 policies");
+    assert!(
+        store.list_policies().len() >= 5,
+        "Seeded store must have >= 5 policies"
+    );
 
     // Stats are computable.
     let stats = store.stats();

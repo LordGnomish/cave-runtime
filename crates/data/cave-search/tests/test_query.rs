@@ -2,10 +2,10 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for boolean query execution (AND/OR/NOT) and phrase query matching.
 
-use std::str::FromStr;
-use cave_search::query::{Query, BooleanQuery, BoolNode};
 use cave_search::index::Index;
+use cave_search::query::{BoolNode, BooleanQuery, Query};
 use cave_search::tenant::TenantId;
+use std::str::FromStr;
 
 fn tenant() -> TenantId {
     TenantId::from_str("test-tenant").unwrap()

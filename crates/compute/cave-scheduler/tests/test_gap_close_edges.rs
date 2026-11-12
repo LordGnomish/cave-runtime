@@ -3,12 +3,10 @@
 //! Edge coverage for cave-scheduler — models, Status helpers, priority queue,
 //! scheduling gates.
 
+use cave_scheduler::extension_points::PreEnqueuePlugin;
 use cave_scheduler::framework::{Code, Pod, Status};
 use cave_scheduler::gates::SchedulingGates;
-use cave_scheduler::extension_points::PreEnqueuePlugin;
-use cave_scheduler::models::{
-    NodeStatus, ResourceCapacity, ResourceRequest, TaintEffect,
-};
+use cave_scheduler::models::{NodeStatus, ResourceCapacity, ResourceRequest, TaintEffect};
 use cave_scheduler::priority_queue::{PreemptionPolicy, PriorityQueue};
 use chrono::{Duration, Utc};
 
@@ -30,11 +28,23 @@ fn capacity_has_room_only_when_both_cpu_and_memory_fit() {
         pods: 10,
         ephemeral_storage_bytes: 0,
     };
-    assert!(cap.has_room_for(&ResourceRequest { cpu_millicores: 500, memory_bytes: 1000, ..Default::default() }));
+    assert!(cap.has_room_for(&ResourceRequest {
+        cpu_millicores: 500,
+        memory_bytes: 1000,
+        ..Default::default()
+    }));
     // CPU exceeds capacity
-    assert!(!cap.has_room_for(&ResourceRequest { cpu_millicores: 5000, memory_bytes: 100, ..Default::default() }));
+    assert!(!cap.has_room_for(&ResourceRequest {
+        cpu_millicores: 5000,
+        memory_bytes: 100,
+        ..Default::default()
+    }));
     // Memory exceeds capacity
-    assert!(!cap.has_room_for(&ResourceRequest { cpu_millicores: 100, memory_bytes: 99_999, ..Default::default() }));
+    assert!(!cap.has_room_for(&ResourceRequest {
+        cpu_millicores: 100,
+        memory_bytes: 99_999,
+        ..Default::default()
+    }));
 }
 
 #[test]
@@ -59,17 +69,37 @@ fn capacity_subtract_saturates_to_zero_no_underflow() {
 #[test]
 fn capacity_add_increments_pod_count_by_one() {
     let mut cap = ResourceCapacity::default();
-    cap.add(&ResourceRequest { cpu_millicores: 1, memory_bytes: 1, ..Default::default() });
-    cap.add(&ResourceRequest { cpu_millicores: 1, memory_bytes: 1, ..Default::default() });
+    cap.add(&ResourceRequest {
+        cpu_millicores: 1,
+        memory_bytes: 1,
+        ..Default::default()
+    });
+    cap.add(&ResourceRequest {
+        cpu_millicores: 1,
+        memory_bytes: 1,
+        ..Default::default()
+    });
     assert_eq!(cap.pods, 2);
 }
 
 #[test]
 fn node_status_and_taint_effect_serde_distinct() {
-    assert_eq!(serde_json::to_string(&NodeStatus::Ready).unwrap(), "\"Ready\"");
-    assert_eq!(serde_json::to_string(&NodeStatus::Cordoned).unwrap(), "\"Cordoned\"");
-    assert_eq!(serde_json::to_string(&TaintEffect::NoSchedule).unwrap(), "\"NoSchedule\"");
-    assert_eq!(serde_json::to_string(&TaintEffect::NoExecute).unwrap(), "\"NoExecute\"");
+    assert_eq!(
+        serde_json::to_string(&NodeStatus::Ready).unwrap(),
+        "\"Ready\""
+    );
+    assert_eq!(
+        serde_json::to_string(&NodeStatus::Cordoned).unwrap(),
+        "\"Cordoned\""
+    );
+    assert_eq!(
+        serde_json::to_string(&TaintEffect::NoSchedule).unwrap(),
+        "\"NoSchedule\""
+    );
+    assert_eq!(
+        serde_json::to_string(&TaintEffect::NoExecute).unwrap(),
+        "\"NoExecute\""
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -212,8 +242,7 @@ fn pq_len_counts_active_backoff_unschedulable() {
 
 #[test]
 fn pq_mark_backoff_grows_attempts_exponentially() {
-    let mut q = PriorityQueue::new()
-        .with_backoff(Duration::seconds(1), Duration::seconds(100));
+    let mut q = PriorityQueue::new().with_backoff(Duration::seconds(1), Duration::seconds(100));
     let p = pod("p", 1);
     let now = Utc::now();
     let after1 = q.mark_backoff(p.clone(), now);
@@ -221,14 +250,16 @@ fn pq_mark_backoff_grows_attempts_exponentially() {
     // (mark_backoff also removes from unschedulable).
     let after2 = q.mark_backoff(p.clone(), now);
     let after3 = q.mark_backoff(p, now);
-    assert!(after2 > after1, "second attempt's backoff window must be longer");
+    assert!(
+        after2 > after1,
+        "second attempt's backoff window must be longer"
+    );
     assert!(after3 > after2);
 }
 
 #[test]
 fn pq_flush_backoff_moves_expired_back_to_active() {
-    let mut q = PriorityQueue::new()
-        .with_backoff(Duration::seconds(1), Duration::seconds(2));
+    let mut q = PriorityQueue::new().with_backoff(Duration::seconds(1), Duration::seconds(2));
     let now = Utc::now();
     q.mark_backoff(pod("p", 5), now);
     assert_eq!(q.backoff_len(), 1);
@@ -262,5 +293,8 @@ fn pq_default_equiv_new() {
 
 #[test]
 fn preemption_policy_variants_distinct() {
-    assert_ne!(PreemptionPolicy::PreemptLowerPriority, PreemptionPolicy::Never);
+    assert_ne!(
+        PreemptionPolicy::PreemptLowerPriority,
+        PreemptionPolicy::Never
+    );
 }

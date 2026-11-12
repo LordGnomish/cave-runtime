@@ -59,10 +59,16 @@ impl std::fmt::Display for ShareError {
             ShareError::UnknownRecordState(id) => write!(f, "unknown record state id {id}"),
             ShareError::UnknownAcknowledgeType(id) => write!(f, "unknown acknowledge type id {id}"),
             ShareError::InvalidTransition { from, to, reason } => {
-                write!(f, "invalid record-state transition {from:?} -> {to:?} ({reason})")
+                write!(
+                    f,
+                    "invalid record-state transition {from:?} -> {to:?} ({reason})"
+                )
             }
             ShareError::InvalidRecordState { offset, actual } => {
-                write!(f, "record at offset {offset} is in state {actual:?}, not Acquired")
+                write!(
+                    f,
+                    "record at offset {offset} is in state {actual:?}, not Acquired"
+                )
             }
             ShareError::NotAcquiredByMember {
                 first_offset,
@@ -75,7 +81,10 @@ impl std::fmt::Display for ShareError {
             ),
             ShareError::OffsetNotFound(o) => write!(f, "no in-flight batch at offset {o}"),
             ShareError::SessionEpochMismatch { expected, actual } => {
-                write!(f, "share-session epoch mismatch: expected {expected}, got {actual}")
+                write!(
+                    f,
+                    "share-session epoch mismatch: expected {expected}, got {actual}"
+                )
             }
             ShareError::UnknownGroupMember(m) => write!(f, "unknown share-group member {m}"),
         }
@@ -352,7 +361,12 @@ impl SharePartition {
     /// splitting a batch — if a batch would overshoot the budget the sweep
     /// stops. Second sweep: allocate one fresh batch at `next_fetch_offset`
     /// for the remaining budget.
-    pub fn acquire(&mut self, member_id: &str, max_records: u64, now_ms: u64) -> Vec<AcquiredRecords> {
+    pub fn acquire(
+        &mut self,
+        member_id: &str,
+        max_records: u64,
+        now_ms: u64,
+    ) -> Vec<AcquiredRecords> {
         let mut out = Vec::new();
         if max_records == 0 {
             return out;
@@ -361,7 +375,11 @@ impl SharePartition {
         let mut acquired_total: u64 = 0;
 
         // First sweep — re-acquire reusable Available batches.
-        let keys: Vec<i64> = self.batches.range(self.start_offset..).map(|(k, _)| *k).collect();
+        let keys: Vec<i64> = self
+            .batches
+            .range(self.start_offset..)
+            .map(|(k, _)| *k)
+            .collect();
         for k in keys {
             let (rc, reusable) = {
                 let b = &self.batches[&k];
@@ -459,12 +477,16 @@ impl SharePartition {
         let b = self.batches.get_mut(&first_offset).unwrap();
         match ack {
             AcknowledgeType::Accept => {
-                b.batch_state.state.validate_transition(RecordState::Acknowledged)?;
+                b.batch_state
+                    .state
+                    .validate_transition(RecordState::Acknowledged)?;
                 b.batch_state.state = RecordState::Acknowledged;
                 b.batch_state.lock_expires_at_ms = None;
             }
             AcknowledgeType::Release => {
-                b.batch_state.state.validate_transition(RecordState::Available)?;
+                b.batch_state
+                    .state
+                    .validate_transition(RecordState::Available)?;
                 b.batch_state.state = RecordState::Available;
                 b.batch_state.lock_expires_at_ms = None;
                 b.batch_state.member_id = String::new();
@@ -474,7 +496,9 @@ impl SharePartition {
                 }
             }
             AcknowledgeType::Reject => {
-                b.batch_state.state.validate_transition(RecordState::Archived)?;
+                b.batch_state
+                    .state
+                    .validate_transition(RecordState::Archived)?;
                 b.batch_state.state = RecordState::Archived;
                 b.batch_state.lock_expires_at_ms = None;
             }
@@ -580,7 +604,12 @@ impl SharePartitionManager {
     pub fn get_or_create(&self, key: SharePartitionKey, start_offset: i64) {
         let mut g = self.partitions.lock().unwrap();
         g.entry(key.clone()).or_insert_with(|| {
-            SharePartition::new(key.group_id.clone(), key.topic.clone(), key.partition, start_offset)
+            SharePartition::new(
+                key.group_id.clone(),
+                key.topic.clone(),
+                key.partition,
+                start_offset,
+            )
         });
     }
 
@@ -593,13 +622,21 @@ impl SharePartitionManager {
     }
 
     /// Mutably operate on a partition; returns `None` if the key is unknown.
-    pub fn with<R>(&self, key: &SharePartitionKey, f: impl FnOnce(&mut SharePartition) -> R) -> Option<R> {
+    pub fn with<R>(
+        &self,
+        key: &SharePartitionKey,
+        f: impl FnOnce(&mut SharePartition) -> R,
+    ) -> Option<R> {
         let mut g = self.partitions.lock().unwrap();
         g.get_mut(key).map(f)
     }
 
     /// Read-only access to a partition; returns `None` if unknown.
-    pub fn read<R>(&self, key: &SharePartitionKey, f: impl FnOnce(&SharePartition) -> R) -> Option<R> {
+    pub fn read<R>(
+        &self,
+        key: &SharePartitionKey,
+        f: impl FnOnce(&SharePartition) -> R,
+    ) -> Option<R> {
         let g = self.partitions.lock().unwrap();
         g.get(key).map(f)
     }
@@ -607,7 +644,9 @@ impl SharePartitionManager {
     /// Sweep expired locks across every partition; returns the total flipped.
     pub fn tick_sweep(&self, now_ms: u64) -> usize {
         let mut g = self.partitions.lock().unwrap();
-        g.values_mut().map(|sp| sp.sweep_expired_locks(now_ms).len()).sum()
+        g.values_mut()
+            .map(|sp| sp.sweep_expired_locks(now_ms).len())
+            .sum()
     }
 
     /// Durable snapshot of every partition.
@@ -715,8 +754,10 @@ impl ShareGroup {
     /// Add a member in `Joining` state and bump `group_epoch`.
     pub fn join(&mut self, id: impl Into<String>) -> u32 {
         let id = id.into();
-        self.members
-            .insert(id.clone(), ShareGroupMember::new(id, self.config.session_timeout_ms));
+        self.members.insert(
+            id.clone(),
+            ShareGroupMember::new(id, self.config.session_timeout_ms),
+        );
         self.group_epoch += 1;
         self.group_epoch
     }

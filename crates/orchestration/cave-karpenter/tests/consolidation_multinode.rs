@@ -14,9 +14,9 @@
 
 use cave_karpenter::batcher::PodSpec;
 use cave_karpenter::consolidation::{
-    Command, Decision, InstanceOffering, NodeCapacity, compute_consolidation,
-    multi_node_consolidation, simulate_scheduling, single_node_consolidation,
-    ConsolidationCandidate,
+    Command, ConsolidationCandidate, Decision, InstanceOffering, NodeCapacity,
+    compute_consolidation, multi_node_consolidation, simulate_scheduling,
+    single_node_consolidation,
 };
 use std::collections::HashMap;
 
@@ -108,7 +108,12 @@ fn consolidation_noop_when_replacement_not_cheaper() {
 
 #[test]
 fn consolidation_noop_when_pods_do_not_fit_anywhere() {
-    let cands = vec![candidate("n1", "default", 5.0, vec![pod("huge", 9000, 9999)])];
+    let cands = vec![candidate(
+        "n1",
+        "default",
+        5.0,
+        vec![pod("huge", 9000, 9999)],
+    )];
     let offerings = vec![offering("small", 1000, 1024, 1.0)];
     let cmd = compute_consolidation(&cands, &[], &offerings);
     assert_eq!(cmd.decision(), Decision::NoOp);
@@ -131,7 +136,11 @@ fn multi_node_consolidation_merges_three_into_one() {
     let cmd = multi_node_consolidation(&cands, no_budget_limit(), &[], &offerings);
     assert_eq!(cmd.decision(), Decision::Replace);
     assert_eq!(cmd.candidates().len(), 3, "all three nodes consolidated");
-    assert_eq!(cmd.replacements().len(), 1, "into a single replacement node");
+    assert_eq!(
+        cmd.replacements().len(),
+        1,
+        "into a single replacement node"
+    );
 }
 
 #[test]

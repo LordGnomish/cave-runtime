@@ -23,7 +23,13 @@ pub struct MachineConfig {
 
 impl Default for MachineConfig {
     fn default() -> Self {
-        MachineConfig { vcpu_count: 1, mem_size_mib: 128, smt: false, cpu_template: None, track_dirty_pages: false }
+        MachineConfig {
+            vcpu_count: 1,
+            mem_size_mib: 128,
+            smt: false,
+            cpu_template: None,
+            track_dirty_pages: false,
+        }
     }
 }
 
@@ -92,7 +98,11 @@ pub struct Balloon {
 
 impl Default for Balloon {
     fn default() -> Self {
-        Balloon { amount_mib: 0, deflate_on_oom: true, stats_polling_interval_s: 0 }
+        Balloon {
+            amount_mib: 0,
+            deflate_on_oom: true,
+            stats_polling_interval_s: 0,
+        }
     }
 }
 
@@ -185,19 +195,35 @@ mod tests {
         let mut r = VmResources::default();
         r.boot_source.kernel_image_path = "/k".into();
         r.add_drive(Drive {
-            drive_id: "rootfs".into(), path_on_host: "/a".into(), is_root_device: true,
-            is_read_only: true, partuuid: None, io_engine: None, cache_type: None, rate_limiter: None,
+            drive_id: "rootfs".into(),
+            path_on_host: "/a".into(),
+            is_root_device: true,
+            is_read_only: true,
+            partuuid: None,
+            io_engine: None,
+            cache_type: None,
+            rate_limiter: None,
         });
         r.add_drive(Drive {
-            drive_id: "rootfs2".into(), path_on_host: "/b".into(), is_root_device: true,
-            is_read_only: true, partuuid: None, io_engine: None, cache_type: None, rate_limiter: None,
+            drive_id: "rootfs2".into(),
+            path_on_host: "/b".into(),
+            is_root_device: true,
+            is_read_only: true,
+            partuuid: None,
+            io_engine: None,
+            cache_type: None,
+            rate_limiter: None,
         });
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn vsock_serializes_guest_cid() {
-        let v = Vsock { vsock_id: "v0".into(), guest_cid: 3, uds_path: "/run/v.sock".into() };
+        let v = Vsock {
+            vsock_id: "v0".into(),
+            guest_cid: 3,
+            uds_path: "/run/v.sock".into(),
+        };
         let j = serde_json::to_value(&v).unwrap();
         assert_eq!(j["guest_cid"], 3);
     }
@@ -233,7 +259,11 @@ mod tests {
     #[test]
     fn rate_limiter_token_bucket() {
         let rl = RateLimiter {
-            bandwidth: Some(TokenBucket { size: 1_000_000, one_time_burst: Some(2_000_000), refill_time: 1000 }),
+            bandwidth: Some(TokenBucket {
+                size: 1_000_000,
+                one_time_burst: Some(2_000_000),
+                refill_time: 1000,
+            }),
             ops: None,
         };
         assert!(rl.bandwidth.is_some());

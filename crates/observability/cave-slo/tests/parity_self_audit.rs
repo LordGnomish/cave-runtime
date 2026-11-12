@@ -7,17 +7,17 @@
 //! regressed against the upstream or broke a parity contract.
 
 use cave_slo::{
+    MODULE_NAME, State,
     engine::{
-        burn_rate_from_indicator, calculate_burn_rate, calculate_error_budget,
-        check_burn_rate_alert, composite_slo_compliance, evaluate_multi_window,
-        is_compliant, minutes_until_exhaustion, MultiWindowEvaluation,
+        MultiWindowEvaluation, burn_rate_from_indicator, calculate_burn_rate,
+        calculate_error_budget, check_burn_rate_alert, composite_slo_compliance,
+        evaluate_multi_window, is_compliant, minutes_until_exhaustion,
     },
     models::{
-        ErrorBudget, MetricType, SloAnnotations, SloIndicator, SloObjective, SloStats,
-        SloStatus, BurnRateAlert, SLO,
+        BurnRateAlert, ErrorBudget, MetricType, SLO, SloAnnotations, SloIndicator, SloObjective,
+        SloStats, SloStatus,
     },
     store::SloStore,
-    State, MODULE_NAME,
 };
 use uuid::Uuid;
 
@@ -91,9 +91,18 @@ fn g4_manifest_present_and_has_parity_block() {
     assert!(manifest.contains("[parity]"), "missing [parity] block");
     assert!(manifest.contains("[upstream]"), "missing [upstream] block");
     assert!(manifest.contains("[module]"), "missing [module] block");
-    assert!(manifest.contains("parity_ratio_source"), "missing parity_ratio_source");
-    assert!(manifest.contains("adr_justified_ratio = 1.0"), "adr_justified_ratio must be 1.0");
-    assert!(manifest.contains("unmapped_count      = 0"), "unmapped_count must be 0");
+    assert!(
+        manifest.contains("parity_ratio_source"),
+        "missing parity_ratio_source"
+    );
+    assert!(
+        manifest.contains("adr_justified_ratio = 1.0"),
+        "adr_justified_ratio must be 1.0"
+    );
+    assert!(
+        manifest.contains("unmapped_count      = 0"),
+        "unmapped_count must be 0"
+    );
 }
 
 // ── G5 – no stubs (unimplemented!/todo!() calls) ─────────────────────────
@@ -111,10 +120,7 @@ fn g5_no_stubs_in_source() {
             !src.contains("unimplemented!"),
             "file {i} contains unimplemented!"
         );
-        assert!(
-            !src.contains("todo!()"),
-            "file {i} contains todo!()"
-        );
+        assert!(!src.contains("todo!()"), "file {i} contains todo!()");
     }
 }
 
@@ -140,7 +146,10 @@ fn g7_upstream_version_pinned_to_v0_126_1() {
 fn g8_backend_engine_is_functional() {
     // Burn rate calculation
     let br = calculate_burn_rate(1.0, 99.0);
-    assert!((br - 1.0).abs() < 1e-9, "1% error on 99% SLO = 1.0 burn rate");
+    assert!(
+        (br - 1.0).abs() < 1e-9,
+        "1% error on 99% SLO = 1.0 burn rate"
+    );
 
     // Error budget
     let slo = SLO {
@@ -159,20 +168,31 @@ fn g8_backend_engine_is_functional() {
     assert!(!budget.is_breached);
 
     // Multi-window
-    let ind = SloIndicator::Ratio { good: 9999, total: 10000 };
+    let ind = SloIndicator::Ratio {
+        good: 9999,
+        total: 10000,
+    };
     let eval = evaluate_multi_window(&slo, ind.clone(), ind.clone(), ind.clone(), ind);
     assert_eq!(eval.status, SloStatus::Ok);
 
     // Composite SLO
     let obj = SloObjective {
-        name: "avail".into(), target: 99.9, window_days: 30, weight: 1.0,
+        name: "avail".into(),
+        target: 99.9,
+        window_days: 30,
+        weight: 1.0,
     };
     let compliance = composite_slo_compliance(&[obj], &[99.95]);
     assert!(compliance > 99.9);
 
     // Budget projection — burn rate 0.1 (under-consuming) leaves budget intact
     let proj = minutes_until_exhaustion(&budget, 0.1);
-    assert!(proj.is_some(), "budget remaining={}, budget.remaining_minutes={}", budget.remaining_percentage, budget.remaining_minutes);
+    assert!(
+        proj.is_some(),
+        "budget remaining={}, budget.remaining_minutes={}",
+        budget.remaining_percentage,
+        budget.remaining_minutes
+    );
 }
 
 #[test]
@@ -208,14 +228,26 @@ fn g8_module_name_is_slo() {
 fn g8_store_list_by_status_filters_correctly() {
     let store = SloStore::new();
     let mut s1 = SLO {
-        id: Uuid::new_v4(), name: "ok-slo".into(), description: "d".into(),
-        target_percentage: 99.9, window_days: 30, metric_type: MetricType::Availability,
-        created_at: chrono::Utc::now(), current_sli: 99.95, status: SloStatus::Ok,
+        id: Uuid::new_v4(),
+        name: "ok-slo".into(),
+        description: "d".into(),
+        target_percentage: 99.9,
+        window_days: 30,
+        metric_type: MetricType::Availability,
+        created_at: chrono::Utc::now(),
+        current_sli: 99.95,
+        status: SloStatus::Ok,
     };
     let mut s2 = SLO {
-        id: Uuid::new_v4(), name: "breached-slo".into(), description: "d".into(),
-        target_percentage: 99.9, window_days: 30, metric_type: MetricType::Availability,
-        created_at: chrono::Utc::now(), current_sli: 90.0, status: SloStatus::Breached,
+        id: Uuid::new_v4(),
+        name: "breached-slo".into(),
+        description: "d".into(),
+        target_percentage: 99.9,
+        window_days: 30,
+        metric_type: MetricType::Availability,
+        created_at: chrono::Utc::now(),
+        current_sli: 90.0,
+        status: SloStatus::Breached,
     };
     store.insert(s1.clone());
     store.insert(s2.clone());

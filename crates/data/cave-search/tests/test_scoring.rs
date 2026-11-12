@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for BM25 relevance scoring — formula correctness, ranking, multi-term search.
 
-use cave_search::scoring::{bm25_score, BM25Params, rank_results, ScoredDoc};
 use cave_search::index::Index;
+use cave_search::scoring::{BM25Params, ScoredDoc, bm25_score, rank_results};
 use cave_search::tenant::TenantId;
 use std::str::FromStr;
 
@@ -26,7 +26,12 @@ fn bm25_higher_tf_gives_higher_score() {
     let doc_len = 10u32;
     let s1 = bm25_score(1, doc_len, avg_len, doc_freq, num_docs);
     let s2 = bm25_score(5, doc_len, avg_len, doc_freq, num_docs);
-    assert!(s2 > s1, "TF=5 should score higher than TF=1; s1={}, s2={}", s1, s2);
+    assert!(
+        s2 > s1,
+        "TF=5 should score higher than TF=1; s1={}, s2={}",
+        s1,
+        s2
+    );
 }
 
 #[test]
@@ -38,7 +43,12 @@ fn bm25_rarer_term_gives_higher_score() {
     let num_docs = 1000u32;
     let s_rare = bm25_score(tf, doc_len, avg_len, 5, num_docs);
     let s_common = bm25_score(tf, doc_len, avg_len, 500, num_docs);
-    assert!(s_rare > s_common, "rare term should score higher; s_rare={}, s_common={}", s_rare, s_common);
+    assert!(
+        s_rare > s_common,
+        "rare term should score higher; s_rare={}, s_common={}",
+        s_rare,
+        s_common
+    );
 }
 
 #[test]
@@ -50,7 +60,12 @@ fn bm25_longer_doc_penalized() {
     let tf = 2u32;
     let s_short = bm25_score(tf, 5, avg_len, df, num_docs);
     let s_long = bm25_score(tf, 50, avg_len, df, num_docs);
-    assert!(s_short > s_long, "shorter doc should score higher; s_short={}, s_long={}", s_short, s_long);
+    assert!(
+        s_short > s_long,
+        "shorter doc should score higher; s_short={}, s_long={}",
+        s_short,
+        s_long
+    );
 }
 
 #[test]
@@ -70,9 +85,18 @@ fn bm25_params_default_k1_b() {
 #[test]
 fn rank_results_sorts_by_score_descending() {
     let docs = vec![
-        ScoredDoc { doc_id: 1, score: 2.5 },
-        ScoredDoc { doc_id: 2, score: 10.0 },
-        ScoredDoc { doc_id: 3, score: 1.0 },
+        ScoredDoc {
+            doc_id: 1,
+            score: 2.5,
+        },
+        ScoredDoc {
+            doc_id: 2,
+            score: 10.0,
+        },
+        ScoredDoc {
+            doc_id: 3,
+            score: 1.0,
+        },
     ];
     let ranked = rank_results(docs, 10);
     assert_eq!(ranked[0].doc_id, 2);
@@ -82,7 +106,12 @@ fn rank_results_sorts_by_score_descending() {
 
 #[test]
 fn rank_results_respects_top_k() {
-    let docs: Vec<ScoredDoc> = (0..20).map(|i| ScoredDoc { doc_id: i, score: i as f64 }).collect();
+    let docs: Vec<ScoredDoc> = (0..20)
+        .map(|i| ScoredDoc {
+            doc_id: i,
+            score: i as f64,
+        })
+        .collect();
     let ranked = rank_results(docs, 5);
     assert_eq!(ranked.len(), 5);
     // Top score should be doc_id 19 (score 19.0)

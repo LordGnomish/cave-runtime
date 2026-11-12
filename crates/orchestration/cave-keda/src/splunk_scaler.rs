@@ -119,7 +119,9 @@ impl SplunkScaler {
             .split_once("://")
             .map(|(scheme, rest)| {
                 !scheme.is_empty()
-                    && scheme.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
+                    && scheme
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
                     && !rest.is_empty()
                     && !rest.contains(' ')
             })

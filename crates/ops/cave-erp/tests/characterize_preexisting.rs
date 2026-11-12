@@ -95,9 +95,30 @@ fn characterize_explode_bom_empty_components() {
 
 #[test]
 fn characterize_advance_stage_moves_to_next_crm_stage() {
-    let s1 = CrmStage { id: Uuid::new_v4(), name: "New".to_string(), order: 1, probability: 10, is_won: false, is_lost: false };
-    let s2 = CrmStage { id: Uuid::new_v4(), name: "Qualified".to_string(), order: 2, probability: 30, is_won: false, is_lost: false };
-    let s3 = CrmStage { id: Uuid::new_v4(), name: "Won".to_string(), order: 3, probability: 100, is_won: true, is_lost: false };
+    let s1 = CrmStage {
+        id: Uuid::new_v4(),
+        name: "New".to_string(),
+        order: 1,
+        probability: 10,
+        is_won: false,
+        is_lost: false,
+    };
+    let s2 = CrmStage {
+        id: Uuid::new_v4(),
+        name: "Qualified".to_string(),
+        order: 2,
+        probability: 30,
+        is_won: false,
+        is_lost: false,
+    };
+    let s3 = CrmStage {
+        id: Uuid::new_v4(),
+        name: "Won".to_string(),
+        order: 3,
+        probability: 100,
+        is_won: true,
+        is_lost: false,
+    };
 
     let stages = vec![s1.clone(), s2.clone(), s3.clone()];
     let next = advance_stage(s1.id, &stages);
@@ -108,7 +129,14 @@ fn characterize_advance_stage_moves_to_next_crm_stage() {
 
 #[test]
 fn characterize_advance_stage_at_last_returns_none() {
-    let s1 = CrmStage { id: Uuid::new_v4(), name: "Won".to_string(), order: 1, probability: 100, is_won: true, is_lost: false };
+    let s1 = CrmStage {
+        id: Uuid::new_v4(),
+        name: "Won".to_string(),
+        order: 1,
+        probability: 100,
+        is_won: true,
+        is_lost: false,
+    };
     let stages = vec![s1.clone()];
     let next = advance_stage(s1.id, &stages);
     assert!(next.is_none());
@@ -170,7 +198,10 @@ fn characterize_bom_component_proportional_scaling() {
     let bom = Bom {
         id: Uuid::new_v4(),
         product_id: prod_a,
-        components: vec![BomComponent { product_id: prod_b, qty: 2.0 }],
+        components: vec![BomComponent {
+            product_id: prod_b,
+            qty: 2.0,
+        }],
         quantity: 1.0,
         routing_id: None,
         created_at: Utc::now(),
@@ -179,7 +210,11 @@ fn characterize_bom_component_proportional_scaling() {
     let boms = HashMap::from([(bom.id, bom.clone())]);
     // Making 7 units → need 14 of prod_b
     let explosion = explode_bom(&bom, &boms, 7.0);
-    let qty = explosion.iter().find(|(p, _)| *p == prod_b).map(|(_, q)| *q).unwrap();
+    let qty = explosion
+        .iter()
+        .find(|(p, _)| *p == prod_b)
+        .map(|(_, q)| *q)
+        .unwrap();
     assert!((qty - 14.0).abs() < 0.01);
 }
 

@@ -66,7 +66,11 @@ impl Dnskey {
         buf.extend_from_slice(&self.public_key);
         let mut ac: u32 = 0;
         for (i, b) in buf.iter().enumerate() {
-            ac += if i & 1 == 1 { *b as u32 } else { (*b as u32) << 8 };
+            ac += if i & 1 == 1 {
+                *b as u32
+            } else {
+                (*b as u32) << 8
+            };
         }
         ac += (ac >> 16) & 0xFFFF;
         (ac & 0xFFFF) as u16
@@ -99,9 +103,7 @@ impl TrustAnchor {
     }
 
     pub fn matches(&self, key: &Dnskey) -> bool {
-        self.owner == key.owner
-            && self.algorithm == key.algorithm
-            && self.key_tag == key.key_tag()
+        self.owner == key.owner && self.algorithm == key.algorithm && self.key_tag == key.key_tag()
     }
 }
 

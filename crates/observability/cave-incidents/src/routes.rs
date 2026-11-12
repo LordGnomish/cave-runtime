@@ -5,15 +5,15 @@
 use crate::State;
 use crate::engine;
 use crate::models::{
-    AcknowledgeRequest, CloseRequest, CreateIncidentRequest, CreatePostMortemRequest,
-    PostMortem, ResolveRequest, AddResponderRequest, Responder,
+    AcknowledgeRequest, AddResponderRequest, CloseRequest, CreateIncidentRequest,
+    CreatePostMortemRequest, PostMortem, ResolveRequest, Responder,
 };
 use axum::{
+    Json, Router,
     extract::{Path, State as AxumState},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -35,7 +35,10 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/incidents/{id}", get(get_incident))
         .route("/api/incidents/{id}", delete(delete_incident))
         // Lifecycle actions
-        .route("/api/incidents/{id}/acknowledge", post(acknowledge_incident))
+        .route(
+            "/api/incidents/{id}/acknowledge",
+            post(acknowledge_incident),
+        )
         .route("/api/incidents/{id}/resolve", post(resolve_incident))
         .route("/api/incidents/{id}/close", post(close_incident))
         // Responders
@@ -66,9 +69,7 @@ async fn create_incident(
     (StatusCode::CREATED, Json(incident))
 }
 
-async fn list_incidents(
-    AxumState(state): AxumState<Arc<State>>,
-) -> Json<serde_json::Value> {
+async fn list_incidents(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
     let list = state.store.list();
     Json(serde_json::to_value(list).unwrap())
 }
@@ -118,7 +119,11 @@ async fn acknowledge_incident(
         Some(mut incident) => match engine::acknowledge(&mut incident, req.user_id) {
             Ok(()) => {
                 state.store.update(incident.clone());
-                (StatusCode::OK, Json(serde_json::to_value(incident).unwrap())).into_response()
+                (
+                    StatusCode::OK,
+                    Json(serde_json::to_value(incident).unwrap()),
+                )
+                    .into_response()
             }
             Err(e) => (
                 StatusCode::CONFLICT,
@@ -140,19 +145,21 @@ async fn resolve_incident(
             Json(serde_json::json!({"error": "incident not found"})),
         )
             .into_response(),
-        Some(mut incident) => {
-            match engine::resolve(&mut incident, req.user_id, req.resolution) {
-                Ok(()) => {
-                    state.store.update(incident.clone());
-                    (StatusCode::OK, Json(serde_json::to_value(incident).unwrap())).into_response()
-                }
-                Err(e) => (
-                    StatusCode::CONFLICT,
-                    Json(serde_json::json!({"error": e.to_string()})),
+        Some(mut incident) => match engine::resolve(&mut incident, req.user_id, req.resolution) {
+            Ok(()) => {
+                state.store.update(incident.clone());
+                (
+                    StatusCode::OK,
+                    Json(serde_json::to_value(incident).unwrap()),
                 )
-                    .into_response(),
+                    .into_response()
             }
-        }
+            Err(e) => (
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response(),
+        },
     }
 }
 
@@ -170,7 +177,11 @@ async fn close_incident(
         Some(mut incident) => match engine::close(&mut incident, req.user_id) {
             Ok(()) => {
                 state.store.update(incident.clone());
-                (StatusCode::OK, Json(serde_json::to_value(incident).unwrap())).into_response()
+                (
+                    StatusCode::OK,
+                    Json(serde_json::to_value(incident).unwrap()),
+                )
+                    .into_response()
             }
             Err(e) => (
                 StatusCode::CONFLICT,
@@ -197,7 +208,11 @@ async fn add_responder(
         acknowledged_at: None,
     };
     if state.store.add_responder(id, responder.clone()) {
-        (StatusCode::CREATED, Json(serde_json::to_value(responder).unwrap())).into_response()
+        (
+            StatusCode::CREATED,
+            Json(serde_json::to_value(responder).unwrap()),
+        )
+            .into_response()
     } else {
         (
             StatusCode::NOT_FOUND,
@@ -214,7 +229,11 @@ async fn get_timeline(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.store.get(id) {
-        Some(i) => (StatusCode::OK, Json(serde_json::to_value(i.timeline).unwrap())).into_response(),
+        Some(i) => (
+            StatusCode::OK,
+            Json(serde_json::to_value(i.timeline).unwrap()),
+        )
+            .into_response(),
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "incident not found"})),
@@ -225,9 +244,7 @@ async fn get_timeline(
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
 
-async fn get_metrics(
-    AxumState(state): AxumState<Arc<State>>,
-) -> Json<serde_json::Value> {
+async fn get_metrics(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
     let m = state.store.metrics();
     Json(serde_json::to_value(m).unwrap())
 }
@@ -254,9 +271,7 @@ async fn create_postmortem(
     (StatusCode::CREATED, Json(serde_json::to_value(pm).unwrap()))
 }
 
-async fn list_postmortems(
-    AxumState(state): AxumState<Arc<State>>,
-) -> Json<serde_json::Value> {
+async fn list_postmortems(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
     let list = state.store.list_postmortems();
     Json(serde_json::to_value(list).unwrap())
 }

@@ -5,7 +5,7 @@
 //!   - pkg/restore/restore.go (getOrderedResources)
 //! 2026-05-30 RED commit references not-yet-existing module cave_backup::restore_order.
 
-use cave_backup::restore_order::{get_ordered_resources, Priorities};
+use cave_backup::restore_order::{Priorities, get_ordered_resources};
 
 // ── Mirror of Velero TestStringOfPriorities (pkg/types/priority_test.go) ──────
 
@@ -111,7 +111,11 @@ fn ordered_no_priorities_is_just_alphabetical() {
         high: vec![],
         low: vec![],
     };
-    let backup_resources = vec!["zebra".to_string(), "apple".to_string(), "mango".to_string()];
+    let backup_resources = vec![
+        "zebra".to_string(),
+        "apple".to_string(),
+        "mango".to_string(),
+    ];
     let ordered = get_ordered_resources(&priorities, &backup_resources);
     assert_eq!(ordered, vec!["apple", "mango", "zebra"]);
 }

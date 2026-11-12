@@ -29,7 +29,8 @@ impl FindingStore {
         FindingStore::default()
     }
     pub fn record(&self, summary: ScanSummary, findings: Vec<Finding>) {
-        self.scans.insert(summary.scan_id.clone(), StoredScan { summary, findings });
+        self.scans
+            .insert(summary.scan_id.clone(), StoredScan { summary, findings });
     }
     pub fn get(&self, scan_id: &str) -> Option<StoredScan> {
         self.scans.get(scan_id).map(|v| v.clone())
@@ -44,7 +45,12 @@ impl FindingStore {
     pub fn list_failures(&self) -> Vec<Finding> {
         let mut out = Vec::new();
         for e in self.scans.iter() {
-            out.extend(e.findings.iter().filter(|f| f.verdict.is_failure()).cloned());
+            out.extend(
+                e.findings
+                    .iter()
+                    .filter(|f| f.verdict.is_failure())
+                    .cloned(),
+            );
         }
         out
     }

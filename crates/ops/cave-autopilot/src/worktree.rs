@@ -135,12 +135,20 @@ impl WorktreeJob {
 
     /// `cargo build` inside the worktree for one crate.
     pub fn build(&self, crate_name: &str) -> Result<CmdOutcome> {
-        Self::run(&self.worktree_path, "cargo", &Self::cargo_build_args(crate_name))
+        Self::run(
+            &self.worktree_path,
+            "cargo",
+            &Self::cargo_build_args(crate_name),
+        )
     }
 
     /// `cargo test` inside the worktree for one crate.
     pub fn test(&self, crate_name: &str) -> Result<CmdOutcome> {
-        Self::run(&self.worktree_path, "cargo", &Self::cargo_test_args(crate_name))
+        Self::run(
+            &self.worktree_path,
+            "cargo",
+            &Self::cargo_test_args(crate_name),
+        )
     }
 
     /// Stage everything and commit inside the worktree.

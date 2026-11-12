@@ -53,7 +53,9 @@ Subcommands:
 
 fn policy(rest: &[String]) -> Result<(i32, String), String> {
     match rest.split_first() {
-        Some((s, _)) if s == "list" => Ok((0, "(empty — no in-process policy store wired)\n".into())),
+        Some((s, _)) if s == "list" => {
+            Ok((0, "(empty — no in-process policy store wired)\n".into()))
+        }
         Some((s, tail)) if s == "validate" => {
             let path = tail.first().ok_or("`validate` requires <json-path>")?;
             let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -76,10 +78,7 @@ fn events(rest: &[String]) -> Result<(i32, String), String> {
 
 fn filter(rest: &[String]) -> Result<(i32, String), String> {
     match rest.first().map(|s| s.as_str()) {
-        Some("ops") => Ok((
-            0,
-            "In NotIn Equal NotEqual Prefix Postfix Mask\n".into(),
-        )),
+        Some("ops") => Ok((0, "In NotIn Equal NotEqual Prefix Postfix Mask\n".into())),
         _ => Err("filter expects `ops`".into()),
     }
 }
@@ -174,7 +173,9 @@ mod tests {
     #[test]
     fn test_filter_ops_lists_all_ops() {
         let (_code, out) = dispatch_with_output(&s(&["filter", "ops"])).unwrap();
-        for o in ["In", "NotIn", "Equal", "NotEqual", "Prefix", "Postfix", "Mask"] {
+        for o in [
+            "In", "NotIn", "Equal", "NotEqual", "Prefix", "Postfix", "Mask",
+        ] {
             assert!(out.contains(o));
         }
     }

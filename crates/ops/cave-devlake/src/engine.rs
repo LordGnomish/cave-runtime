@@ -2,9 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! DORA metrics engine — deployment frequency, lead time, CFR, MTTR ratings + analytics.
 
-use crate::models::{
-    Commit, DeployStatus, DeploymentRecord, DoraRating, PullRequest, Sprint,
-};
+use crate::models::{Commit, DeployStatus, DeploymentRecord, DoraRating, PullRequest, Sprint};
 
 // ── DORA Deployment Frequency Rating ─────────────────────────────────────────
 // Thresholds (deploys per day):
@@ -86,21 +84,14 @@ pub fn dora_mttr_rating(mttr_secs: f64) -> DoraRating {
 // The overall rating is the minimum (worst) across the four metrics.
 
 pub fn overall_dora_rating(ratings: &[DoraRating]) -> DoraRating {
-    ratings
-        .iter()
-        .min()
-        .cloned()
-        .unwrap_or(DoraRating::Low)
+    ratings.iter().min().cloned().unwrap_or(DoraRating::Low)
 }
 
 // ── PR Cycle Time ─────────────────────────────────────────────────────────────
 
 /// Average cycle time (seconds) across all PRs that have `cycle_time_secs` set.
 pub fn pr_cycle_time_avg_secs(prs: &[PullRequest]) -> f64 {
-    let times: Vec<f64> = prs
-        .iter()
-        .filter_map(|pr| pr.cycle_time_secs)
-        .collect();
+    let times: Vec<f64> = prs.iter().filter_map(|pr| pr.cycle_time_secs).collect();
     if times.is_empty() {
         return 0.0;
     }

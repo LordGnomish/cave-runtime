@@ -207,8 +207,16 @@ mod tests {
         so.min_replica_count = Some(2);
         so.max_replica_count = Some(10);
         let triggers = vec![
-            HpaTrigger { trigger_index: 0, metric_name: "kafka-topic".into(), target_value: 5.0 },
-            HpaTrigger { trigger_index: 1, metric_name: "prometheus".into(), target_value: 100.0 },
+            HpaTrigger {
+                trigger_index: 0,
+                metric_name: "kafka-topic".into(),
+                target_value: 5.0,
+            },
+            HpaTrigger {
+                trigger_index: 1,
+                metric_name: "prometheus".into(),
+                target_value: 100.0,
+            },
         ];
         let hpa = build_hpa("orders", "", "default", &so, target(), &triggers, None);
 
@@ -220,7 +228,10 @@ mod tests {
         assert_eq!(hpa.scale_target_ref.api_version, "apps/v1");
         assert_eq!(hpa.metrics.len(), 2);
         assert_eq!(hpa.metrics[0].metric_name, "s0-kafka-topic");
-        assert_eq!(hpa.metrics[0].target_type, HpaMetricTargetType::AverageValue);
+        assert_eq!(
+            hpa.metrics[0].target_type,
+            HpaMetricTargetType::AverageValue
+        );
         assert_eq!(hpa.metrics[0].target_average_value_milli, 5000);
         assert_eq!(hpa.metrics[1].metric_name, "s1-prometheus");
         assert_eq!(hpa.metrics[1].target_average_value_milli, 100_000);

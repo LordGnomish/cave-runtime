@@ -13,8 +13,8 @@
 //! itself is in-crate runtime logic.
 
 use cave_certs::webhook_validation::{
-    validate_certificate_spec, WebhookCertificateSpec, WebhookIssuerRef, WebhookKeyAlgorithm,
-    WebhookPrivateKey,
+    WebhookCertificateSpec, WebhookIssuerRef, WebhookKeyAlgorithm, WebhookPrivateKey,
+    validate_certificate_spec,
 };
 
 fn base_spec() -> WebhookCertificateSpec {
@@ -99,9 +99,10 @@ fn invalid_ip_address_rejected() {
     let mut spec = base_spec();
     spec.ip_addresses = vec!["999.1.1.1".into(), "10.0.0.1".into()];
     let errs = validate_certificate_spec(&spec, "spec");
-    assert!(errs
-        .iter()
-        .any(|e| e.field == "spec.ipAddresses[0]" && e.message.contains("invalid IP")));
+    assert!(
+        errs.iter()
+            .any(|e| e.field == "spec.ipAddresses[0]" && e.message.contains("invalid IP"))
+    );
     // valid one produces no error
     assert!(!errs.iter().any(|e| e.field == "spec.ipAddresses[1]"));
 }
@@ -218,9 +219,10 @@ fn issuer_ref_missing_group_with_external_kind_hint() {
     spec.issuer_ref.kind = "AWSPCAClusterIssuer".into();
     spec.issuer_ref.group = "".into();
     let errs = validate_certificate_spec(&spec, "spec");
-    assert!(errs
-        .iter()
-        .any(|e| e.field == "spec.issuerRef.kind" && e.message.contains("did you forget")));
+    assert!(
+        errs.iter()
+            .any(|e| e.field == "spec.issuerRef.kind" && e.message.contains("did you forget"))
+    );
 }
 
 #[test]

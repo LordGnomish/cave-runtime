@@ -94,9 +94,9 @@ fn normalize(tok: &str) -> String {
         return "LIT".into();
     }
     const KEYWORDS: &[&str] = &[
-        "if", "else", "while", "for", "return", "fn", "function", "def", "class",
-        "struct", "enum", "let", "var", "const", "true", "false", "null", "None",
-        "import", "from", "as", "match", "switch", "case", "break", "continue",
+        "if", "else", "while", "for", "return", "fn", "function", "def", "class", "struct", "enum",
+        "let", "var", "const", "true", "false", "null", "None", "import", "from", "as", "match",
+        "switch", "case", "break", "continue",
     ];
     if KEYWORDS.contains(&tok) {
         return tok.to_string();
@@ -172,10 +172,7 @@ mod tests {
         let src_a = "fn alpha() { return compute_value(x, y, z); }\n";
         let src_b = "fn beta() { return compute_value(x, y, z); }\n";
         let groups = detect(
-            &[
-                ("a.rs".into(), src_a.into()),
-                ("b.rs".into(), src_b.into()),
-            ],
+            &[("a.rs".into(), src_a.into()), ("b.rs".into(), src_b.into())],
             &CpdConfig {
                 block_size: 6,
                 min_occurrences: 2,
@@ -189,10 +186,7 @@ mod tests {
         let src_a = "fn alpha() { return x + y; }\n";
         let src_b = "fn beta() { while_loop_until_done(); }\n";
         let groups = detect(
-            &[
-                ("a.rs".into(), src_a.into()),
-                ("b.rs".into(), src_b.into()),
-            ],
+            &[("a.rs".into(), src_a.into()), ("b.rs".into(), src_b.into())],
             &CpdConfig {
                 block_size: 8,
                 min_occurrences: 2,
@@ -217,14 +211,22 @@ mod tests {
     #[test]
     fn tokenize_strips_string_literal() {
         let toks = tokenize(r#"let x = "secret";"#);
-        let lits: Vec<&String> = toks.iter().map(|(_, t)| t).filter(|t| t == &"LIT").collect();
+        let lits: Vec<&String> = toks
+            .iter()
+            .map(|(_, t)| t)
+            .filter(|t| t == &"LIT")
+            .collect();
         assert_eq!(lits.len(), 1);
     }
 
     #[test]
     fn tokenize_strips_number_literal() {
         let toks = tokenize("let x = 12345;");
-        let lits: Vec<&String> = toks.iter().map(|(_, t)| t).filter(|t| t == &"LIT").collect();
+        let lits: Vec<&String> = toks
+            .iter()
+            .map(|(_, t)| t)
+            .filter(|t| t == &"LIT")
+            .collect();
         assert_eq!(lits.len(), 1);
     }
 
@@ -240,10 +242,7 @@ mod tests {
         let src_a = "fn alpha() { return compute(x, y); }\n";
         let src_b = "fn renamed_func() { return compute(z, w); }\n";
         let groups = detect(
-            &[
-                ("a.rs".into(), src_a.into()),
-                ("b.rs".into(), src_b.into()),
-            ],
+            &[("a.rs".into(), src_a.into()), ("b.rs".into(), src_b.into())],
             &CpdConfig {
                 block_size: 6,
                 min_occurrences: 2,

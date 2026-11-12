@@ -16,10 +16,10 @@
 //! already implemented and source-verified but lacked a direct assertion. No
 //! new behavior.
 
+use cave_cdc::SourceRecord;
 use cave_cdc::routing::{RoutingPolicy, TopicRouter};
 use cave_cdc::schema::{Compatibility, FieldDef, Schema, SchemaFormat, SchemaRegistry};
 use cave_cdc::streams_sink::{MemorySink, StreamsSink};
-use cave_cdc::SourceRecord;
 use chrono::Utc;
 use std::collections::HashMap;
 
@@ -211,7 +211,9 @@ fn opt(name: &str, ty: &str) -> FieldDef {
 #[test]
 fn register_rejects_backward_incompatible_required_field_addition() {
     let mut r = SchemaRegistry::new(TENANT, Compatibility::Backward);
-    let v1 = r.register(schema("orders.value", vec![req("id", "int64")])).unwrap();
+    let v1 = r
+        .register(schema("orders.value", vec![req("id", "int64")]))
+        .unwrap();
     assert_eq!(v1, 1);
 
     let bad = r.register(schema(
@@ -235,10 +237,14 @@ fn register_rejects_backward_incompatible_required_field_addition() {
 #[test]
 fn register_rejects_backward_incompatible_type_change() {
     let mut r = SchemaRegistry::new(TENANT, Compatibility::Backward);
-    r.register(schema("orders.value", vec![req("id", "int64")])).unwrap();
+    r.register(schema("orders.value", vec![req("id", "int64")]))
+        .unwrap();
 
     let bad = r.register(schema("orders.value", vec![req("id", "string")]));
-    assert!(bad.is_err(), "type change on existing field breaks BACKWARD");
+    assert!(
+        bad.is_err(),
+        "type change on existing field breaks BACKWARD"
+    );
     assert_eq!(r.version_count("orders.value"), 1);
 }
 
@@ -249,7 +255,9 @@ fn register_rejects_backward_incompatible_type_change() {
 #[test]
 fn register_rejects_forward_incompatible_required_field_addition() {
     let mut r = SchemaRegistry::new(TENANT, Compatibility::Forward);
-    let v1 = r.register(schema("orders.value", vec![req("id", "int64")])).unwrap();
+    let v1 = r
+        .register(schema("orders.value", vec![req("id", "int64")]))
+        .unwrap();
     assert_eq!(v1, 1);
 
     let bad = r.register(schema(

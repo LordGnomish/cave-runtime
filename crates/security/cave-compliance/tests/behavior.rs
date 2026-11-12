@@ -73,11 +73,7 @@ fn expired_exception(control_id: Uuid, control_ref: &str) -> ControlException {
 fn test_generate_report_active_exception_excludes_failure() {
     let fw = cis_kubernetes_framework();
     let ctrl = &fw.controls[0];
-    let findings = vec![finding_for(
-        ctrl.id,
-        &ctrl.control_id,
-        FindingStatus::Fail,
-    )];
+    let findings = vec![finding_for(ctrl.id, &ctrl.control_id, FindingStatus::Fail)];
     let exceptions = vec![active_exception(ctrl.id, &ctrl.control_id)];
 
     let report = generate_report(&fw, &findings, &exceptions);
@@ -91,11 +87,7 @@ fn test_generate_report_active_exception_excludes_failure() {
 fn test_generate_report_expired_exception_still_counts_failure() {
     let fw = cis_kubernetes_framework();
     let ctrl = &fw.controls[0];
-    let findings = vec![finding_for(
-        ctrl.id,
-        &ctrl.control_id,
-        FindingStatus::Fail,
-    )];
+    let findings = vec![finding_for(ctrl.id, &ctrl.control_id, FindingStatus::Fail)];
     let exceptions = vec![expired_exception(ctrl.id, &ctrl.control_id)];
 
     let report = generate_report(&fw, &findings, &exceptions);

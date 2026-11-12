@@ -72,9 +72,8 @@ pub struct TrackerState {
 impl TrackerState {
     /// Load + parse a tracker index file.
     pub fn load(path: &Path) -> Result<Self> {
-        let raw = std::fs::read_to_string(path).map_err(|e| {
-            AutopilotError::Tracker(format!("cannot read {}: {e}", path.display()))
-        })?;
+        let raw = std::fs::read_to_string(path)
+            .map_err(|e| AutopilotError::Tracker(format!("cannot read {}: {e}", path.display())))?;
         let state: TrackerState = serde_json::from_str(&raw)?;
         Ok(state)
     }
@@ -189,8 +188,7 @@ mod tests {
 
     #[test]
     fn effective_completion_prefers_honest_then_parity_then_fill() {
-        let only_fill: CrateEntry =
-            serde_json::from_str(r#"{ "fill_ratio": 0.4 }"#).unwrap();
+        let only_fill: CrateEntry = serde_json::from_str(r#"{ "fill_ratio": 0.4 }"#).unwrap();
         assert_eq!(only_fill.effective_completion(), 0.4);
         let parity_over_fill: CrateEntry =
             serde_json::from_str(r#"{ "parity_ratio": 0.7, "fill_ratio": 0.4 }"#).unwrap();
@@ -230,7 +228,8 @@ mod tests {
 
     #[test]
     fn missing_crate_dir_defaults_to_crates_name() {
-        let s = TrackerState::from_str(r#"{ "crates": { "cave-x": {"honest_ratio": 0.1} } }"#).unwrap();
+        let s =
+            TrackerState::from_str(r#"{ "crates": { "cave-x": {"honest_ratio": 0.1} } }"#).unwrap();
         let r = s.ranked_incomplete(0.95);
         assert_eq!(r[0].crate_dir, "crates/cave-x");
     }

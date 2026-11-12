@@ -7,7 +7,7 @@
 //!   - Google SRE Workbook, Chapter 5: Alerting on SLOs
 //!   - nobl9/nobl9-go BudgetAdjustment + Objective models
 
-use crate::models::{BurnRateAlert, ErrorBudget, SloIndicator, SloObjective, SloStatus, SLO};
+use crate::models::{BurnRateAlert, ErrorBudget, SLO, SloIndicator, SloObjective, SloStatus};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -222,7 +222,7 @@ pub fn minutes_until_exhaustion(budget: &ErrorBudget, burn_rate: f64) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{MetricType, SloStatus, SLO};
+    use crate::models::{MetricType, SLO, SloStatus};
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -406,7 +406,10 @@ mod tests {
 
     #[test]
     fn test_burn_rate_from_indicator() {
-        let ind = SloIndicator::Ratio { good: 9990, total: 10000 };
+        let ind = SloIndicator::Ratio {
+            good: 9990,
+            total: 10000,
+        };
         // 0.1% error / 0.1% budget = 1.0 burn rate
         let br = burn_rate_from_indicator(&ind, 99.9);
         assert!((br - 1.0).abs() < 1e-6, "br={br}");

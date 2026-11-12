@@ -45,12 +45,14 @@ fn gate_2_source_sha_present_and_is_real_commit() {
     // a 40-char lowercase hex git SHA-1 (the earlier placeholder "v2.5.3" was a
     // stale tag string — reconciled to the real commit at the v2.5.4 bump).
     assert_eq!(
-        sha,
-        "4f6d47246a053375271a5fd8af85c3b75695aa46",
+        sha, "4f6d47246a053375271a5fd8af85c3b75695aa46",
         "source_sha must pin the OpenBao v2.5.4 commit"
     );
     assert!(
-        sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+        sha.len() == 40
+            && sha
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
         "source_sha must be a 40-char lowercase hex git SHA (got {:?})",
         sha
     );
@@ -136,7 +138,10 @@ fn gate_7_no_stub_macros_in_src() {
     walk(&root, &mut |p| {
         // The self-audit scanner itself carries the macro names as string
         // literals (it greps for them); excluding it avoids a false positive.
-        if p.file_name().map(|n| n == "parity_self_audit.rs").unwrap_or(false) {
+        if p.file_name()
+            .map(|n| n == "parity_self_audit.rs")
+            .unwrap_or(false)
+        {
             return;
         }
         if p.extension().map(|e| e == "rs").unwrap_or(false)

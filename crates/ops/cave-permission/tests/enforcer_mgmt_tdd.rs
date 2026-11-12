@@ -49,11 +49,7 @@ fn get_policy_returns_all_rules_sorted() {
     // Deterministic ordering for stable diffs / API responses.
     assert_eq!(
         policies[0],
-        vec![
-            "alice".to_string(),
-            "data1".to_string(),
-            "read".to_string()
-        ]
+        vec!["alice".to_string(), "data1".to_string(), "read".to_string()]
     );
     assert_eq!(
         policies[1],

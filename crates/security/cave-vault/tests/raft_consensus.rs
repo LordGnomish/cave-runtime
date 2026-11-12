@@ -11,8 +11,8 @@
 //! inconsistent AppendEntries is rejected, conflicting tails are overwritten,
 //! and an entry not present on a majority is never committed.
 
-use cave_vault::storage::raft::{LogEntry, LogOp, RaftBackend};
 use cave_vault::storage::Backend;
+use cave_vault::storage::raft::{LogEntry, LogOp, RaftBackend};
 
 /// The highest log index replicated on a majority of the cluster — the index
 /// a leader may advance `commitIndex` to (Raft §5.3/§5.4). Sorting ascending,
@@ -48,9 +48,18 @@ fn elects_leader_then_replicates_and_commits_across_quorum() {
     f2.bump_term(1);
 
     // ── Leader proposes three writes ───────────────────────────────────────
-    leader.propose(LogOp::Put { path: "kv/a".into(), value: b"1".to_vec() });
-    leader.propose(LogOp::Put { path: "kv/b".into(), value: b"2".to_vec() });
-    leader.propose(LogOp::Put { path: "kv/c".into(), value: b"3".to_vec() });
+    leader.propose(LogOp::Put {
+        path: "kv/a".into(),
+        value: b"1".to_vec(),
+    });
+    leader.propose(LogOp::Put {
+        path: "kv/b".into(),
+        value: b"2".to_vec(),
+    });
+    leader.propose(LogOp::Put {
+        path: "kv/c".into(),
+        value: b"3".to_vec(),
+    });
     assert_eq!(leader.last_log_index(), 3);
 
     // ── Replicate to both followers (AppendEntries) ────────────────────────
@@ -94,7 +103,10 @@ fn append_entries_rejects_log_gap() {
     let entry = LogEntry {
         index: 6,
         term: 1,
-        op: LogOp::Put { path: "kv/x".into(), value: b"v".to_vec() },
+        op: LogOp::Put {
+            path: "kv/x".into(),
+            value: b"v".to_vec(),
+        },
     };
     let ok = f.append_entries(5, 1, vec![entry], 0).unwrap();
     assert!(!ok, "consistency check must reject a gap");
@@ -106,16 +118,28 @@ fn append_entries_overwrites_conflicting_tail() {
     let f = RaftBackend::new();
     f.bump_term(1);
     // Follower has three term-1 entries.
-    f.propose(LogOp::Put { path: "k/1".into(), value: b"a".to_vec() });
-    f.propose(LogOp::Put { path: "k/2".into(), value: b"b".to_vec() });
-    f.propose(LogOp::Put { path: "k/3".into(), value: b"c".to_vec() });
+    f.propose(LogOp::Put {
+        path: "k/1".into(),
+        value: b"a".to_vec(),
+    });
+    f.propose(LogOp::Put {
+        path: "k/2".into(),
+        value: b"b".to_vec(),
+    });
+    f.propose(LogOp::Put {
+        path: "k/3".into(),
+        value: b"c".to_vec(),
+    });
 
     // New leader (term 2) overwrites from index 2 with a different entry.
     f.bump_term(2);
     let new_entry = LogEntry {
         index: 2,
         term: 2,
-        op: LogOp::Put { path: "k/2new".into(), value: b"z".to_vec() },
+        op: LogOp::Put {
+            path: "k/2new".into(),
+            value: b"z".to_vec(),
+        },
     };
     let ok = f.append_entries(1, 1, vec![new_entry], 0).unwrap();
     assert!(ok);
@@ -132,7 +156,10 @@ fn idempotent_append_does_not_duplicate() {
     let f = RaftBackend::new();
     leader.bump_term(1);
     f.bump_term(1);
-    leader.propose(LogOp::Put { path: "kv/a".into(), value: b"1".to_vec() });
+    leader.propose(LogOp::Put {
+        path: "kv/a".into(),
+        value: b"1".to_vec(),
+    });
 
     // Same AppendEntries delivered twice (retransmit) must be a no-op.
     assert!(replicate_all(&leader, &f, 0));
@@ -150,10 +177,16 @@ fn entry_not_on_majority_is_not_committed() {
     }
 
     // idx 1 replicated to f1 only; idx 2 replicated to nobody.
-    leader.propose(LogOp::Put { path: "kv/safe".into(), value: b"1".to_vec() });
+    leader.propose(LogOp::Put {
+        path: "kv/safe".into(),
+        value: b"1".to_vec(),
+    });
     let e1 = leader.log_entries_from(0);
     assert!(f1.append_entries(0, 0, e1, 0).unwrap());
-    leader.propose(LogOp::Put { path: "kv/risky".into(), value: b"2".to_vec() });
+    leader.propose(LogOp::Put {
+        path: "kv/risky".into(),
+        value: b"2".to_vec(),
+    });
 
     // matchIndex: leader=2, f1=1, f2=0  → majority-acked index = 1.
     let commit = quorum_commit_index(vec![

@@ -189,11 +189,7 @@ impl ElfObject {
 
     /// Decode `.symtab` against its linked `.strtab`.
     pub fn symbols(&self) -> Vec<Symbol> {
-        let Some(symtab) = self
-            .sections
-            .iter()
-            .find(|s| s.sh_type == 2 /*SHT_SYMTAB*/)
-        else {
+        let Some(symtab) = self.sections.iter().find(|s| s.sh_type == 2 /*SHT_SYMTAB*/) else {
             return Vec::new();
         };
         let strtab = self
@@ -596,7 +592,11 @@ impl Loader {
         // GPL-compatible licenses per `license_is_gpl_compatible()`.
         let gpl_ok = matches!(
             lic,
-            "GPL" | "GPL v2" | "GPL and additional rights" | "Dual BSD/GPL" | "Dual MIT/GPL"
+            "GPL"
+                | "GPL v2"
+                | "GPL and additional rights"
+                | "Dual BSD/GPL"
+                | "Dual MIT/GPL"
                 | "Dual MPL/GPL"
         );
         if !gpl_ok {

@@ -9,7 +9,7 @@
 use crate::CrossplaneState;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -51,9 +51,10 @@ impl InfraAction {
         match args.first().map(|s| s.as_str()) {
             Some("list") | None => Ok(Self::List),
             Some("get") => {
-                let name = args.get(1).cloned().ok_or_else(|| {
-                    CrossplaneError::Internal("get requires a name".to_string())
-                })?;
+                let name = args
+                    .get(1)
+                    .cloned()
+                    .ok_or_else(|| CrossplaneError::Internal("get requires a name".to_string()))?;
                 Ok(Self::Get(name))
             }
             Some("health") => Ok(Self::Health),
@@ -110,10 +111,9 @@ pub fn dispatch(
             "items": state.function_store.list(),
         })),
         (InfraSubcommand::Function, InfraAction::Get(name)) => {
-            let f = state
-                .function_store
-                .get(&name)
-                .ok_or_else(|| CrossplaneError::Internal(format!("function not found: {}", name)))?;
+            let f = state.function_store.get(&name).ok_or_else(|| {
+                CrossplaneError::Internal(format!("function not found: {}", name))
+            })?;
             Ok(serde_json::to_value(f).unwrap_or(Value::Null))
         }
         (InfraSubcommand::Xr, InfraAction::List) => Ok(json!({
@@ -150,13 +150,10 @@ pub fn dispatch(
 }
 
 /// Top-level entrypoint for `cavectl infra ...`.
-pub fn run_cli(
-    state: &Arc<CrossplaneState>,
-    args: &[String],
-) -> CrossplaneResult<Value> {
-    let sub_str = args
-        .first()
-        .ok_or_else(|| CrossplaneError::Internal("usage: cavectl infra <sub> [action] [name]".into()))?;
+pub fn run_cli(state: &Arc<CrossplaneState>, args: &[String]) -> CrossplaneResult<Value> {
+    let sub_str = args.first().ok_or_else(|| {
+        CrossplaneError::Internal("usage: cavectl infra <sub> [action] [name]".into())
+    })?;
     let sub = InfraSubcommand::from_str(sub_str)
         .ok_or_else(|| CrossplaneError::Internal(format!("unknown subcommand: {}", sub_str)))?;
     let rest: Vec<String> = args.iter().skip(1).cloned().collect();
@@ -222,11 +219,7 @@ mod tests {
 
     #[test]
     fn dispatch_xrd_get_missing_errors() {
-        let r = dispatch(
-            &s(),
-            InfraSubcommand::Xrd,
-            InfraAction::Get("nope".into()),
-        );
+        let r = dispatch(&s(), InfraSubcommand::Xrd, InfraAction::Get("nope".into()));
         assert!(r.is_err());
     }
 

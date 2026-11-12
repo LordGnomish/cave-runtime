@@ -2,7 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for chat store and model layer.
 
-use cave_chat::models::{Channel, ChannelType, Message, MessageType, Reaction, UserPresence, PresenceStatus, ChatStats};
+use cave_chat::models::{
+    Channel, ChannelType, ChatStats, Message, MessageType, PresenceStatus, Reaction, UserPresence,
+};
 use cave_chat::store::ChatStore;
 use chrono::Utc;
 use uuid::Uuid;
@@ -178,7 +180,9 @@ fn test_add_reaction_to_message() {
     let msg = make_message(cid, "carol");
     let mid = msg.id;
     store.create_message(msg);
-    let updated = store.add_reaction(&mid, "👍".to_string(), "dave".to_string()).expect("ok");
+    let updated = store
+        .add_reaction(&mid, "👍".to_string(), "dave".to_string())
+        .expect("ok");
     assert_eq!(updated.reactions.len(), 1);
     assert_eq!(updated.reactions[0].emoji, "👍");
 }
@@ -193,7 +197,9 @@ fn test_reaction_no_duplicate_user() {
     let mid = msg.id;
     store.create_message(msg);
     store.add_reaction(&mid, "❤️".to_string(), "dave".to_string());
-    let updated = store.add_reaction(&mid, "❤️".to_string(), "dave".to_string()).expect("ok");
+    let updated = store
+        .add_reaction(&mid, "❤️".to_string(), "dave".to_string())
+        .expect("ok");
     assert_eq!(updated.reactions[0].users.len(), 1);
 }
 

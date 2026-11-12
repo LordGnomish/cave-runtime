@@ -148,12 +148,18 @@ mod tests {
 
     #[test]
     fn actor_source_serializes_screaming() {
-        assert_eq!(serde_json::to_string(&ActorSource::Agent).unwrap(), "\"AGENT\"");
+        assert_eq!(
+            serde_json::to_string(&ActorSource::Agent).unwrap(),
+            "\"AGENT\""
+        );
         assert_eq!(
             serde_json::to_string(&ActorSource::Application).unwrap(),
             "\"APPLICATION\""
         );
-        assert_eq!(serde_json::to_string(&ActorSource::System).unwrap(), "\"SYSTEM\"");
+        assert_eq!(
+            serde_json::to_string(&ActorSource::System).unwrap(),
+            "\"SYSTEM\""
+        );
     }
 
     #[test]
@@ -169,7 +175,10 @@ mod tests {
     fn actor_context_omits_provider_when_absent() {
         let a = ActorMetadata::system("Sys");
         let json = serde_json::to_string(&a).unwrap();
-        assert!(!json.contains("provider"), "provider must be omitted when None: {json}");
+        assert!(
+            !json.contains("provider"),
+            "provider must be omitted when None: {json}"
+        );
     }
 
     #[test]
@@ -178,7 +187,10 @@ mod tests {
         a.context.provider = Some(ConnectedAccountProvider::Google);
         let json = serde_json::to_string(&a).unwrap();
         let back: ActorMetadata = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.context.provider, Some(ConnectedAccountProvider::Google));
+        assert_eq!(
+            back.context.provider,
+            Some(ConnectedAccountProvider::Google)
+        );
         assert_eq!(back.source, ActorSource::Manual);
     }
 
@@ -211,7 +223,11 @@ mod tests {
 
     #[test]
     fn dashboard_rename_updates_title_search_vector_and_actor() {
-        let mut d = Dashboard::new(Uuid::nil(), Some("Old".into()), ActorMetadata::system("Sys"));
+        let mut d = Dashboard::new(
+            Uuid::nil(),
+            Some("Old".into()),
+            ActorMetadata::system("Sys"),
+        );
         let editor = ActorMetadata::manual(Uuid::new_v4(), "Grace");
         d.rename(Some("New Title".into()), editor.clone());
         assert_eq!(d.title.as_deref(), Some("New Title"));

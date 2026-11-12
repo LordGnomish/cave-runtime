@@ -3,8 +3,8 @@
 //! Policy evaluation engine for cave-admission webhook requests.
 
 use crate::models::{
-    AdmissionPolicy, AdmissionRequest, AdmissionResponse, AdmissionStatus,
-    EnforcementAction, PolicyEvalRule, RuleOperator, ViolationLog,
+    AdmissionPolicy, AdmissionRequest, AdmissionResponse, AdmissionStatus, EnforcementAction,
+    PolicyEvalRule, RuleOperator, ViolationLog,
 };
 use base64::Engine as _;
 use chrono::Utc;
@@ -44,7 +44,10 @@ impl PolicyEvaluator {
             }
             // Check if resource type matches
             if !policy.resource_types.is_empty()
-                && !policy.resource_types.iter().any(|r| r == resource_kind || r == "*")
+                && !policy
+                    .resource_types
+                    .iter()
+                    .any(|r| r == resource_kind || r == "*")
             {
                 continue;
             }
@@ -184,16 +187,14 @@ impl PolicyEvaluator {
                     None
                 }
             }
-            RuleOperator::Equals => {
-                match field_val {
-                    None => Some(format!("Field '{}' does not exist", rule.field)),
-                    Some(v) if v == &rule.value => None,
-                    Some(v) => Some(format!(
-                        "Field '{}' has value {:?} but expected {:?}",
-                        rule.field, v, rule.value
-                    )),
-                }
-            }
+            RuleOperator::Equals => match field_val {
+                None => Some(format!("Field '{}' does not exist", rule.field)),
+                Some(v) if v == &rule.value => None,
+                Some(v) => Some(format!(
+                    "Field '{}' has value {:?} but expected {:?}",
+                    rule.field, v, rule.value
+                )),
+            },
             RuleOperator::NotEquals => {
                 match field_val {
                     None => None, // field absent = not equal = rule satisfied
@@ -204,48 +205,56 @@ impl PolicyEvaluator {
                     _ => None,
                 }
             }
-            RuleOperator::Contains => {
-                match field_val {
-                    None => Some(format!("Field '{}' does not exist", rule.field)),
-                    Some(Value::String(s)) => {
-                        let needle = rule.value.as_str().unwrap_or("");
-                        if s.contains(needle) {
-                            None
-                        } else {
-                            Some(format!("Field '{}' does not contain {:?}", rule.field, needle))
-                        }
+            RuleOperator::Contains => match field_val {
+                None => Some(format!("Field '{}' does not exist", rule.field)),
+                Some(Value::String(s)) => {
+                    let needle = rule.value.as_str().unwrap_or("");
+                    if s.contains(needle) {
+                        None
+                    } else {
+                        Some(format!(
+                            "Field '{}' does not contain {:?}",
+                            rule.field, needle
+                        ))
                     }
-                    Some(Value::Array(arr)) => {
-                        if arr.contains(&rule.value) {
-                            None
-                        } else {
-                            Some(format!("Field '{}' does not contain {:?}", rule.field, rule.value))
-                        }
-                    }
-                    _ => Some(format!("Field '{}' is not a string or array", rule.field)),
                 }
-            }
-            RuleOperator::NotContains => {
-                match field_val {
-                    None => None,
-                    Some(Value::String(s)) => {
-                        let needle = rule.value.as_str().unwrap_or("");
-                        if s.contains(needle) {
-                            Some(format!("Field '{}' must not contain {:?}", rule.field, needle))
-                        } else {
-                            None
-                        }
+                Some(Value::Array(arr)) => {
+                    if arr.contains(&rule.value) {
+                        None
+                    } else {
+                        Some(format!(
+                            "Field '{}' does not contain {:?}",
+                            rule.field, rule.value
+                        ))
                     }
-                    Some(Value::Array(arr)) => {
-                        if arr.contains(&rule.value) {
-                            Some(format!("Field '{}' must not contain {:?}", rule.field, rule.value))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
                 }
-            }
+                _ => Some(format!("Field '{}' is not a string or array", rule.field)),
+            },
+            RuleOperator::NotContains => match field_val {
+                None => None,
+                Some(Value::String(s)) => {
+                    let needle = rule.value.as_str().unwrap_or("");
+                    if s.contains(needle) {
+                        Some(format!(
+                            "Field '{}' must not contain {:?}",
+                            rule.field, needle
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                Some(Value::Array(arr)) => {
+                    if arr.contains(&rule.value) {
+                        Some(format!(
+                            "Field '{}' must not contain {:?}",
+                            rule.field, rule.value
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
             RuleOperator::GreaterThan => {
                 let actual = field_val.and_then(Value::as_f64).unwrap_or(0.0);
                 let threshold = rule.value.as_f64().unwrap_or(0.0);
@@ -305,10 +314,7 @@ mod tests {
         }
     }
 
-    fn make_policy(
-        rules: Vec<PolicyEvalRule>,
-        action: EnforcementAction,
-    ) -> AdmissionPolicy {
+    fn make_policy(rules: Vec<PolicyEvalRule>, action: EnforcementAction) -> AdmissionPolicy {
         AdmissionPolicy {
             id: Uuid::new_v4(),
             name: "test-policy".to_string(),

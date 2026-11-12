@@ -2,13 +2,21 @@
 // Copyright 2026 Cave Runtime contributors
 //! Failing test for enhanced JQL parser (AND/OR/IN/IS EMPTY/ORDER BY).
 
-use cave_tracker::jql_engine::{JqlEngine, JqlValue, JqlCondition, ParsedJql};
-use cave_tracker::models::{Issue, Priority, IssueType};
+use cave_tracker::jql_engine::{JqlCondition, JqlEngine, JqlValue, ParsedJql};
+use cave_tracker::models::{Issue, IssueType, Priority};
 use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn make_issue(key: &str, project: &str, status: &str, priority: Priority, issue_type: IssueType, assignee: Option<String>, sprint_id: Option<Uuid>) -> Issue {
+fn make_issue(
+    key: &str,
+    project: &str,
+    status: &str,
+    priority: Priority,
+    issue_type: IssueType,
+    assignee: Option<String>,
+    sprint_id: Option<Uuid>,
+) -> Issue {
     Issue {
         id: Uuid::new_v4(),
         key: key.to_string(),
@@ -87,8 +95,24 @@ fn test_jql_parse_order_by_desc() {
 #[test]
 fn test_jql_evaluate_project_filter() {
     let issues = vec![
-        make_issue("CAVE-1", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, None),
-        make_issue("OTHER-1", "OTHER", "To Do", Priority::Medium, IssueType::Task, None, None),
+        make_issue(
+            "CAVE-1",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "OTHER-1",
+            "OTHER",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
     ];
     let parsed = JqlEngine::parse("project = CAVE").unwrap();
     let result = JqlEngine::evaluate(&issues, &parsed);
@@ -99,9 +123,33 @@ fn test_jql_evaluate_project_filter() {
 #[test]
 fn test_jql_evaluate_status_in() {
     let issues = vec![
-        make_issue("CAVE-1", "CAVE", "In Progress", Priority::Medium, IssueType::Task, None, None),
-        make_issue("CAVE-2", "CAVE", "Done", Priority::Medium, IssueType::Task, None, None),
-        make_issue("CAVE-3", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, None),
+        make_issue(
+            "CAVE-1",
+            "CAVE",
+            "In Progress",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "CAVE-2",
+            "CAVE",
+            "Done",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "CAVE-3",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
     ];
     let parsed = JqlEngine::parse(r#"status IN ("In Progress", "Done")"#).unwrap();
     let result = JqlEngine::evaluate(&issues, &parsed);
@@ -112,8 +160,24 @@ fn test_jql_evaluate_status_in() {
 fn test_jql_evaluate_sprint_is_empty() {
     let sprint_id = Uuid::new_v4();
     let issues = vec![
-        make_issue("CAVE-1", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, None),
-        make_issue("CAVE-2", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, Some(sprint_id)),
+        make_issue(
+            "CAVE-1",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "CAVE-2",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            Some(sprint_id),
+        ),
     ];
     let parsed = JqlEngine::parse("sprint IS EMPTY").unwrap();
     let result = JqlEngine::evaluate(&issues, &parsed);
@@ -124,8 +188,24 @@ fn test_jql_evaluate_sprint_is_empty() {
 #[test]
 fn test_jql_empty_query_returns_all() {
     let issues = vec![
-        make_issue("CAVE-1", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, None),
-        make_issue("OTHER-1", "OTHER", "Done", Priority::Low, IssueType::Bug, None, None),
+        make_issue(
+            "CAVE-1",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "OTHER-1",
+            "OTHER",
+            "Done",
+            Priority::Low,
+            IssueType::Bug,
+            None,
+            None,
+        ),
     ];
     let parsed = JqlEngine::parse("").unwrap();
     let result = JqlEngine::evaluate(&issues, &parsed);
@@ -135,9 +215,33 @@ fn test_jql_empty_query_returns_all() {
 #[test]
 fn test_jql_order_by_priority() {
     let issues = vec![
-        make_issue("CAVE-1", "CAVE", "To Do", Priority::Low, IssueType::Task, None, None),
-        make_issue("CAVE-2", "CAVE", "To Do", Priority::Critical, IssueType::Task, None, None),
-        make_issue("CAVE-3", "CAVE", "To Do", Priority::Medium, IssueType::Task, None, None),
+        make_issue(
+            "CAVE-1",
+            "CAVE",
+            "To Do",
+            Priority::Low,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "CAVE-2",
+            "CAVE",
+            "To Do",
+            Priority::Critical,
+            IssueType::Task,
+            None,
+            None,
+        ),
+        make_issue(
+            "CAVE-3",
+            "CAVE",
+            "To Do",
+            Priority::Medium,
+            IssueType::Task,
+            None,
+            None,
+        ),
     ];
     let parsed = JqlEngine::parse("project = CAVE ORDER BY priority ASC").unwrap();
     let result = JqlEngine::evaluate(&issues, &parsed);

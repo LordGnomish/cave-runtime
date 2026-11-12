@@ -268,11 +268,7 @@ pub fn matches_filters(ev: &Event, f: &Filters) -> bool {
         if ctx.r#type.as_deref().is_some_and(|t| t != ev.r#type) {
             return false;
         }
-        if ctx
-            .subject
-            .as_deref()
-            .is_some_and(|s| s != ev.subject)
-        {
+        if ctx.subject.as_deref().is_some_and(|s| s != ev.subject) {
             return false;
         }
         if ctx.source.as_deref().is_some_and(|s| s != ev.source) {
@@ -439,7 +435,10 @@ mod tests {
             }),
             data: vec![],
         };
-        assert!(!matches_filters(&ev("ci.failed", serde_json::json!({})), &f));
+        assert!(!matches_filters(
+            &ev("ci.failed", serde_json::json!({})),
+            &f
+        ));
     }
 
     #[test]

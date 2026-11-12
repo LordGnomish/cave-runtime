@@ -59,7 +59,11 @@ fn slice_returns_half_open_range_and_errors_below_snapshot() {
     // hi past the end clamps to last_index inclusive (no panic, no extra entries).
     let tail = log.slice(4, 99).expect("slice clamps hi");
     let tail_idxs: Vec<u64> = tail.iter().map(|e| e.index).collect();
-    assert_eq!(tail_idxs, vec![4, 5], "hi beyond end clamps to entries.len()");
+    assert_eq!(
+        tail_idxs,
+        vec![4, 5],
+        "hi beyond end clamps to entries.len()"
+    );
 
     // After compaction past index 3, slice starting at or below the snapshot errors.
     log.compact(3, 7);
@@ -91,10 +95,7 @@ fn term_resolves_snapshot_boundary_and_errors_when_compacted() {
     // A live index above the snapshot keeps its original term.
     assert_eq!(log.term(4).expect("live term above snapshot"), 4);
     // An index strictly below the snapshot is compacted -> error.
-    assert!(
-        log.term(2).is_err(),
-        "term of a compacted index must error"
-    );
+    assert!(log.term(2).is_err(), "term of a compacted index must error");
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +139,11 @@ fn compact_discards_through_index_and_sets_snapshot_meta() {
 
     log.compact(3, 2);
 
-    assert_eq!(log.snapshot_index(), 3, "snapshot_index advances to compact idx");
+    assert_eq!(
+        log.snapshot_index(),
+        3,
+        "snapshot_index advances to compact idx"
+    );
     assert_eq!(log.snapshot_term(), 2, "snapshot_term records the term");
     assert_eq!(log.first_index(), 4, "first_index == snapshot_index + 1");
     assert_eq!(log.last_index(), 5, "tail entries survive compaction");
@@ -190,7 +195,10 @@ fn last_membership_returns_most_recent_change_entry() {
 
     // Scans backward -> the later config (cfg_b at index 4) wins.
     let found = log.last_membership().expect("a membership entry exists");
-    assert_eq!(found, cfg_b, "most recent MembershipChange entry is returned");
+    assert_eq!(
+        found, cfg_b,
+        "most recent MembershipChange entry is returned"
+    );
     assert_eq!(found.voters, set(&[1, 2, 3]));
 
     // A log with no membership entry returns None.
@@ -204,7 +212,12 @@ fn last_membership_returns_most_recent_change_entry() {
 
 #[test]
 fn chunks_split_contiguously_and_terminate_with_done() {
-    let snap = Snapshot::new(10, 3, MembershipConfig::single(1), vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    let snap = Snapshot::new(
+        10,
+        3,
+        MembershipConfig::single(1),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    );
 
     // 10 bytes / chunk_size 4 -> [0..4), [4..8), [8..10) = 3 chunks.
     let chunks = snap.chunks(4);
@@ -213,7 +226,11 @@ fn chunks_split_contiguously_and_terminate_with_done() {
     assert_eq!(chunks[1].offset, 4, "offsets are contiguous by data length");
     assert_eq!(chunks[2].offset, 8);
     assert_eq!(chunks[0].data, vec![0, 1, 2, 3]);
-    assert_eq!(chunks[2].data, vec![8, 9], "final chunk holds the remainder");
+    assert_eq!(
+        chunks[2].data,
+        vec![8, 9],
+        "final chunk holds the remainder"
+    );
     assert!(!chunks[0].done);
     assert!(!chunks[1].done);
     assert!(chunks[2].done, "only the last chunk is done");
@@ -239,8 +256,14 @@ fn receiver_assembles_in_order_chunks_and_resets_on_gap() {
     let mut rx = SnapshotReceiver::new();
     assert!(rx.feed(chunks[0].clone()).is_none());
     assert!(rx.feed(chunks[1].clone()).is_none());
-    let done = rx.feed(chunks[2].clone()).expect("done chunk completes snapshot");
-    assert_eq!(done.data, vec![10, 20, 30, 40, 50], "reassembled bytes match");
+    let done = rx
+        .feed(chunks[2].clone())
+        .expect("done chunk completes snapshot");
+    assert_eq!(
+        done.data,
+        vec![10, 20, 30, 40, 50],
+        "reassembled bytes match"
+    );
     assert_eq!(done.meta.index, 7);
     assert_eq!(done.meta.term, 2);
 
@@ -252,7 +275,10 @@ fn receiver_assembles_in_order_chunks_and_resets_on_gap() {
         rx2.feed(chunks[2].clone()).is_none(),
         "a gapped offset returns None"
     );
-    assert!(rx2.buffer.is_empty(), "buffer is reset after an out-of-order chunk");
+    assert!(
+        rx2.buffer.is_empty(),
+        "buffer is reset after an out-of-order chunk"
+    );
     assert_eq!(rx2.next_offset, 0, "next_offset rewinds to 0 on reset");
 }
 
@@ -269,11 +295,21 @@ fn joint_for_remove_then_leave_joint_round_trip() {
 
     // Phase 1: enter joint config removing node 3.
     let joint = joint_for_remove(&current, 3);
-    assert!(joint.is_joint(), "removal produces a joint (C_old,new) config");
-    assert_eq!(joint.voters, set(&[1, 2]), "node 3 removed from incoming voters");
+    assert!(
+        joint.is_joint(),
+        "removal produces a joint (C_old,new) config"
+    );
+    assert_eq!(
+        joint.voters,
+        set(&[1, 2]),
+        "node 3 removed from incoming voters"
+    );
     assert!(!joint.voters.contains(&3));
     assert_eq!(
-        joint.voters_outgoing.as_ref().expect("outgoing set present"),
+        joint
+            .voters_outgoing
+            .as_ref()
+            .expect("outgoing set present"),
         &set(&[1, 2, 3]),
         "voters_outgoing preserves the old voter set"
     );
@@ -303,7 +339,10 @@ fn validate_rejects_overlap_and_multi_removal_but_accepts_single_change() {
         voters: set(&[1, 2]),
         ..Default::default()
     };
-    assert!(validate(&current, &ok).is_ok(), "single voter removal is valid");
+    assert!(
+        validate(&current, &ok).is_ok(),
+        "single voter removal is valid"
+    );
 
     // Empty voter set is rejected.
     let empty = MembershipConfig::default();
@@ -344,7 +383,10 @@ fn joint_config_unions_old_and_new_voters_and_includes_learners() {
         auto_leave: true,
     };
 
-    assert!(joint.is_joint(), "voters_outgoing == Some marks a joint config");
+    assert!(
+        joint.is_joint(),
+        "voters_outgoing == Some marks a joint config"
+    );
     // all_voters == new ∪ old.
     assert_eq!(
         joint.all_voters(),
@@ -395,9 +437,15 @@ fn read_only_queue_drains_request_exactly_at_quorum() {
     // A second distinct peer reaches quorum -> the request drains out.
     let ready = q.ack(11, 2);
     assert_eq!(ready.len(), 1, "2 distinct acks >= quorum 2: drains");
-    assert_eq!(ready[0].index, 42, "drained request carries its commit index");
+    assert_eq!(
+        ready[0].index, 42,
+        "drained request carries its commit index"
+    );
     assert_eq!(ready[0].acks.len(), 2, "drained request has both peer acks");
-    assert!(q.is_empty(), "request removed from the queue after draining");
+    assert!(
+        q.is_empty(),
+        "request removed from the queue after draining"
+    );
 }
 
 // ---------------------------------------------------------------------------

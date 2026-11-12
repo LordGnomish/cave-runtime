@@ -192,7 +192,9 @@ mod tests {
 
     #[test]
     fn parse_display_roundtrip() {
-        for name in ["F32", "F16", "Q4_0", "Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "BF16"] {
+        for name in [
+            "F32", "F16", "Q4_0", "Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "BF16",
+        ] {
             let q: QuantType = name.parse().unwrap();
             assert_eq!(q.to_string(), name, "roundtrip {name}");
         }

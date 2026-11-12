@@ -73,7 +73,11 @@ pub struct LifecycleMachine {
 
 impl LifecycleMachine {
     pub fn new(runtime: Runtime) -> Self {
-        LifecycleMachine { state: LifecycleState::Created, runtime, history: Vec::new() }
+        LifecycleMachine {
+            state: LifecycleState::Created,
+            runtime,
+            history: Vec::new(),
+        }
     }
 
     /// Drive a transition; on illegal moves return Err and leave state alone.
@@ -110,7 +114,8 @@ mod tests {
         m.transition(LifecycleState::Running, None).unwrap();
         m.transition(LifecycleState::Paused, None).unwrap();
         m.transition(LifecycleState::Running, None).unwrap();
-        m.transition(LifecycleState::Stopped, Some("oci-exit".into())).unwrap();
+        m.transition(LifecycleState::Stopped, Some("oci-exit".into()))
+            .unwrap();
         m.transition(LifecycleState::Removed, None).unwrap();
         assert_eq!(m.state, LifecycleState::Removed);
         assert_eq!(m.history.len(), 5);
@@ -136,15 +141,25 @@ mod tests {
 
     #[test]
     fn to_sandbox_state_maps_stopped() {
-        assert_eq!(LifecycleState::Stopped.to_sandbox_state(), SandboxState::Stopped);
-        assert_eq!(LifecycleState::Removed.to_sandbox_state(), SandboxState::Stopped);
-        assert_eq!(LifecycleState::Running.to_sandbox_state(), SandboxState::Running);
+        assert_eq!(
+            LifecycleState::Stopped.to_sandbox_state(),
+            SandboxState::Stopped
+        );
+        assert_eq!(
+            LifecycleState::Removed.to_sandbox_state(),
+            SandboxState::Stopped
+        );
+        assert_eq!(
+            LifecycleState::Running.to_sandbox_state(),
+            SandboxState::Running
+        );
     }
 
     #[test]
     fn history_records_reason() {
         let mut m = LifecycleMachine::new(Runtime::Gvisor);
-        m.transition(LifecycleState::Running, Some("user-start".into())).unwrap();
+        m.transition(LifecycleState::Running, Some("user-start".into()))
+            .unwrap();
         assert_eq!(m.history[0].reason.as_deref(), Some("user-start"));
     }
 

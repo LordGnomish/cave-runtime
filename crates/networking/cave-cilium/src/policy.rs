@@ -301,7 +301,11 @@ impl PolicyRepository {
         let mut entries: Vec<PolicyMapEntry> = Vec::new();
         let mut default_deny = false;
 
-        for rule in self.rules.iter().filter(|r| r.endpoint_selector.matches(endpoint)) {
+        for rule in self
+            .rules
+            .iter()
+            .filter(|r| r.endpoint_selector.matches(endpoint))
+        {
             // Normalise the direction-specific sub-rules.
             let norms: Vec<NormRule> = match dir {
                 Direction::Ingress => rule

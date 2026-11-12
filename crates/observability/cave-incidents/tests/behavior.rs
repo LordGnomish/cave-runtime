@@ -15,7 +15,7 @@ use cave_incidents::models::{
     EscalationPolicy, EscalationStep, EscalationTarget, Incident, IncidentSeverity, IncidentStatus,
     NotificationChannel, OnCallSchedule, OnCallUser, ResponderRole, RotationType, ScheduleLayer,
 };
-use cave_incidents::oncall::{default_escalation_policy, default_schedule, OnCallEngine};
+use cave_incidents::oncall::{OnCallEngine, default_escalation_policy, default_schedule};
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 

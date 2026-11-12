@@ -10,8 +10,8 @@
 //!   internal/resources/datastore/datastore_multitenancy.go — UsedBy gating
 
 use cave_kamaji::isolation::{
-    add_tenant_prefix, deregister_usage, kamaji_labels, merge_maps, owns_resource,
-    register_usage, tenant_selector, used_by_key,
+    add_tenant_prefix, deregister_usage, kamaji_labels, merge_maps, owns_resource, register_usage,
+    tenant_selector, used_by_key,
 };
 use std::collections::BTreeMap;
 
@@ -20,8 +20,14 @@ use std::collections::BTreeMap;
 #[test]
 fn kamaji_labels_carry_project_name_and_component() {
     let l = kamaji_labels("alpha", "datastore-config");
-    assert_eq!(l.get("kamaji.clastix.io/project").map(String::as_str), Some("kamaji"));
-    assert_eq!(l.get("kamaji.clastix.io/name").map(String::as_str), Some("alpha"));
+    assert_eq!(
+        l.get("kamaji.clastix.io/project").map(String::as_str),
+        Some("kamaji")
+    );
+    assert_eq!(
+        l.get("kamaji.clastix.io/name").map(String::as_str),
+        Some("alpha")
+    );
     assert_eq!(
         l.get("kamaji.clastix.io/component").map(String::as_str),
         Some("datastore-config")
@@ -33,7 +39,10 @@ fn kamaji_labels_carry_project_name_and_component() {
 #[test]
 fn tenant_prefix_namespaces_resource_names() {
     // {tcpName}-{name}
-    assert_eq!(add_tenant_prefix("datastore-config", "alpha"), "alpha-datastore-config");
+    assert_eq!(
+        add_tenant_prefix("datastore-config", "alpha"),
+        "alpha-datastore-config"
+    );
 }
 
 // ── MergeMaps (override precedence) ─────────────────────────────────────────
@@ -55,7 +64,10 @@ fn merge_maps_later_wins() {
 #[test]
 fn tenant_selector_scopes_by_control_plane_name() {
     let sel = tenant_selector("alpha");
-    assert_eq!(sel.get("kamaji.clastix.io/name").map(String::as_str), Some("alpha"));
+    assert_eq!(
+        sel.get("kamaji.clastix.io/name").map(String::as_str),
+        Some("alpha")
+    );
 }
 
 #[test]

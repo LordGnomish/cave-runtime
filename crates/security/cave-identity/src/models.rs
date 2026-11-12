@@ -259,7 +259,10 @@ mod tests {
 
     #[test]
     fn bundle_endpoint_profile_eq() {
-        assert_eq!(BundleEndpointProfile::HttpsWeb, BundleEndpointProfile::HttpsWeb);
+        assert_eq!(
+            BundleEndpointProfile::HttpsWeb,
+            BundleEndpointProfile::HttpsWeb
+        );
         let p = BundleEndpointProfile::HttpsSpiffe {
             endpoint_spiffe_id: SpiffeId::new("spiffe://example.org/spire/server"),
         };

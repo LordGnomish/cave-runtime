@@ -122,7 +122,10 @@ fn gate_8_parity_report_exists() {
     let report = crate_root().join("PARITY_REPORT.md");
     assert!(report.exists(), "PARITY_REPORT.md required");
     let body = fs::read_to_string(&report).unwrap();
-    assert!(body.contains("Charter v2"), "PARITY_REPORT.md must reference Charter v2");
+    assert!(
+        body.contains("Charter v2"),
+        "PARITY_REPORT.md must reference Charter v2"
+    );
     assert!(
         body.contains("8/8 PASS") || body.contains("8-gate"),
         "PARITY_REPORT.md must reference 8-gate result"

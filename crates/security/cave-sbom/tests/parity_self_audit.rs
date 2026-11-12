@@ -140,7 +140,9 @@ fn at_least_twenty_mapped_area_blocks() {
     assert!(
         total >= 20,
         "expected >= 20 [[mapped]] or [[files]] blocks; got {} (mapped={}, files={})",
-        total, mapped_blocks, files_blocks
+        total,
+        mapped_blocks,
+        files_blocks
     );
 }
 

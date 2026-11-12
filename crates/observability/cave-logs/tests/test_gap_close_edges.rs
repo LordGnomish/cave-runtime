@@ -12,29 +12,29 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use cave_logs::{
-    chunk::{compress, decode_chunk, decompress, encode_chunk, snappy_raw_compress,
-            snappy_raw_decompress, HeadChunk},
+    chunk::{
+        HeadChunk, compress, decode_chunk, decompress, encode_chunk, snappy_raw_compress,
+        snappy_raw_decompress,
+    },
     index::{ChunkMeta, LabelIndex, StreamKey},
     ingest::loki_push::parse_label_selector,
     limits::{LimitError, LimitsRegistry},
     logql::{
         ast::{
-            BinOp, CompareOp, LabelFilter, LabelFilterValue, LabelMatcher, LineFilter,
-            MatchOp, MetricQuery, Parser as AstParser, PipelineStage, Query, RangeAgg,
-            StreamSelector, VectorAgg,
+            BinOp, CompareOp, LabelFilter, LabelFilterValue, LabelMatcher, LineFilter, MatchOp,
+            MetricQuery, Parser as AstParser, PipelineStage, Query, RangeAgg, StreamSelector,
+            VectorAgg,
         },
         eval::{apply_pipeline, labels_match},
         lexer::{Lexer, Token},
         parser::{ParseError, Parser},
     },
     models::{
-        Chunk, Codec, Direction, EntryValue, Labels, LogEntry, LogStream, PushRequest,
-        TenantLimits,
+        Chunk, Codec, Direction, EntryValue, Labels, LogEntry, LogStream, PushRequest, TenantLimits,
     },
     multitenant::{
-        dry_run_retention, inject_tenant_stream_label, normalize_tenant_label,
-        plan_compaction, tenant_from_headers, CompactionPolicy, RetentionPolicy,
-        DEFAULT_TENANT, TENANT_LABEL,
+        CompactionPolicy, DEFAULT_TENANT, RetentionPolicy, TENANT_LABEL, dry_run_retention,
+        inject_tenant_stream_label, normalize_tenant_label, plan_compaction, tenant_from_headers,
     },
 };
 
@@ -156,10 +156,9 @@ fn direction_codec_serde_round_trip() {
 
 #[test]
 fn entry_value_deserialises_two_element_array() {
-    let req: PushRequest = serde_json::from_str(
-        r#"{"streams":[{"stream":{"app":"x"},"values":[["1000","hello"]]}]}"#,
-    )
-    .unwrap();
+    let req: PushRequest =
+        serde_json::from_str(r#"{"streams":[{"stream":{"app":"x"},"values":[["1000","hello"]]}]}"#)
+            .unwrap();
     assert_eq!(req.streams.len(), 1);
     let ev: &EntryValue = &req.streams[0].values[0];
     assert_eq!(ev.ts_ns, 1000);
@@ -174,31 +173,31 @@ fn entry_value_deserialises_with_metadata() {
     )
     .unwrap();
     let ev = &req.streams[0].values[0];
-    assert_eq!(ev.metadata.as_ref().unwrap().get("k").map(String::as_str), Some("v"));
+    assert_eq!(
+        ev.metadata.as_ref().unwrap().get("k").map(String::as_str),
+        Some("v")
+    );
 }
 
 #[test]
 fn entry_value_rejects_non_array() {
-    let r: Result<PushRequest, _> = serde_json::from_str(
-        r#"{"streams":[{"stream":{},"values":["not-an-array"]}]}"#,
-    );
+    let r: Result<PushRequest, _> =
+        serde_json::from_str(r#"{"streams":[{"stream":{},"values":["not-an-array"]}]}"#);
     assert!(r.is_err());
 }
 
 #[test]
 fn entry_value_rejects_short_array() {
-    let r: Result<PushRequest, _> = serde_json::from_str(
-        r#"{"streams":[{"stream":{},"values":[["1000"]]}]}"#,
-    );
+    let r: Result<PushRequest, _> =
+        serde_json::from_str(r#"{"streams":[{"stream":{},"values":[["1000"]]}]}"#);
     assert!(r.is_err());
 }
 
 #[test]
 fn entry_value_rejects_non_string_timestamp() {
     // ts must be a string in Loki wire format
-    let r: Result<PushRequest, _> = serde_json::from_str(
-        r#"{"streams":[{"stream":{},"values":[[1000,"line"]]}]}"#,
-    );
+    let r: Result<PushRequest, _> =
+        serde_json::from_str(r#"{"streams":[{"stream":{},"values":[[1000,"line"]]}]}"#);
     assert!(r.is_err());
 }
 
@@ -252,7 +251,9 @@ fn lexer_rejects_unknown_duration_unit() {
 
 #[test]
 fn lexer_skips_line_comments() {
-    let toks = Lexer::new("// just a comment\n{app=\"x\"}").tokenize().unwrap();
+    let toks = Lexer::new("// just a comment\n{app=\"x\"}")
+        .tokenize()
+        .unwrap();
     // Comment is consumed; should start with `{`
     assert_eq!(toks.first(), Some(&Token::LBrace));
 }
@@ -316,9 +317,10 @@ fn parser_line_filter_variants_all_parse() {
     match q {
         Query::Log(lq) => {
             assert_eq!(lq.pipeline.len(), 4);
-            for (i, expected_variant) in [
-                "Contains", "NotContains", "Matches", "NotMatches"
-            ].iter().enumerate() {
+            for (i, expected_variant) in ["Contains", "NotContains", "Matches", "NotMatches"]
+                .iter()
+                .enumerate()
+            {
                 let actual = match &lq.pipeline[i] {
                     PipelineStage::LineFilter(LineFilter::Contains(_)) => "Contains",
                     PipelineStage::LineFilter(LineFilter::NotContains(_)) => "NotContains",
@@ -360,10 +362,8 @@ fn parser_topk_records_k() {
 #[test]
 fn parser_binary_precedence_mul_before_add() {
     // rate(..) + rate(..) * rate(..) -> Add with Mul on the right (precedence climbing).
-    let q = Parser::parse_query(
-        r#"rate({a="b"}[1m]) + rate({c="d"}[1m]) * rate({e="f"}[1m])"#,
-    )
-    .unwrap();
+    let q = Parser::parse_query(r#"rate({a="b"}[1m]) + rate({c="d"}[1m]) * rate({e="f"}[1m])"#)
+        .unwrap();
     match q {
         Query::Metric(MetricQuery::BinaryExpr(be)) => {
             assert_eq!(be.op, BinOp::Add);
@@ -536,7 +536,10 @@ fn chunk_encode_decode_preserves_metadata() {
     };
     let decoded = decode_chunk(&chunk).unwrap();
     assert_eq!(decoded.len(), 1);
-    assert_eq!(decoded[0].metadata.get("trace").map(String::as_str), Some("abc"));
+    assert_eq!(
+        decoded[0].metadata.get("trace").map(String::as_str),
+        Some("abc")
+    );
 }
 
 #[test]

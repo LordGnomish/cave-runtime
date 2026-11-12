@@ -25,7 +25,8 @@ pub fn dashboard_panels() -> Vec<DashboardPanel> {
     vec![
         DashboardPanel {
             title: "Falco alerts/min — Critical+".into(),
-            query: "sum(rate(falco_alerts_total{priority=~\"CRITICAL|ALERT|EMERGENCY\"}[1m]))".into(),
+            query: "sum(rate(falco_alerts_total{priority=~\"CRITICAL|ALERT|EMERGENCY\"}[1m]))"
+                .into(),
             unit: "alerts/min",
         },
         DashboardPanel {
@@ -70,7 +71,8 @@ pub fn alert_rules() -> Vec<AlertRule> {
     vec![
         AlertRule {
             alert: "FalcoCriticalAlertSurge".into(),
-            expr: "sum(rate(falco_alerts_total{priority=~\"CRITICAL|ALERT|EMERGENCY\"}[5m])) > 10".into(),
+            expr: "sum(rate(falco_alerts_total{priority=~\"CRITICAL|ALERT|EMERGENCY\"}[5m])) > 10"
+                .into(),
             for_: "5m",
             severity: "page",
             summary: "Falco critical-tier alerts > 10/min for 5m".into(),
@@ -150,7 +152,11 @@ mod tests {
     fn alert_severities_use_known_tiers() {
         let known = ["page", "ticket", "info"];
         for a in alert_rules() {
-            assert!(known.contains(&a.severity), "unknown severity '{}'", a.severity);
+            assert!(
+                known.contains(&a.severity),
+                "unknown severity '{}'",
+                a.severity
+            );
         }
     }
 }

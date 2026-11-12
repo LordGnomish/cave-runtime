@@ -109,10 +109,7 @@ impl CreateRequest {
     /// it back to canonical Modelfile text for the `modelfile` field.
     ///
     /// [`Modelfile`]: crate::modelfile::Modelfile
-    pub fn from_modelfile(
-        model: impl Into<String>,
-        mf: &crate::modelfile::Modelfile,
-    ) -> Self {
+    pub fn from_modelfile(model: impl Into<String>, mf: &crate::modelfile::Modelfile) -> Self {
         Self {
             model: model.into(),
             modelfile: mf.to_modelfile_string(),
@@ -410,19 +407,28 @@ mod tests {
         .unwrap();
         let req = CreateRequest::from_modelfile("derived", &mf);
         assert_eq!(req.model, "derived");
-        assert!(req.modelfile.contains("FROM base"), "got: {}", req.modelfile);
+        assert!(
+            req.modelfile.contains("FROM base"),
+            "got: {}",
+            req.modelfile
+        );
         assert!(
             req.modelfile.contains("PARAMETER temperature \"0.7\""),
             "got: {}",
             req.modelfile
         );
-        assert!(req.modelfile.contains("SYSTEM \"be nice\""), "got: {}", req.modelfile);
+        assert!(
+            req.modelfile.contains("SYSTEM \"be nice\""),
+            "got: {}",
+            req.modelfile
+        );
         assert!(req.stream.is_none());
     }
 
     #[test]
     fn running_model_deserializes() {
-        let raw = r#"[{"name":"qwen3","model":"qwen3-coder-next:Q4_K_M","size":1024,"size_vram":512}]"#;
+        let raw =
+            r#"[{"name":"qwen3","model":"qwen3-coder-next:Q4_K_M","size":1024,"size_vram":512}]"#;
         let v: Vec<RunningModel> = serde_json::from_str(raw).unwrap();
         assert_eq!(v[0].name, "qwen3");
         assert_eq!(v[0].size_vram, 512);

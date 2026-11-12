@@ -52,9 +52,15 @@ impl fmt::Display for ModelfileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModelfileError::MissingFrom => write!(f, "no FROM line"),
-            ModelfileError::InvalidCommand(c) => write!(f, "command must be one of \"from\", \"license\", \"template\", \"system\", \"adapter\", \"parameter\", or \"message\": {c}"),
+            ModelfileError::InvalidCommand(c) => write!(
+                f,
+                "command must be one of \"from\", \"license\", \"template\", \"system\", \"adapter\", \"parameter\", or \"message\": {c}"
+            ),
             ModelfileError::InvalidMessageRole(r) => {
-                write!(f, "role must be one of \"system\", \"user\", or \"assistant\": {r}")
+                write!(
+                    f,
+                    "role must be one of \"system\", \"user\", or \"assistant\": {r}"
+                )
             }
             ModelfileError::UnterminatedQuote => write!(f, "unterminated quoted value"),
         }
@@ -88,11 +94,17 @@ impl Modelfile {
             match keyword.as_str() {
                 "from" => {
                     let value = read_value(rest, &lines, &mut i)?;
-                    commands.push(Command { name: "model".into(), args: value });
+                    commands.push(Command {
+                        name: "model".into(),
+                        args: value,
+                    });
                 }
                 "license" | "template" | "system" | "adapter" => {
                     let value = read_value(rest, &lines, &mut i)?;
-                    commands.push(Command { name: keyword, args: value });
+                    commands.push(Command {
+                        name: keyword,
+                        args: value,
+                    });
                 }
                 "parameter" => {
                     // First token of the remainder is the parameter name; the
@@ -154,7 +166,9 @@ impl Modelfile {
     /// A parameter is any command whose name is not one of the reserved
     /// command names.
     pub fn parameters(&self) -> Vec<(&str, &str)> {
-        const RESERVED: [&str; 6] = ["model", "system", "template", "adapter", "license", "message"];
+        const RESERVED: [&str; 6] = [
+            "model", "system", "template", "adapter", "license", "message",
+        ];
         self.commands
             .iter()
             .filter(|c| !RESERVED.contains(&c.name.as_str()))
@@ -174,7 +188,9 @@ impl Modelfile {
     /// Serialise back to canonical Modelfile text. Cite parser.go
     /// `Command.String()` / `File.String()`.
     pub fn to_modelfile_string(&self) -> String {
-        const RESERVED: [&str; 6] = ["model", "system", "template", "adapter", "license", "message"];
+        const RESERVED: [&str; 6] = [
+            "model", "system", "template", "adapter", "license", "message",
+        ];
         let mut out = String::new();
         for cmd in &self.commands {
             let line = match cmd.name.as_str() {
@@ -226,11 +242,7 @@ fn split_first_word(s: &str) -> (&str, &str) {
 /// `*i`). Handles bare values, single-quoted values, and `"""…"""` triple-quoted
 /// values that may span subsequent lines. On a multiline read, `*i` is advanced
 /// to the line holding the closing delimiter.
-fn read_value(
-    rest: &str,
-    lines: &[&str],
-    i: &mut usize,
-) -> Result<String, ModelfileError> {
+fn read_value(rest: &str, lines: &[&str], i: &mut usize) -> Result<String, ModelfileError> {
     let rest = rest.trim_start();
 
     // Triple-quoted literal — may close on the same line or a later one.

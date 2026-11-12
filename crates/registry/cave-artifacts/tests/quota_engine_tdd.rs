@@ -11,7 +11,7 @@
 //   - src/pkg/quota/driver/driver.go + src/pkg/quota/manager.go (limit check)
 //   - src/lib/errors/quota.go (QuotaExceeded payload listing offending res.)
 
-use cave_artifacts::harbor::quota::{QuotaError, ResourceKind, ResourceList, QuotaUsage};
+use cave_artifacts::harbor::quota::{QuotaError, QuotaUsage, ResourceKind, ResourceList};
 
 // ── ResourceList arithmetic ──────────────────────────────────────────────────
 
@@ -52,9 +52,12 @@ fn within_limit_is_allowed() {
     let hard = ResourceList::new()
         .with(ResourceKind::Count, 10)
         .with(ResourceKind::Storage, 1000);
-    let usage = QuotaUsage::new(hard, ResourceList::new()
-        .with(ResourceKind::Count, 4)
-        .with(ResourceKind::Storage, 400));
+    let usage = QuotaUsage::new(
+        hard,
+        ResourceList::new()
+            .with(ResourceKind::Count, 4)
+            .with(ResourceKind::Storage, 400),
+    );
     // adding 3 count + 500 storage stays under hard.
     let delta = ResourceList::new()
         .with(ResourceKind::Count, 3)
@@ -67,16 +70,22 @@ fn exceeding_storage_is_rejected_and_names_resource() {
     let hard = ResourceList::new()
         .with(ResourceKind::Count, 10)
         .with(ResourceKind::Storage, 1000);
-    let usage = QuotaUsage::new(hard, ResourceList::new()
-        .with(ResourceKind::Count, 4)
-        .with(ResourceKind::Storage, 900));
+    let usage = QuotaUsage::new(
+        hard,
+        ResourceList::new()
+            .with(ResourceKind::Count, 4)
+            .with(ResourceKind::Storage, 900),
+    );
     // +200 storage -> 1100 > 1000.
     let delta = ResourceList::new().with(ResourceKind::Storage, 200);
     match usage.check_add(&delta) {
         Err(QuotaError::Exceeded { resources }) => {
             assert!(resources.iter().any(|r| r.kind == ResourceKind::Storage));
             // the offending entry reports requested/used/hard.
-            let r = resources.iter().find(|r| r.kind == ResourceKind::Storage).unwrap();
+            let r = resources
+                .iter()
+                .find(|r| r.kind == ResourceKind::Storage)
+                .unwrap();
             assert_eq!(r.hard, 1000);
             assert_eq!(r.used, 900);
             assert_eq!(r.requested, 200);
@@ -91,9 +100,12 @@ fn negative_one_hard_means_unlimited() {
     let hard = ResourceList::new()
         .with(ResourceKind::Count, -1)
         .with(ResourceKind::Storage, -1);
-    let usage = QuotaUsage::new(hard, ResourceList::new()
-        .with(ResourceKind::Count, 999_999)
-        .with(ResourceKind::Storage, 1 << 50));
+    let usage = QuotaUsage::new(
+        hard,
+        ResourceList::new()
+            .with(ResourceKind::Count, 999_999)
+            .with(ResourceKind::Storage, 1 << 50),
+    );
     let delta = ResourceList::new()
         .with(ResourceKind::Count, 1_000_000)
         .with(ResourceKind::Storage, 1 << 40);

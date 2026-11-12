@@ -246,7 +246,10 @@ fn update_replacement_preserves_id() {
     apply_update(&mut doc, &upd).unwrap();
     assert_eq!(doc.get("_id"), Some(&json!("abc")));
     assert_eq!(doc.get("name"), Some(&json!("new")));
-    assert!(!doc.contains_key("extra"), "replacement must drop other fields");
+    assert!(
+        !doc.contains_key("extra"),
+        "replacement must drop other fields"
+    );
 }
 
 #[test]
@@ -300,7 +303,10 @@ fn projection_bool_true_flags_inclusion_mode() {
     let mut proj = Document::new();
     proj.insert("a".into(), Value::Bool(true));
     let out = apply_projection(&doc, Some(&proj));
-    assert!(!out.contains_key("b"), "inclusion mode must drop non-listed fields");
+    assert!(
+        !out.contains_key("b"),
+        "inclusion mode must drop non-listed fields"
+    );
     assert!(out.contains_key("_id"), "_id is preserved by default");
 }
 
@@ -389,7 +395,10 @@ async fn cursor_store_kill_removes_and_returns_bool() {
     let s = CursorStore::new();
     let id = s.create("x".into(), make_docs(1), 10).await;
     assert!(s.kill(id).await);
-    assert!(!s.kill(id).await, "killing the same cursor again returns false");
+    assert!(
+        !s.kill(id).await,
+        "killing the same cursor again returns false"
+    );
 }
 
 #[tokio::test]
@@ -467,7 +476,9 @@ async fn engine_find_with_filter_returns_only_matching() {
         .get_or_create_collection("c")
         .await;
     for i in 0..5 {
-        col.insert_one(doc_from_json(json!({"n": i}))).await.unwrap();
+        col.insert_one(doc_from_json(json!({"n": i})))
+            .await
+            .unwrap();
     }
     let f = doc_from_json(json!({"n": 3}));
     let res = col.find(Some(&f)).await.unwrap();
@@ -483,7 +494,9 @@ async fn engine_count_with_and_without_filter() {
         .get_or_create_collection("c")
         .await;
     for _ in 0..3 {
-        col.insert_one(doc_from_json(json!({"k": "v"}))).await.unwrap();
+        col.insert_one(doc_from_json(json!({"k": "v"})))
+            .await
+            .unwrap();
     }
     assert_eq!(col.count(None).await.unwrap(), 3);
     let f = doc_from_json(json!({"k": "v"}));
@@ -501,7 +514,9 @@ async fn engine_delete_many_returns_count_and_drops_docs() {
         .get_or_create_collection("c")
         .await;
     for _ in 0..4 {
-        col.insert_one(doc_from_json(json!({"x": 1}))).await.unwrap();
+        col.insert_one(doc_from_json(json!({"x": 1})))
+            .await
+            .unwrap();
     }
     let f = doc_from_json(json!({"x": 1}));
     let n = col.delete_many(Some(&f)).await.unwrap();
@@ -518,7 +533,9 @@ async fn engine_update_many_applies_to_all_matching() {
         .get_or_create_collection("c")
         .await;
     for _ in 0..3 {
-        col.insert_one(doc_from_json(json!({"state": "old"}))).await.unwrap();
+        col.insert_one(doc_from_json(json!({"state": "old"})))
+            .await
+            .unwrap();
     }
     let f = doc_from_json(json!({"state": "old"}));
     let upd = doc_from_json(json!({"$set": {"state": "new"}}));
@@ -536,7 +553,9 @@ async fn engine_drop_collection_removes_documents() {
         .await
         .get_or_create_collection("c")
         .await;
-    col.insert_one(doc_from_json(json!({"x": 1}))).await.unwrap();
+    col.insert_one(doc_from_json(json!({"x": 1})))
+        .await
+        .unwrap();
     col.drop().await.unwrap();
     assert_eq!(col.count(None).await.unwrap(), 0);
 }
@@ -551,7 +570,9 @@ async fn engine_index_lifecycle_add_list_drop() {
         .await;
     let mut keys = BTreeMap::new();
     keys.insert("a".into(), 1);
-    col.add_index(Index::new("a_idx".into(), keys, false)).await.unwrap();
+    col.add_index(Index::new("a_idx".into(), keys, false))
+        .await
+        .unwrap();
     assert_eq!(col.list_indexes().await.unwrap().len(), 1);
     col.drop_index("a_idx").await.unwrap();
     assert!(col.list_indexes().await.unwrap().is_empty());
@@ -595,7 +616,9 @@ async fn engine_stats_reports_counts() {
         .get_or_create_collection("c")
         .await;
     for _ in 0..3 {
-        col.insert_one(doc_from_json(json!({"x": 1}))).await.unwrap();
+        col.insert_one(doc_from_json(json!({"x": 1})))
+            .await
+            .unwrap();
     }
     let stats = e.stats().await.unwrap();
     assert_eq!(stats.database_count, 1);

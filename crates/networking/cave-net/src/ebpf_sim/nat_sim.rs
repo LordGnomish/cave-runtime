@@ -150,7 +150,11 @@ pub fn snat_v4_new_mapping(
     let mut port = if otuple.sport >= target.min_port && otuple.sport <= target.max_port {
         otuple.sport
     } else {
-        clamp_port_range(target.min_port, target.max_port, helpers.get_prandom_u32() as u16)
+        clamp_port_range(
+            target.min_port,
+            target.max_port,
+            helpers.get_prandom_u32() as u16,
+        )
     };
 
     let mut retries = 0u32;
@@ -239,7 +243,11 @@ mod tests {
     fn new_mapping_creates_forward_and_reverse() {
         let h = Helpers::new();
         let mut m = new_snat_map(1024);
-        let t = NatTarget { addr: u32::from_be_bytes([192, 168, 1, 10]), min_port: 1024, max_port: 65535 };
+        let t = NatTarget {
+            addr: u32::from_be_bytes([192, 168, 1, 10]),
+            min_port: 1024,
+            max_port: 65535,
+        };
         let e = snat_v4_new_mapping(&mut m, &otuple(40000), &t, &h).unwrap();
         assert_eq!(e.to_addr, t.addr);
         assert_eq!(e.to_port, 40000);

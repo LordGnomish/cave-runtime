@@ -57,7 +57,10 @@ fn test_two_alerts_same_distinction_group_together() {
         is_demo: false,
     });
     assert!(r1.group_created, "first alert opens a new group");
-    assert!(!r2.group_created, "second alert joins the existing open group");
+    assert!(
+        !r2.group_created,
+        "second alert joins the existing open group"
+    );
     assert_eq!(r1.group_id, r2.group_id, "same distinction -> same group");
     assert_eq!(eng.open_group_count(), 1);
 }
@@ -96,7 +99,10 @@ fn test_same_distinction_different_channel_do_not_group() {
         is_resolve_signal: false,
         is_demo: false,
     });
-    assert_ne!(a.group_id, b.group_id, "channel is part of the grouping key");
+    assert_ne!(
+        a.group_id, b.group_id,
+        "channel is part of the grouping key"
+    );
 }
 
 #[test]

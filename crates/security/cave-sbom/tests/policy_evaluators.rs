@@ -9,7 +9,7 @@ use cave_sbom::components::ComponentRecord;
 use cave_sbom::models::{AffectedRange, AnalysisState, Severity, VulnIntel, VulnSource};
 use cave_sbom::policy::{
     Operator, Policy, PolicyCondition, ViolationState, evaluate_pipeline,
-    license_group::{LicenseGroup, license_belongs_to_group, KNOWN_GROUPS},
+    license_group::{KNOWN_GROUPS, LicenseGroup, license_belongs_to_group},
     version_distance::versions_behind,
     vuln_id::component_has_vuln_id,
 };
@@ -63,7 +63,10 @@ fn gpl3_belongs_to_copyleft_group() {
 
 #[test]
 fn apache2_belongs_to_permissive_group() {
-    assert!(license_belongs_to_group("Apache-2.0", LicenseGroup::Permissive));
+    assert!(license_belongs_to_group(
+        "Apache-2.0",
+        LicenseGroup::Permissive
+    ));
 }
 
 #[test]
@@ -73,18 +76,30 @@ fn mit_belongs_to_permissive_group() {
 
 #[test]
 fn agpl3_belongs_to_copyleft_group() {
-    assert!(license_belongs_to_group("AGPL-3.0-only", LicenseGroup::Copyleft));
+    assert!(license_belongs_to_group(
+        "AGPL-3.0-only",
+        LicenseGroup::Copyleft
+    ));
 }
 
 #[test]
 fn unknown_license_belongs_to_no_group() {
-    assert!(!license_belongs_to_group("PROPRIETARY-X", LicenseGroup::Copyleft));
-    assert!(!license_belongs_to_group("PROPRIETARY-X", LicenseGroup::Permissive));
+    assert!(!license_belongs_to_group(
+        "PROPRIETARY-X",
+        LicenseGroup::Copyleft
+    ));
+    assert!(!license_belongs_to_group(
+        "PROPRIETARY-X",
+        LicenseGroup::Permissive
+    ));
 }
 
 #[test]
 fn lgpl21_belongs_to_weakcopyleft_group() {
-    assert!(license_belongs_to_group("LGPL-2.1", LicenseGroup::WeakCopyleft));
+    assert!(license_belongs_to_group(
+        "LGPL-2.1",
+        LicenseGroup::WeakCopyleft
+    ));
 }
 
 #[test]
@@ -107,7 +122,11 @@ fn policy_license_in_copyleft_group_fires_on_gpl3() {
     };
     let c = mk_comp("lib", Some("GPL-3.0"), "1.0");
     let viols = evaluate_pipeline(&[p], &[c], &[], Utc::now());
-    assert_eq!(viols.len(), 1, "GPL-3.0 component must violate Copyleft group policy");
+    assert_eq!(
+        viols.len(),
+        1,
+        "GPL-3.0 component must violate Copyleft group policy"
+    );
 }
 
 #[test]
@@ -123,7 +142,10 @@ fn policy_license_in_copyleft_group_does_not_fire_on_mit() {
     };
     let c = mk_comp("lib", Some("MIT"), "1.0");
     let viols = evaluate_pipeline(&[p], &[c], &[], Utc::now());
-    assert!(viols.is_empty(), "MIT component must not violate Copyleft group policy");
+    assert!(
+        viols.is_empty(),
+        "MIT component must not violate Copyleft group policy"
+    );
 }
 
 #[test]
@@ -139,7 +161,10 @@ fn policy_license_in_group_no_license_does_not_fire() {
     };
     let c = mk_comp("lib", None, "1.0");
     let viols = evaluate_pipeline(&[p], &[c], &[], Utc::now());
-    assert!(viols.is_empty(), "component with no license must not violate group policy");
+    assert!(
+        viols.is_empty(),
+        "component with no license must not violate group policy"
+    );
 }
 
 // ─── 3. VersionDistance evaluator ───────────────────────────────────────────
@@ -170,7 +195,10 @@ fn versions_behind_returns_max_when_version_not_in_list() {
     // If the component version isn't in the list, assume maximum lag.
     let available = vec!["1.0.0", "2.0.0"];
     let behind = versions_behind("0.5.0", &available);
-    assert_eq!(behind, 2, "unknown version should be treated as maximally old");
+    assert_eq!(
+        behind, 2,
+        "unknown version should be treated as maximally old"
+    );
 }
 
 // ─── 4. VersionDistance PolicyCondition fires on old component ──────────────
@@ -191,7 +219,11 @@ fn policy_version_distance_fires_when_too_far_behind() {
     };
     let c = mk_comp("pkg", Some("MIT"), "1.0.0");
     let viols = evaluate_pipeline(&[p], &[c], &[], Utc::now());
-    assert_eq!(viols.len(), 1, "component 2 versions behind threshold=1 should violate");
+    assert_eq!(
+        viols.len(),
+        1,
+        "component 2 versions behind threshold=1 should violate"
+    );
 }
 
 #[test]

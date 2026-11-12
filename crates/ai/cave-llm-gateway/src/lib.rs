@@ -39,20 +39,20 @@ pub mod streaming;
 use axum::Router;
 use std::sync::Arc;
 
-pub use bench_wire::{BenchOutcome, BenchPrompt, BenchSummary, BenchTarget, BENCH_PROMPT_IDS};
+pub use bench_wire::{BENCH_PROMPT_IDS, BenchOutcome, BenchPrompt, BenchSummary, BenchTarget};
 pub use capability::{
-    seed_catalogue, seeded_router, CapabilityRequest, CapabilityRouter, Locality, ModelCapability,
+    CapabilityRequest, CapabilityRouter, Locality, ModelCapability, seed_catalogue, seeded_router,
 };
 pub use error::{GatewayError, GatewayResult};
-pub use health::{check_all as check_health, HealthReport, HealthState, ProviderHealth};
+pub use health::{HealthReport, HealthState, ProviderHealth, check_all as check_health};
 pub use hermes_bridge::{
-    classify_provider as classify_hermes_provider, from_hermes_request, to_hermes_response,
-    HermesCompletionRequest, HermesCompletionResponse, HermesProviderKind,
-    HERMES_REQUIRED_PROVIDERS,
+    HERMES_REQUIRED_PROVIDERS, HermesCompletionRequest, HermesCompletionResponse,
+    HermesProviderKind, classify_provider as classify_hermes_provider, from_hermes_request,
+    to_hermes_response,
 };
-pub use keychain::{resolve as resolve_api_key, KeySource, KeychainProvider};
-pub use metrics::{global as global_metrics, GatewayMetrics, ProviderStats};
-pub use retry::{with_retry, RetryPolicy};
+pub use keychain::{KeySource, KeychainProvider, resolve as resolve_api_key};
+pub use metrics::{GatewayMetrics, ProviderStats, global as global_metrics};
+pub use retry::{RetryPolicy, with_retry};
 pub use router::GatewayRouter;
 
 /// Crate identity. Charter v2 gate (`gate_1_upstream_version_pinned`)

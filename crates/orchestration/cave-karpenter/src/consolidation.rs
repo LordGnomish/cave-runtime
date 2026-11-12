@@ -128,7 +128,11 @@ fn pack_new_nodes(pods: &[PodSpec], offerings: &[InstanceOffering]) -> Option<Ve
     }
     // Cheapest offerings first — consolidation minimises price.
     let mut sorted_offerings: Vec<&InstanceOffering> = offerings.iter().collect();
-    sorted_offerings.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_offerings.sort_by(|a, b| {
+        a.price
+            .partial_cmp(&b.price)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Largest pods first — first-fit-decreasing.
     let mut sorted_pods: Vec<&PodSpec> = pods.iter().collect();
@@ -390,8 +394,20 @@ mod tests {
     fn pack_new_nodes_uses_cheapest_fitting_offering() {
         let pods = vec![pod("a", 500, 512)];
         let offerings = vec![
-            InstanceOffering { name: "pricey".into(), cpu_millis: 4000, memory_mib: 8192, zone: "z".into(), price: 9.0 },
-            InstanceOffering { name: "cheap".into(), cpu_millis: 1000, memory_mib: 1024, zone: "z".into(), price: 2.0 },
+            InstanceOffering {
+                name: "pricey".into(),
+                cpu_millis: 4000,
+                memory_mib: 8192,
+                zone: "z".into(),
+                price: 9.0,
+            },
+            InstanceOffering {
+                name: "cheap".into(),
+                cpu_millis: 1000,
+                memory_mib: 1024,
+                zone: "z".into(),
+                price: 2.0,
+            },
         ];
         let claims = pack_new_nodes(&pods, &offerings).unwrap();
         assert_eq!(claims.len(), 1);
@@ -401,7 +417,13 @@ mod tests {
     #[test]
     fn pack_new_nodes_none_when_pod_fits_nothing() {
         let pods = vec![pod("huge", 9000, 9000)];
-        let offerings = vec![InstanceOffering { name: "s".into(), cpu_millis: 1000, memory_mib: 1024, zone: "z".into(), price: 1.0 }];
+        let offerings = vec![InstanceOffering {
+            name: "s".into(),
+            cpu_millis: 1000,
+            memory_mib: 1024,
+            zone: "z".into(),
+            price: 1.0,
+        }];
         assert!(pack_new_nodes(&pods, &offerings).is_none());
     }
 

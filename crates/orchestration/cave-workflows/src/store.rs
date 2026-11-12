@@ -38,7 +38,11 @@ impl WorkflowStore {
     pub fn list(&self, namespace: Option<&str>) -> Vec<Workflow> {
         let all = self.by_id.read().unwrap();
         match namespace {
-            Some(ns) => all.values().filter(|w| w.namespace == ns).cloned().collect(),
+            Some(ns) => all
+                .values()
+                .filter(|w| w.namespace == ns)
+                .cloned()
+                .collect(),
             None => all.values().cloned().collect(),
         }
     }

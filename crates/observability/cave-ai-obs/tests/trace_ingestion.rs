@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for trace/span/generation ingestion core.
 
-use cave_ai_obs::trace_store::{TraceStore, TraceStatus};
-use cave_ai_obs::trace_models::{Trace, Span, Generation, Score, PromptTemplate};
+use cave_ai_obs::trace_models::{Generation, PromptTemplate, Score, Span, Trace};
+use cave_ai_obs::trace_store::{TraceStatus, TraceStore};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -292,7 +292,9 @@ fn test_prompt_template_crud() {
         created_at: Utc::now(),
     };
     store.upsert_prompt_template(tmpl.clone());
-    let retrieved = store.get_prompt_template("system-prompt-v1", 1).expect("must exist");
+    let retrieved = store
+        .get_prompt_template("system-prompt-v1", 1)
+        .expect("must exist");
     assert_eq!(retrieved.content, tmpl.content);
     assert_eq!(retrieved.variables, vec!["context".to_string()]);
 }
@@ -313,7 +315,9 @@ fn test_prompt_template_versioning() {
     }
     let versions = store.list_prompt_versions("my-prompt");
     assert_eq!(versions.len(), 3);
-    let active = store.get_active_prompt("my-prompt").expect("active version");
+    let active = store
+        .get_active_prompt("my-prompt")
+        .expect("active version");
     assert_eq!(active.version, 3);
 }
 

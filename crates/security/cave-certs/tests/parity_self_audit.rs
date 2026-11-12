@@ -36,8 +36,14 @@ fn walkdir(dir: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn g1_upstream_version_pinned() {
     let m = read_manifest();
-    assert!(m.contains("version"), "G1: [upstream] version must be present");
-    assert!(m.contains("source_sha"), "G1: [upstream] source_sha must be present");
+    assert!(
+        m.contains("version"),
+        "G1: [upstream] version must be present"
+    );
+    assert!(
+        m.contains("source_sha"),
+        "G1: [upstream] source_sha must be present"
+    );
 }
 
 /// G2: every .rs source file has the SPDX header.

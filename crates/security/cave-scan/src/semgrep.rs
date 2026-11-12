@@ -84,16 +84,11 @@ fn pattern_tokens(pat: &str) -> Vec<String> {
     tokenize(pat).into_iter().map(|(_, t)| t).collect()
 }
 
-fn match_at(
-    tokens: &[(usize, String)],
-    pat: &[String],
-    start: usize,
-) -> Option<String> {
+fn match_at(tokens: &[(usize, String)], pat: &[String], start: usize) -> Option<String> {
     if start + pat.len() > tokens.len() {
         return None;
     }
-    let mut bindings: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
+    let mut bindings: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let mut acc = String::new();
     for (i, p) in pat.iter().enumerate() {
         let actual = &tokens[start + i].1;
@@ -117,10 +112,7 @@ fn match_at(
     Some(acc)
 }
 
-fn eval_pattern(
-    tokens: &[(usize, String)],
-    pat: &SemgrepPattern,
-) -> Vec<(usize, String)> {
+fn eval_pattern(tokens: &[(usize, String)], pat: &SemgrepPattern) -> Vec<(usize, String)> {
     match pat {
         SemgrepPattern::Pattern(p) => {
             let needle = pattern_tokens(p);

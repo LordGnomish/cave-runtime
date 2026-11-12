@@ -77,11 +77,7 @@ fn cert_request_approve_and_deny_state_transitions() {
     let mut cr2 = CertificateRequest::new(TENANT, spec(issuer, "csr-2"));
     cr2.deny(DenialReason::PolicyViolation, "No wildcard certs allowed");
     assert_eq!(cr2.state, CertificateRequestState::Denied);
-    assert!(cr2
-        .failure_message
-        .as_deref()
-        .unwrap()
-        .contains("wildcard"));
+    assert!(cr2.failure_message.as_deref().unwrap().contains("wildcard"));
 }
 
 /// Cite: cert-manager controller — once Approved the issuer issues the cert
@@ -93,11 +89,12 @@ fn cert_request_issue_stamps_pem_and_transitions_issued() {
     cr.approve();
     cr.issue("-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n");
     assert_eq!(cr.state, CertificateRequestState::Issued);
-    assert!(cr
-        .certificate_pem
-        .as_deref()
-        .unwrap()
-        .starts_with("-----BEGIN CERTIFICATE-----"));
+    assert!(
+        cr.certificate_pem
+            .as_deref()
+            .unwrap()
+            .starts_with("-----BEGIN CERTIFICATE-----")
+    );
 }
 
 /// Cite: cert-manager — a CertificateRequest that has been Issued cannot

@@ -78,7 +78,10 @@ fn pipeline_starts_with_migration_and_ends_with_ingress() {
 }
 
 fn idx(step: &str) -> usize {
-    default_pipeline().iter().position(|s| *s == step).expect(step)
+    default_pipeline()
+        .iter()
+        .position(|s| *s == step)
+        .expect(step)
 }
 
 #[test]
@@ -165,7 +168,10 @@ fn reconcile_is_idempotent_once_converged() {
     // every subsequent pass is a no-op: the datastore-setup step stays
     // converged so no further datastore work is performed.
     let pass = r.reconcile(&mut t, &mut c).unwrap();
-    assert!(pass.applied.is_empty(), "converged pipeline applies nothing");
+    assert!(
+        pass.applied.is_empty(),
+        "converged pipeline applies nothing"
+    );
     assert_eq!(t.status.phase, TenantPhase::Running);
     assert!(c.connection.db_exists("tenants_alpha").unwrap());
 }
@@ -201,7 +207,10 @@ fn deployment_step_builds_the_three_dedicated_components() {
     let mut t = tcp();
     let (mut conn, setup) = ctx_parts();
     let mut r = Reconciler::new();
-    assert!(r.control_plane().is_none(), "no components before reconcile");
+    assert!(
+        r.control_plane().is_none(),
+        "no components before reconcile"
+    );
 
     let mut c = ReconcileContext {
         connection: &mut conn,
@@ -213,11 +222,17 @@ fn deployment_step_builds_the_three_dedicated_components() {
 
     // Once the `deployment` step converges, the dedicated apiserver +
     // controller-manager + scheduler container plan exists, in that order.
-    let cp = r.control_plane().expect("deployment step materialised the CP");
+    let cp = r
+        .control_plane()
+        .expect("deployment step materialised the CP");
     let names: Vec<&str> = cp.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(
         names,
-        vec!["kube-apiserver", "kube-controller-manager", "kube-scheduler"]
+        vec![
+            "kube-apiserver",
+            "kube-controller-manager",
+            "kube-scheduler"
+        ]
     );
 }
 
@@ -244,7 +259,10 @@ fn kine_backed_tenant_apiserver_points_at_local_kine_sidecar() {
         "SQL/kine driver routes the apiserver at the local Kine etcd shim"
     );
     assert!(
-        !apiserver.args.iter().any(|a| a.starts_with("--etcd-prefix")),
+        !apiserver
+            .args
+            .iter()
+            .any(|a| a.starts_with("--etcd-prefix")),
         "kine driver does not set an etcd key prefix"
     );
 }

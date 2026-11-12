@@ -59,84 +59,234 @@ pub fn mitre_techniques() -> Vec<MitreTechnique> {
     let mut out = Vec::new();
 
     // ── Initial Access ────────────────────────────────────────────────────────
-    out.push(tech("T1190", Tactic::InitialAccess, "Exploit Public-Facing Application", Severity::Critical,
-        "Detect cluster-edge LoadBalancer/Ingress exposing application endpoints to internet."));
-    out.push(tech("T1133", Tactic::InitialAccess, "External Remote Services", Severity::High,
-        "Detect exposed Kubernetes Dashboard, kubectl proxy or remote-exec."));
-    out.push(tech("T1078", Tactic::InitialAccess, "Valid Accounts", Severity::High,
-        "Detect anonymous-auth=true or service-account token reuse from outside cluster."));
+    out.push(tech(
+        "T1190",
+        Tactic::InitialAccess,
+        "Exploit Public-Facing Application",
+        Severity::Critical,
+        "Detect cluster-edge LoadBalancer/Ingress exposing application endpoints to internet.",
+    ));
+    out.push(tech(
+        "T1133",
+        Tactic::InitialAccess,
+        "External Remote Services",
+        Severity::High,
+        "Detect exposed Kubernetes Dashboard, kubectl proxy or remote-exec.",
+    ));
+    out.push(tech(
+        "T1078",
+        Tactic::InitialAccess,
+        "Valid Accounts",
+        Severity::High,
+        "Detect anonymous-auth=true or service-account token reuse from outside cluster.",
+    ));
 
     // ── Execution ─────────────────────────────────────────────────────────────
-    out.push(tech("T1610", Tactic::Execution, "Deploy Container", Severity::High,
-        "Detect new privileged-pod admissions outside known controllers."));
-    out.push(tech("T1059", Tactic::Execution, "Command and Scripting Interpreter", Severity::Medium,
-        "Detect kubectl exec into prod pods (cross-correlated with audit log)."));
-    out.push(tech("T1609", Tactic::Execution, "Container Administration Command", Severity::High,
-        "Detect kubectl run with custom-entrypoint."));
+    out.push(tech(
+        "T1610",
+        Tactic::Execution,
+        "Deploy Container",
+        Severity::High,
+        "Detect new privileged-pod admissions outside known controllers.",
+    ));
+    out.push(tech(
+        "T1059",
+        Tactic::Execution,
+        "Command and Scripting Interpreter",
+        Severity::Medium,
+        "Detect kubectl exec into prod pods (cross-correlated with audit log).",
+    ));
+    out.push(tech(
+        "T1609",
+        Tactic::Execution,
+        "Container Administration Command",
+        Severity::High,
+        "Detect kubectl run with custom-entrypoint.",
+    ));
 
     // ── Persistence ───────────────────────────────────────────────────────────
-    out.push(tech("T1543", Tactic::Persistence, "Create or Modify System Process", Severity::High,
-        "Detect creation of DaemonSets running on every node."));
-    out.push(tech("T1098", Tactic::Persistence, "Account Manipulation", Severity::Critical,
-        "Detect cluster-admin role-binding modifications."));
-    out.push(tech("T1525", Tactic::Persistence, "Implant Internal Image", Severity::High,
-        "Detect new image being pushed to internal registry with sensitive labels."));
+    out.push(tech(
+        "T1543",
+        Tactic::Persistence,
+        "Create or Modify System Process",
+        Severity::High,
+        "Detect creation of DaemonSets running on every node.",
+    ));
+    out.push(tech(
+        "T1098",
+        Tactic::Persistence,
+        "Account Manipulation",
+        Severity::Critical,
+        "Detect cluster-admin role-binding modifications.",
+    ));
+    out.push(tech(
+        "T1525",
+        Tactic::Persistence,
+        "Implant Internal Image",
+        Severity::High,
+        "Detect new image being pushed to internal registry with sensitive labels.",
+    ));
 
     // ── Privilege Escalation ──────────────────────────────────────────────────
-    out.push(tech("T1611", Tactic::PrivilegeEscalation, "Escape to Host", Severity::Critical,
-        "Detect host-namespace flags (hostPID/hostIPC/hostNetwork) on new pods."));
-    out.push(tech("T1078.001", Tactic::PrivilegeEscalation, "Default Accounts", Severity::High,
-        "Detect default service-account being used to access secrets."));
-    out.push(tech("T1068", Tactic::PrivilegeEscalation, "Exploitation for Privilege Escalation", Severity::Critical,
-        "Detect kernel-exploit indicators (capabilities + sysctl)."));
+    out.push(tech(
+        "T1611",
+        Tactic::PrivilegeEscalation,
+        "Escape to Host",
+        Severity::Critical,
+        "Detect host-namespace flags (hostPID/hostIPC/hostNetwork) on new pods.",
+    ));
+    out.push(tech(
+        "T1078.001",
+        Tactic::PrivilegeEscalation,
+        "Default Accounts",
+        Severity::High,
+        "Detect default service-account being used to access secrets.",
+    ));
+    out.push(tech(
+        "T1068",
+        Tactic::PrivilegeEscalation,
+        "Exploitation for Privilege Escalation",
+        Severity::Critical,
+        "Detect kernel-exploit indicators (capabilities + sysctl).",
+    ));
 
     // ── Defense Evasion ───────────────────────────────────────────────────────
-    out.push(tech("T1036", Tactic::DefenseEvasion, "Masquerading", Severity::Medium,
-        "Detect pod-name patterns mimicking system pods (kube-*, etcd-*)."));
-    out.push(tech("T1562", Tactic::DefenseEvasion, "Impair Defenses", Severity::High,
-        "Detect deletion of NetworkPolicies, audit-policy or admission webhooks."));
-    out.push(tech("T1070", Tactic::DefenseEvasion, "Indicator Removal", Severity::High,
-        "Detect log-tail truncation events or audit-policy edit."));
+    out.push(tech(
+        "T1036",
+        Tactic::DefenseEvasion,
+        "Masquerading",
+        Severity::Medium,
+        "Detect pod-name patterns mimicking system pods (kube-*, etcd-*).",
+    ));
+    out.push(tech(
+        "T1562",
+        Tactic::DefenseEvasion,
+        "Impair Defenses",
+        Severity::High,
+        "Detect deletion of NetworkPolicies, audit-policy or admission webhooks.",
+    ));
+    out.push(tech(
+        "T1070",
+        Tactic::DefenseEvasion,
+        "Indicator Removal",
+        Severity::High,
+        "Detect log-tail truncation events or audit-policy edit.",
+    ));
 
     // ── Credential Access ─────────────────────────────────────────────────────
-    out.push(tech("T1552.007", Tactic::CredentialAccess, "Container API", Severity::High,
-        "Detect pods reading service-account-token files via mountedSAToken."));
-    out.push(tech("T1539", Tactic::CredentialAccess, "Steal Web Session Cookie", Severity::Medium,
-        "Detect kubeconfig token harvesting."));
-    out.push(tech("T1212", Tactic::CredentialAccess, "Exploitation for Credential Access", Severity::High,
-        "Detect kube-apiserver --insecure-port=8080 listening on host."));
+    out.push(tech(
+        "T1552.007",
+        Tactic::CredentialAccess,
+        "Container API",
+        Severity::High,
+        "Detect pods reading service-account-token files via mountedSAToken.",
+    ));
+    out.push(tech(
+        "T1539",
+        Tactic::CredentialAccess,
+        "Steal Web Session Cookie",
+        Severity::Medium,
+        "Detect kubeconfig token harvesting.",
+    ));
+    out.push(tech(
+        "T1212",
+        Tactic::CredentialAccess,
+        "Exploitation for Credential Access",
+        Severity::High,
+        "Detect kube-apiserver --insecure-port=8080 listening on host.",
+    ));
 
     // ── Discovery ─────────────────────────────────────────────────────────────
-    out.push(tech("T1613", Tactic::Discovery, "Container and Resource Discovery", Severity::Low,
-        "Detect pods enumerating cluster resources via /api or /apis."));
-    out.push(tech("T1018", Tactic::Discovery, "Remote System Discovery", Severity::Low,
-        "Detect port-scan from inside cluster (mass-connect events)."));
-    out.push(tech("T1046", Tactic::Discovery, "Network Service Discovery", Severity::Medium,
-        "Detect cluster-internal nmap-style scans via Hubble flows."));
+    out.push(tech(
+        "T1613",
+        Tactic::Discovery,
+        "Container and Resource Discovery",
+        Severity::Low,
+        "Detect pods enumerating cluster resources via /api or /apis.",
+    ));
+    out.push(tech(
+        "T1018",
+        Tactic::Discovery,
+        "Remote System Discovery",
+        Severity::Low,
+        "Detect port-scan from inside cluster (mass-connect events).",
+    ));
+    out.push(tech(
+        "T1046",
+        Tactic::Discovery,
+        "Network Service Discovery",
+        Severity::Medium,
+        "Detect cluster-internal nmap-style scans via Hubble flows.",
+    ));
 
     // ── Lateral Movement ──────────────────────────────────────────────────────
-    out.push(tech("T1021", Tactic::LateralMovement, "Remote Services", Severity::High,
-        "Detect cross-namespace SSH/RDP-equivalent traffic."));
-    out.push(tech("T1550", Tactic::LateralMovement, "Use Alternate Authentication Material", Severity::High,
-        "Detect bearer-token reuse from a different IP/pod."));
-    out.push(tech("T1080", Tactic::LateralMovement, "Taint Shared Content", Severity::Medium,
-        "Detect modification of shared PVCs across namespaces."));
+    out.push(tech(
+        "T1021",
+        Tactic::LateralMovement,
+        "Remote Services",
+        Severity::High,
+        "Detect cross-namespace SSH/RDP-equivalent traffic.",
+    ));
+    out.push(tech(
+        "T1550",
+        Tactic::LateralMovement,
+        "Use Alternate Authentication Material",
+        Severity::High,
+        "Detect bearer-token reuse from a different IP/pod.",
+    ));
+    out.push(tech(
+        "T1080",
+        Tactic::LateralMovement,
+        "Taint Shared Content",
+        Severity::Medium,
+        "Detect modification of shared PVCs across namespaces.",
+    ));
 
     // ── Collection ────────────────────────────────────────────────────────────
-    out.push(tech("T1602", Tactic::Collection, "Data from Configuration Repository", Severity::Medium,
-        "Detect mass-read of ConfigMaps."));
-    out.push(tech("T1530", Tactic::Collection, "Data from Cloud Storage", Severity::High,
-        "Detect S3/GCS-presigned URL emission from pods."));
-    out.push(tech("T1213", Tactic::Collection, "Data from Information Repositories", Severity::Medium,
-        "Detect bulk secret retrieval."));
+    out.push(tech(
+        "T1602",
+        Tactic::Collection,
+        "Data from Configuration Repository",
+        Severity::Medium,
+        "Detect mass-read of ConfigMaps.",
+    ));
+    out.push(tech(
+        "T1530",
+        Tactic::Collection,
+        "Data from Cloud Storage",
+        Severity::High,
+        "Detect S3/GCS-presigned URL emission from pods.",
+    ));
+    out.push(tech(
+        "T1213",
+        Tactic::Collection,
+        "Data from Information Repositories",
+        Severity::Medium,
+        "Detect bulk secret retrieval.",
+    ));
 
     // ── Impact ────────────────────────────────────────────────────────────────
-    out.push(tech("T1485", Tactic::Impact, "Data Destruction", Severity::Critical,
-        "Detect bulk DELETE against secrets, configmaps, namespaces."));
-    out.push(tech("T1499", Tactic::Impact, "Endpoint Denial of Service", Severity::High,
-        "Detect node-level cpu/mem flood from unprivileged tenants."));
-    out.push(tech("T1496", Tactic::Impact, "Resource Hijacking", Severity::Critical,
-        "Detect cryptominer-style sustained 100% CPU."));
+    out.push(tech(
+        "T1485",
+        Tactic::Impact,
+        "Data Destruction",
+        Severity::Critical,
+        "Detect bulk DELETE against secrets, configmaps, namespaces.",
+    ));
+    out.push(tech(
+        "T1499",
+        Tactic::Impact,
+        "Endpoint Denial of Service",
+        Severity::High,
+        "Detect node-level cpu/mem flood from unprivileged tenants.",
+    ));
+    out.push(tech(
+        "T1496",
+        Tactic::Impact,
+        "Resource Hijacking",
+        Severity::Critical,
+        "Detect cryptominer-style sustained 100% CPU.",
+    ));
 
     out
 }
@@ -157,8 +307,11 @@ fn tech(id: &str, tactic: Tactic, title: &str, sev: Severity, detection: &str) -
 }
 
 /// Group techniques by tactic for coverage reports.
-pub fn group_by_tactic(t: &[MitreTechnique]) -> std::collections::HashMap<Tactic, Vec<MitreTechnique>> {
-    let mut m: std::collections::HashMap<Tactic, Vec<MitreTechnique>> = std::collections::HashMap::new();
+pub fn group_by_tactic(
+    t: &[MitreTechnique],
+) -> std::collections::HashMap<Tactic, Vec<MitreTechnique>> {
+    let mut m: std::collections::HashMap<Tactic, Vec<MitreTechnique>> =
+        std::collections::HashMap::new();
     for x in t {
         m.entry(x.tactic).or_default().push(x.clone());
     }

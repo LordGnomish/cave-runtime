@@ -147,16 +147,36 @@ fn gate_rollup_consistency() {
     for line in body.lines() {
         let t = line.trim_start();
         if let Some(rhs) = t.strip_prefix("mapped_count") {
-            m = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            m = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("partial_count") {
-            p = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            p = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("skipped_count") {
-            s = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            s = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("unmapped_count") {
-            u = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            u = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("total") {
             if !t.starts_with("total_") {
-                total = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+                total = rhs
+                    .trim_start_matches([' ', '='])
+                    .trim()
+                    .parse()
+                    .unwrap_or(0);
             }
         }
     }

@@ -136,7 +136,11 @@ pub struct ExpansionTemplate {
 impl ExpansionTemplate {
     /// `applyToGVKs` (db.go:278) — flatten every ApplyTo on the template.
     fn apply_to_gvks(&self) -> Vec<GroupVersionKind> {
-        self.spec.apply_to.iter().flat_map(|a| a.flatten()).collect()
+        self.spec
+            .apply_to
+            .iter()
+            .flat_map(|a| a.flatten())
+            .collect()
     }
 }
 
@@ -212,15 +216,13 @@ fn nested_map(obj: &Value, path: &[&str]) -> PolicyResult<Option<Value>> {
             _ => {
                 return Err(PolicyError::Validation(format!(
                     "could not extract source field: {seg} is not an object"
-                )))
+                )));
             }
         }
     }
     match cur {
         Value::Object(_) => Ok(Some(cur.clone())),
-        _ => Err(PolicyError::Validation(
-            "source field is not a map".into(),
-        )),
+        _ => Err(PolicyError::Validation("source field is not a map".into())),
     }
 }
 
@@ -262,7 +264,10 @@ fn mock_name_for_resource(generator: &Value, gvk: &GroupVersionKind) -> String {
 /// `ensureOwnerReference` (system.go:258) — append an OwnerReference for the
 /// parent if one is not already present (matched on apiVersion+kind+name).
 fn ensure_owner_reference(resultant: &mut Value, parent: &Value) {
-    let parent_api_version = parent.get("apiVersion").and_then(Value::as_str).unwrap_or("");
+    let parent_api_version = parent
+        .get("apiVersion")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let parent_kind = parent.get("kind").and_then(Value::as_str).unwrap_or("");
     let parent_name = parent
         .pointer("/metadata/name")
@@ -296,7 +301,10 @@ fn ensure_owner_reference(resultant: &mut Value, parent: &Value) {
         }
     }
     let mut new_ref = Map::new();
-    new_ref.insert("apiVersion".into(), Value::String(parent_api_version.into()));
+    new_ref.insert(
+        "apiVersion".into(),
+        Value::String(parent_api_version.into()),
+    );
     new_ref.insert("kind".into(), Value::String(parent_kind.into()));
     new_ref.insert("name".into(), Value::String(parent_name.into()));
     arr.push(Value::Object(new_ref));
@@ -425,7 +433,10 @@ impl TemplateDb {
         );
 
         let gen_gvk = template.spec.generated_gvk.to_gvk();
-        self.generators.entry(gen_gvk).or_default().insert(id.clone());
+        self.generators
+            .entry(gen_gvk)
+            .or_default()
+            .insert(id.clone());
         for m in template.apply_to_gvks() {
             self.matchers.entry(m).or_default().insert(id.clone());
         }

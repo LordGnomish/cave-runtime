@@ -192,7 +192,10 @@ mod tests {
         })
         .await
         .unwrap_err();
-        assert!(matches!(err, GatewayError::UpstreamError { status: 400, .. }));
+        assert!(matches!(
+            err,
+            GatewayError::UpstreamError { status: 400, .. }
+        ));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }

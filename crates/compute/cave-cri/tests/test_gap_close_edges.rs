@@ -6,9 +6,8 @@
 use cave_cri::error::{CriError, CriResult};
 use cave_cri::leases::resource::{Resource, ResourceKind};
 use cave_cri::models::{
-    Container, ContainerSpec, ContainerStatus, ImageReference, NetworkMode, OciImage, OciLayer,
-    ImageConfig, ResourceLimits, RestartPolicy, Sandbox, SandboxSpec, SandboxState,
-    UserNamespaceMode,
+    Container, ContainerSpec, ContainerStatus, ImageConfig, ImageReference, NetworkMode, OciImage,
+    OciLayer, ResourceLimits, RestartPolicy, Sandbox, SandboxSpec, SandboxState, UserNamespaceMode,
 };
 use cave_cri::store::{ContainerStore, ImageStore, SandboxStore};
 use chrono::Utc;
@@ -91,17 +90,35 @@ fn make_sandbox(name: &str) -> Sandbox {
 #[test]
 fn cri_error_display_includes_context() {
     assert!(CriError::NotFound("abc".into()).to_string().contains("abc"));
-    assert!(CriError::InvalidState("paused".into()).to_string().contains("paused"));
-    assert!(CriError::Namespace("netns".into()).to_string().contains("netns"));
-    assert!(CriError::Cgroup("memory.limit".into()).to_string().contains("memory.limit"));
+    assert!(CriError::InvalidState("paused".into())
+        .to_string()
+        .contains("paused"));
+    assert!(CriError::Namespace("netns".into())
+        .to_string()
+        .contains("netns"));
+    assert!(CriError::Cgroup("memory.limit".into())
+        .to_string()
+        .contains("memory.limit"));
     assert!(CriError::Registry("404".into()).to_string().contains("404"));
-    assert!(CriError::Rootfs("ENOSPC".into()).to_string().contains("ENOSPC"));
+    assert!(CriError::Rootfs("ENOSPC".into())
+        .to_string()
+        .contains("ENOSPC"));
     assert!(CriError::Runtime("oom".into()).to_string().contains("oom"));
-    assert!(CriError::Image("digest mismatch".into()).to_string().contains("digest mismatch"));
-    assert!(CriError::Sandbox("uid clash".into()).to_string().contains("uid clash"));
-    assert!(CriError::Snapshot("locked".into()).to_string().contains("locked"));
-    assert!(CriError::Network("CNI failed".into()).to_string().contains("CNI failed"));
-    assert!(CriError::Exec("nonzero".into()).to_string().contains("nonzero"));
+    assert!(CriError::Image("digest mismatch".into())
+        .to_string()
+        .contains("digest mismatch"));
+    assert!(CriError::Sandbox("uid clash".into())
+        .to_string()
+        .contains("uid clash"));
+    assert!(CriError::Snapshot("locked".into())
+        .to_string()
+        .contains("locked"));
+    assert!(CriError::Network("CNI failed".into())
+        .to_string()
+        .contains("CNI failed"));
+    assert!(CriError::Exec("nonzero".into())
+        .to_string()
+        .contains("nonzero"));
 }
 
 #[test]
@@ -114,8 +131,12 @@ fn cri_error_io_wrapping() {
 
 #[test]
 fn cri_result_ok_and_err() {
-    fn ok() -> CriResult<i32> { Ok(1) }
-    fn bad() -> CriResult<i32> { Err(CriError::NotFound("x".into())) }
+    fn ok() -> CriResult<i32> {
+        Ok(1)
+    }
+    fn bad() -> CriResult<i32> {
+        Err(CriError::NotFound("x".into()))
+    }
     assert_eq!(ok().unwrap(), 1);
     assert!(bad().is_err());
 }
@@ -346,6 +367,12 @@ fn user_namespace_mode_default_is_host() {
 
 #[test]
 fn sandbox_state_serializes_as_string_variant() {
-    assert_eq!(serde_json::to_string(&SandboxState::Ready).unwrap(), "\"Ready\"");
-    assert_eq!(serde_json::to_string(&SandboxState::NotReady).unwrap(), "\"NotReady\"");
+    assert_eq!(
+        serde_json::to_string(&SandboxState::Ready).unwrap(),
+        "\"Ready\""
+    );
+    assert_eq!(
+        serde_json::to_string(&SandboxState::NotReady).unwrap(),
+        "\"NotReady\""
+    );
 }

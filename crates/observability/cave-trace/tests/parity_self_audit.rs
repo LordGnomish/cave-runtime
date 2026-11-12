@@ -261,9 +261,16 @@ fn assertion_9_jaeger_surface_intact() {
     let _adaptive: AdaptiveSampler = AdaptiveSampler::new(0.05, 50.0, Duration::from_secs(60));
     let _tail: TailSampler = TailSampler::new(vec![
         TailRule::AlwaysOnError,
-        TailRule::SlowTrace { threshold_ns: 1_000_000 },
-        TailRule::TagMatch { key: "x".into(), value: "y".into() },
-        TailRule::ServiceMatch { service: "api".into() },
+        TailRule::SlowTrace {
+            threshold_ns: 1_000_000,
+        },
+        TailRule::TagMatch {
+            key: "x".into(),
+            value: "y".into(),
+        },
+        TailRule::ServiceMatch {
+            service: "api".into(),
+        },
         TailRule::Probabilistic { rate: 0.5 },
     ]);
     let sample_yes = SamplingDecision::Sample;

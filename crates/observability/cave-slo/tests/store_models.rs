@@ -3,7 +3,7 @@
 //! Tests for extended SLO models, store, and annotation support — written FIRST (TDD).
 
 use cave_slo::models::{
-    MetricType, SLO, SloIndicator, SloObjective, SloStatus, SloStats, SloAnnotations,
+    MetricType, SLO, SloAnnotations, SloIndicator, SloObjective, SloStats, SloStatus,
 };
 use cave_slo::store::SloStore;
 use uuid::Uuid;
@@ -26,23 +26,44 @@ fn make_slo(name: &str, target: f64) -> SLO {
 
 #[test]
 fn test_slo_indicator_ratio_serde() {
-    let ind = SloIndicator::Ratio { good: 980, total: 1000 };
+    let ind = SloIndicator::Ratio {
+        good: 980,
+        total: 1000,
+    };
     let json = serde_json::to_string(&ind).unwrap();
     let back: SloIndicator = serde_json::from_str(&json).unwrap();
-    assert!(matches!(back, SloIndicator::Ratio { good: 980, total: 1000 }));
+    assert!(matches!(
+        back,
+        SloIndicator::Ratio {
+            good: 980,
+            total: 1000
+        }
+    ));
 }
 
 #[test]
 fn test_slo_indicator_latency_serde() {
-    let ind = SloIndicator::Latency { p99_ms: 250.0, threshold_ms: 300.0 };
+    let ind = SloIndicator::Latency {
+        p99_ms: 250.0,
+        threshold_ms: 300.0,
+    };
     let json = serde_json::to_string(&ind).unwrap();
     let back: SloIndicator = serde_json::from_str(&json).unwrap();
-    assert!(matches!(back, SloIndicator::Latency { p99_ms: _, threshold_ms: _ }));
+    assert!(matches!(
+        back,
+        SloIndicator::Latency {
+            p99_ms: _,
+            threshold_ms: _
+        }
+    ));
 }
 
 #[test]
 fn test_slo_indicator_threshold_serde() {
-    let ind = SloIndicator::Threshold { value: 0.05, threshold: 0.10 };
+    let ind = SloIndicator::Threshold {
+        value: 0.05,
+        threshold: 0.10,
+    };
     let json = serde_json::to_string(&ind).unwrap();
     let back: SloIndicator = serde_json::from_str(&json).unwrap();
     assert!(matches!(back, SloIndicator::Threshold { .. }));
@@ -50,7 +71,10 @@ fn test_slo_indicator_threshold_serde() {
 
 #[test]
 fn test_slo_indicator_error_rate() {
-    let ind = SloIndicator::Ratio { good: 990, total: 1000 };
+    let ind = SloIndicator::Ratio {
+        good: 990,
+        total: 1000,
+    };
     let rate = ind.error_rate_pct();
     assert!((rate - 1.0).abs() < 1e-9, "expected 1.0 got {rate}");
 }
@@ -58,7 +82,10 @@ fn test_slo_indicator_error_rate() {
 #[test]
 fn test_slo_indicator_error_rate_latency() {
     // p99 < threshold → 0% error
-    let ind = SloIndicator::Latency { p99_ms: 100.0, threshold_ms: 300.0 };
+    let ind = SloIndicator::Latency {
+        p99_ms: 100.0,
+        threshold_ms: 300.0,
+    };
     let rate = ind.error_rate_pct();
     assert!((rate - 0.0).abs() < 1e-9);
 }
@@ -66,7 +93,10 @@ fn test_slo_indicator_error_rate_latency() {
 #[test]
 fn test_slo_indicator_error_rate_latency_exceeded() {
     // p99 >= threshold → 100% error
-    let ind = SloIndicator::Latency { p99_ms: 350.0, threshold_ms: 300.0 };
+    let ind = SloIndicator::Latency {
+        p99_ms: 350.0,
+        threshold_ms: 300.0,
+    };
     let rate = ind.error_rate_pct();
     assert!((rate - 100.0).abs() < 1e-9);
 }
@@ -97,7 +127,12 @@ fn test_slo_objective_serde() {
 
 #[test]
 fn test_slo_objective_budget_minutes() {
-    let obj = SloObjective { name: "t".to_string(), target: 99.9, window_days: 30, weight: 1.0 };
+    let obj = SloObjective {
+        name: "t".to_string(),
+        target: 99.9,
+        window_days: 30,
+        weight: 1.0,
+    };
     // 30 days = 43200 minutes total; 0.1% bad = 43.2 minutes
     let budget = obj.allowed_bad_minutes();
     assert!((budget - 43.2).abs() < 0.01, "expected ~43.2, got {budget}");

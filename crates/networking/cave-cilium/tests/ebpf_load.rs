@@ -290,11 +290,11 @@ fn extracts_maps_and_programs_from_symtab() {
 #[test]
 fn program_type_is_derived_from_section_prefix() {
     assert_eq!(ProgramType::from_section("xdp"), Some(ProgramType::Xdp));
-    assert_eq!(ProgramType::from_section("xdp/devmap"), Some(ProgramType::Xdp));
     assert_eq!(
-        ProgramType::from_section("tc"),
-        Some(ProgramType::SchedCls)
+        ProgramType::from_section("xdp/devmap"),
+        Some(ProgramType::Xdp)
     );
+    assert_eq!(ProgramType::from_section("tc"), Some(ProgramType::SchedCls));
     assert_eq!(
         ProgramType::from_section("classifier"),
         Some(ProgramType::SchedCls)
@@ -316,7 +316,9 @@ fn loader_verifies_assigns_fds_and_attaches() {
     let obj = BpfObject::from_elf(&elf).unwrap();
 
     let mut loader = Loader::new();
-    let coll = loader.load(&obj).expect("verifier passes for GPL r0=0;exit");
+    let coll = loader
+        .load(&obj)
+        .expect("verifier passes for GPL r0=0;exit");
 
     // Map FDs are assigned monotonically starting after stdio (>=3).
     let fd = coll.map_fd("cilium_lxc").expect("map fd assigned");

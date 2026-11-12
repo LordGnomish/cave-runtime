@@ -14,7 +14,7 @@
 //! real implementation lives in `cave_artifacts::harbor::storage`, which this
 //! file exercises directly (cave-artifacts is a dependency of cave-registry).
 
-use cave_artifacts::harbor::storage::{compute_digest, RegistryStorage};
+use cave_artifacts::harbor::storage::{RegistryStorage, compute_digest};
 
 // distribution/distribution storage/blob_test.go `TestBlobMount` / linkedblobstore:
 // a blob is freed only once the last repository reference is dropped.
@@ -108,7 +108,9 @@ async fn referrers_returns_subjects_and_filters_by_artifact_type() {
     assert_eq!(all.len(), 2);
 
     // Filtered: only the SPDX referrer matches.
-    let spdx = s.get_referrers(subject, Some("application/spdx+json")).await;
+    let spdx = s
+        .get_referrers(subject, Some("application/spdx+json"))
+        .await;
     assert_eq!(spdx.len(), 1);
     assert_eq!(
         spdx[0].artifact_type.as_deref(),
@@ -116,13 +118,14 @@ async fn referrers_returns_subjects_and_filters_by_artifact_type() {
     );
 
     // A subject with no referrers returns an empty list (the `None => vec![]` branch).
-    assert!(s
-        .get_referrers(
+    assert!(
+        s.get_referrers(
             "sha256:2222222222222222222222222222222222222222222222222222222222222222",
             None
         )
         .await
-        .is_empty());
+        .is_empty()
+    );
 }
 
 // distribution storage/blob_test.go `TestBlobMount`: a cross-repo mount must
@@ -166,7 +169,10 @@ async fn cancel_upload_and_offset_query_lifecycle() {
     assert_eq!(s.upload_offset(&uuid).await, None);
 
     // Cancelling an unknown uuid returns false.
-    assert!(!s.cancel_upload("00000000-0000-0000-0000-000000000000").await);
+    assert!(
+        !s.cancel_upload("00000000-0000-0000-0000-000000000000")
+            .await
+    );
     // Patching a non-existent session returns None.
     assert_eq!(s.patch_upload(&uuid, (b"x" as &[u8]).into()).await, None);
 }
@@ -201,13 +207,14 @@ async fn get_manifest_by_digest_and_by_tag() {
 
     // Unknown references (both tag-form and digest-form) resolve to None.
     assert!(s.get_manifest("library/redis", "8").await.is_none());
-    assert!(s
-        .get_manifest(
+    assert!(
+        s.get_manifest(
             "library/redis",
             "sha256:3333333333333333333333333333333333333333333333333333333333333333"
         )
         .await
-        .is_none());
+        .is_none()
+    );
 }
 
 // storage/catalog_test.go `TestCatalog*` + handlers `TestCatalogAPI`:
@@ -217,14 +224,42 @@ async fn list_repos_returns_sorted_repositories() {
     let s = RegistryStorage::default();
     let ct = "application/vnd.oci.image.manifest.v1+json".to_string();
     // Insert out of alphabetical order, with one repo touched twice.
-    s.store_manifest("zeta/svc", "v1", ct.clone(), (b"z1" as &[u8]).into(), None, None)
-        .await;
-    s.store_manifest("alpha/svc", "v1", ct.clone(), (b"a1" as &[u8]).into(), None, None)
-        .await;
-    s.store_manifest("mid/svc", "v1", ct.clone(), (b"m1" as &[u8]).into(), None, None)
-        .await;
-    s.store_manifest("alpha/svc", "v2", ct.clone(), (b"a2" as &[u8]).into(), None, None)
-        .await;
+    s.store_manifest(
+        "zeta/svc",
+        "v1",
+        ct.clone(),
+        (b"z1" as &[u8]).into(),
+        None,
+        None,
+    )
+    .await;
+    s.store_manifest(
+        "alpha/svc",
+        "v1",
+        ct.clone(),
+        (b"a1" as &[u8]).into(),
+        None,
+        None,
+    )
+    .await;
+    s.store_manifest(
+        "mid/svc",
+        "v1",
+        ct.clone(),
+        (b"m1" as &[u8]).into(),
+        None,
+        None,
+    )
+    .await;
+    s.store_manifest(
+        "alpha/svc",
+        "v2",
+        ct.clone(),
+        (b"a2" as &[u8]).into(),
+        None,
+        None,
+    )
+    .await;
 
     // Sorted ascending and de-duplicated (alpha/svc appears once despite two tags).
     assert_eq!(
@@ -252,9 +287,12 @@ async fn gc_retains_blobs_referenced_by_manifest_config_and_layers() {
     let layer_digest = compute_digest(layer_bytes);
     let orphan_digest = compute_digest(orphan_bytes);
 
-    s.store_blob(config_digest.clone(), config_bytes.into(), repo).await;
-    s.store_blob(layer_digest.clone(), layer_bytes.into(), repo).await;
-    s.store_blob(orphan_digest.clone(), orphan_bytes.into(), repo).await;
+    s.store_blob(config_digest.clone(), config_bytes.into(), repo)
+        .await;
+    s.store_blob(layer_digest.clone(), layer_bytes.into(), repo)
+        .await;
+    s.store_blob(orphan_digest.clone(), orphan_bytes.into(), repo)
+        .await;
 
     // An ImageManifest referencing the config + layer (parsed by gc()).
     let manifest_json = format!(

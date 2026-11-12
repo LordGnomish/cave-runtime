@@ -133,7 +133,12 @@ impl RunscCommand {
     pub fn to_argv(&self) -> Vec<String> {
         match self {
             RunscCommand::Create { id, bundle } => {
-                vec!["create".into(), "--bundle".into(), bundle.clone(), id.clone()]
+                vec![
+                    "create".into(),
+                    "--bundle".into(),
+                    bundle.clone(),
+                    id.clone(),
+                ]
             }
             RunscCommand::Start { id } => vec!["start".into(), id.clone()],
             RunscCommand::Kill { id, signal } => {
@@ -199,22 +204,36 @@ mod tests {
 
     #[test]
     fn create_argv() {
-        let c = RunscCommand::Create { id: "c1".into(), bundle: "/b".into() };
+        let c = RunscCommand::Create {
+            id: "c1".into(),
+            bundle: "/b".into(),
+        };
         assert_eq!(
             c.to_argv(),
-            vec!["create".to_string(), "--bundle".into(), "/b".into(), "c1".into()]
+            vec![
+                "create".to_string(),
+                "--bundle".into(),
+                "/b".into(),
+                "c1".into()
+            ]
         );
     }
 
     #[test]
     fn kill_argv_includes_signal() {
-        let c = RunscCommand::Kill { id: "c1".into(), signal: 9 };
+        let c = RunscCommand::Kill {
+            id: "c1".into(),
+            signal: 9,
+        };
         assert_eq!(c.to_argv(), vec!["kill", "c1", "9"]);
     }
 
     #[test]
     fn delete_force_flag() {
-        let c = RunscCommand::Delete { id: "c1".into(), force: true };
+        let c = RunscCommand::Delete {
+            id: "c1".into(),
+            force: true,
+        };
         assert_eq!(c.to_argv(), vec!["delete", "--force", "c1"]);
     }
 

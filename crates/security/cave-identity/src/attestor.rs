@@ -114,11 +114,10 @@ impl WorkloadAttestor for UnixWorkloadAttestor {
         "unix"
     }
     async fn attest(&self, pid: i32) -> Result<Vec<Selector>> {
-        let info = self
-            .table
-            .get(&pid)
-            .map(|v| v.clone())
-            .ok_or_else(|| IdentityError::AttestationFailed(format!("pid not found: {}", pid)))?;
+        let info =
+            self.table.get(&pid).map(|v| v.clone()).ok_or_else(|| {
+                IdentityError::AttestationFailed(format!("pid not found: {}", pid))
+            })?;
         let mut out = vec![
             Selector::new("unix", format!("uid:{}", info.uid)),
             Selector::new("unix", format!("gid:{}", info.gid)),
@@ -197,7 +196,10 @@ impl WorkloadAttestor for X509PopAttestor {
             .get(&pid)
             .map(|v| v.clone())
             .ok_or_else(|| IdentityError::AttestationFailed("x509_pop: pid unknown".into()))?;
-        Ok(vec![Selector::new("x509_pop", format!("fingerprint:{}", fp))])
+        Ok(vec![Selector::new(
+            "x509_pop",
+            format!("fingerprint:{}", fp),
+        )])
     }
 }
 
@@ -219,9 +221,10 @@ mod tests {
         );
         let s = a.attest(42).await.unwrap();
         assert_eq!(s.len(), 4);
-        assert!(s
-            .iter()
-            .any(|sel| sel.kind == "unix" && sel.value == "uid:1000"));
+        assert!(
+            s.iter()
+                .any(|sel| sel.kind == "unix" && sel.value == "uid:1000")
+        );
     }
 
     #[tokio::test]
@@ -231,9 +234,10 @@ mod tests {
         a.by_container
             .insert("cidA".into(), vec![("env".into(), "prod".into())]);
         let s = a.attest(7).await.unwrap();
-        assert!(s
-            .iter()
-            .any(|sel| sel.value == "label:env=prod" && sel.kind == "docker"));
+        assert!(
+            s.iter()
+                .any(|sel| sel.value == "label:env=prod" && sel.kind == "docker")
+        );
         assert!(s.iter().any(|sel| sel.value == "id:cidA"));
     }
 

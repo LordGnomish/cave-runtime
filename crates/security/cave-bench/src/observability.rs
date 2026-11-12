@@ -29,7 +29,10 @@ pub fn dashboard_panels() -> Vec<DashboardPanel> {
         DashboardPanel {
             title: "Control failure rate (1m)".into(),
             metric: METRIC_CONTROL_FAIL_TOTAL.into(),
-            query: format!("sum by (framework) (rate({}[1m]))", METRIC_CONTROL_FAIL_TOTAL),
+            query: format!(
+                "sum by (framework) (rate({}[1m]))",
+                METRIC_CONTROL_FAIL_TOTAL
+            ),
         },
         DashboardPanel {
             title: "CIS score trend".into(),
@@ -54,7 +57,10 @@ pub fn dashboard_panels() -> Vec<DashboardPanel> {
         DashboardPanel {
             title: "Profile execution duration".into(),
             metric: METRIC_SCAN_DURATION_SECONDS.into(),
-            query: format!("histogram_quantile(0.95, rate({}_bucket[5m]))", METRIC_SCAN_DURATION_SECONDS),
+            query: format!(
+                "histogram_quantile(0.95, rate({}_bucket[5m]))",
+                METRIC_SCAN_DURATION_SECONDS
+            ),
         },
         DashboardPanel {
             title: "Scan queue depth".into(),
@@ -126,7 +132,10 @@ pub fn alert_rules_yaml() -> String {
         out.push_str(&format!("      - alert: {}\n", r.name));
         out.push_str(&format!("        expr: {}\n", r.expr));
         out.push_str(&format!("        for: {}\n", r.r#for));
-        out.push_str(&format!("        labels:\n          severity: {}\n", r.severity));
+        out.push_str(&format!(
+            "        labels:\n          severity: {}\n",
+            r.severity
+        ));
         out.push_str(&format!(
             "        annotations:\n          description: \"{}\"\n",
             r.description
@@ -204,7 +213,11 @@ mod tests {
             METRIC_CHECK_SKIP_ERROR_TOTAL,
         ];
         for r in alert_rules() {
-            assert!(known.iter().any(|k| r.expr.contains(k)), "{} missing metric", r.name);
+            assert!(
+                known.iter().any(|k| r.expr.contains(k)),
+                "{} missing metric",
+                r.name
+            );
         }
     }
 }

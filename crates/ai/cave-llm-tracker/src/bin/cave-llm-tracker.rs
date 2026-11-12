@@ -12,8 +12,8 @@ use tracing::info;
 use cave_llm_tracker::bench::{run_bench, synth_snapshot};
 use cave_llm_tracker::config::TrackerConfig;
 use cave_llm_tracker::error::TrackerResult;
-use cave_llm_tracker::poll::{poll_all, PollSummary};
-use cave_llm_tracker::report::{shortlist, DailyReport};
+use cave_llm_tracker::poll::{PollSummary, poll_all};
+use cave_llm_tracker::report::{DailyReport, shortlist};
 use cave_llm_tracker::selection::{baseline_verdict, evaluate};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -126,7 +126,9 @@ fn write_report(cli: &Cli, report: &DailyReport, cfg: &TrackerConfig) -> Tracker
 }
 
 async fn mode_poll(cfg: TrackerConfig) -> TrackerResult<()> {
-    let p = poll_all(&cfg).await.unwrap_or_else(|_| PollSummary::from_seed_only());
+    let p = poll_all(&cfg)
+        .await
+        .unwrap_or_else(|_| PollSummary::from_seed_only());
     println!("{}", serde_json::to_string_pretty(&p)?);
     Ok(())
 }
@@ -150,9 +152,7 @@ async fn mode_select(cfg: TrackerConfig) -> TrackerResult<()> {
 }
 
 fn tracing_subscriber_init() {
-    let _ = tracing::subscriber::set_global_default(
-        tracing_subscriber_stub::default_subscriber(),
-    );
+    let _ = tracing::subscriber::set_global_default(tracing_subscriber_stub::default_subscriber());
 }
 
 /// Tiny shim — we don't want `tracing-subscriber` as a workspace dep

@@ -4,11 +4,11 @@
 //! These tests assert the OBSERVED behaviour of pre-existing code.
 
 use cave_admission::evaluator::PolicyEvaluator;
+use cave_admission::models::AdmissionRequest;
 use cave_admission::models::{
     AdmissionOperation, AdmissionPolicy, EnforcementAction, GroupVersionResource, PolicyEvalRule,
     RuleOperator, UserInfo,
 };
-use cave_admission::models::AdmissionRequest;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -90,7 +90,10 @@ fn warn_action_allows_with_warning() {
     );
     let (response, _logs) = evaluator.evaluate(&request, &[policy]);
     assert!(response.allowed, "Warn policy should allow the request");
-    assert!(!response.warnings.is_empty(), "A warning should be attached");
+    assert!(
+        !response.warnings.is_empty(),
+        "A warning should be attached"
+    );
 }
 
 // --- EnforcementAction::Audit allows silently -----------------------------------
@@ -122,11 +125,15 @@ fn audit_action_allows_silently() {
 #[test]
 fn mutating_injects_cave_admission_patch() {
     let evaluator = PolicyEvaluator::new();
-    let obj = serde_json::json!({"metadata": {"name": "ok-pod", "namespace": "default"}, "spec": {}});
+    let obj =
+        serde_json::json!({"metadata": {"name": "ok-pod", "namespace": "default"}, "spec": {}});
     let request = make_request(obj);
     let (response, _logs) = evaluator.evaluate_mutating(&request, &[]);
     assert!(response.allowed);
-    assert!(response.patch.is_some(), "Patch must be set for mutating webhook");
+    assert!(
+        response.patch.is_some(),
+        "Patch must be set for mutating webhook"
+    );
     assert_eq!(
         response.patch_type.as_deref(),
         Some("JSONPatch"),
@@ -180,7 +187,10 @@ fn policy_skipped_when_operation_does_not_match() {
     // request is Create
     let request = make_request(obj);
     let (response, logs) = evaluator.evaluate(&request, &[policy]);
-    assert!(response.allowed, "Policy should be skipped — operation mismatch");
+    assert!(
+        response.allowed,
+        "Policy should be skipped — operation mismatch"
+    );
     assert!(logs.is_empty());
 }
 
@@ -211,13 +221,19 @@ fn greater_than_operator() {
         operator: RuleOperator::GreaterThan,
         value: serde_json::json!(3),
     };
-    assert!(evaluator.evaluate_rule(&obj, &rule).is_none(), "5 > 3 should pass");
+    assert!(
+        evaluator.evaluate_rule(&obj, &rule).is_none(),
+        "5 > 3 should pass"
+    );
     let rule2 = PolicyEvalRule {
         field: "spec.replicas".into(),
         operator: RuleOperator::GreaterThan,
         value: serde_json::json!(10),
     };
-    assert!(evaluator.evaluate_rule(&obj, &rule2).is_some(), "5 > 10 should fail");
+    assert!(
+        evaluator.evaluate_rule(&obj, &rule2).is_some(),
+        "5 > 10 should fail"
+    );
 }
 
 #[test]
@@ -229,7 +245,10 @@ fn less_than_operator() {
         operator: RuleOperator::LessThan,
         value: serde_json::json!(5),
     };
-    assert!(evaluator.evaluate_rule(&obj, &rule).is_none(), "2 < 5 should pass");
+    assert!(
+        evaluator.evaluate_rule(&obj, &rule).is_none(),
+        "2 < 5 should pass"
+    );
 }
 
 #[test]
@@ -241,7 +260,10 @@ fn not_exists_operator_rejects_present_field() {
         operator: RuleOperator::NotExists,
         value: serde_json::json!(null),
     };
-    assert!(evaluator.evaluate_rule(&obj, &rule).is_some(), "Field exists — rule should fail");
+    assert!(
+        evaluator.evaluate_rule(&obj, &rule).is_some(),
+        "Field exists — rule should fail"
+    );
 }
 
 #[test]
@@ -253,7 +275,10 @@ fn contains_operator_works_for_strings() {
         operator: RuleOperator::Contains,
         value: serde_json::json!(":latest"),
     };
-    assert!(evaluator.evaluate_rule(&obj, &rule).is_none(), "Image contains :latest — rule should pass");
+    assert!(
+        evaluator.evaluate_rule(&obj, &rule).is_none(),
+        "Image contains :latest — rule should pass"
+    );
 }
 
 #[test]

@@ -264,7 +264,10 @@ fn parse_purl(s: &str) -> Option<Purl> {
     let qualifiers = qual_str
         .map(|q| {
             q.split('&')
-                .filter_map(|kv| kv.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+                .filter_map(|kv| {
+                    kv.split_once('=')
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                })
                 .collect()
         })
         .unwrap_or_default();

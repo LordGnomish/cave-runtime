@@ -54,7 +54,11 @@ pub async fn seal_backends(
     use crate::core::seal::AutoSealType;
     let active = {
         let seal = state.seal_state.read().await;
-        if seal.is_initialized() { "shamir" } else { "uninitialized" }
+        if seal.is_initialized() {
+            "shamir"
+        } else {
+            "uninitialized"
+        }
     };
     Ok(VaultResponse::new().with_data(json!({
         "active": active,

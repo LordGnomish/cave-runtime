@@ -6,10 +6,12 @@
 //! the code already exists on origin/main and compiles correctly.
 //! No red-first TDD pair needed for pre-existing code.
 
-use cave_tracker::board::{board_view, check_wip_violations, default_kanban_board, default_scrum_board};
+use cave_tracker::board::{
+    board_view, check_wip_violations, default_kanban_board, default_scrum_board,
+};
 use cave_tracker::fields::{create_field, validate_field_value};
 use cave_tracker::models::{CustomFieldType, IssueType, LinkType, Priority};
-use cave_tracker::query::{apply_filter, parse_jql, IssueFilter};
+use cave_tracker::query::{IssueFilter, apply_filter, parse_jql};
 use cave_tracker::sprint::{backlog_issues, complete_sprint, sprint_stats, start_sprint};
 use cave_tracker::workflow::{
     apply_transition, available_transitions, can_transition, default_kanban_workflow,

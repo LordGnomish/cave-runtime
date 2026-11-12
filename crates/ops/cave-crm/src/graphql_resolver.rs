@@ -16,7 +16,7 @@
 //! runtime that `graphql_schema.rs` previously only described — closing the
 //! `[[partial]] graphql-resolvers` gap.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::cmp::Ordering;
 
 /// One object collection the resolver can serve, identified by its
@@ -137,7 +137,13 @@ impl GraphQlResolver {
             .and_then(|c| c.as_str())
             .and_then(decode_cursor)
             .map(|i| i + 1)
-            .or_else(|| field.args.get("offset").and_then(|v| v.as_u64()).map(|v| v as usize))
+            .or_else(|| {
+                field
+                    .args
+                    .get("offset")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize)
+            })
             .unwrap_or(0);
         let limit = field
             .args
@@ -261,7 +267,10 @@ fn apply_operator(op: &str, actual: &Value, expected: &Value) -> bool {
         "gte" => cmp_values(actual, expected) != Ordering::Less,
         "lt" => cmp_values(actual, expected) == Ordering::Less,
         "lte" => cmp_values(actual, expected) != Ordering::Greater,
-        "in" => expected.as_array().map(|a| a.contains(actual)).unwrap_or(false),
+        "in" => expected
+            .as_array()
+            .map(|a| a.contains(actual))
+            .unwrap_or(false),
         "ilike" => {
             let hay = actual.as_str().unwrap_or("").to_lowercase();
             let needle = expected.as_str().unwrap_or("").to_lowercase();
@@ -279,10 +288,7 @@ fn parse_order_by(arg: Option<&Value>) -> Vec<(String, bool)> {
     let mut out = Vec::new();
     let push_obj = |obj: &Map<String, Value>, out: &mut Vec<(String, bool)>| {
         for (k, dir) in obj {
-            let desc = dir
-                .as_str()
-                .map(|s| s.starts_with("DESC"))
-                .unwrap_or(false);
+            let desc = dir.as_str().map(|s| s.starts_with("DESC")).unwrap_or(false);
             out.push((to_snake(k), desc));
         }
     };
@@ -463,9 +469,8 @@ fn lex(src: &str) -> Result<Vec<Tok>, String> {
                     i += 1;
                 }
                 let num: String = bytes[start..i].iter().collect();
-                let n: serde_json::Number = num
-                    .parse()
-                    .map_err(|_| format!("bad number: {}", num))?;
+                let n: serde_json::Number =
+                    num.parse().map_err(|_| format!("bad number: {}", num))?;
                 toks.push(Tok::Num(n));
             }
             a if a.is_alphabetic() || a == '_' => {
@@ -685,7 +690,8 @@ mod tests {
     #[test]
     fn find_many_orders_ascending_by_field() {
         let r = resolver();
-        let out = r.execute("{ people(orderBy: {position: ASC}) { edges { node { firstName } } } }");
+        let out =
+            r.execute("{ people(orderBy: {position: ASC}) { edges { node { firstName } } } }");
         let edges = out["data"]["people"]["edges"].as_array().unwrap();
         assert_eq!(edges[0]["node"]["firstName"], "Bob"); // position 0
         assert_eq!(edges[1]["node"]["firstName"], "Ada"); // position 1
@@ -695,7 +701,8 @@ mod tests {
     #[test]
     fn find_many_orders_descending_by_field() {
         let r = resolver();
-        let out = r.execute("{ people(orderBy: {position: DESC}) { edges { node { firstName } } } }");
+        let out =
+            r.execute("{ people(orderBy: {position: DESC}) { edges { node { firstName } } } }");
         let edges = out["data"]["people"]["edges"].as_array().unwrap();
         assert_eq!(edges[0]["node"]["firstName"], "Cleo");
         assert_eq!(edges[2]["node"]["firstName"], "Bob");
@@ -704,7 +711,9 @@ mod tests {
     #[test]
     fn find_many_filters_by_field_equality() {
         let r = resolver();
-        let out = r.execute("{ people(filter: {firstName: \"Ada\"}) { edges { node { id } } totalCount } }");
+        let out = r.execute(
+            "{ people(filter: {firstName: \"Ada\"}) { edges { node { id } } totalCount } }",
+        );
         assert_eq!(out["data"]["people"]["totalCount"], 1);
     }
 

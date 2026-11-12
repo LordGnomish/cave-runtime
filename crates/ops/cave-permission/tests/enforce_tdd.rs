@@ -63,10 +63,10 @@ fn empty_enforcer_denies_by_default() {
 fn batch_enforce_matches_per_request_decisions() {
     let e = rbac_enforcer();
     let reqs = vec![
-        ("alice", "/reports", "write"),  // allow (direct)
-        ("alice", "/data/secret", "read"), // allow (via admin role)
+        ("alice", "/reports", "write"),     // allow (direct)
+        ("alice", "/data/secret", "read"),  // allow (via admin role)
         ("alice", "/data/secret", "write"), // deny (wrong act)
-        ("mallory", "/reports", "write"), // deny (no grant)
+        ("mallory", "/reports", "write"),   // deny (no grant)
     ];
     let decisions = e.batch_enforce(&reqs);
     assert_eq!(decisions, vec![true, true, false, false]);

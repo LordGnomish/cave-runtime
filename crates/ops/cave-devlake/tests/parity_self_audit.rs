@@ -8,7 +8,9 @@ use std::path::PathBuf;
 fn workspace_root() -> PathBuf {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     // pop crates/ops/cave-devlake → workspace root
-    p.pop(); p.pop(); p.pop();
+    p.pop();
+    p.pop();
+    p.pop();
     p
 }
 
@@ -39,7 +41,10 @@ fn g2_spdx_headers_present() {
             missing.push(entry.display().to_string());
         }
     }
-    assert!(missing.is_empty(), "G2: missing SPDX headers in: {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "G2: missing SPDX headers in: {missing:?}"
+    );
 }
 
 /// G3: honest_ratio is truthful (non-negative, <= 1.0, present in manifest)
@@ -54,7 +59,10 @@ fn g3_honest_ratio_present_and_valid() {
             // strip inline comment (everything after '#')
             let rhs_clean = rhs.split('#').next().unwrap_or(rhs).trim();
             let val: f64 = rhs_clean.parse().expect("honest_ratio not a float");
-            assert!(val >= 0.0 && val <= 1.0, "G3: honest_ratio out of range: {val}");
+            assert!(
+                val >= 0.0 && val <= 1.0,
+                "G3: honest_ratio out of range: {val}"
+            );
         }
     }
 }
@@ -63,8 +71,15 @@ fn g3_honest_ratio_present_and_valid() {
 #[test]
 fn g4_manifest_present_with_required_fields() {
     let content = fs::read_to_string(manifest_path()).expect("manifest missing");
-    for field in &["fill_ratio", "honest_ratio", "adr_justified_ratio", "mapped_count",
-                   "skipped_count", "unmapped_count", "last_audit"] {
+    for field in &[
+        "fill_ratio",
+        "honest_ratio",
+        "adr_justified_ratio",
+        "mapped_count",
+        "skipped_count",
+        "unmapped_count",
+        "last_audit",
+    ] {
         assert!(content.contains(field), "G4: missing field {field}");
     }
 }
@@ -171,7 +186,10 @@ fn manifest_fill_ratio_is_one() {
                 .trim()
                 .parse()
                 .expect("not a float");
-            assert!((val - 1.0).abs() < 0.001, "fill_ratio must be 1.0, got {val}");
+            assert!(
+                (val - 1.0).abs() < 0.001,
+                "fill_ratio must be 1.0, got {val}"
+            );
             return;
         }
     }

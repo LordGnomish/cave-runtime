@@ -151,8 +151,14 @@ impl<E: SqlExecutor> SqlBackend<E> {
     /// SQL used by [`StorageBackend::count`]: a single-row `count(*)`.
     fn count_query(coll: &str, filter: &Value) -> sql::SqlQuery {
         // Reuse the $count pipeline shape for a count(*) projection.
-        sql::pipeline_to_sql(coll, &[serde_json::json!({"$match": filter}), serde_json::json!({"$count": "n"})])
-            .expect("count pipeline always translates")
+        sql::pipeline_to_sql(
+            coll,
+            &[
+                serde_json::json!({"$match": filter}),
+                serde_json::json!({"$count": "n"}),
+            ],
+        )
+        .expect("count pipeline always translates")
     }
 }
 
@@ -276,7 +282,10 @@ mod tests {
             .await
             .unwrap();
 
-        let found = be.find("users", &json!({"age": {"$gt": 25}})).await.unwrap();
+        let found = be
+            .find("users", &json!({"age": {"$gt": 25}}))
+            .await
+            .unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0]["name"], json!("alice"));
 
@@ -322,7 +331,10 @@ mod tests {
         assert_eq!(rows, vec![json!({"_id": "1", "x": 9})]);
 
         let q = be.executor().last().unwrap();
-        assert_eq!(q.sql, "SELECT _jsonb FROM \"c\" WHERE _jsonb -> 'x' > $1::jsonb");
+        assert_eq!(
+            q.sql,
+            "SELECT _jsonb FROM \"c\" WHERE _jsonb -> 'x' > $1::jsonb"
+        );
         assert_eq!(q.params, vec!["1"]);
     }
 

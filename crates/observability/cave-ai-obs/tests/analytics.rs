@@ -6,7 +6,7 @@ use cave_ai_obs::analytics::{
     AggregatedStats, CostWindow, ModelStats, compute_aggregated_stats, compute_cost_window,
     compute_model_stats, top_models_by_cost,
 };
-use cave_ai_obs::trace_models::{Generation, TraceStatus, Trace};
+use cave_ai_obs::trace_models::{Generation, Trace, TraceStatus};
 use cave_ai_obs::trace_store::TraceStore;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
@@ -178,7 +178,11 @@ fn test_cost_window_excludes_old_generations() {
     store.upsert_generation(make_generation(trace_id, "gpt-4", 10, 5, 0.001, 50));
 
     let window = compute_cost_window(&store, Duration::hours(1));
-    assert!(window.total_usd < 1.0, "old generation should be excluded, total={}", window.total_usd);
+    assert!(
+        window.total_usd < 1.0,
+        "old generation should be excluded, total={}",
+        window.total_usd
+    );
 }
 
 // ─── Top models by cost ───────────────────────────────────────────────────

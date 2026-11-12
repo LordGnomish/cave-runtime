@@ -106,7 +106,9 @@ mod tests {
     #[test]
     fn pipeline_render_returns_empty() {
         let c = LegacyComposer::new();
-        let out = c.render(&pipeline_composition(), &json!({"size": 5})).unwrap();
+        let out = c
+            .render(&pipeline_composition(), &json!({"size": 5}))
+            .unwrap();
         assert!(out.is_empty());
     }
 
