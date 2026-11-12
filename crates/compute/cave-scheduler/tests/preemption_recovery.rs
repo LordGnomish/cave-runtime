@@ -119,9 +119,9 @@ fn recovery_loop_handles_multiple_victims_across_preemptors() {
     handle.mark_failed("v3");
     // v2 succeeds (dequeued normally — never marked failed).
     handle.dequeue(); // dequeues v1 from pending
-    // Actually dequeue v2 (v1 already marked failed and removed from pending):
-    // We re-think: mark_failed should move from pending to failed without
-    // requiring a dequeue call. Let's verify the semantics.
+                      // Actually dequeue v2 (v1 already marked failed and removed from pending):
+                      // We re-think: mark_failed should move from pending to failed without
+                      // requiring a dequeue call. Let's verify the semantics.
 
     let recovery = EvictionRecoveryLoop::new(handle.clone(), nominated.clone());
     let readmitted = recovery.drain_failed();

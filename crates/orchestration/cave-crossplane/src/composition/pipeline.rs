@@ -206,11 +206,7 @@ mod tests {
             json!({}),
         );
         let r = p
-            .run_sync(
-                &[Step::new("ready", "function-auto-ready")],
-                &s,
-                &req,
-            )
+            .run_sync(&[Step::new("ready", "function-auto-ready")], &s, &req)
             .unwrap();
         assert!(r.ok());
     }
@@ -221,11 +217,7 @@ mod tests {
         s.install("function-go-templating", "v0.1.0", "x").unwrap();
         let p = PipelineExecutor::new();
         // observed carries the template ctx; step input carries the template + override.
-        let req = RunFunctionRequest::new(
-            "ctx",
-            json!({}),
-            json!({"name":"world"}),
-        );
+        let req = RunFunctionRequest::new("ctx", json!({}), json!({"name":"world"}));
         let r = p
             .run_sync(
                 &[Step::new("t", "function-go-templating")
@@ -254,8 +246,7 @@ mod tests {
         let req = RunFunctionRequest::new("ctx", json!({}), json!({}));
         let r = p
             .run_sync(
-                &[Step::new("kcl", "function-kcl")
-                    .with_input(json!({"source":"x = 1"}))],
+                &[Step::new("kcl", "function-kcl").with_input(json!({"source":"x = 1"}))],
                 &s,
                 &req,
             )

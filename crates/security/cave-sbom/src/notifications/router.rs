@@ -107,7 +107,10 @@ mod tests {
             NotificationLevel::Error,
             PublisherKind::Console,
         );
-        let n = note(NotificationGroup::PolicyViolation, NotificationLevel::Warning);
+        let n = note(
+            NotificationGroup::PolicyViolation,
+            NotificationLevel::Warning,
+        );
         assert!(resolve_rules(&[r], &n).is_empty());
     }
 
@@ -119,7 +122,10 @@ mod tests {
             NotificationLevel::Warning,
             PublisherKind::Console,
         );
-        let n = note(NotificationGroup::PolicyViolation, NotificationLevel::Warning);
+        let n = note(
+            NotificationGroup::PolicyViolation,
+            NotificationLevel::Warning,
+        );
         assert_eq!(resolve_rules(&[r], &n).len(), 1);
     }
 
@@ -143,13 +149,19 @@ mod tests {
             NotificationLevel::Informational,
             PublisherKind::Console,
         );
-        let n = note(NotificationGroup::NewVulnerability, NotificationLevel::Informational);
+        let n = note(
+            NotificationGroup::NewVulnerability,
+            NotificationLevel::Informational,
+        );
         assert!(should_notify(&[r], &n));
     }
 
     #[test]
     fn should_notify_returns_false_when_none_match() {
-        let n = note(NotificationGroup::NewVulnerability, NotificationLevel::Error);
+        let n = note(
+            NotificationGroup::NewVulnerability,
+            NotificationLevel::Error,
+        );
         assert!(!should_notify(&[], &n));
     }
 
@@ -163,13 +175,19 @@ mod tests {
         );
         let r2 = rule(
             true,
-            vec![NotificationGroup::NewVulnerability, NotificationGroup::PolicyViolation],
+            vec![
+                NotificationGroup::NewVulnerability,
+                NotificationGroup::PolicyViolation,
+            ],
             NotificationLevel::Warning,
             PublisherKind::Webhook {
                 url: "https://example/".into(),
             },
         );
-        let n = note(NotificationGroup::NewVulnerability, NotificationLevel::Warning);
+        let n = note(
+            NotificationGroup::NewVulnerability,
+            NotificationLevel::Warning,
+        );
         let rules = [r1, r2];
         let matched = resolve_rules(&rules, &n);
         assert_eq!(matched.len(), 2);
@@ -179,13 +197,25 @@ mod tests {
     fn rules_with_multiple_groups_match_any_group() {
         let r = rule(
             true,
-            vec![NotificationGroup::NewVulnerability, NotificationGroup::PolicyViolation],
+            vec![
+                NotificationGroup::NewVulnerability,
+                NotificationGroup::PolicyViolation,
+            ],
             NotificationLevel::Informational,
             PublisherKind::Console,
         );
-        let n1 = note(NotificationGroup::PolicyViolation, NotificationLevel::Informational);
-        let n2 = note(NotificationGroup::NewVulnerability, NotificationLevel::Informational);
-        let n3 = note(NotificationGroup::BomConsumed, NotificationLevel::Informational);
+        let n1 = note(
+            NotificationGroup::PolicyViolation,
+            NotificationLevel::Informational,
+        );
+        let n2 = note(
+            NotificationGroup::NewVulnerability,
+            NotificationLevel::Informational,
+        );
+        let n3 = note(
+            NotificationGroup::BomConsumed,
+            NotificationLevel::Informational,
+        );
         assert_eq!(resolve_rules(std::slice::from_ref(&r), &n1).len(), 1);
         assert_eq!(resolve_rules(std::slice::from_ref(&r), &n2).len(), 1);
         assert_eq!(resolve_rules(std::slice::from_ref(&r), &n3).len(), 0);

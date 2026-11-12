@@ -30,10 +30,14 @@ pub fn dispatch(cmd: FalcoSubcommand) -> Result<String> {
             let pack = rule_loader::parse(&body)?;
             Ok(format!(
                 "parsed: {} rule(s) / {} macro(s) / {} list(s)\n",
-                pack.rules.len(), pack.macros.len(), pack.lists.len()
+                pack.rules.len(),
+                pack.macros.len(),
+                pack.lists.len()
             ))
         }
-        FalcoSubcommand::RulesListBuiltin => Ok("cave-falco ships no built-in rules; pack-loaded at runtime\n".into()),
+        FalcoSubcommand::RulesListBuiltin => {
+            Ok("cave-falco ships no built-in rules; pack-loaded at runtime\n".into())
+        }
         FalcoSubcommand::Observability => {
             let mut out = String::new();
             out.push_str("# Dashboard panels\n");
@@ -73,7 +77,9 @@ mod tests {
 
     #[test]
     fn rules_parse_unreadable_path_errors() {
-        let r = dispatch(FalcoSubcommand::RulesParse { path: "/no/such/path-cave-falco-test".into() });
+        let r = dispatch(FalcoSubcommand::RulesParse {
+            path: "/no/such/path-cave-falco-test".into(),
+        });
         assert!(r.is_err());
     }
 }

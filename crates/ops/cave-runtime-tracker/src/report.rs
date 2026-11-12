@@ -61,10 +61,16 @@ impl DailyReport {
             "# cave-runtime-tracker — daily upstream drift ({})\n\n",
             self.generated_at_utc
         ));
-        md.push_str(&format!("- tracked subsystems: **{}**\n", self.totals.tracked));
+        md.push_str(&format!(
+            "- tracked subsystems: **{}**\n",
+            self.totals.tracked
+        ));
         md.push_str(&format!("- ✅ in-sync: {}\n", self.totals.in_sync));
         md.push_str(&format!("- ⚠️ behind: {}\n", self.totals.behind));
-        md.push_str(&format!("- ❔ unknown (unpinned / unresolved): {}\n", self.totals.unknown));
+        md.push_str(&format!(
+            "- ❔ unknown (unpinned / unresolved): {}\n",
+            self.totals.unknown
+        ));
         md.push_str("- phase 0: **report only, no auto-bump**\n\n");
 
         if !self.poll.unresolved.is_empty() {
@@ -78,7 +84,10 @@ impl DailyReport {
         // Group rows by category, categories alphabetised, rows by name.
         let mut by_cat: BTreeMap<&str, Vec<&crate::poll::PollResult>> = BTreeMap::new();
         for r in &self.poll.results {
-            by_cat.entry(r.upstream.category.as_str()).or_default().push(r);
+            by_cat
+                .entry(r.upstream.category.as_str())
+                .or_default()
+                .push(r);
         }
         for (cat, mut rows) in by_cat {
             rows.sort_by(|a, b| a.upstream.name.cmp(&b.upstream.name));
@@ -129,7 +138,9 @@ impl DailyReport {
         behind.sort_by(|a, b| a.upstream.name.cmp(&b.upstream.name));
         md.push_str(&format!("## ⚠️ Behind upstream ({})\n\n", behind.len()));
         if behind.is_empty() {
-            md.push_str("_Nothing behind — every pinned port matches its latest upstream tag._\n\n");
+            md.push_str(
+                "_Nothing behind — every pinned port matches its latest upstream tag._\n\n",
+            );
         } else {
             md.push_str("| Subsystem | cave module | upstream | ported | latest |\n");
             md.push_str("|-----------|-------------|----------|--------|--------|\n");
@@ -170,8 +181,14 @@ impl DailyReport {
             md.push_str("| cave module | upstream | upstream LOC | cave LOC | depth |\n");
             md.push_str("|-------------|----------|-------------:|---------:|------:|\n");
             for m in measurements {
-                let up = m.upstream.map(|s| s.code.to_string()).unwrap_or_else(|| "—".into());
-                let cave = m.cave.map(|s| s.code.to_string()).unwrap_or_else(|| "—".into());
+                let up = m
+                    .upstream
+                    .map(|s| s.code.to_string())
+                    .unwrap_or_else(|| "—".into());
+                let cave = m
+                    .cave
+                    .map(|s| s.code.to_string())
+                    .unwrap_or_else(|| "—".into());
                 let depth = m
                     .ratio
                     .map(|r| format!("{:.2}%", r * 100.0))
@@ -277,8 +294,14 @@ mod tests {
         let m = Measurement {
             upstream_repo: "cilium/cilium".to_string(),
             cave_module: "cave-net".to_string(),
-            upstream: Some(LocStats { code: 400_000, ..Default::default() }),
-            cave: Some(LocStats { code: 12_000, ..Default::default() }),
+            upstream: Some(LocStats {
+                code: 400_000,
+                ..Default::default()
+            }),
+            cave: Some(LocStats {
+                code: 12_000,
+                ..Default::default()
+            }),
             ratio: Some(0.03),
         };
         let md = report.to_progress_markdown(&[m]);
@@ -303,7 +326,9 @@ mod tests {
     #[test]
     fn write_to_dir_skips_latest_when_disabled() {
         let dir = tempfile::tempdir().unwrap();
-        report().write_to_dir(dir.path(), "2026-06-07", false).unwrap();
+        report()
+            .write_to_dir(dir.path(), "2026-06-07", false)
+            .unwrap();
         assert!(!dir.path().join("latest.json").exists());
     }
 }

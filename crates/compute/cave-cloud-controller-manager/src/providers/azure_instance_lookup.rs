@@ -227,7 +227,10 @@ mod tests {
         let client = InMemoryAzureClient::new();
         client.insert(sample_row("aks-node-0")).await;
         let l = AzureInstanceLookup::new(client);
-        assert_eq!(l.instance_type("aks-node-0").await.unwrap(), "Standard_D4s_v5");
+        assert_eq!(
+            l.instance_type("aks-node-0").await.unwrap(),
+            "Standard_D4s_v5"
+        );
     }
 
     #[tokio::test]

@@ -65,19 +65,25 @@ pub fn project(audit: &AuditEvent) -> FalcoEvent {
     let mut ev = FalcoEvent::k8s_audit(&audit.stage, &audit.verb);
     if let Some(u) = &audit.user {
         ev.fields.insert("ka.user.name".into(), u.username.clone());
-        ev.fields.insert("ka.user.groups".into(), u.groups.join(","));
+        ev.fields
+            .insert("ka.user.groups".into(), u.groups.join(","));
     }
     if let Some(o) = &audit.object_ref {
-        ev.fields.insert("ka.target.resource".into(), o.resource.clone());
-        ev.fields.insert("ka.target.namespace".into(), o.namespace.clone());
+        ev.fields
+            .insert("ka.target.resource".into(), o.resource.clone());
+        ev.fields
+            .insert("ka.target.namespace".into(), o.namespace.clone());
         ev.fields.insert("ka.target.name".into(), o.name.clone());
         if !o.subresource.is_empty() {
-            ev.fields.insert("ka.target.subresource".into(), o.subresource.clone());
+            ev.fields
+                .insert("ka.target.subresource".into(), o.subresource.clone());
         }
     }
     if let Some(r) = &audit.response_status {
-        ev.fields.insert("ka.response.code".into(), r.code.to_string());
-        ev.fields.insert("ka.response.status".into(), r.status.clone());
+        ev.fields
+            .insert("ka.response.code".into(), r.code.to_string());
+        ev.fields
+            .insert("ka.response.status".into(), r.status.clone());
     }
     ev.fields.insert("ka.uri".into(), audit.request_uri.clone());
     ev
@@ -98,10 +104,21 @@ mod tests {
             level: "RequestResponse".into(),
             stage: "ResponseComplete".into(),
             verb: "create".into(),
-            user: Some(AuditUser { username: "system:serviceaccount:dev:builder".into(), groups: vec!["system:authenticated".into()] }),
+            user: Some(AuditUser {
+                username: "system:serviceaccount:dev:builder".into(),
+                groups: vec!["system:authenticated".into()],
+            }),
             request_uri: "/api/v1/namespaces/dev/pods".into(),
-            object_ref: Some(ObjectRef { resource: "pods".into(), namespace: "dev".into(), name: "app-1".into(), subresource: String::new() }),
-            response_status: Some(ResponseStatus { code: 201, status: "Created".into() }),
+            object_ref: Some(ObjectRef {
+                resource: "pods".into(),
+                namespace: "dev".into(),
+                name: "app-1".into(),
+                subresource: String::new(),
+            }),
+            response_status: Some(ResponseStatus {
+                code: 201,
+                status: "Created".into(),
+            }),
             stage_timestamp: "2026-05-24T10:00:00Z".into(),
         }
     }
@@ -110,7 +127,10 @@ mod tests {
     fn projects_user_resource_namespace_into_ka_fields() {
         let ev = project(&sample());
         assert_eq!(ev.fields.get("ka.verb").unwrap(), "create");
-        assert_eq!(ev.fields.get("ka.user.name").unwrap(), "system:serviceaccount:dev:builder");
+        assert_eq!(
+            ev.fields.get("ka.user.name").unwrap(),
+            "system:serviceaccount:dev:builder"
+        );
         assert_eq!(ev.fields.get("ka.target.resource").unwrap(), "pods");
         assert_eq!(ev.fields.get("ka.target.namespace").unwrap(), "dev");
         assert_eq!(ev.fields.get("ka.response.code").unwrap(), "201");
@@ -127,7 +147,10 @@ mod tests {
     #[test]
     fn projects_groups_joined_with_comma() {
         let ev = project(&sample());
-        assert_eq!(ev.fields.get("ka.user.groups").unwrap(), "system:authenticated");
+        assert_eq!(
+            ev.fields.get("ka.user.groups").unwrap(),
+            "system:authenticated"
+        );
     }
 
     #[test]

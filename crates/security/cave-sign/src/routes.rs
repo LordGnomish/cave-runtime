@@ -35,7 +35,10 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/sign/verify", post(verify_route))
         .route("/api/sign/attest", post(attest_route))
         .route("/api/sign/verify-attest", post(verify_attest_route))
-        .route("/api/sign/policy", get(get_policy_route).post(set_policy_route))
+        .route(
+            "/api/sign/policy",
+            get(get_policy_route).post(set_policy_route),
+        )
         .route("/api/sign/fulcio", get(fulcio_route))
         .route("/api/sign/rekor", get(rekor_route))
         .route("/api/sign/list", get(list_route))
@@ -119,7 +122,8 @@ async fn verify_route(
             .map_err(|e| ApiError::bad(format!("payload base64: {}", e)))?,
         None => req.artifact.as_bytes().to_vec(),
     };
-    let bundle = crate::bundle::CosignBundle::decode_json(&req.bundle_json).map_err(ApiError::from)?;
+    let bundle =
+        crate::bundle::CosignBundle::decode_json(&req.bundle_json).map_err(ApiError::from)?;
     let policy = req.identity.as_deref().map(|i| {
         crate::policy::Policy::new("inline")
             .require(crate::policy::Rule::CertificateIdentity { glob: i.into() })
@@ -170,8 +174,10 @@ pub struct VerifyAttestReq {
 async fn verify_attest_route(
     Json(req): Json<VerifyAttestReq>,
 ) -> std::result::Result<Json<serde_json::Value>, ApiError> {
-    let (alg, pk) = crate::keypair::decode_public_pem(&req.public_key_pem).map_err(ApiError::from)?;
-    let att = crate::attestation::verify_envelope(&req.envelope, alg, &pk).map_err(ApiError::from)?;
+    let (alg, pk) =
+        crate::keypair::decode_public_pem(&req.public_key_pem).map_err(ApiError::from)?;
+    let att =
+        crate::attestation::verify_envelope(&req.envelope, alg, &pk).map_err(ApiError::from)?;
     Ok(Json(json!({
         "valid": true,
         "predicate_type": att.predicate_type.uri(),
@@ -180,7 +186,12 @@ async fn verify_attest_route(
 }
 
 async fn get_policy_route(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
-    let p = state.policy.lock().ok().map(|p| p.clone()).unwrap_or_default();
+    let p = state
+        .policy
+        .lock()
+        .ok()
+        .map(|p| p.clone())
+        .unwrap_or_default();
     Json(serde_json::to_value(p).unwrap())
 }
 
@@ -214,11 +225,17 @@ async fn rekor_route(
     Query(q): Query<RekorQuery>,
 ) -> std::result::Result<Json<serde_json::Value>, ApiError> {
     if let Some(i) = q.log_index {
-        let e = state.rekor.get_by_index_offline(i).map_err(ApiError::from)?;
+        let e = state
+            .rekor
+            .get_by_index_offline(i)
+            .map_err(ApiError::from)?;
         return Ok(Json(serde_json::to_value(e).unwrap()));
     }
     if let Some(d) = q.digest {
-        let es = state.rekor.search_by_digest_offline(&d).map_err(ApiError::from)?;
+        let es = state
+            .rekor
+            .search_by_digest_offline(&d)
+            .map_err(ApiError::from)?;
         return Ok(Json(serde_json::to_value(es).unwrap()));
     }
     let (size, root) = state.rekor.tree_state_offline().map_err(ApiError::from)?;
@@ -272,7 +289,7 @@ impl IntoResponse for ApiError {
 mod tests {
     use super::*;
     use crate::State;
-    use axum::http::{Request, Method};
+    use axum::http::{Method, Request};
     use tower::ServiceExt;
 
     fn router() -> Router {
@@ -362,8 +379,10 @@ mod tests {
     async fn policy_set_then_get_roundtrip() {
         let state = Arc::new(State::default());
         let r = create_router(state.clone());
-        let policy = crate::policy::Policy::new("test")
-            .require(crate::policy::Rule::CertificateIdentity { glob: "*@cave.io".into() });
+        let policy =
+            crate::policy::Policy::new("test").require(crate::policy::Rule::CertificateIdentity {
+                glob: "*@cave.io".into(),
+            });
         let body = serde_json::to_vec(&policy).unwrap();
         let resp = r
             .clone()

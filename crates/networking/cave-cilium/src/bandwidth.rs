@@ -71,12 +71,7 @@ pub enum EdtVerdict {
 /// current departure timestamp (`ctx->tstamp`), and `wire_len` is the on-wire
 /// byte length (`ctx_wire_len`). On `Pass`/`Paced` the function updates
 /// `info.t_last` exactly as the BPF code's `WRITE_ONCE(info->t_last, …)` does.
-pub fn edt_sched_departure(
-    info: &mut EdtInfo,
-    now: u64,
-    tstamp: u64,
-    wire_len: u64,
-) -> EdtVerdict {
+pub fn edt_sched_departure(info: &mut EdtInfo, now: u64, tstamp: u64, wire_len: u64) -> EdtVerdict {
     // `if (!info->bps) goto out;` — no rate configured.
     if info.bps == 0 {
         return EdtVerdict::Pass;
@@ -108,7 +103,10 @@ mod tests {
     #[test]
     fn no_rate_configured_passes() {
         let mut info = EdtInfo::new(0);
-        assert_eq!(edt_sched_departure(&mut info, 100, 100, 1500), EdtVerdict::Pass);
+        assert_eq!(
+            edt_sched_departure(&mut info, 100, 100, 1500),
+            EdtVerdict::Pass
+        );
         // t_last untouched when bps==0.
         assert_eq!(info.t_last, 0);
     }
@@ -142,11 +140,21 @@ mod tests {
         let now = 0;
         // First packet at now=0, tstamp=0: t_next(=1.5ms) > t(=0)? yes -> paced.
         let v1 = edt_sched_departure(&mut info, now, 0, 1500);
-        assert_eq!(v1, EdtVerdict::Paced { departure: 1_500_000 });
+        assert_eq!(
+            v1,
+            EdtVerdict::Paced {
+                departure: 1_500_000
+            }
+        );
         assert_eq!(info.t_last, 1_500_000);
         // Second back-to-back packet (still now=0): departure stacks by delay.
         let v2 = edt_sched_departure(&mut info, now, 0, 1500);
-        assert_eq!(v2, EdtVerdict::Paced { departure: 3_000_000 });
+        assert_eq!(
+            v2,
+            EdtVerdict::Paced {
+                departure: 3_000_000
+            }
+        );
         assert_eq!(info.t_last, 3_000_000);
     }
 
@@ -175,7 +183,10 @@ mod tests {
         // Once real time has advanced well past t_last+delay, the aggregate is
         // back under rate: the packet passes and t_last snaps forward to `t`.
         let now = 10 * delay;
-        assert_eq!(edt_sched_departure(&mut info, now, now, 1500), EdtVerdict::Pass);
+        assert_eq!(
+            edt_sched_departure(&mut info, now, now, 1500),
+            EdtVerdict::Pass
+        );
         assert_eq!(info.t_last, now);
     }
 }

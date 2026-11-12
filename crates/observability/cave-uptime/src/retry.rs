@@ -129,9 +129,7 @@ mod tests {
         let result = execute_with_retry(&cfg, || {
             n += 1;
             let c = n;
-            async move {
-                if c < 3 { Err("no") } else { Ok::<u32, &str>(c) }
-            }
+            async move { if c < 3 { Err("no") } else { Ok::<u32, &str>(c) } }
         })
         .await;
         assert!(result.is_ok());

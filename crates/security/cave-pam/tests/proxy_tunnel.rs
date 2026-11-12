@@ -2,9 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for access proxy tunnel state tracking.
 
-use cave_pam::proxy_tunnel::{
-    TunnelRegistry, TunnelState, TunnelKind, OpenTunnel,
-};
+use cave_pam::proxy_tunnel::{OpenTunnel, TunnelKind, TunnelRegistry, TunnelState};
 use uuid::Uuid;
 
 fn make_open(kind: TunnelKind, target: &str) -> OpenTunnel {

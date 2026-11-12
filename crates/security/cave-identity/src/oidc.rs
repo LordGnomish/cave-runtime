@@ -130,9 +130,10 @@ mod tests {
         assert_eq!(d.jwks_uri, "https://spire.example.org/keys");
         assert_eq!(d.issuer, "https://spire.example.org");
         assert!(d.response_types_supported.contains(&"id_token".into()));
-        assert!(d
-            .id_token_signing_alg_values_supported
-            .contains(&"ES256".into()));
+        assert!(
+            d.id_token_signing_alg_values_supported
+                .contains(&"ES256".into())
+        );
     }
 
     #[test]

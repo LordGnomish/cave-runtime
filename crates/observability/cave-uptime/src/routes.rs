@@ -14,11 +14,11 @@
 //!   GET    /api/uptime/status
 //!   POST   /api/uptime/push/:id    (push heartbeat)
 
+use crate::AppState;
 use crate::history::UptimeWindow;
 use crate::models::{ProbeType, UptimeProbe};
 use crate::probe::build_probe_result;
 use crate::status::{MonitorStatus, ProbeStatusSummary, build_status_page};
-use crate::AppState;
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -168,10 +168,7 @@ async fn update_probe(
     Ok(Json(ProbeResponse::from(probe)))
 }
 
-async fn delete_probe(
-    State(state): State<Arc<AppState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_probe(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> StatusCode {
     if state.probes.delete(id) {
         state.scheduler.unregister(id);
         StatusCode::NO_CONTENT

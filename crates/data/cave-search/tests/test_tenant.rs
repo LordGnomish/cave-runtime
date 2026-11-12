@@ -2,11 +2,15 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for multi-tenant index isolation and the Tenant/TenantRegistry aggregate.
 
-use cave_search::tenant::{TenantId, Tenant, TenantRegistry};
+use cave_search::tenant::{Tenant, TenantId, TenantRegistry};
 use std::str::FromStr;
 
-fn tenant_a() -> TenantId { TenantId::from_str("tenant-a").unwrap() }
-fn tenant_b() -> TenantId { TenantId::from_str("tenant-b").unwrap() }
+fn tenant_a() -> TenantId {
+    TenantId::from_str("tenant-a").unwrap()
+}
+fn tenant_b() -> TenantId {
+    TenantId::from_str("tenant-b").unwrap()
+}
 
 #[test]
 fn tenant_id_from_str_valid() {

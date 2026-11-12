@@ -14,9 +14,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use cave_slo::engine::{composite_slo_compliance, evaluate_multi_window};
-use cave_slo::models::{
-    MetricType, SloAnnotations, SloIndicator, SloObjective, SloStatus, SLO,
-};
+use cave_slo::models::{MetricType, SLO, SloAnnotations, SloIndicator, SloObjective, SloStatus};
 use cave_slo::store::SloStore;
 
 fn make_slo(target_percentage: f64, window_days: u32) -> SLO {
@@ -46,13 +44,33 @@ fn multi_window_fires_both_alerts_when_burning_fast() {
     let slo = make_slo(99.9, 30);
     let eval = evaluate_multi_window(
         &slo,
-        SloIndicator::Ratio { good: 984, total: 1000 },
-        SloIndicator::Ratio { good: 993, total: 1000 },
-        SloIndicator::Ratio { good: 993, total: 1000 },
-        SloIndicator::Ratio { good: 993, total: 1000 },
+        SloIndicator::Ratio {
+            good: 984,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 993,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 993,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 993,
+            total: 1000,
+        },
     );
-    assert!((eval.burn_rate_1h - 16.0).abs() < 1e-6, "br_1h={}", eval.burn_rate_1h);
-    assert!((eval.burn_rate_6h - 7.0).abs() < 1e-6, "br_6h={}", eval.burn_rate_6h);
+    assert!(
+        (eval.burn_rate_1h - 16.0).abs() < 1e-6,
+        "br_1h={}",
+        eval.burn_rate_1h
+    );
+    assert!(
+        (eval.burn_rate_6h - 7.0).abs() < 1e-6,
+        "br_6h={}",
+        eval.burn_rate_6h
+    );
     assert!(eval.short_window_alert);
     assert!(eval.long_window_alert);
     assert_eq!(eval.status, SloStatus::Breached);
@@ -66,10 +84,22 @@ fn multi_window_no_alerts_when_healthy() {
     let slo = make_slo(99.9, 30);
     let eval = evaluate_multi_window(
         &slo,
-        SloIndicator::Ratio { good: 1000, total: 1000 },
-        SloIndicator::Ratio { good: 1000, total: 1000 },
-        SloIndicator::Ratio { good: 1000, total: 1000 },
-        SloIndicator::Ratio { good: 1000, total: 1000 },
+        SloIndicator::Ratio {
+            good: 1000,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 1000,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 1000,
+            total: 1000,
+        },
+        SloIndicator::Ratio {
+            good: 1000,
+            total: 1000,
+        },
     );
     assert!((eval.burn_rate_1h - 0.0).abs() < 1e-9);
     assert!((eval.burn_rate_6h - 0.0).abs() < 1e-9);
@@ -84,8 +114,18 @@ fn multi_window_no_alerts_when_healthy() {
 fn composite_weighted_average() {
     // (0.7 * 99.0 + 0.3 * 95.0) / (0.7 + 0.3) = (69.3 + 28.5) / 1.0 = 97.8.
     let objectives = vec![
-        SloObjective { name: "avail".into(), target: 99.9, window_days: 30, weight: 0.7 },
-        SloObjective { name: "latency".into(), target: 99.0, window_days: 30, weight: 0.3 },
+        SloObjective {
+            name: "avail".into(),
+            target: 99.9,
+            window_days: 30,
+            weight: 0.7,
+        },
+        SloObjective {
+            name: "latency".into(),
+            target: 99.0,
+            window_days: 30,
+            weight: 0.3,
+        },
     ];
     let result = composite_slo_compliance(&objectives, &[99.0, 95.0]);
     assert!((result - 97.8).abs() < 1e-9, "result={result}");
@@ -100,8 +140,18 @@ fn composite_empty_objectives_is_zero() {
 #[test]
 fn composite_zero_total_weight_is_zero() {
     let objectives = vec![
-        SloObjective { name: "a".into(), target: 99.0, window_days: 30, weight: 0.0 },
-        SloObjective { name: "b".into(), target: 99.0, window_days: 30, weight: 0.0 },
+        SloObjective {
+            name: "a".into(),
+            target: 99.0,
+            window_days: 30,
+            weight: 0.0,
+        },
+        SloObjective {
+            name: "b".into(),
+            target: 99.0,
+            window_days: 30,
+            weight: 0.0,
+        },
     ];
     let result = composite_slo_compliance(&objectives, &[99.0, 95.0]);
     assert!((result - 0.0).abs() < 1e-12);
@@ -128,27 +178,58 @@ fn objective_window_and_budget_minutes() {
 #[test]
 fn indicator_error_rate_all_arms() {
     // Latency: 0% when p99 < threshold, else 100%.
-    assert!((SloIndicator::Latency { p99_ms: 200.0, threshold_ms: 150.0 }.error_rate_pct()
-        - 100.0)
-        .abs()
-        < 1e-9);
-    assert!((SloIndicator::Latency { p99_ms: 100.0, threshold_ms: 150.0 }.error_rate_pct()
-        - 0.0)
-        .abs()
-        < 1e-9);
+    assert!(
+        (SloIndicator::Latency {
+            p99_ms: 200.0,
+            threshold_ms: 150.0
+        }
+        .error_rate_pct()
+            - 100.0)
+            .abs()
+            < 1e-9
+    );
+    assert!(
+        (SloIndicator::Latency {
+            p99_ms: 100.0,
+            threshold_ms: 150.0
+        }
+        .error_rate_pct()
+            - 0.0)
+            .abs()
+            < 1e-9
+    );
     // Threshold: 0% when value < threshold, else 100% (equal counts as breach).
-    assert!((SloIndicator::Threshold { value: 5.0, threshold: 10.0 }.error_rate_pct()
-        - 0.0)
-        .abs()
-        < 1e-9);
-    assert!((SloIndicator::Threshold { value: 10.0, threshold: 10.0 }.error_rate_pct()
-        - 100.0)
-        .abs()
-        < 1e-9);
+    assert!(
+        (SloIndicator::Threshold {
+            value: 5.0,
+            threshold: 10.0
+        }
+        .error_rate_pct()
+            - 0.0)
+            .abs()
+            < 1e-9
+    );
+    assert!(
+        (SloIndicator::Threshold {
+            value: 10.0,
+            threshold: 10.0
+        }
+        .error_rate_pct()
+            - 100.0)
+            .abs()
+            < 1e-9
+    );
     // Ratio: total==0 guard returns 0; otherwise (total-good)/total*100.
     assert!((SloIndicator::Ratio { good: 0, total: 0 }.error_rate_pct() - 0.0).abs() < 1e-9);
     assert!(
-        (SloIndicator::Ratio { good: 990, total: 1000 }.error_rate_pct() - 1.0).abs() < 1e-9
+        (SloIndicator::Ratio {
+            good: 990,
+            total: 1000
+        }
+        .error_rate_pct()
+            - 1.0)
+            .abs()
+            < 1e-9
     );
 }
 
@@ -182,7 +263,11 @@ fn store_compute_stats_and_list_by_status() {
     assert_eq!(stats.breaching, 1);
     assert_eq!(stats.breached, 1);
     // Unknown is counted in total but in no status bucket.
-    assert!((stats.avg_compliance - 77.0).abs() < 1e-9, "avg={}", stats.avg_compliance);
+    assert!(
+        (stats.avg_compliance - 77.0).abs() < 1e-9,
+        "avg={}",
+        stats.avg_compliance
+    );
 
     let breached = store.list_by_status(SloStatus::Breached);
     assert_eq!(breached.len(), 1);

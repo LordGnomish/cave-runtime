@@ -142,22 +142,34 @@ pub struct MockHypervisor {
 
 impl Default for MockHypervisor {
     fn default() -> Self {
-        MockHypervisor { next_pid: parking_lot::Mutex::new(10_000) }
+        MockHypervisor {
+            next_pid: parking_lot::Mutex::new(10_000),
+        }
     }
 }
 
 #[async_trait]
 impl Hypervisor for MockHypervisor {
-    fn kind(&self) -> HypervisorType { HypervisorType::Mock }
+    fn kind(&self) -> HypervisorType {
+        HypervisorType::Mock
+    }
     async fn create_vm(&self, _sandbox_id: &str) -> Result<u32, String> {
         let mut g = self.next_pid.lock();
         *g += 1;
         Ok(*g)
     }
-    async fn start_vm(&self, _: &str) -> Result<(), String> { Ok(()) }
-    async fn stop_vm(&self, _: &str) -> Result<(), String> { Ok(()) }
-    async fn pause_vm(&self, _: &str) -> Result<(), String> { Ok(()) }
-    async fn resume_vm(&self, _: &str) -> Result<(), String> { Ok(()) }
+    async fn start_vm(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    async fn stop_vm(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    async fn pause_vm(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    async fn resume_vm(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

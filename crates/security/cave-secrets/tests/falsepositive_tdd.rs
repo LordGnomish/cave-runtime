@@ -7,7 +7,7 @@
 //! positive (wordlist match, low-entropy, all-same-character) while keeping
 //! realistic high-entropy secrets.
 
-use cave_secrets::detector::{builtin_detectors, falsepositives, scan, scan_filtered, Finding};
+use cave_secrets::detector::{Finding, builtin_detectors, falsepositives, scan, scan_filtered};
 
 /// A placeholder API key and a 24-char low-entropy value must be suppressed,
 /// while a realistic high-entropy secret still produces a finding.

@@ -18,7 +18,6 @@ use cave_artifacts::pulp::content::{
     DebFilter, PypiFilter, RpmFilter, generate_deb_package_entry, generate_pypi_project_json,
     generate_pypi_simple_page, generate_repomd_xml, verify_artifact_checksums, verify_sha256,
 };
-use sha2::{Digest, Sha256};
 use cave_artifacts::pulp::distribution::{
     DistributionError, find_distribution_by_path, resolve_content_path, validate_distribution,
 };
@@ -49,6 +48,7 @@ use cave_artifacts::pulp::upload::{
     parse_content_range,
 };
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -561,8 +561,15 @@ fn rbac_get_user_permissions_deduplicates_across_roles() {
         },
     ];
     let perms = get_user_permissions("alice", &[], &assignments, &roles);
-    let view_count = perms.iter().filter(|p| p.contains("view_repository")).count();
-    assert_eq!(view_count, 1, "expected dedup for view_repository: {:?}", perms);
+    let view_count = perms
+        .iter()
+        .filter(|p| p.contains("view_repository"))
+        .count();
+    assert_eq!(
+        view_count, 1,
+        "expected dedup for view_repository: {:?}",
+        perms
+    );
     // Result is sorted.
     let mut sorted_check = perms.clone();
     sorted_check.sort();
@@ -782,7 +789,13 @@ fn upload_offset_mismatch_does_not_advance_state() {
     u.accept_chunk(0, 256).unwrap();
     let pre = u.offset;
     let err = u.accept_chunk(512, 256).unwrap_err();
-    assert!(matches!(err, UploadError::OutOfOrder { expected: 256, got: 512 }));
+    assert!(matches!(
+        err,
+        UploadError::OutOfOrder {
+            expected: 256,
+            got: 512
+        }
+    ));
     // Offset must NOT have advanced on error.
     assert_eq!(u.offset, pre);
 }
@@ -967,7 +980,12 @@ fn pypi_simple_page_empty_packages_still_renders_header() {
 
 #[test]
 fn pypi_project_json_pep691_shape() {
-    let pkg = make_python_pkg("flask", "3.0.0", PythonPackageType::Bdist_wheel, &"a".repeat(64));
+    let pkg = make_python_pkg(
+        "flask",
+        "3.0.0",
+        PythonPackageType::Bdist_wheel,
+        &"a".repeat(64),
+    );
     let json = generate_pypi_project_json("flask", &[pkg]);
     assert_eq!(json["meta"]["api-version"], "1.0");
     assert_eq!(json["name"], "flask");
@@ -986,9 +1004,9 @@ fn deb_package_entry_omits_optional_fields_when_none() {
         architecture: "all".into(),
         section: None,
         priority: None,
-        maintainer: None, // intentionally None
+        maintainer: None,  // intentionally None
         description: None, // intentionally None
-        depends: None, // intentionally None
+        depends: None,     // intentionally None
         pre_depends: None,
         suggests: None,
         recommends: None,
@@ -1034,8 +1052,9 @@ fn versions_to_prune_handles_unsorted_input() {
 #[test]
 fn versions_to_prune_retain_equals_count_is_no_op() {
     let repo_href = "/pulp/api/v3/repositories/abc/";
-    let versions: Vec<RepositoryVersion> =
-        (1..=5u64).map(|n| RepositoryVersion::new(repo_href, n)).collect();
+    let versions: Vec<RepositoryVersion> = (1..=5u64)
+        .map(|n| RepositoryVersion::new(repo_href, n))
+        .collect();
     let to_prune = versions_to_prune(&versions, 5);
     assert!(to_prune.is_empty());
 }

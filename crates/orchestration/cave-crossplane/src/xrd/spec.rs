@@ -165,8 +165,8 @@ mod tests {
 
     #[test]
     fn with_claim_names_attaches() {
-        let s = XrdSpec::new("g", "X", XrdScope::Cluster)
-            .with_claim_names(XrdNames::from_kind("XC"));
+        let s =
+            XrdSpec::new("g", "X", XrdScope::Cluster).with_claim_names(XrdNames::from_kind("XC"));
         assert!(s.claim_names.is_some());
     }
 

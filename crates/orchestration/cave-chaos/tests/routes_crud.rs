@@ -7,18 +7,18 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use cave_chaos::{
+    State,
     models::{
         BlastRadius, ChaosExperiment, ChaosTarget, ExperimentParams, ExperimentStatus,
         ExperimentType, SafetyGuard,
     },
     routes::create_router,
-    State,
 };
+use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
-use std::collections::HashMap;
-use chrono::Utc;
 
 fn app() -> axum::Router {
     let state = Arc::new(State::default());
@@ -88,7 +88,9 @@ async fn post_experiments_creates_experiment() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let exp: ChaosExperiment = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(exp.status, ExperimentStatus::Draft);
     assert_eq!(exp.target.namespace, "staging");
@@ -108,7 +110,9 @@ async fn get_experiments_returns_list() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let list: Vec<ChaosExperiment> = serde_json::from_slice(&bytes).unwrap();
     assert!(list.is_empty(), "fresh state should have no experiments");
 }
@@ -200,7 +204,9 @@ async fn full_experiment_lifecycle_create_start_stop() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let created: ChaosExperiment = serde_json::from_slice(&bytes).unwrap();
     let eid = created.id;
 
@@ -216,7 +222,9 @@ async fn full_experiment_lifecycle_create_start_stop() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let fetched: ChaosExperiment = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(fetched.status, ExperimentStatus::Draft);
 
@@ -233,7 +241,9 @@ async fn full_experiment_lifecycle_create_start_stop() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let started: ChaosExperiment = serde_json::from_slice(&bytes).unwrap();
     // After start+execute, should be Completed (executor is synchronous)
     assert!(

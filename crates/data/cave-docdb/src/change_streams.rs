@@ -55,7 +55,10 @@ pub enum StreamScope {
     /// Single database, all its collections.
     Database(String),
     /// Single collection.
-    Collection { database: String, collection: String },
+    Collection {
+        database: String,
+        collection: String,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -144,9 +147,10 @@ fn scope_matches(scope: &StreamScope, ev: &ChangeEvent) -> bool {
     match scope {
         StreamScope::Cluster => true,
         StreamScope::Database(db) => &ev.database == db,
-        StreamScope::Collection { database, collection } => {
-            &ev.database == database && &ev.collection == collection
-        }
+        StreamScope::Collection {
+            database,
+            collection,
+        } => &ev.database == database && &ev.collection == collection,
     }
 }
 
@@ -230,7 +234,8 @@ mod tests {
         let _t1 = bus.publish(ev("a", "users", OperationType::Insert));
         let t2 = bus.publish(ev("a", "users", OperationType::Update));
         let _t3 = bus.publish(ev("a", "users", OperationType::Delete));
-        let mut c = ChangeStreamCursor::open(Arc::clone(&bus), StreamScope::Cluster).resume_after(t2);
+        let mut c =
+            ChangeStreamCursor::open(Arc::clone(&bus), StreamScope::Cluster).resume_after(t2);
         let batch = c.next_batch();
         assert_eq!(batch.len(), 1);
         assert_eq!(batch[0].operation_type, OperationType::Delete);

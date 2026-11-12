@@ -35,5 +35,5 @@ pub use finding::{Finding, redact};
 pub use protect::{ProtectOutcome, protect_staged_blobs, protect_staged_with};
 pub use report::{write_csv, write_json, write_junit, write_sarif};
 pub use rule::{Rule, builtin_rules};
-pub use rule_pack::{load_pack_str, merge_packs, RulePackError, RulePackSpec, RuleSpec};
+pub use rule_pack::{RulePackError, RulePackSpec, RuleSpec, load_pack_str, merge_packs};
 pub use stopwords::{default_stopwords, filter_with_stopwords};

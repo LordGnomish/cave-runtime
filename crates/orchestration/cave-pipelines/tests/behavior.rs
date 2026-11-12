@@ -16,11 +16,11 @@
 //! Every assertion checks a concrete value derived from the implementation in
 //! `src/triggers.rs` and `src/notifications.rs`; no network is touched.
 
-use cave_pipelines::notifications::{
-    send_notification, NotificationConfig, NotificationRule, NotifyOn, PipelineEvent,
-};
-use cave_pipelines::triggers::{evaluate_cel, passes_interceptors, Interceptor, WebhookEvent};
 use cave_pipelines::RunPhase;
+use cave_pipelines::notifications::{
+    NotificationConfig, NotificationRule, NotifyOn, PipelineEvent, send_notification,
+};
+use cave_pipelines::triggers::{Interceptor, WebhookEvent, evaluate_cel, passes_interceptors};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -53,10 +53,9 @@ fn bitbucket_interceptor_passes_on_matching_event_key() {
 #[test]
 fn bitbucket_interceptor_filters_non_matching_event_key() {
     let mut event = WebhookEvent::new("pull_request", json!({}));
-    event.headers.insert(
-        "x-event-key".to_string(),
-        "pullrequest:created".to_string(),
-    );
+    event
+        .headers
+        .insert("x-event-key".to_string(), "pullrequest:created".to_string());
 
     let interceptors = vec![Interceptor::Bitbucket {
         secret_ref: "bb-secret".to_string(),

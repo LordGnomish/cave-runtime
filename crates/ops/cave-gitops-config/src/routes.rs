@@ -213,9 +213,7 @@ async fn create_request(
         updated_at: now,
     };
 
-    let stored = state
-        .store
-        .create_resource_request(resource_request);
+    let stored = state.store.create_resource_request(resource_request);
 
     // Run the pipeline
     let clusters = state.store.list_clusters();
@@ -246,10 +244,7 @@ async fn create_request(
         // Reconcile against any existing live entry at this path. A freshly
         // written desired manifest with no live counterpart, or one that drifts
         // from the live state, is OutOfSync (ArgoCD CompareAppState semantics).
-        let live = state
-            .store
-            .get_state_entry(&path)
-            .map(|e| e.content);
+        let live = state.store.get_state_entry(&path).map(|e| e.content);
         let sync_status = compare_state(&desired, live.as_deref());
         state.store.upsert_state_entry(StateStoreEntry {
             id: Uuid::new_v4(),

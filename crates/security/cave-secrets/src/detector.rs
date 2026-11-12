@@ -657,8 +657,11 @@ mod tests {
     #[test]
     fn test_scan_filtered_keeps_real_secret() {
         let detectors = builtin_detectors();
-        let findings =
-            scan_filtered(r#"api_key="A7xQ9pL2zR8vK3mN6wT1yB5dF4hG0jUq""#, "x.env", &detectors);
+        let findings = scan_filtered(
+            r#"api_key="A7xQ9pL2zR8vK3mN6wT1yB5dF4hG0jUq""#,
+            "x.env",
+            &detectors,
+        );
         assert!(!findings.is_empty());
     }
 }

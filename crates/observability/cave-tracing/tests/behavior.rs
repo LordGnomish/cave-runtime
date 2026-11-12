@@ -30,10 +30,8 @@
 use std::collections::HashMap;
 
 use cave_tracing::exporter::OtlpHttpExporter;
-use cave_tracing::propagation::{parse_tracestate, TraceState};
-use cave_tracing::types::{
-    AttrValue, Event, Link, SpanContext, SpanData, SpanKind, Status,
-};
+use cave_tracing::propagation::{TraceState, parse_tracestate};
+use cave_tracing::types::{AttrValue, Event, Link, SpanContext, SpanData, SpanKind, Status};
 
 /// Build a baseline root `SpanData` (no parent, no links, single resource attr).
 fn base_span(name: &str) -> SpanData {

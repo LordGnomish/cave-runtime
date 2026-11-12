@@ -7,10 +7,8 @@ use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
 };
+use cave_incidents::models::{CreateIncidentRequest, IncidentSeverity, IncidentStatus};
 use cave_incidents::{State, router};
-use cave_incidents::models::{
-    CreateIncidentRequest, IncidentSeverity, IncidentStatus,
-};
 use std::sync::Arc;
 use tower::ServiceExt; // for .oneshot()
 use uuid::Uuid;
@@ -30,13 +28,16 @@ async fn json_request(
         .uri(uri)
         .header("content-type", "application/json");
     let req = if let Some(b) = body {
-        req.body(Body::from(serde_json::to_vec(&b).unwrap())).unwrap()
+        req.body(Body::from(serde_json::to_vec(&b).unwrap()))
+            .unwrap()
     } else {
         req.body(Body::empty()).unwrap()
     };
     let response = app.oneshot(req).await.unwrap();
     let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
     (status, json)
 }
@@ -117,7 +118,8 @@ async fn test_get_incident_route() {
     state.store.create(i);
 
     let app = router(state);
-    let (status, body) = json_request(app, Method::GET, &format!("/api/incidents/{id}"), None).await;
+    let (status, body) =
+        json_request(app, Method::GET, &format!("/api/incidents/{id}"), None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["title"], "API Slow");
     assert_eq!(body["id"], id.to_string());
@@ -132,7 +134,8 @@ async fn test_get_missing_incident_returns_404() {
         Method::GET,
         &format!("/api/incidents/{}", Uuid::new_v4()),
         None,
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -157,7 +160,8 @@ async fn test_acknowledge_incident_route() {
         Method::POST,
         &format!("/api/incidents/{id}/acknowledge"),
         Some(payload),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["status"], "acknowledged");
     assert!(body["acknowledged_at"].is_string());
@@ -188,7 +192,8 @@ async fn test_resolve_incident_route() {
         Method::POST,
         &format!("/api/incidents/{id}/resolve"),
         Some(payload),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["status"], "resolved");
     assert!(body["resolved_at"].is_string());
@@ -209,7 +214,13 @@ async fn test_delete_incident_route() {
     state.store.create(i);
 
     let app = router(state);
-    let (del_status, _) = json_request(app.clone(), Method::DELETE, &format!("/api/incidents/{id}"), None).await;
+    let (del_status, _) = json_request(
+        app.clone(),
+        Method::DELETE,
+        &format!("/api/incidents/{id}"),
+        None,
+    )
+    .await;
     // Can't reuse app (consumed), so we just check status code
     assert_eq!(del_status, StatusCode::NO_CONTENT);
 }
@@ -262,7 +273,8 @@ async fn test_create_postmortem_route() {
         Method::POST,
         "/api/incidents/postmortems",
         Some(payload),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(body["title"], "DB Failure Post-Mortem");
     assert_eq!(body["status"], "draft");

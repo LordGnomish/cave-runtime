@@ -7,30 +7,21 @@
 //! window evaluation). Persistence (BeanModel/redbean) and socket fan-out
 //! stay out of crate; only the pure time/calendar evaluation is ported.
 
-use cave_uptime::maintenance::{
-    Maintenance, MaintenanceStatus, MaintenanceStrategy, TimeRange,
-};
+use cave_uptime::maintenance::{Maintenance, MaintenanceStatus, MaintenanceStrategy, TimeRange};
 use chrono::{TimeZone, Utc};
 
 /// `calcDuration`: end_time - start_time in seconds, +24h when crossing midnight.
 #[test]
 fn calc_duration_same_day() {
-    let m = Maintenance::recurring_weekday(
-        "deploy",
-        TimeRange::new("02:00", "04:00"),
-        vec![1, 3, 5],
-    );
+    let m =
+        Maintenance::recurring_weekday("deploy", TimeRange::new("02:00", "04:00"), vec![1, 3, 5]);
     // 02:00 -> 04:00 == 7200 seconds
     assert_eq!(m.calc_duration(), 7200);
 }
 
 #[test]
 fn calc_duration_crosses_midnight() {
-    let m = Maintenance::recurring_weekday(
-        "night",
-        TimeRange::new("23:00", "01:00"),
-        vec![6],
-    );
+    let m = Maintenance::recurring_weekday("night", TimeRange::new("23:00", "01:00"), vec![6]);
     // 23:00 -> 01:00 crosses midnight -> 2h == 7200 (upstream adds 24*3600)
     assert_eq!(m.calc_duration(), 7200);
 }
@@ -113,11 +104,7 @@ fn recurring_weekday_inactive_on_unlisted_day() {
 /// Recurring-weekday: not active outside the daily time window.
 #[test]
 fn recurring_weekday_inactive_outside_time() {
-    let m = Maintenance::recurring_weekday(
-        "midday",
-        TimeRange::new("11:00", "13:00"),
-        vec![3],
-    );
+    let m = Maintenance::recurring_weekday("midday", TimeRange::new("11:00", "13:00"), vec![3]);
     let now = Utc.with_ymd_and_hms(2026, 7, 1, 9, 0, 0).unwrap();
     assert!(!m.is_active_at(now));
 }
@@ -127,11 +114,7 @@ fn recurring_weekday_inactive_outside_time() {
 #[test]
 fn recurring_weekday_crosses_midnight() {
     // Window 23:00 -> 01:00 listed for Wednesday (3).
-    let m = Maintenance::recurring_weekday(
-        "night",
-        TimeRange::new("23:00", "01:00"),
-        vec![3],
-    );
+    let m = Maintenance::recurring_weekday("night", TimeRange::new("23:00", "01:00"), vec![3]);
     // 23:30 Wednesday -> active.
     let wed_night = Utc.with_ymd_and_hms(2026, 7, 1, 23, 30, 0).unwrap();
     assert!(m.is_active_at(wed_night));
@@ -143,22 +126,16 @@ fn recurring_weekday_crosses_midnight() {
 /// Recurring-day-of-month: active on a listed day of the month.
 #[test]
 fn recurring_day_of_month_active() {
-    let m = Maintenance::recurring_day_of_month(
-        "monthly",
-        TimeRange::new("01:00", "02:00"),
-        vec![15],
-    );
+    let m =
+        Maintenance::recurring_day_of_month("monthly", TimeRange::new("01:00", "02:00"), vec![15]);
     let now = Utc.with_ymd_and_hms(2026, 7, 15, 1, 30, 0).unwrap();
     assert!(m.is_active_at(now));
 }
 
 #[test]
 fn recurring_day_of_month_inactive_other_day() {
-    let m = Maintenance::recurring_day_of_month(
-        "monthly",
-        TimeRange::new("01:00", "02:00"),
-        vec![15],
-    );
+    let m =
+        Maintenance::recurring_day_of_month("monthly", TimeRange::new("01:00", "02:00"), vec![15]);
     let now = Utc.with_ymd_and_hms(2026, 7, 16, 1, 30, 0).unwrap();
     assert!(!m.is_active_at(now));
 }
@@ -166,18 +143,17 @@ fn recurring_day_of_month_inactive_other_day() {
 /// `getDayOfWeekList`: weekday list is sorted ascending.
 #[test]
 fn weekday_list_sorted() {
-    let m = Maintenance::recurring_weekday(
-        "x",
-        TimeRange::new("00:00", "01:00"),
-        vec![5, 1, 3],
-    );
+    let m = Maintenance::recurring_weekday("x", TimeRange::new("00:00", "01:00"), vec![5, 1, 3]);
     assert_eq!(m.day_of_week_list(), vec![1, 3, 5]);
 }
 
 /// Strategy is reflected by the constructor.
 #[test]
 fn strategy_constructors() {
-    assert_eq!(Maintenance::manual("a").strategy, MaintenanceStrategy::Manual);
+    assert_eq!(
+        Maintenance::manual("a").strategy,
+        MaintenanceStrategy::Manual
+    );
     let s = Maintenance::single(
         "b",
         Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),

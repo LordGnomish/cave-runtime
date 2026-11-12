@@ -15,7 +15,7 @@
 //! notify-event taxonomy. The actual libvirt RPC glue lives in
 //! cave-runtime's host-preflight layer.
 
-use crate::libvirt::{emit_domain_xml, EmitOptions};
+use crate::libvirt::{EmitOptions, emit_domain_xml};
 use crate::models::{VirtualMachineInstance, VmPhase};
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +47,10 @@ pub enum LauncherState {
 impl LauncherState {
     /// Whether the state should report "ready" to the readiness probe.
     pub fn is_ready(&self) -> bool {
-        matches!(self, LauncherState::Idle | LauncherState::Running | LauncherState::Paused)
+        matches!(
+            self,
+            LauncherState::Idle | LauncherState::Running | LauncherState::Paused
+        )
     }
 
     /// Whether libvirt's domain object exists in this state.
@@ -296,7 +299,10 @@ mod tests {
             LauncherCommand::Shutdown,
             LauncherCommand::Kill,
         ] {
-            assert_eq!(next_state(LauncherState::Exited, *cmd), LauncherState::Exited);
+            assert_eq!(
+                next_state(LauncherState::Exited, *cmd),
+                LauncherState::Exited
+            );
         }
     }
 
@@ -310,9 +316,7 @@ mod tests {
 
     #[test]
     fn notify_implied_phase_running() {
-        let e = NotifyEvent::DomainStarted {
-            uuid: "u".into(),
-        };
+        let e = NotifyEvent::DomainStarted { uuid: "u".into() };
         assert_eq!(e.implied_phase(), VmPhase::Running);
     }
 

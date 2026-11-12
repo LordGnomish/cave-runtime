@@ -61,8 +61,7 @@ pub fn load_pack_str(toml_src: &str) -> Result<Vec<Rule>, RulePackError> {
 /// behaviour: `[extend]` rules with `useDefault = true` then explicit
 /// rule overrides take effect last).
 pub fn merge_packs(base: Vec<Rule>, pack: Vec<Rule>) -> Vec<Rule> {
-    let pack_ids: std::collections::HashSet<&str> =
-        pack.iter().map(|r| r.id.as_str()).collect();
+    let pack_ids: std::collections::HashSet<&str> = pack.iter().map(|r| r.id.as_str()).collect();
     let mut out: Vec<Rule> = base
         .into_iter()
         .filter(|r| !pack_ids.contains(r.id.as_str()))
@@ -185,10 +184,12 @@ fn spec_to_rules(spec: RulePackSpec) -> Result<Vec<Rule>, RulePackError> {
             rule = rule.with_keywords(r.keywords.into_iter());
         }
         if let Some(p) = r.path {
-            rule = rule.with_path(&p).map_err(|e| RulePackError::InvalidPathRegex {
-                id: r.id.clone(),
-                reason: e.to_string(),
-            })?;
+            rule = rule
+                .with_path(&p)
+                .map_err(|e| RulePackError::InvalidPathRegex {
+                    id: r.id.clone(),
+                    reason: e.to_string(),
+                })?;
         }
         if let (Some(floor), Some(group)) = (r.entropy, r.entropy_group) {
             rule = rule.with_entropy(floor, group);

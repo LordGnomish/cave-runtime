@@ -2,9 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! In-memory chat store — channels, messages, presence, stats.
 
-use crate::models::{
-    Channel, ChatStats, Message, PresenceStatus, Reaction, UserPresence,
-};
+use crate::models::{Channel, ChatStats, Message, PresenceStatus, Reaction, UserPresence};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -125,10 +123,7 @@ impl ChatStore {
         let messages = self.messages.read().unwrap();
         let mut msgs: Vec<Message> = messages
             .values()
-            .filter(|m| {
-                m.channel_id == *channel_id
-                    && before.map_or(true, |t| m.created_at < t)
-            })
+            .filter(|m| m.channel_id == *channel_id && before.map_or(true, |t| m.created_at < t))
             .cloned()
             .collect();
         // newest-first
@@ -156,12 +151,7 @@ impl ChatStore {
     }
 
     /// Add an emoji reaction from `user` to a message (idempotent per user).
-    pub fn add_reaction(
-        &self,
-        message_id: &Uuid,
-        emoji: String,
-        user: String,
-    ) -> Option<Message> {
+    pub fn add_reaction(&self, message_id: &Uuid, emoji: String, user: String) -> Option<Message> {
         let mut messages = self.messages.write().unwrap();
         if let Some(msg) = messages.get_mut(message_id) {
             if let Some(reaction) = msg.reactions.iter_mut().find(|r| r.emoji == emoji) {
@@ -180,12 +170,7 @@ impl ChatStore {
     }
 
     /// Remove a user's reaction from a message.  Returns the updated message.
-    pub fn remove_reaction(
-        &self,
-        message_id: &Uuid,
-        emoji: &str,
-        user: &str,
-    ) -> Option<Message> {
+    pub fn remove_reaction(&self, message_id: &Uuid, emoji: &str, user: &str) -> Option<Message> {
         let mut messages = self.messages.write().unwrap();
         if let Some(msg) = messages.get_mut(message_id) {
             for reaction in msg.reactions.iter_mut() {
@@ -240,11 +225,7 @@ impl ChatStore {
         let presence = self.presence.read().unwrap();
 
         let now = Utc::now();
-        let today_start = now
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_utc();
+        let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
 
         let total_channels = channels.len() as u64;
         let total_messages = messages.len() as u64;

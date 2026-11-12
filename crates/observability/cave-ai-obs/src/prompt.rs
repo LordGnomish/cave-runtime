@@ -93,7 +93,10 @@ mod tests {
 
     #[test]
     fn test_render_multiple_vars() {
-        let tmpl = make_tmpl("{{greeting}}, {{name}}! From {{city}}.", &["greeting", "name", "city"]);
+        let tmpl = make_tmpl(
+            "{{greeting}}, {{name}}! From {{city}}.",
+            &["greeting", "name", "city"],
+        );
         let mut vars = HashMap::new();
         vars.insert("greeting".to_string(), "Hello".to_string());
         vars.insert("name".to_string(), "Alice".to_string());

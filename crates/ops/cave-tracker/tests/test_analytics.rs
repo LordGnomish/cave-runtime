@@ -2,14 +2,19 @@
 // Copyright 2026 Cave Runtime contributors
 //! Failing test for sprint velocity / analytics engine.
 
-use cave_tracker::analytics::{sprint_velocity, cycle_time_stats, triage_issue};
-use cave_tracker::models::{Issue, Sprint, SprintState, IssueType, Priority};
 use cave_tracker::TrackerStore;
+use cave_tracker::analytics::{cycle_time_stats, sprint_velocity, triage_issue};
+use cave_tracker::models::{Issue, IssueType, Priority, Sprint, SprintState};
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn make_issue_with_sp(project_id: Uuid, sprint_id: Option<Uuid>, story_points: Option<f64>, status: &str) -> Issue {
+fn make_issue_with_sp(
+    project_id: Uuid,
+    sprint_id: Option<Uuid>,
+    story_points: Option<f64>,
+    status: &str,
+) -> Issue {
     Issue {
         id: Uuid::new_v4(),
         key: "TEST-1".to_string(),

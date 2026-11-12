@@ -12,9 +12,14 @@
 // Upstream reference (pulpcore 3.49.0):
 //   - pulpcore/app/tasks/reclaim_space.py :: reclaim_space()
 
-use cave_artifacts::pulp::reclaim::{plan_reclaim, ContentArtifactRef, ReclaimRequest};
+use cave_artifacts::pulp::reclaim::{ContentArtifactRef, ReclaimRequest, plan_reclaim};
 
-fn cref(content: &str, repo_version: &str, on_demand_remote: bool, size: u64) -> ContentArtifactRef {
+fn cref(
+    content: &str,
+    repo_version: &str,
+    on_demand_remote: bool,
+    size: u64,
+) -> ContentArtifactRef {
     ContentArtifactRef {
         content_pk: content.to_string(),
         repo_version_pk: repo_version.to_string(),
@@ -56,10 +61,7 @@ fn skips_content_protected_by_keeplist() {
     let req = ReclaimRequest {
         target_repo_versions: vec!["rvA".into()],
         keeplist_repo_versions: vec!["rvK".into()],
-        refs: vec![
-            cref("c1", "rvA", true, 500),
-            cref("c1", "rvK", true, 500),
-        ],
+        refs: vec![cref("c1", "rvA", true, 500), cref("c1", "rvK", true, 500)],
     };
     let plan = plan_reclaim(&req);
     assert!(plan.reclaimable_content.is_empty());
@@ -72,10 +74,7 @@ fn ignores_content_outside_target_repo_versions() {
     let req = ReclaimRequest {
         target_repo_versions: vec!["rvA".into()],
         keeplist_repo_versions: vec![],
-        refs: vec![
-            cref("c1", "rvA", true, 100),
-            cref("c2", "rvB", true, 999),
-        ],
+        refs: vec![cref("c1", "rvA", true, 100), cref("c2", "rvB", true, 999)],
     };
     let plan = plan_reclaim(&req);
     assert_eq!(plan.reclaimable_content, vec!["c1".to_string()]);
@@ -88,10 +87,7 @@ fn deduplicates_content_present_in_multiple_targeted_versions() {
     let req = ReclaimRequest {
         target_repo_versions: vec!["rvA".into(), "rvA2".into()],
         keeplist_repo_versions: vec![],
-        refs: vec![
-            cref("c1", "rvA", true, 700),
-            cref("c1", "rvA2", true, 700),
-        ],
+        refs: vec![cref("c1", "rvA", true, 700), cref("c1", "rvA2", true, 700)],
     };
     let plan = plan_reclaim(&req);
     assert_eq!(plan.reclaimable_content, vec!["c1".to_string()]);

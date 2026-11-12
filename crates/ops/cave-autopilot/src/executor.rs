@@ -212,7 +212,14 @@ impl LlmSmokeExecutor {
             }
             last_detail = format!(
                 "attempt {attempt}: cargo test did not pass\n{}",
-                out.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n")
+                out.lines()
+                    .rev()
+                    .take(8)
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect::<Vec<_>>()
+                    .join("\n")
             );
         }
 
@@ -309,10 +316,17 @@ mod tests {
             .find(|f| f.path.ends_with("src/lib.rs"))
             .unwrap();
         // The model's source is licensed even if the model forgot the header.
-        assert!(lib.content.contains("SPDX-License-Identifier: AGPL-3.0-or-later"));
+        assert!(
+            lib.content
+                .contains("SPDX-License-Identifier: AGPL-3.0-or-later")
+        );
         assert!(lib.content.contains("fn add"));
         // Every path is scoped under the crate dir — no escapes.
-        assert!(fs.files.iter().all(|f| f.path.starts_with("cave-test-autopilot/")));
+        assert!(
+            fs.files
+                .iter()
+                .all(|f| f.path.starts_with("cave-test-autopilot/"))
+        );
     }
 
     #[test]
@@ -335,7 +349,11 @@ mod tests {
     fn assemble_does_not_double_license_header() {
         let already = "// SPDX-License-Identifier: AGPL-3.0-or-later\npub fn a()->i32{1}\n#[test] fn t(){assert_eq!(a(),1);}";
         let fs = assemble_crate("c", already);
-        let lib = fs.files.iter().find(|f| f.path.ends_with("src/lib.rs")).unwrap();
+        let lib = fs
+            .files
+            .iter()
+            .find(|f| f.path.ends_with("src/lib.rs"))
+            .unwrap();
         assert_eq!(lib.content.matches("SPDX-License-Identifier").count(), 1);
     }
 }

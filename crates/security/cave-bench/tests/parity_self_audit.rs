@@ -58,7 +58,11 @@ fn assertion_6_gate_6_fill_ratio_meets_floor() {
     let r = a::gate_6_fill_ratio(&m).expect("G6 fill_ratio");
     assert!(r >= a::FLOOR_FILL_RATIO, "fill_ratio {r} >= floor");
     let h = a::honest_ratio(&m);
-    assert!(h >= a::FLOOR_HONEST_RATIO, "honest_ratio {h} >= {}", a::FLOOR_HONEST_RATIO);
+    assert!(
+        h >= a::FLOOR_HONEST_RATIO,
+        "honest_ratio {h} >= {}",
+        a::FLOOR_HONEST_RATIO
+    );
 
     let recorded: f64 = a::extract_scalar(&m, "fill_ratio")
         .expect("fill_ratio in [parity]")
@@ -94,21 +98,25 @@ fn assertion_8_gate_8_no_stub_macros() {
 
 #[test]
 fn assertion_9_surface_integrity_and_audit_date() {
-    use cave_bench::cis_engine::{BinOp, CisContext, CisRule, Logic, TestItem, ValueSource, evaluate_rule};
+    use cave_bench::cis_control_plane::control_plane_checks;
+    use cave_bench::cis_engine::{
+        BinOp, CisContext, CisRule, Logic, TestItem, ValueSource, evaluate_rule,
+    };
+    use cave_bench::cis_etcd::etcd_checks;
     use cave_bench::cis_master::master_checks;
     use cave_bench::cis_node::node_checks;
-    use cave_bench::cis_etcd::etcd_checks;
-    use cave_bench::cis_control_plane::control_plane_checks;
-    use cave_bench::kubescape_nsa::{NsaManifestFacts, evaluate_control, nsa_controls};
+    use cave_bench::cli::{BenchSubcommand, dispatch};
     use cave_bench::kubescape_mitre::{Tactic, group_by_tactic, mitre_techniques};
+    use cave_bench::kubescape_nsa::{NsaManifestFacts, evaluate_control, nsa_controls};
+    use cave_bench::models::{
+        Check, CisLevel, Finding, Framework, NodeType, Severity, Target, Verdict,
+    };
+    use cave_bench::observability::{alert_rules, alert_rules_yaml, dashboard_panels};
     use cave_bench::profile::{builtin_profiles, find_profile};
-    use cave_bench::runner::{RunMode, ScanInput, cis_pairs, run_profile, smoke_run};
     use cave_bench::report::{Format, render};
+    use cave_bench::runner::{RunMode, ScanInput, cis_pairs, run_profile, smoke_run};
     use cave_bench::scheduler::{NotifyAction, ScheduleRegistry, ScheduledScan, default_dag};
     use cave_bench::store::FindingStore;
-    use cave_bench::observability::{alert_rules, alert_rules_yaml, dashboard_panels};
-    use cave_bench::cli::{BenchSubcommand, dispatch};
-    use cave_bench::models::{Check, CisLevel, Finding, Framework, NodeType, Severity, Target, Verdict};
     use cave_bench::{MODULE_NAME, State, router};
     use std::sync::Arc;
 
@@ -150,7 +158,10 @@ fn assertion_9_surface_integrity_and_audit_date() {
     assert!(nsa.len() >= 20);
     let facts = NsaManifestFacts::default();
     let f = evaluate_control(&nsa[0], &facts, "h");
-    assert!(matches!(f.verdict, Verdict::Pass | Verdict::Fail | Verdict::Warn));
+    assert!(matches!(
+        f.verdict,
+        Verdict::Pass | Verdict::Fail | Verdict::Warn
+    ));
 
     // MITRE 10 tactics × ≥3 techniques.
     let techs = mitre_techniques();
@@ -166,7 +177,9 @@ fn assertion_9_surface_integrity_and_audit_date() {
     let p = find_profile("cis-1.10").unwrap();
     let t = Target::host_files("/etc/kubernetes", "n1");
     let mut input = ScanInput::new("n1");
-    input.cis_context.set_flag("apiserver", "--anonymous-auth", "false");
+    input
+        .cis_context
+        .set_flag("apiserver", "--anonymous-auth", "false");
     let (findings, summary) = run_profile(&p, &t, &input, RunMode::Sequential);
     assert!(!findings.is_empty());
     assert_eq!(summary.profile_id, "cis-1.10");
@@ -198,5 +211,10 @@ fn assertion_9_surface_integrity_and_audit_date() {
     assert!(cli_out.contains("cis-1.10"));
 
     // Verdict + severity types exposed.
-    let _ = (Verdict::Pass, Severity::Critical, CisLevel::L1, Finding::pass(&meta, "h", "ok"));
+    let _ = (
+        Verdict::Pass,
+        Severity::Critical,
+        CisLevel::L1,
+        Finding::pass(&meta, "h", "ok"),
+    );
 }

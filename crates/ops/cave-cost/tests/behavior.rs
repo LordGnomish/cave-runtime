@@ -241,9 +241,9 @@ fn test_calculate_cost_scales_with_window_hours() {
         None,
         labels.clone(),
         annos.clone(),
-        2.0,           // cpu cores
+        2.0, // cpu cores
         1.0,
-        4 * GIB,       // memory bytes
+        4 * GIB, // memory bytes
         GIB,
         0,
         0,
@@ -292,13 +292,13 @@ fn test_calculate_cost_storage_network_gpu() {
         None,
         HashMap::new(),
         HashMap::new(),
-        0.0,         // no cpu
+        0.0, // no cpu
         0.0,
-        0,           // no memory
+        0, // no memory
         0,
-        10 * GIB,    // storage bytes
-        20 * GIB,    // network egress bytes
-        1.0,         // gpu cores
+        10 * GIB, // storage bytes
+        20 * GIB, // network egress bytes
+        1.0,      // gpu cores
         start,
         start + Duration::hours(1),
         &p,

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use crate::error::{TrackerError, TrackerResult};
-use crate::registry::{default_registry, Upstream};
+use crate::registry::{Upstream, default_registry};
 
 /// Top-level config consumed by the CLI and the daily LaunchAgent.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -55,7 +55,9 @@ impl TrackerConfig {
 
     pub fn validate(&self) -> TrackerResult<()> {
         if self.upstreams.is_empty() {
-            return Err(TrackerError::Config("upstreams must not be empty".to_string()));
+            return Err(TrackerError::Config(
+                "upstreams must not be empty".to_string(),
+            ));
         }
         if self.request_timeout_secs == 0 {
             return Err(TrackerError::Config(
@@ -122,7 +124,9 @@ mod tests {
 
     #[test]
     fn default_config_validates() {
-        TrackerConfig::default_config().validate().expect("default valid");
+        TrackerConfig::default_config()
+            .validate()
+            .expect("default valid");
     }
 
     #[test]
@@ -152,7 +156,10 @@ mod tests {
         let distinct = c.distinct_repos();
         // kubernetes/kubernetes is tracked by several crates but must
         // appear exactly once in the distinct set.
-        let k8s = distinct.iter().filter(|r| *r == "kubernetes/kubernetes").count();
+        let k8s = distinct
+            .iter()
+            .filter(|r| *r == "kubernetes/kubernetes")
+            .count();
         assert_eq!(k8s, 1);
         assert!(distinct.len() < c.upstreams.len());
     }

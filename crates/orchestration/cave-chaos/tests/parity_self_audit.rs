@@ -86,7 +86,11 @@ fn assertion_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 // ─── Assertion 4: parity_ratio_source = "manifest" ───────────────────────────
@@ -111,7 +115,9 @@ fn assertion_5_last_audit_is_today() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert!(
-        when.as_deref().map(|d| d.starts_with("2026-")).unwrap_or(false),
+        when.as_deref()
+            .map(|d| d.starts_with("2026-"))
+            .unwrap_or(false),
         "[parity] last_audit must reflect the 2026-* Charter v2 close-out (got {:?})",
         when
     );
@@ -223,6 +229,7 @@ fn assertion_8_no_stub_macros_in_src() {
 
 #[test]
 fn assertion_9_chaos_surface_intact() {
+    use cave_chaos::MODULE_NAME;
     use cave_chaos::engine::{actual_duration_secs, is_active, is_high_risk, validate_experiment};
     use cave_chaos::executor::ChaosExecutor;
     use cave_chaos::models::{
@@ -230,14 +237,13 @@ fn assertion_9_chaos_surface_intact() {
         ExperimentStatus, ExperimentType, SafetyGuard,
     };
     use cave_chaos::schedule::{
-        cron_field_matches, is_cron_due, next_cron_run, should_run, validate_cron_expression,
-        CronField, ScheduledRunDecision,
+        CronField, ScheduledRunDecision, cron_field_matches, is_cron_due, next_cron_run,
+        should_run, validate_cron_expression,
     };
     use cave_chaos::store::ChaosStore;
     use cave_chaos::workflow::{
-        execute_workflow, ChaosWorkflow, WorkflowNode, WorkflowNodeType, WorkflowStatus,
+        ChaosWorkflow, WorkflowNode, WorkflowNodeType, WorkflowStatus, execute_workflow,
     };
-    use cave_chaos::MODULE_NAME;
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
@@ -281,7 +287,10 @@ fn assertion_9_chaos_surface_intact() {
 
     // 3. Engine validation
     let errs = validate_experiment(&exp);
-    assert!(errs.is_empty(), "latency exp with latency_ms set should be valid");
+    assert!(
+        errs.is_empty(),
+        "latency exp with latency_ms set should be valid"
+    );
     assert!(!is_active(&exp));
     assert!(!is_high_risk(&exp));
     assert!(actual_duration_secs(&exp).is_none());
@@ -398,7 +407,10 @@ fn assertion_9_chaos_surface_intact() {
         enabled: false,
         ..always_sched.clone()
     };
-    assert_eq!(should_run(&disabled_sched, &now), ScheduledRunDecision::Skip);
+    assert_eq!(
+        should_run(&disabled_sched, &now),
+        ScheduledRunDecision::Skip
+    );
 
     let _ = is_cron_due("* * * * *", &now).unwrap();
 

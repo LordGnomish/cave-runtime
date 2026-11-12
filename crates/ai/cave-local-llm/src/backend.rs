@@ -89,16 +89,12 @@ pub trait InferenceBackend: Send + Sync {
     fn chat<'a>(
         &'a self,
         req: BackendChatRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>,
-    >;
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>>;
 
     fn embed<'a>(
         &'a self,
         req: BackendEmbedRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>,
-    >;
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>>;
 }
 
 /// Adapter: wrap an [`OllamaClient`] as an [`InferenceBackend`].
@@ -120,9 +116,8 @@ impl InferenceBackend for OllamaBackend {
     fn chat<'a>(
         &'a self,
         req: BackendChatRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>,
-    > {
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>>
+    {
         Box::pin(async move {
             let mut options = serde_json::Map::new();
             if let Some(t) = req.temperature {
@@ -166,9 +161,8 @@ impl InferenceBackend for OllamaBackend {
     fn embed<'a>(
         &'a self,
         req: BackendEmbedRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>,
-    > {
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>>
+    {
         Box::pin(async move {
             let lc = OllamaLifecycle::from(&self.client);
             let ereq = EmbedRequest {
@@ -208,9 +202,8 @@ impl InferenceBackend for OpenAiCompatBackend {
     fn chat<'a>(
         &'a self,
         req: BackendChatRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>,
-    > {
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendChatResponse>> + Send + 'a>>
+    {
         Box::pin(async move {
             let chat_req = OpenAiChatRequest {
                 model: req.model,
@@ -230,7 +223,11 @@ impl InferenceBackend for OpenAiCompatBackend {
                 stop: None,
             };
             let r = self.client.chat_completions(chat_req).await?;
-            let choice = r.choices.into_iter().next().ok_or(BackendError::EmptyOutput)?;
+            let choice = r
+                .choices
+                .into_iter()
+                .next()
+                .ok_or(BackendError::EmptyOutput)?;
             Ok(BackendChatResponse {
                 model: r.model,
                 content: choice.message.content,
@@ -247,9 +244,8 @@ impl InferenceBackend for OpenAiCompatBackend {
     fn embed<'a>(
         &'a self,
         req: BackendEmbedRequest,
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>,
-    > {
+    ) -> Pin<Box<dyn std::future::Future<Output = BackendResult<BackendEmbedResponse>> + Send + 'a>>
+    {
         Box::pin(async move {
             let ereq = OpenAiEmbeddingRequest {
                 model: req.model.clone(),

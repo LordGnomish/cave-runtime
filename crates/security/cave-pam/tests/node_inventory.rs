@@ -2,11 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for node/resource inventory and enrollment.
 
-use cave_pam::node_inventory::{
-    NodeInventory, NodeRecord, NodeKind, NodeHealth, EnrollNode,
-};
-use uuid::Uuid;
+use cave_pam::node_inventory::{EnrollNode, NodeHealth, NodeInventory, NodeKind, NodeRecord};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 fn make_enroll(kind: NodeKind, hostname: &str) -> EnrollNode {
     EnrollNode {
@@ -24,7 +22,9 @@ fn make_enroll(kind: NodeKind, hostname: &str) -> EnrollNode {
 #[test]
 fn test_enroll_and_get_node() {
     let inv = NodeInventory::new();
-    let id = inv.enroll(make_enroll(NodeKind::Server, "web-01")).expect("enroll should succeed");
+    let id = inv
+        .enroll(make_enroll(NodeKind::Server, "web-01"))
+        .expect("enroll should succeed");
     let node = inv.get(&id).expect("node should exist");
     assert_eq!(node.hostname, "web-01");
     assert_eq!(node.kind, NodeKind::Server);
@@ -36,7 +36,8 @@ fn test_list_by_kind() {
     let inv = NodeInventory::new();
     inv.enroll(make_enroll(NodeKind::Server, "srv-01")).unwrap();
     inv.enroll(make_enroll(NodeKind::Server, "srv-02")).unwrap();
-    inv.enroll(make_enroll(NodeKind::Database, "db-01")).unwrap();
+    inv.enroll(make_enroll(NodeKind::Database, "db-01"))
+        .unwrap();
 
     let servers = inv.list_by_kind(&NodeKind::Server);
     assert_eq!(servers.len(), 2);
@@ -47,8 +48,11 @@ fn test_list_by_kind() {
 #[test]
 fn test_update_health() {
     let inv = NodeInventory::new();
-    let id = inv.enroll(make_enroll(NodeKind::Server, "node-01")).unwrap();
-    inv.update_health(&id, NodeHealth::Healthy).expect("update should succeed");
+    let id = inv
+        .enroll(make_enroll(NodeKind::Server, "node-01"))
+        .unwrap();
+    inv.update_health(&id, NodeHealth::Healthy)
+        .expect("update should succeed");
     let node = inv.get(&id).unwrap();
     assert_eq!(node.health, NodeHealth::Healthy);
 }
@@ -56,7 +60,9 @@ fn test_update_health() {
 #[test]
 fn test_deregister_node() {
     let inv = NodeInventory::new();
-    let id = inv.enroll(make_enroll(NodeKind::Server, "temp-01")).unwrap();
+    let id = inv
+        .enroll(make_enroll(NodeKind::Server, "temp-01"))
+        .unwrap();
     inv.deregister(&id).expect("deregister should succeed");
     assert!(inv.get(&id).is_none());
 }
@@ -64,8 +70,12 @@ fn test_deregister_node() {
 #[test]
 fn test_list_unhealthy() {
     let inv = NodeInventory::new();
-    let id1 = inv.enroll(make_enroll(NodeKind::Server, "sick-01")).unwrap();
-    let _id2 = inv.enroll(make_enroll(NodeKind::Server, "healthy-01")).unwrap();
+    let id1 = inv
+        .enroll(make_enroll(NodeKind::Server, "sick-01"))
+        .unwrap();
+    let _id2 = inv
+        .enroll(make_enroll(NodeKind::Server, "healthy-01"))
+        .unwrap();
     inv.update_health(&id1, NodeHealth::Unhealthy).unwrap();
     inv.update_health(&_id2, NodeHealth::Healthy).unwrap();
 
@@ -85,8 +95,10 @@ fn test_label_filter() {
         kind: NodeKind::Server,
         labels: staging_labels,
         addr: "10.0.1.1:22".to_string(),
-    }).unwrap();
-    inv.enroll(make_enroll(NodeKind::Server, "prod-srv")).unwrap(); // has env=prod
+    })
+    .unwrap();
+    inv.enroll(make_enroll(NodeKind::Server, "prod-srv"))
+        .unwrap(); // has env=prod
 
     let prod_nodes = inv.list_by_label("env", "prod");
     assert_eq!(prod_nodes.len(), 1);

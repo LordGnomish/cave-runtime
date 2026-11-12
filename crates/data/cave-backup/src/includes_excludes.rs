@@ -144,14 +144,19 @@ impl IncludesExcludes {
 /// (empty when valid).
 ///
 /// Port of Velero's `ValidateIncludesExcludes`.
-pub fn validate_includes_excludes(includes_list: &[String], excludes_list: &[String]) -> Vec<String> {
+pub fn validate_includes_excludes(
+    includes_list: &[String],
+    excludes_list: &[String],
+) -> Vec<String> {
     let mut errs = Vec::new();
 
     let includes: BTreeSet<&String> = includes_list.iter().collect();
     let excludes: BTreeSet<&String> = excludes_list.iter().collect();
 
     if includes.len() > 1 && includes.contains(&"*".to_string()) {
-        errs.push("includes list must either contain '*' only, or a non-empty list of items".to_string());
+        errs.push(
+            "includes list must either contain '*' only, or a non-empty list of items".to_string(),
+        );
     }
 
     if excludes.contains(&"*".to_string()) {

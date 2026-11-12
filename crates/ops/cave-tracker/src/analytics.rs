@@ -4,8 +4,8 @@
 //!
 //! Adapted from the orphan `tracker.rs` to work with the current models.
 
-use crate::models::{Issue, Priority, SprintState};
 use crate::TrackerStore;
+use crate::models::{Issue, Priority, SprintState};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -97,7 +97,10 @@ pub fn cycle_time_stats(store: &TrackerStore, project_id: Uuid) -> CycleTimeStat
 
     let sum: f64 = cycle_times.iter().sum();
     let min = cycle_times.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = cycle_times.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let max = cycle_times
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
 
     CycleTimeStats {
         count: cycle_times.len(),
@@ -144,10 +147,14 @@ pub fn triage_issue(store: &TrackerStore, issue_id: Uuid) -> Option<TriageSugges
 
     // Label heuristics.
     let mut labels: Vec<String> = Vec::new();
-    if combined.contains("security") || combined.contains("vulnerability") || combined.contains("cve") {
+    if combined.contains("security")
+        || combined.contains("vulnerability")
+        || combined.contains("cve")
+    {
         labels.push("security".into());
     }
-    if combined.contains("performance") || combined.contains("slow") || combined.contains("latency") {
+    if combined.contains("performance") || combined.contains("slow") || combined.contains("latency")
+    {
         labels.push("performance".into());
     }
     if combined.contains(" ui ") || combined.contains("frontend") || combined.contains("css") {
@@ -156,7 +163,8 @@ pub fn triage_issue(store: &TrackerStore, issue_id: Uuid) -> Option<TriageSugges
     if combined.contains("api") || combined.contains("backend") || combined.contains("server") {
         labels.push("backend".into());
     }
-    if combined.contains("database") || combined.contains(" db ") || combined.contains("migration") {
+    if combined.contains("database") || combined.contains(" db ") || combined.contains("migration")
+    {
         labels.push("database".into());
     }
     if combined.contains("crash") || combined.contains("panic") || combined.contains("exception") {
@@ -180,8 +188,8 @@ pub fn triage_issue(store: &TrackerStore, issue_id: Uuid) -> Option<TriageSugges
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Issue, IssueType, Priority};
     use crate::TrackerStore;
+    use crate::models::{Issue, IssueType, Priority};
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;

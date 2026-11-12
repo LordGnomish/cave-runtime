@@ -34,7 +34,10 @@ impl DevlakeStore {
     // ── Pipelines ─────────────────────────────────────────────────────────────
 
     pub fn insert_pipeline(&self, pipeline: Pipeline) {
-        self.pipelines.write().unwrap().insert(pipeline.id, pipeline);
+        self.pipelines
+            .write()
+            .unwrap()
+            .insert(pipeline.id, pipeline);
     }
 
     pub fn get_pipeline(&self, id: Uuid) -> Option<Pipeline> {
@@ -87,11 +90,7 @@ impl DevlakeStore {
         deployments
     }
 
-    pub fn recent_deployments(
-        &self,
-        env: Option<&DeploymentEnv>,
-        limit: usize,
-    ) -> Vec<Deployment> {
+    pub fn recent_deployments(&self, env: Option<&DeploymentEnv>, limit: usize) -> Vec<Deployment> {
         let mut deployments = self.list_deployments();
         if let Some(env) = env {
             deployments.retain(|d| &d.environment == env);
@@ -100,11 +99,7 @@ impl DevlakeStore {
         deployments
     }
 
-    pub fn deployments_in_period(
-        &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Vec<Deployment> {
+    pub fn deployments_in_period(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<Deployment> {
         self.deployments
             .read()
             .unwrap()
@@ -134,11 +129,7 @@ impl DevlakeStore {
         incidents
     }
 
-    pub fn resolve_incident(
-        &self,
-        id: Uuid,
-        resolved_at: DateTime<Utc>,
-    ) -> Option<Incident> {
+    pub fn resolve_incident(&self, id: Uuid, resolved_at: DateTime<Utc>) -> Option<Incident> {
         let mut incidents = self.incidents.write().unwrap();
         if let Some(inc) = incidents.get_mut(&id) {
             inc.resolved_at = Some(resolved_at);
@@ -159,8 +150,13 @@ impl DevlakeStore {
     }
 
     pub fn list_prs(&self) -> Vec<PullRequest> {
-        let mut prs: Vec<PullRequest> =
-            self.pull_requests.read().unwrap().values().cloned().collect();
+        let mut prs: Vec<PullRequest> = self
+            .pull_requests
+            .read()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect();
         prs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         prs
     }
@@ -204,8 +200,7 @@ impl DevlakeStore {
     }
 
     pub fn list_issues(&self) -> Vec<Issue> {
-        let mut issues: Vec<Issue> =
-            self.issues.read().unwrap().values().cloned().collect();
+        let mut issues: Vec<Issue> = self.issues.read().unwrap().values().cloned().collect();
         issues.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         issues
     }
@@ -244,8 +239,7 @@ impl DevlakeStore {
     }
 
     pub fn list_sprints(&self) -> Vec<Sprint> {
-        let mut sprints: Vec<Sprint> =
-            self.sprints.read().unwrap().values().cloned().collect();
+        let mut sprints: Vec<Sprint> = self.sprints.read().unwrap().values().cloned().collect();
         sprints.sort_by(|a, b| b.start_date.cmp(&a.start_date));
         sprints
     }
@@ -264,7 +258,10 @@ impl DevlakeStore {
         let deployment_frequency_per_day = total / days.max(1.0);
 
         // Lead time: avg lead_time_secs from deployments that have it
-        let lead_times: Vec<f64> = deployments.iter().filter_map(|d| d.lead_time_secs).collect();
+        let lead_times: Vec<f64> = deployments
+            .iter()
+            .filter_map(|d| d.lead_time_secs)
+            .collect();
         let lead_time_secs = if lead_times.is_empty() {
             0.0
         } else {
@@ -349,8 +346,7 @@ impl DevlakeStore {
 
         for i in 0..20u32 {
             let days_ago = (i * 2) as i64;
-            let deployed_at =
-                now - Duration::days(days_ago) - Duration::hours((i % 8) as i64);
+            let deployed_at = now - Duration::days(days_ago) - Duration::hours((i % 8) as i64);
             let lead_time = Some(1800.0 + (i as f64 * 300.0));
             let status = if i % 7 == 0 {
                 DeploymentStatus::Failed

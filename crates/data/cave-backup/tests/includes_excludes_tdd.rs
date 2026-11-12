@@ -4,7 +4,7 @@
 //! (IncludesExcludes.ShouldInclude / IncludeEverything + ValidateIncludesExcludes).
 //! 2026-05-30 RED commit references not-yet-existing module cave_backup::includes_excludes.
 
-use cave_backup::includes_excludes::{validate_includes_excludes, IncludesExcludes};
+use cave_backup::includes_excludes::{IncludesExcludes, validate_includes_excludes};
 
 fn build(includes: &[&str], excludes: &[&str]) -> IncludesExcludes {
     let mut ie = IncludesExcludes::new();

@@ -934,8 +934,7 @@ mod tests {
 
     #[test]
     fn test_parser_insert_returning_column_list() {
-        let mut parser =
-            Parser::new("INSERT INTO users (id) VALUES (1) RETURNING id, name");
+        let mut parser = Parser::new("INSERT INTO users (id) VALUES (1) RETURNING id, name");
         let ast = parser.parse().unwrap();
         let Statement::Insert(insert) = ast.statement else {
             panic!("expected Insert");
@@ -946,9 +945,8 @@ mod tests {
 
     #[test]
     fn test_parser_insert_on_conflict_do_nothing() {
-        let mut parser = Parser::new(
-            "INSERT INTO users (id) VALUES (1) ON CONFLICT (id) DO NOTHING",
-        );
+        let mut parser =
+            Parser::new("INSERT INTO users (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
         let ast = parser.parse().unwrap();
         let Statement::Insert(insert) = ast.statement else {
             panic!("expected Insert");
@@ -969,7 +967,10 @@ mod tests {
         let Statement::Insert(insert) = ast.statement else {
             panic!("expected Insert");
         };
-        let Some(OnConflictAction::DoUpdate { target, assignments }) = insert.on_conflict
+        let Some(OnConflictAction::DoUpdate {
+            target,
+            assignments,
+        }) = insert.on_conflict
         else {
             panic!("expected DoUpdate");
         };
@@ -980,8 +981,7 @@ mod tests {
 
     #[test]
     fn test_parser_insert_on_conflict_default_target() {
-        let mut parser =
-            Parser::new("INSERT INTO users (id) VALUES (1) ON CONFLICT DO NOTHING");
+        let mut parser = Parser::new("INSERT INTO users (id) VALUES (1) ON CONFLICT DO NOTHING");
         let ast = parser.parse().unwrap();
         let Statement::Insert(insert) = ast.statement else {
             panic!("expected Insert");
@@ -994,8 +994,7 @@ mod tests {
 
     #[test]
     fn test_parser_update_returning() {
-        let mut parser =
-            Parser::new("UPDATE users SET name = 'bob' RETURNING id");
+        let mut parser = Parser::new("UPDATE users SET name = 'bob' RETURNING id");
         let ast = parser.parse().unwrap();
         let Statement::Update(update) = ast.statement else {
             panic!("expected Update");

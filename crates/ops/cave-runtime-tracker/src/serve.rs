@@ -14,7 +14,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use axum::{extract::State, http::header, response::IntoResponse, routing::get, Router};
+use axum::{Router, extract::State, http::header, response::IntoResponse, routing::get};
 
 use crate::config::TrackerConfig;
 use crate::measure::Measurement;
@@ -47,7 +47,10 @@ async fn metrics_handler(State(st): State<AppState>) -> impl IntoResponse {
     let (report, measurements) = load_latest(&st.cfg, &st.dir);
     let body = render_prometheus(&report, &measurements);
     (
-        [(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         body,
     )
 }
@@ -113,8 +116,14 @@ mod tests {
         let m = Measurement {
             upstream_repo: "cilium/cilium".to_string(),
             cave_module: "cave-net".to_string(),
-            upstream: Some(crate::measure::LocStats { code: 1000, ..Default::default() }),
-            cave: Some(crate::measure::LocStats { code: 100, ..Default::default() }),
+            upstream: Some(crate::measure::LocStats {
+                code: 1000,
+                ..Default::default()
+            }),
+            cave: Some(crate::measure::LocStats {
+                code: 100,
+                ..Default::default()
+            }),
             ratio: Some(0.1),
         };
         std::fs::write(
@@ -157,7 +166,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), 200);
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
         assert!(body.contains("cave_runtime_tracker_tracked"));
         assert!(body.contains("cave_runtime_tracker_drift{"));

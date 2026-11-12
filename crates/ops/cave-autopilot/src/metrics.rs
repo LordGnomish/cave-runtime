@@ -13,7 +13,7 @@
 //! under a mutex and the HTTP handlers render a clone. Rendering is pure and
 //! unit-tested; only [`serve`] does I/O.
 
-use axum::{extract::State, response::IntoResponse, routing::get, Router};
+use axum::{Router, extract::State, response::IntoResponse, routing::get};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -86,18 +86,78 @@ impl MetricsSnapshot {
             s.push_str(&format!("# HELP {name} {help}\n# TYPE {name} {ty}\n"));
             s.push_str(&format!("{name}{{instance=\"{inst}\"}} {val}\n"));
         };
-        g("cave_autopilot_uptime_seconds", "Daemon uptime in seconds", "gauge", self.uptime_secs.to_string());
-        g("cave_autopilot_tasks_completed_total", "Tasks completed (merged)", "counter", self.tasks_completed.to_string());
-        g("cave_autopilot_tasks_failed_total", "Tasks failed after all tiers", "counter", self.tasks_failed.to_string());
-        g("cave_autopilot_tasks_escalated_human_total", "Tasks escalated to a human", "counter", self.tasks_escalated_human.to_string());
-        g("cave_autopilot_claude_tokens_used_total", "Claude tokens consumed today", "counter", self.claude_tokens_used.to_string());
-        g("cave_autopilot_queue_depth", "Pending tasks in the queue", "gauge", self.queue_depth.to_string());
-        g("cave_autopilot_mean_completion_ratio", "Mean subsystem completion", "gauge", format!("{:.4}", self.mean_completion));
-        g("cave_autopilot_escalation_rate", "Fraction of finished tasks that reached Claude", "gauge", format!("{:.4}", self.escalation_rate()));
-        g("cave_autopilot_idle", "1 if daemon is in idle/monitor mode", "gauge", if self.idle { "1".into() } else { "0".into() });
-        g("cave_autopilot_last_task_timestamp_seconds", "Unix time of last worked task", "gauge", self.last_task_unix.to_string());
-        g("cave_autopilot_smoke_runs_total", "Operational LLM smoke dispatches attempted", "counter", self.smoke_runs.to_string());
-        g("cave_autopilot_smoke_passed_total", "Operational LLM smoke dispatches that passed cargo test", "counter", self.smoke_passed.to_string());
+        g(
+            "cave_autopilot_uptime_seconds",
+            "Daemon uptime in seconds",
+            "gauge",
+            self.uptime_secs.to_string(),
+        );
+        g(
+            "cave_autopilot_tasks_completed_total",
+            "Tasks completed (merged)",
+            "counter",
+            self.tasks_completed.to_string(),
+        );
+        g(
+            "cave_autopilot_tasks_failed_total",
+            "Tasks failed after all tiers",
+            "counter",
+            self.tasks_failed.to_string(),
+        );
+        g(
+            "cave_autopilot_tasks_escalated_human_total",
+            "Tasks escalated to a human",
+            "counter",
+            self.tasks_escalated_human.to_string(),
+        );
+        g(
+            "cave_autopilot_claude_tokens_used_total",
+            "Claude tokens consumed today",
+            "counter",
+            self.claude_tokens_used.to_string(),
+        );
+        g(
+            "cave_autopilot_queue_depth",
+            "Pending tasks in the queue",
+            "gauge",
+            self.queue_depth.to_string(),
+        );
+        g(
+            "cave_autopilot_mean_completion_ratio",
+            "Mean subsystem completion",
+            "gauge",
+            format!("{:.4}", self.mean_completion),
+        );
+        g(
+            "cave_autopilot_escalation_rate",
+            "Fraction of finished tasks that reached Claude",
+            "gauge",
+            format!("{:.4}", self.escalation_rate()),
+        );
+        g(
+            "cave_autopilot_idle",
+            "1 if daemon is in idle/monitor mode",
+            "gauge",
+            if self.idle { "1".into() } else { "0".into() },
+        );
+        g(
+            "cave_autopilot_last_task_timestamp_seconds",
+            "Unix time of last worked task",
+            "gauge",
+            self.last_task_unix.to_string(),
+        );
+        g(
+            "cave_autopilot_smoke_runs_total",
+            "Operational LLM smoke dispatches attempted",
+            "counter",
+            self.smoke_runs.to_string(),
+        );
+        g(
+            "cave_autopilot_smoke_passed_total",
+            "Operational LLM smoke dispatches that passed cargo test",
+            "counter",
+            self.smoke_passed.to_string(),
+        );
 
         // Per-tier LLM call counts as a labelled family.
         s.push_str("# HELP cave_autopilot_llm_calls_total LLM calls per escalation tier\n");
@@ -172,8 +232,12 @@ mod tests {
         assert!(out.contains("# TYPE cave_autopilot_uptime_seconds gauge"));
         assert!(out.contains("cave_autopilot_uptime_seconds{instance=\"cave-runtime\"} 42"));
         assert!(out.contains("cave_autopilot_tasks_completed_total{instance=\"cave-runtime\"} 3"));
-        assert!(out.contains("cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l2_coder\"} 2"));
-        assert!(out.contains("cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l3_claude\"} 1"));
+        assert!(out.contains(
+            "cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l2_coder\"} 2"
+        ));
+        assert!(out.contains(
+            "cave_autopilot_llm_calls_total{instance=\"cave-runtime\",tier=\"l3_claude\"} 1"
+        ));
     }
 
     #[test]

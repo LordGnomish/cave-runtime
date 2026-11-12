@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::KamajiState;
-use crate::components::{
-    ControlPlaneInput, DatastoreBinding, NetworkProfile, build_control_plane,
-};
+use crate::components::{ControlPlaneInput, DatastoreBinding, NetworkProfile, build_control_plane};
 use crate::connection::Driver;
 use crate::ds_setup::tenant_schema;
 use crate::lifecycle;

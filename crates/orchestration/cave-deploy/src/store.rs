@@ -78,11 +78,7 @@ impl DeployStore {
 
     // ─── Revision history (mutates app.status.history) ────────────────────
 
-    pub fn append_revision(
-        &self,
-        name: &str,
-        entry: RevisionHistory,
-    ) -> Result<(), DeployError> {
+    pub fn append_revision(&self, name: &str, entry: RevisionHistory) -> Result<(), DeployError> {
         let mut s = self.inner.write().unwrap();
         let app = s
             .applications
@@ -127,7 +123,13 @@ impl DeployStore {
     }
 
     pub fn list_appsets(&self) -> Vec<ApplicationSet> {
-        self.inner.read().unwrap().appsets.values().cloned().collect()
+        self.inner
+            .read()
+            .unwrap()
+            .appsets
+            .values()
+            .cloned()
+            .collect()
     }
 
     pub fn get_appset(&self, name: &str) -> Option<ApplicationSet> {
@@ -159,7 +161,13 @@ impl DeployStore {
     }
 
     pub fn list_projects(&self) -> Vec<AppProject> {
-        self.inner.read().unwrap().projects.values().cloned().collect()
+        self.inner
+            .read()
+            .unwrap()
+            .projects
+            .values()
+            .cloned()
+            .collect()
     }
 }
 
@@ -269,7 +277,10 @@ mod tests {
         };
         store.update_application_status("app1", new_status).unwrap();
         let updated = store.get_application("app1").unwrap();
-        assert_eq!(updated.status.unwrap().health.status, HealthStatus::Degraded);
+        assert_eq!(
+            updated.status.unwrap().health.status,
+            HealthStatus::Degraded
+        );
     }
 
     #[test]

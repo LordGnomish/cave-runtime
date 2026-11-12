@@ -5,8 +5,8 @@
 //! Adapted from the orphan `automation.rs` to work with the current models
 //! and TrackerStore (non-async, HashMap-based).
 
-use crate::models::{IssueType, Priority};
 use crate::TrackerStore;
+use crate::models::{IssueType, Priority};
 use chrono::Utc;
 use serde::Serialize;
 use uuid::Uuid;
@@ -27,9 +27,14 @@ pub struct AutomationRule {
 #[derive(Debug, Clone)]
 pub enum AutomationTrigger {
     IssueCreated,
-    StatusChanged { from: Option<String>, to: Option<String> },
+    StatusChanged {
+        from: Option<String>,
+        to: Option<String>,
+    },
     SprintStarted,
-    DueDateApproaching { days_before: u32 },
+    DueDateApproaching {
+        days_before: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -87,10 +92,18 @@ pub fn evaluate_rules(
     let mut results = Vec::new();
 
     for rule in rules {
-        if !rule.enabled { continue; }
-        if rule.project_id != issue_snapshot.project_id { continue; }
-        if !matches_trigger(&rule.trigger, event) { continue; }
-        if !matches_condition(&rule.condition, &issue_snapshot) { continue; }
+        if !rule.enabled {
+            continue;
+        }
+        if rule.project_id != issue_snapshot.project_id {
+            continue;
+        }
+        if !matches_trigger(&rule.trigger, event) {
+            continue;
+        }
+        if !matches_condition(&rule.condition, &issue_snapshot) {
+            continue;
+        }
 
         let outcome = apply_action(store, issue_id, &rule.action);
         let applied = outcome.is_ok();
@@ -176,8 +189,8 @@ fn apply_action(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Issue, IssueType, Priority};
     use crate::TrackerStore;
+    use crate::models::{Issue, IssueType, Priority};
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
@@ -231,7 +244,9 @@ mod tests {
             name: "Auto-assign".to_string(),
             trigger: AutomationTrigger::IssueCreated,
             condition: AutomationCondition::Always,
-            action: AutomationAction::Assign { to: "alice".to_string() },
+            action: AutomationAction::Assign {
+                to: "alice".to_string(),
+            },
             enabled: true,
         };
         let results = evaluate_rules(&mut store, id, &RuleEvent::IssueCreated, &[rule]);
@@ -254,7 +269,9 @@ mod tests {
             name: "Disabled".to_string(),
             trigger: AutomationTrigger::IssueCreated,
             condition: AutomationCondition::Always,
-            action: AutomationAction::Assign { to: "bob".to_string() },
+            action: AutomationAction::Assign {
+                to: "bob".to_string(),
+            },
             enabled: false,
         };
         let results = evaluate_rules(&mut store, id, &RuleEvent::IssueCreated, &[rule]);
@@ -278,7 +295,9 @@ mod tests {
                 to: Some("Done".to_string()),
             },
             condition: AutomationCondition::Always,
-            action: AutomationAction::AddLabel { label: "reviewed".to_string() },
+            action: AutomationAction::AddLabel {
+                label: "reviewed".to_string(),
+            },
             enabled: true,
         };
         let results = evaluate_rules(

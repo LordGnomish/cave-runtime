@@ -71,7 +71,10 @@ pub struct GitHubClient {
 
 impl GitHubClient {
     pub fn new(config: GitHubConfig) -> Self {
-        Self { config, client: reqwest::Client::new() }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+        }
     }
 
     /// POST /repos/{owner}/{repo}/statuses/{sha}
@@ -181,14 +184,20 @@ mod tests {
 
     #[test]
     fn test_commit_state_success_statuses() {
-        assert_eq!(CommitState::from(&RunPhase::Succeeded), CommitState::Success);
+        assert_eq!(
+            CommitState::from(&RunPhase::Succeeded),
+            CommitState::Success
+        );
         assert_eq!(CommitState::from(&RunPhase::Skipped), CommitState::Success);
     }
 
     #[test]
     fn test_commit_state_failure_statuses() {
         assert_eq!(CommitState::from(&RunPhase::Failed), CommitState::Failure);
-        assert_eq!(CommitState::from(&RunPhase::Cancelled), CommitState::Failure);
+        assert_eq!(
+            CommitState::from(&RunPhase::Cancelled),
+            CommitState::Failure
+        );
     }
 
     #[test]

@@ -2,14 +2,21 @@
 // Copyright 2026 Cave Runtime contributors
 //! Failing test for roadmap / timeline engine.
 
-use cave_tracker::roadmap_engine::{timeline_view, capacity_plan, risk_report, RiskKind};
-use cave_tracker::models::{Issue, Sprint, SprintState, IssueType, Priority};
 use cave_tracker::TrackerStore;
+use cave_tracker::models::{Issue, IssueType, Priority, Sprint, SprintState};
+use cave_tracker::roadmap_engine::{RiskKind, capacity_plan, risk_report, timeline_view};
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn make_issue(project_id: Uuid, issue_type: IssueType, status: &str, sprint_id: Option<Uuid>, story_points: Option<f64>, assignee: Option<String>) -> Issue {
+fn make_issue(
+    project_id: Uuid,
+    issue_type: IssueType,
+    status: &str,
+    sprint_id: Option<Uuid>,
+    story_points: Option<f64>,
+    assignee: Option<String>,
+) -> Issue {
     Issue {
         id: Uuid::new_v4(),
         key: "TEST-1".to_string(),
@@ -87,7 +94,14 @@ fn test_capacity_plan_with_completed_sprint() {
     let sprint_id = sprint.id;
     store.sprints.insert(sprint_id, sprint);
 
-    let issue = make_issue(project_id, IssueType::Task, "Done", Some(sprint_id), Some(5.0), None);
+    let issue = make_issue(
+        project_id,
+        IssueType::Task,
+        "Done",
+        Some(sprint_id),
+        Some(5.0),
+        None,
+    );
     store.issues.insert(issue.id, issue);
 
     let plan = capacity_plan(&store, project_id);
@@ -108,12 +122,24 @@ fn test_risk_report_detects_unassigned_in_active_sprint() {
     store.sprints.insert(sprint_id, sprint);
 
     // Unassigned issue in active sprint
-    let issue = make_issue(project_id, IssueType::Task, "In Progress", Some(sprint_id), None, None);
+    let issue = make_issue(
+        project_id,
+        IssueType::Task,
+        "In Progress",
+        Some(sprint_id),
+        None,
+        None,
+    );
     store.issues.insert(issue.id, issue);
 
     let report = risk_report(&store, project_id);
     assert_eq!(report.project_id, project_id);
-    assert!(report.risks.iter().any(|r| matches!(r.kind, RiskKind::NoAssignee)));
+    assert!(
+        report
+            .risks
+            .iter()
+            .any(|r| matches!(r.kind, RiskKind::NoAssignee))
+    );
 }
 
 #[test]

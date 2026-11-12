@@ -7,7 +7,7 @@
 //! emit a stable exit code, and format a developer-readable summary on
 //! stderr-equivalent output.
 
-use crate::detector::{scan, Finding, SecretDetector};
+use crate::detector::{Finding, SecretDetector, scan};
 
 /// Result of a pre-commit run.
 #[derive(Debug, Clone)]
@@ -116,8 +116,14 @@ mod tests {
     #[test]
     fn clean_files_pass() {
         let files = [
-            StagedFile { path: "src/main.rs", content: "fn main() {}\n" },
-            StagedFile { path: "README.md", content: "hi\n" },
+            StagedFile {
+                path: "src/main.rs",
+                content: "fn main() {}\n",
+            },
+            StagedFile {
+                path: "README.md",
+                content: "hi\n",
+            },
         ];
         let r = run_precommit(&files, &det(), &[]);
         assert!(!r.has_blocking());
@@ -195,12 +201,18 @@ mod tests {
     #[test]
     fn multi_file_with_one_leak() {
         let files = [
-            StagedFile { path: "a.txt", content: "clean\n" },
+            StagedFile {
+                path: "a.txt",
+                content: "clean\n",
+            },
             StagedFile {
                 path: "b.env",
                 content: "AWS_KEY=AKIAIOSFODNN7EXAMPLE\n",
             },
-            StagedFile { path: "c.md", content: "fine\n" },
+            StagedFile {
+                path: "c.md",
+                content: "fine\n",
+            },
         ];
         let r = run_precommit(&files, &det(), &[]);
         assert_eq!(r.files_scanned, 3);

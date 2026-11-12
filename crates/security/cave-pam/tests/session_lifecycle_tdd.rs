@@ -140,5 +140,8 @@ fn rejected_transition_does_not_mutate_history() {
     let mut sm = SessionLifecycle::new();
     sm.set_state(SessionState::Running).unwrap();
     let _ = sm.set_state(SessionState::Pending); // rejected
-    assert_eq!(sm.history(), &[SessionState::Pending, SessionState::Running]);
+    assert_eq!(
+        sm.history(),
+        &[SessionState::Pending, SessionState::Running]
+    );
 }

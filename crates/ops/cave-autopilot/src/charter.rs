@@ -227,8 +227,14 @@ mod tests {
 
     #[test]
     fn classify_commit_markers() {
-        assert_eq!(classify_commit("test(cave-x): add failing test for foo"), CommitKind::Red);
-        assert_eq!(classify_commit("feat(cave-x): implement foo (GREEN)"), CommitKind::Green);
+        assert_eq!(
+            classify_commit("test(cave-x): add failing test for foo"),
+            CommitKind::Red
+        );
+        assert_eq!(
+            classify_commit("feat(cave-x): implement foo (GREEN)"),
+            CommitKind::Green
+        );
         assert_eq!(classify_commit("chore: bump deps"), CommitKind::Other);
     }
 
@@ -268,7 +274,11 @@ mod tests {
         use CommitKind::*;
         let stub = (
             PathBuf::from("x.rs"),
-            StubHit { line: 1, needle: "todo!(", text: "todo!()".into() },
+            StubHit {
+                line: 1,
+                needle: "todo!(",
+                text: "todo!()".into(),
+            },
         );
         let a = CharterAudit::evaluate(&[stub], &[Red, Green], 100, 50);
         assert!(!a.passes());

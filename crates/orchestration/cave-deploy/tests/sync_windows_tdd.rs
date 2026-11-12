@@ -14,7 +14,7 @@
 
 use cave_deploy::rbac::{SyncWindow, SyncWindowKind};
 use cave_deploy::sync_windows::{
-    can_sync, inactive_allows, matching_windows, window_is_active, WindowAppContext,
+    WindowAppContext, can_sync, inactive_allows, matching_windows, window_is_active,
 };
 use chrono::{TimeZone, Utc};
 

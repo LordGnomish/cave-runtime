@@ -171,7 +171,10 @@ pub async fn apply_entry(backend: &dyn StorageBackend, entry: &OplogEntry) -> Re
             Ok(true)
         }
         OpType::Update => {
-            let selector = entry.o2.clone().unwrap_or_else(|| Value::Object(Default::default()));
+            let selector = entry
+                .o2
+                .clone()
+                .unwrap_or_else(|| Value::Object(Default::default()));
             backend.update(coll, &selector, &entry.o).await?;
             Ok(true)
         }
@@ -249,11 +252,29 @@ mod tests {
         let primary = MemoryBackend::new();
         let log = OpLog::new();
 
-        primary.insert("c", json!({"_id": "1", "n": 1})).await.unwrap();
-        log.append(OpType::Insert, "test.c", json!({"_id": "1", "n": 1}), None, 1);
+        primary
+            .insert("c", json!({"_id": "1", "n": 1}))
+            .await
+            .unwrap();
+        log.append(
+            OpType::Insert,
+            "test.c",
+            json!({"_id": "1", "n": 1}),
+            None,
+            1,
+        );
 
-        primary.insert("c", json!({"_id": "2", "n": 2})).await.unwrap();
-        log.append(OpType::Insert, "test.c", json!({"_id": "2", "n": 2}), None, 1);
+        primary
+            .insert("c", json!({"_id": "2", "n": 2}))
+            .await
+            .unwrap();
+        log.append(
+            OpType::Insert,
+            "test.c",
+            json!({"_id": "2", "n": 2}),
+            None,
+            1,
+        );
 
         primary
             .update("c", &json!({"_id": "1"}), &json!({"$set": {"n": 9}}))

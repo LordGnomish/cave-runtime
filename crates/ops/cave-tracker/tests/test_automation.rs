@@ -2,12 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 //! Failing test for automation rules engine.
 
+use cave_tracker::TrackerStore;
 use cave_tracker::automation_engine::{
-    AutomationRule, AutomationTrigger, AutomationCondition, AutomationAction,
-    evaluate_rules, RuleEvent,
+    AutomationAction, AutomationCondition, AutomationRule, AutomationTrigger, RuleEvent,
+    evaluate_rules,
 };
 use cave_tracker::models::{Issue, IssueType, Priority};
-use cave_tracker::TrackerStore;
 use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -61,7 +61,9 @@ fn test_automation_assign_on_creation() {
         name: "Auto-assign on create".to_string(),
         trigger: AutomationTrigger::IssueCreated,
         condition: AutomationCondition::Always,
-        action: AutomationAction::Assign { to: "alice".to_string() },
+        action: AutomationAction::Assign {
+            to: "alice".to_string(),
+        },
         enabled: true,
     };
 
@@ -85,7 +87,9 @@ fn test_automation_trigger_not_matching() {
         name: "Only on sprint start".to_string(),
         trigger: AutomationTrigger::SprintStarted,
         condition: AutomationCondition::Always,
-        action: AutomationAction::Assign { to: "bob".to_string() },
+        action: AutomationAction::Assign {
+            to: "bob".to_string(),
+        },
         enabled: true,
     };
 
@@ -113,19 +117,28 @@ fn test_automation_status_transition_action() {
             to: Some("Done".to_string()),
         },
         condition: AutomationCondition::Always,
-        action: AutomationAction::AddLabel { label: "completed".to_string() },
+        action: AutomationAction::AddLabel {
+            label: "completed".to_string(),
+        },
         enabled: true,
     };
 
     let results = evaluate_rules(
         &mut store,
         issue_id,
-        &RuleEvent::StatusChanged { from: "In Progress".to_string(), to: "Done".to_string() },
+        &RuleEvent::StatusChanged {
+            from: "In Progress".to_string(),
+            to: "Done".to_string(),
+        },
         &[rule],
     );
     assert_eq!(results.len(), 1);
     assert!(results[0].applied);
-    assert!(store.issues[&issue_id].labels.contains(&"completed".to_string()));
+    assert!(
+        store.issues[&issue_id]
+            .labels
+            .contains(&"completed".to_string())
+    );
 }
 
 #[test]
@@ -142,7 +155,9 @@ fn test_automation_disabled_rule_skipped() {
         name: "Disabled rule".to_string(),
         trigger: AutomationTrigger::IssueCreated,
         condition: AutomationCondition::Always,
-        action: AutomationAction::Assign { to: "charlie".to_string() },
+        action: AutomationAction::Assign {
+            to: "charlie".to_string(),
+        },
         enabled: false,
     };
 

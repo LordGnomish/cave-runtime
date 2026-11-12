@@ -65,7 +65,10 @@ fn reconcile_default_deny_allows_only_matching_peer_with_l7() {
     let ingress = repo.resolve(&Labels::new(&[("app", "web")]), Direction::Ingress, &peers);
 
     // The web endpoint IS selected by a rule with ingress → default-deny.
-    assert!(ingress.default_deny, "selected endpoint enters default-deny");
+    assert!(
+        ingress.default_deny,
+        "selected endpoint enters default-deny"
+    );
 
     // Exactly one allow entry: the client identity on 80/TCP with L7.
     assert_eq!(ingress.entries.len(), 1, "only the client peer is allowed");
@@ -79,7 +82,10 @@ fn reconcile_default_deny_allows_only_matching_peer_with_l7() {
 
     // The evil identity is not in the allow set.
     assert!(
-        !ingress.entries.iter().any(|e| e.peer == Peer::Identity(evil)),
+        !ingress
+            .entries
+            .iter()
+            .any(|e| e.peer == Peer::Identity(evil)),
         "evil identity must be denied"
     );
 
@@ -125,7 +131,10 @@ fn cidr_and_entity_rules_resolve_to_non_identity_peers() {
 
     let r = repo.resolve(&Labels::new(&[("app", "web")]), Direction::Egress, &[]);
     assert!(r.default_deny, "egress now restricted");
-    assert!(r.entries.iter().any(|e| e.peer == Peer::Cidr("1.1.1.0/24".parse().unwrap())));
+    assert!(r
+        .entries
+        .iter()
+        .any(|e| e.peer == Peer::Cidr("1.1.1.0/24".parse().unwrap())));
     assert!(r
         .entries
         .iter()

@@ -240,9 +240,15 @@ mod tests {
         let mut s = RabbitMqScaler::new("t");
         s.mode = RabbitMqMode::QueueLength;
         s.activation_value = 10.0;
-        s.record_queue(QueueInfo { messages: 5, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 5,
+            ..Default::default()
+        });
         assert!(!s.is_active());
-        s.record_queue(QueueInfo { messages: 50, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 50,
+            ..Default::default()
+        });
         assert!(s.is_active());
     }
 
@@ -252,7 +258,11 @@ mod tests {
         s.mode = RabbitMqMode::MessageRate;
         s.activation_value = 10.0;
         // rate above threshold, zero messages → active
-        s.record_queue(QueueInfo { messages: 0, publish_rate: 25.0, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 0,
+            publish_rate: 25.0,
+            ..Default::default()
+        });
         assert!(s.is_active());
         assert_eq!(s.metric_value(), Some(25.0));
     }
@@ -261,8 +271,18 @@ mod tests {
     fn compose_sum_adds_messages_and_rate() {
         let mut s = RabbitMqScaler::new("t");
         s.use_regex = true;
-        s.record_queue(QueueInfo { messages: 100, messages_ready: 80, publish_rate: 1.5, ..Default::default() });
-        s.record_queue(QueueInfo { messages: 200, messages_ready: 150, publish_rate: 2.5, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 100,
+            messages_ready: 80,
+            publish_rate: 1.5,
+            ..Default::default()
+        });
+        s.record_queue(QueueInfo {
+            messages: 200,
+            messages_ready: 150,
+            publish_rate: 2.5,
+            ..Default::default()
+        });
         let c = s.composed();
         assert_eq!(c.messages, 300);
         assert_eq!(c.messages_ready, 230);
@@ -273,8 +293,14 @@ mod tests {
     fn compose_avg_integer_division_like_upstream() {
         let mut s = RabbitMqScaler::new("t");
         s.operation = RabbitMqOperation::Avg;
-        s.record_queue(QueueInfo { messages: 10, ..Default::default() });
-        s.record_queue(QueueInfo { messages: 21, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 10,
+            ..Default::default()
+        });
+        s.record_queue(QueueInfo {
+            messages: 21,
+            ..Default::default()
+        });
         // (10 + 21) / 2 = 15 with integer division (upstream getAverage)
         assert_eq!(s.composed().messages, 15);
     }
@@ -283,8 +309,16 @@ mod tests {
     fn compose_max_takes_largest_per_field() {
         let mut s = RabbitMqScaler::new("t");
         s.operation = RabbitMqOperation::Max;
-        s.record_queue(QueueInfo { messages: 10, publish_rate: 9.0, ..Default::default() });
-        s.record_queue(QueueInfo { messages: 7, publish_rate: 12.0, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 10,
+            publish_rate: 9.0,
+            ..Default::default()
+        });
+        s.record_queue(QueueInfo {
+            messages: 7,
+            publish_rate: 12.0,
+            ..Default::default()
+        });
         let c = s.composed();
         assert_eq!(c.messages, 10);
         assert!((c.publish_rate - 12.0).abs() < 1e-9);
@@ -294,7 +328,10 @@ mod tests {
     fn recommended_replicas_ceils_against_queue_length() {
         let mut s = RabbitMqScaler::new("t");
         s.queue_length = 20.0;
-        s.record_queue(QueueInfo { messages: 45, ..Default::default() });
+        s.record_queue(QueueInfo {
+            messages: 45,
+            ..Default::default()
+        });
         // ceil(45 / 20) = 3
         assert_eq!(s.recommended_replicas(), 3);
     }

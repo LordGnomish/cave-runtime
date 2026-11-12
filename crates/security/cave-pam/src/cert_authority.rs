@@ -12,8 +12,8 @@
 use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc, RwLock,
+    atomic::{AtomicU64, Ordering},
 };
 use uuid::Uuid;
 
@@ -258,7 +258,10 @@ mod tests {
             })
             .unwrap();
         ca.revoke(&cert.serial).unwrap();
-        assert_eq!(ca.revoke(&cert.serial).unwrap_err(), CaError::AlreadyRevoked);
+        assert_eq!(
+            ca.revoke(&cert.serial).unwrap_err(),
+            CaError::AlreadyRevoked
+        );
     }
 
     #[test]

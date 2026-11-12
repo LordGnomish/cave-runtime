@@ -15,7 +15,7 @@
 
 use cave_streams::kafka_share_groups::{
     AcknowledgeType, MemberState, RecordState, ShareError, ShareGroup, ShareGroupConfig,
-    ShareGroupOffset, ShareSession, SharePartition, SharePartitionKey, SharePartitionManager,
+    ShareGroupOffset, SharePartition, SharePartitionKey, SharePartitionManager, ShareSession,
 };
 
 // ── RecordState ──────────────────────────────────────────────────────────────
@@ -65,35 +65,51 @@ fn record_state_terminals_reject_all_transitions() {
 
 #[test]
 fn record_state_available_only_to_acquired() {
-    assert!(RecordState::Available
-        .validate_transition(RecordState::Acquired)
-        .is_ok());
-    assert!(RecordState::Available
-        .validate_transition(RecordState::Available)
-        .is_err());
-    assert!(RecordState::Available
-        .validate_transition(RecordState::Acknowledged)
-        .is_err());
-    assert!(RecordState::Available
-        .validate_transition(RecordState::Archived)
-        .is_err());
+    assert!(
+        RecordState::Available
+            .validate_transition(RecordState::Acquired)
+            .is_ok()
+    );
+    assert!(
+        RecordState::Available
+            .validate_transition(RecordState::Available)
+            .is_err()
+    );
+    assert!(
+        RecordState::Available
+            .validate_transition(RecordState::Acknowledged)
+            .is_err()
+    );
+    assert!(
+        RecordState::Available
+            .validate_transition(RecordState::Archived)
+            .is_err()
+    );
 }
 
 #[test]
 fn record_state_acquired_transitions() {
-    assert!(RecordState::Acquired
-        .validate_transition(RecordState::Available)
-        .is_ok());
-    assert!(RecordState::Acquired
-        .validate_transition(RecordState::Acknowledged)
-        .is_ok());
-    assert!(RecordState::Acquired
-        .validate_transition(RecordState::Archived)
-        .is_ok());
+    assert!(
+        RecordState::Acquired
+            .validate_transition(RecordState::Available)
+            .is_ok()
+    );
+    assert!(
+        RecordState::Acquired
+            .validate_transition(RecordState::Acknowledged)
+            .is_ok()
+    );
+    assert!(
+        RecordState::Acquired
+            .validate_transition(RecordState::Archived)
+            .is_ok()
+    );
     // same-state is rejected even for non-terminal Acquired
-    assert!(RecordState::Acquired
-        .validate_transition(RecordState::Acquired)
-        .is_err());
+    assert!(
+        RecordState::Acquired
+            .validate_transition(RecordState::Acquired)
+            .is_err()
+    );
 }
 
 #[test]
@@ -145,7 +161,8 @@ fn acquire_zero_records_is_noop() {
 fn acknowledge_accept_marks_acknowledged_and_clears_lock() {
     let mut sp = fresh(0);
     sp.acquire("m1", 5, 1000);
-    sp.acknowledge("m1", 0, 4, AcknowledgeType::Accept, 2000).unwrap();
+    sp.acknowledge("m1", 0, 4, AcknowledgeType::Accept, 2000)
+        .unwrap();
     let b = &sp.batches_snapshot()[0];
     assert_eq!(b.batch_state.state, RecordState::Acknowledged);
     assert_eq!(b.batch_state.lock_expires_at_ms, None);
@@ -155,7 +172,8 @@ fn acknowledge_accept_marks_acknowledged_and_clears_lock() {
 fn acknowledge_release_returns_to_available_and_next_acquire_bumps_delivery() {
     let mut sp = fresh(0);
     sp.acquire("m1", 4, 1000);
-    sp.acknowledge("m1", 0, 3, AcknowledgeType::Release, 2000).unwrap();
+    sp.acknowledge("m1", 0, 3, AcknowledgeType::Release, 2000)
+        .unwrap();
     let b = &sp.batches_snapshot()[0];
     assert_eq!(b.batch_state.state, RecordState::Available);
     assert_eq!(b.batch_state.lock_expires_at_ms, None);
@@ -167,27 +185,42 @@ fn acknowledge_release_returns_to_available_and_next_acquire_bumps_delivery() {
 fn acknowledge_reject_archives() {
     let mut sp = fresh(0);
     sp.acquire("m1", 2, 1000);
-    sp.acknowledge("m1", 0, 1, AcknowledgeType::Reject, 2000).unwrap();
-    assert_eq!(sp.batches_snapshot()[0].batch_state.state, RecordState::Archived);
+    sp.acknowledge("m1", 0, 1, AcknowledgeType::Reject, 2000)
+        .unwrap();
+    assert_eq!(
+        sp.batches_snapshot()[0].batch_state.state,
+        RecordState::Archived
+    );
 }
 
 #[test]
 fn acknowledge_renew_extends_lock_only() {
     let mut sp = fresh(0);
     sp.acquire("m1", 2, 1000);
-    let before = sp.batches_snapshot()[0].batch_state.lock_expires_at_ms.unwrap();
-    sp.acknowledge("m1", 0, 1, AcknowledgeType::Renew, 5000).unwrap();
+    let before = sp.batches_snapshot()[0]
+        .batch_state
+        .lock_expires_at_ms
+        .unwrap();
+    sp.acknowledge("m1", 0, 1, AcknowledgeType::Renew, 5000)
+        .unwrap();
     let b = &sp.batches_snapshot()[0];
     assert_eq!(b.batch_state.state, RecordState::Acquired);
     let after = b.batch_state.lock_expires_at_ms.unwrap();
-    assert!(after > before, "renew must push deadline forward ({} > {})", after, before);
+    assert!(
+        after > before,
+        "renew must push deadline forward ({} > {})",
+        after,
+        before
+    );
 }
 
 #[test]
 fn acknowledge_wrong_member_rejected() {
     let mut sp = fresh(0);
     sp.acquire("m1", 2, 1000);
-    let err = sp.acknowledge("m2", 0, 1, AcknowledgeType::Accept, 2000).unwrap_err();
+    let err = sp
+        .acknowledge("m2", 0, 1, AcknowledgeType::Accept, 2000)
+        .unwrap_err();
     assert!(matches!(err, ShareError::NotAcquiredByMember { .. }));
 }
 
@@ -195,7 +228,9 @@ fn acknowledge_wrong_member_rejected() {
 fn acknowledge_unknown_offset_rejected() {
     let mut sp = fresh(0);
     sp.acquire("m1", 2, 1000);
-    let err = sp.acknowledge("m1", 99, 99, AcknowledgeType::Accept, 2000).unwrap_err();
+    let err = sp
+        .acknowledge("m1", 99, 99, AcknowledgeType::Accept, 2000)
+        .unwrap_err();
     assert!(matches!(err, ShareError::OffsetNotFound(99)));
 }
 
@@ -203,8 +238,11 @@ fn acknowledge_unknown_offset_rejected() {
 fn acknowledge_already_terminal_rejected_as_invalid_state() {
     let mut sp = fresh(0);
     sp.acquire("m1", 2, 1000);
-    sp.acknowledge("m1", 0, 1, AcknowledgeType::Accept, 2000).unwrap();
-    let err = sp.acknowledge("m1", 0, 1, AcknowledgeType::Accept, 3000).unwrap_err();
+    sp.acknowledge("m1", 0, 1, AcknowledgeType::Accept, 2000)
+        .unwrap();
+    let err = sp
+        .acknowledge("m1", 0, 1, AcknowledgeType::Accept, 3000)
+        .unwrap_err();
     assert!(matches!(err, ShareError::InvalidRecordState { .. }));
 }
 
@@ -216,7 +254,10 @@ fn sweep_expired_releases_acquired_batch() {
     sp.acquire("m1", 2, 0); // deadline = 1000
     let released = sp.sweep_expired_locks(5000);
     assert_eq!(released.len(), 1);
-    assert_eq!(sp.batches_snapshot()[0].batch_state.state, RecordState::Available);
+    assert_eq!(
+        sp.batches_snapshot()[0].batch_state.state,
+        RecordState::Available
+    );
 }
 
 #[test]
@@ -232,20 +273,31 @@ fn delivery_cap_archives_on_release() {
     let mut sp = SharePartition::new("g", "t", 0, 0).with_max_delivery_count(3);
     for now in [0u64, 100, 200] {
         sp.acquire("m1", 2, now);
-        sp.acknowledge("m1", 0, 1, AcknowledgeType::Release, now + 1).unwrap();
+        sp.acknowledge("m1", 0, 1, AcknowledgeType::Release, now + 1)
+            .unwrap();
     }
-    assert_eq!(sp.batches_snapshot()[0].batch_state.state, RecordState::Archived);
+    assert_eq!(
+        sp.batches_snapshot()[0].batch_state.state,
+        RecordState::Archived
+    );
 }
 
 #[test]
 fn delivery_cap_one_release_archives_then_fresh_batch() {
     let mut sp = SharePartition::new("g", "t", 0, 0).with_max_delivery_count(1);
     sp.acquire("m1", 2, 1000);
-    sp.acknowledge("m1", 0, 1, AcknowledgeType::Release, 2000).unwrap();
-    assert_eq!(sp.batches_snapshot()[0].batch_state.state, RecordState::Archived);
+    sp.acknowledge("m1", 0, 1, AcknowledgeType::Release, 2000)
+        .unwrap();
+    assert_eq!(
+        sp.batches_snapshot()[0].batch_state.state,
+        RecordState::Archived
+    );
     let got = sp.acquire("m1", 2, 3000);
     assert_eq!(got.len(), 1);
-    assert_eq!(got[0].first_offset, 2, "capped batch is skipped; fresh batch at next_fetch");
+    assert_eq!(
+        got[0].first_offset, 2,
+        "capped batch is skipped; fresh batch at next_fetch"
+    );
 }
 
 // ── move_start_offset ────────────────────────────────────────────────────────
@@ -254,7 +306,8 @@ fn delivery_cap_one_release_archives_then_fresh_batch() {
 fn move_start_offset_drops_fully_stale_and_bumps_epoch() {
     let mut sp = fresh(0);
     sp.acquire("m1", 10, 1000);
-    sp.acknowledge("m1", 0, 9, AcknowledgeType::Accept, 2000).unwrap();
+    sp.acknowledge("m1", 0, 9, AcknowledgeType::Accept, 2000)
+        .unwrap();
     let epoch_before = sp.state_epoch();
     sp.move_start_offset(10);
     assert_eq!(sp.state_epoch(), epoch_before + 1);
@@ -266,7 +319,11 @@ fn move_start_offset_keeps_straddling_batch_whole() {
     let mut sp = fresh(10);
     sp.acquire("m1", 5, 1000); // [10,14]
     sp.move_start_offset(12);
-    assert_eq!(sp.batches_snapshot().len(), 1, "partial-overlap batch kept (no split)");
+    assert_eq!(
+        sp.batches_snapshot().len(),
+        1,
+        "partial-overlap batch kept (no split)"
+    );
 }
 
 #[test]
@@ -274,7 +331,11 @@ fn move_start_offset_noop_when_not_advancing() {
     let mut sp = fresh(10);
     let epoch_before = sp.state_epoch();
     sp.move_start_offset(5);
-    assert_eq!(sp.state_epoch(), epoch_before, "no epoch bump when new_start <= start");
+    assert_eq!(
+        sp.state_epoch(),
+        epoch_before,
+        "no epoch bump when new_start <= start"
+    );
 }
 
 // ── snapshot / persister form ────────────────────────────────────────────────
@@ -341,8 +402,14 @@ fn share_group_member_stabilises() {
 #[test]
 fn share_group_unknown_member_errors() {
     let mut g = ShareGroup::new("sg");
-    assert!(matches!(g.stabilise("ghost"), Err(ShareError::UnknownGroupMember(_))));
-    assert!(matches!(g.leave("ghost"), Err(ShareError::UnknownGroupMember(_))));
+    assert!(matches!(
+        g.stabilise("ghost"),
+        Err(ShareError::UnknownGroupMember(_))
+    ));
+    assert!(matches!(
+        g.leave("ghost"),
+        Err(ShareError::UnknownGroupMember(_))
+    ));
 }
 
 #[test]
@@ -369,7 +436,10 @@ fn share_session_advance_is_epoch_validated() {
     let mut s = ShareSession::new("g", "m1", "conn-1");
     assert_eq!(s.advance(0).unwrap(), 1);
     assert_eq!(s.advance(1).unwrap(), 2);
-    assert!(matches!(s.advance(99), Err(ShareError::SessionEpochMismatch { .. })));
+    assert!(matches!(
+        s.advance(99),
+        Err(ShareError::SessionEpochMismatch { .. })
+    ));
 }
 
 #[test]

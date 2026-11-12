@@ -61,11 +61,17 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/api/chat/health", get(health))
         // Channel endpoints
-        .route("/api/chat/channels", get(list_channels).post(create_channel))
+        .route(
+            "/api/chat/channels",
+            get(list_channels).post(create_channel),
+        )
         .route("/api/chat/channels/{id}", get(get_channel))
         .route("/api/chat/channels/{id}/archive", post(archive_channel))
         .route("/api/chat/channels/{id}/members", post(add_member))
-        .route("/api/chat/channels/{id}/members/{user_id}", delete(remove_member))
+        .route(
+            "/api/chat/channels/{id}/members/{user_id}",
+            delete(remove_member),
+        )
         .route(
             "/api/chat/channels/{id}/messages",
             get(get_channel_messages).post(post_message),
@@ -123,9 +129,7 @@ async fn create_channel(
     (StatusCode::CREATED, Json(created))
 }
 
-async fn list_channels(
-    State(state): State<Arc<AppState>>,
-) -> Json<Vec<Channel>> {
+async fn list_channels(State(state): State<Arc<AppState>>) -> Json<Vec<Channel>> {
     Json(state.store.list_channels())
 }
 

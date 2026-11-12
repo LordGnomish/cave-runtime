@@ -37,7 +37,10 @@ fn secret(name: &str, ns: &str, t: &str) -> Resource {
 
 #[test]
 fn api_error_display_includes_kind_and_name() {
-    let e = ApiError::NotFound { kind: "Pod".into(), name: "nginx".into() };
+    let e = ApiError::NotFound {
+        kind: "Pod".into(),
+        name: "nginx".into(),
+    };
     let s = e.to_string();
     assert!(s.contains("Pod"));
     assert!(s.contains("nginx"));
@@ -45,7 +48,10 @@ fn api_error_display_includes_kind_and_name() {
 
 #[test]
 fn api_error_already_exists_includes_context() {
-    let e = ApiError::AlreadyExists { kind: "ConfigMap".into(), name: "settings".into() };
+    let e = ApiError::AlreadyExists {
+        kind: "ConfigMap".into(),
+        name: "settings".into(),
+    };
     let s = e.to_string();
     assert!(s.contains("ConfigMap"));
     assert!(s.contains("settings"));
@@ -53,16 +59,28 @@ fn api_error_already_exists_includes_context() {
 
 #[test]
 fn api_error_other_variants_print_with_message() {
-    assert!(ApiError::Conflict("rv mismatch".into()).to_string().contains("rv"));
-    assert!(ApiError::Invalid("bad-spec".into()).to_string().contains("bad-spec"));
-    assert!(ApiError::Forbidden("rbac".into()).to_string().contains("rbac"));
-    assert!(ApiError::Internal("boom".into()).to_string().contains("boom"));
+    assert!(ApiError::Conflict("rv mismatch".into())
+        .to_string()
+        .contains("rv"));
+    assert!(ApiError::Invalid("bad-spec".into())
+        .to_string()
+        .contains("bad-spec"));
+    assert!(ApiError::Forbidden("rbac".into())
+        .to_string()
+        .contains("rbac"));
+    assert!(ApiError::Internal("boom".into())
+        .to_string()
+        .contains("boom"));
 }
 
 #[test]
 fn api_result_alias_pattern_matches() {
-    fn ok() -> ApiResult<u32> { Ok(7) }
-    fn err() -> ApiResult<u32> { Err(ApiError::Forbidden("x".into())) }
+    fn ok() -> ApiResult<u32> {
+        Ok(7)
+    }
+    fn err() -> ApiResult<u32> {
+        Err(ApiError::Forbidden("x".into()))
+    }
     assert_eq!(ok().unwrap(), 7);
     assert!(matches!(err(), Err(ApiError::Forbidden(_))));
 }
@@ -104,7 +122,10 @@ fn object_reference_default_has_empty_fields() {
 // ---------------------------------------------------------------------------
 
 fn lbls(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 #[test]
@@ -137,7 +158,8 @@ fn label_selector_negation_requires_absent_key() {
 
 #[test]
 fn label_selector_operator_enum_round_trip_from_requirements() {
-    let sel = LabelSelector::parse("env=prod, tier in (web, api), !canary, region != us-west").unwrap();
+    let sel =
+        LabelSelector::parse("env=prod, tier in (web, api), !canary, region != us-west").unwrap();
     let ops: Vec<&LabelOperator> = sel.requirements.iter().map(|r| &r.op).collect();
     assert!(matches!(ops[0], LabelOperator::Equals(_)));
     assert!(matches!(ops[1], LabelOperator::In(_)));
@@ -167,8 +189,9 @@ fn field_selector_rejects_unknown_operators() {
 fn field_selector_not_equals_passes_when_field_absent() {
     let sel = FieldSelector::parse("status.phase!=Failed").unwrap();
     assert!(sel.matches(&BTreeMap::new()), "absent field passes !=");
-    let fm: BTreeMap<String, String> =
-        [("status.phase".to_string(), "Failed".to_string())].into_iter().collect();
+    let fm: BTreeMap<String, String> = [("status.phase".to_string(), "Failed".to_string())]
+        .into_iter()
+        .collect();
     assert!(!sel.matches(&fm));
 }
 

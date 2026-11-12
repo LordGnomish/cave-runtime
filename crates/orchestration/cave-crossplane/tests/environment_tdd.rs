@@ -113,7 +113,10 @@ fn from_environment_field_path_patches_composed_resource() {
     let applied = env
         .apply_patch(&mut composed, &patch)
         .expect("from-env patch applies");
-    assert!(applied, "patch with a present source must report applied=true");
+    assert!(
+        applied,
+        "patch with a present source must report applied=true"
+    );
 
     assert_eq!(
         composed["spec"]["forProvider"]["region"],
@@ -130,7 +133,10 @@ fn from_environment_field_path_missing_source_is_noop() {
     let patch = from_env_patch("data.absent", "spec.forProvider.region");
 
     let applied = env.apply_patch(&mut composed, &patch).unwrap();
-    assert!(!applied, "missing optional source must report applied=false");
+    assert!(
+        !applied,
+        "missing optional source must report applied=false"
+    );
     assert_eq!(composed, serde_json::json!({"spec": {}}));
 }
 

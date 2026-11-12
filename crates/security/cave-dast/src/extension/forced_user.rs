@@ -64,11 +64,7 @@ impl ForcedUserMode {
     /// Apply forced-user credentials to a request's headers. Returns
     /// the mutated header list. Idempotent — replaces any existing
     /// `Authorization` / `Cookie` headers in the context.
-    pub fn apply_to_headers(
-        &self,
-        context_id: &str,
-        headers: &mut Vec<(String, String)>,
-    ) -> bool {
+    pub fn apply_to_headers(&self, context_id: &str, headers: &mut Vec<(String, String)>) -> bool {
         if !self.enabled {
             return false;
         }

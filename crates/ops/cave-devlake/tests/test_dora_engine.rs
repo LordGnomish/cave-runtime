@@ -3,10 +3,13 @@
 //! Tests for DORA engine rating functions — written BEFORE implementation (TDD).
 
 use cave_devlake::engine::{
-    dora_cfr_rating, dora_deployment_frequency_rating, dora_lead_time_rating, dora_mttr_rating,
-    overall_dora_rating, pr_cycle_time_avg_secs, commit_frequency_per_day, sprint_velocity_avg,
+    commit_frequency_per_day, dora_cfr_rating, dora_deployment_frequency_rating,
+    dora_lead_time_rating, dora_mttr_rating, overall_dora_rating, pr_cycle_time_avg_secs,
+    sprint_velocity_avg,
 };
-use cave_devlake::models::{Commit, DoraRating, Issue, IssueStatus, IssueType, PrState, PullRequest, Sprint, SprintState};
+use cave_devlake::models::{
+    Commit, DoraRating, Issue, IssueStatus, IssueType, PrState, PullRequest, Sprint, SprintState,
+};
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
@@ -273,5 +276,8 @@ fn sprint_velocity_avg_computed() {
         },
     ];
     let avg = sprint_velocity_avg(&sprints);
-    assert!((avg - 25.0).abs() < 0.01, "Expected avg 25 completed points, got {avg}");
+    assert!(
+        (avg - 25.0).abs() < 0.01,
+        "Expected avg 25 completed points, got {avg}"
+    );
 }

@@ -10,11 +10,9 @@
 //! cave uses `rcgen` (already in the workspace via cave-vault / cave-mesh)
 //! for X.509 certificate generation.
 
-use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, DnType, IsCa, KeyPair, SanType,
-};
-use time::{Duration, OffsetDateTime};
+use rcgen::{BasicConstraints, Certificate, CertificateParams, DnType, IsCa, KeyPair, SanType};
 use thiserror::Error;
+use time::{Duration, OffsetDateTime};
 
 /// Input for an issuance operation (shared by SelfSigned + CA backends).
 #[derive(Debug, Clone)]
@@ -43,7 +41,9 @@ pub struct IssueResult {
 pub enum IssuerError {
     #[error("rcgen error: {0}")]
     Rcgen(#[from] rcgen::Error),
-    #[error("cross-tenant issuance denied: issuer belongs to '{issuer_tenant}', request from '{request_tenant}'")]
+    #[error(
+        "cross-tenant issuance denied: issuer belongs to '{issuer_tenant}', request from '{request_tenant}'"
+    )]
     CrossTenantDenied {
         issuer_tenant: String,
         request_tenant: String,
@@ -65,9 +65,11 @@ fn build_cert_params(req: &IssueRequest) -> Result<(CertificateParams, KeyPair),
     }
 
     for dns in &req.dns_names {
-        params
-            .subject_alt_names
-            .push(SanType::DnsName(dns.clone().try_into().map_err(|_| rcgen::Error::CouldNotParseCertificate)?));
+        params.subject_alt_names.push(SanType::DnsName(
+            dns.clone()
+                .try_into()
+                .map_err(|_| rcgen::Error::CouldNotParseCertificate)?,
+        ));
     }
 
     // Cite: cert-manager duration handling. rcgen uses `time` crate.

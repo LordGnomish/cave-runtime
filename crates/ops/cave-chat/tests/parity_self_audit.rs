@@ -25,8 +25,7 @@ fn gate1_source_sha_pinned() {
         .unwrap_or("");
     // Accept any non-empty value that looks like a tag (starts with "v") or a SHA (hex chars)
     let ok = !source_sha.is_empty()
-        && (source_sha.starts_with('v')
-            || source_sha.chars().all(|c| c.is_ascii_hexdigit()));
+        && (source_sha.starts_with('v') || source_sha.chars().all(|c| c.is_ascii_hexdigit()));
     assert!(
         ok,
         "G1 FAIL: [upstream].source_sha must be a version tag or SHA (got {:?})",
@@ -84,7 +83,12 @@ fn gate3_honest_ratio_truthful() {
 fn gate4_manifest_present() {
     let m = manifest();
     let parity = m.get("parity").expect("[parity] section");
-    for field in &["fill_ratio", "honest_ratio", "adr_justified_ratio", "last_audit"] {
+    for field in &[
+        "fill_ratio",
+        "honest_ratio",
+        "adr_justified_ratio",
+        "last_audit",
+    ] {
         assert!(
             parity.get(field).is_some(),
             "G4 FAIL: [parity].{} is missing",
@@ -149,7 +153,9 @@ fn gate7_upstream_version() {
         .unwrap_or("");
     // Accept vX.Y.Z or X.Y.Z
     assert!(
-        !version.is_empty() && (version.starts_with('v') || version.chars().next().map_or(false, |c| c.is_numeric())),
+        !version.is_empty()
+            && (version.starts_with('v')
+                || version.chars().next().map_or(false, |c| c.is_numeric())),
         "G7 FAIL: [upstream].version looks wrong: {:?}",
         version
     );

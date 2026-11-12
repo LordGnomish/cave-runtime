@@ -141,7 +141,12 @@ impl ServerCa {
     pub fn bootstrap(&self, now: DateTime<Utc>) -> Result<()> {
         let mut g = self.inner.write().expect("poisoned");
         let params = g.params.clone();
-        let root_key = synth_key("root-0", SignatureAlgorithm::EcdsaP256Sha256, now, params.root_ttl);
+        let root_key = synth_key(
+            "root-0",
+            SignatureAlgorithm::EcdsaP256Sha256,
+            now,
+            params.root_ttl,
+        );
         let int_key = synth_key(
             "int-0",
             SignatureAlgorithm::EcdsaP256Sha256,
@@ -171,7 +176,13 @@ impl ServerCa {
                 tainted: false,
             },
         );
-        g.jwt_keys.insert(0, JwtAuthority2 { key: jwt_key, tainted: false });
+        g.jwt_keys.insert(
+            0,
+            JwtAuthority2 {
+                key: jwt_key,
+                tainted: false,
+            },
+        );
         g.sequence_number += 1;
         Ok(())
     }
@@ -203,8 +214,7 @@ impl ServerCa {
         );
         // Prune expired (now > old_not_after + overlap)
         let cutoff = now - params.overlap;
-        g.intermediates
-            .retain(|a| a.key.not_after >= cutoff);
+        g.intermediates.retain(|a| a.key.not_after >= cutoff);
         g.sequence_number += 1;
         Ok(())
     }
@@ -220,7 +230,13 @@ impl ServerCa {
             now,
             params.jwt_key_ttl,
         );
-        g.jwt_keys.insert(0, JwtAuthority2 { key: jwt_key, tainted: false });
+        g.jwt_keys.insert(
+            0,
+            JwtAuthority2 {
+                key: jwt_key,
+                tainted: false,
+            },
+        );
         let cutoff = now - params.overlap;
         g.jwt_keys.retain(|a| a.key.not_after >= cutoff);
         g.sequence_number += 1;
@@ -296,12 +312,7 @@ impl ServerCa {
 /// `public_key_der` is `SHA-256("pub:<id>:<algo>")` — sufficient for the JWKS
 /// `kid` mapping and bundle hashing without producing a real cryptographic
 /// key. Live deployments swap this for [`cave_pki`] or a KMS.
-fn synth_key(
-    id: &str,
-    algorithm: SignatureAlgorithm,
-    now: DateTime<Utc>,
-    ttl: Duration,
-) -> CaKey {
+fn synth_key(id: &str, algorithm: SignatureAlgorithm, now: DateTime<Utc>, ttl: Duration) -> CaKey {
     use sha2::{Digest, Sha256};
     let mut pub_h = Sha256::new();
     pub_h.update(format!("pub:{}:{}", id, algorithm.as_str()).as_bytes());

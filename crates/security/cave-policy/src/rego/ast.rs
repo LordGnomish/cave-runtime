@@ -88,11 +88,7 @@ pub enum Expr {
     /// `x := y` — local assignment
     Assign(Term, Term),
     /// `x == y`, `x != y`, `x < y`, `x <= y`, `x > y`, `x >= y`
-    Compare {
-        op: CompareOp,
-        lhs: Term,
-        rhs: Term,
-    },
+    Compare { op: CompareOp, lhs: Term, rhs: Term },
     /// `not expr` — negation as failure
     Not(Box<Expr>),
     /// `not { body }` — negation over a body

@@ -9,8 +9,8 @@
 //!   - exportText body (header + "History" + per-message text format)
 
 use cave_chat::conversation_export::{
-    export_markdown, export_text, format_message_text, ExportFormat, ExportMessage,
-    ConversationMeta,
+    ConversationMeta, ExportFormat, ExportMessage, export_markdown, export_text,
+    format_message_text,
 };
 
 fn meta() -> ConversationMeta {
@@ -65,7 +65,10 @@ fn markdown_export_has_header_and_history_section() {
 #[test]
 fn text_export_has_header_and_history_section() {
     let out = export_text(&meta(), &msgs());
-    assert!(out.starts_with("Conversation\n########################\n"), "got: {out}");
+    assert!(
+        out.starts_with("Conversation\n########################\n"),
+        "got: {out}"
+    );
     assert!(out.contains("conversationId: conv-1\n"));
     assert!(out.contains("\nHistory\n########################\n"));
     assert!(out.contains(">> User:\nHello there\n"));

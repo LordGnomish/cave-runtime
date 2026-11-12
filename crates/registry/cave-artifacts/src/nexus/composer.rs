@@ -304,8 +304,14 @@ mod tests {
 
     #[test]
     fn parse_path_packages_json() {
-        assert_eq!(parse_path("packages.json"), Some(ComposerPath::PackagesJson));
-        assert_eq!(parse_path("/packages.json"), Some(ComposerPath::PackagesJson));
+        assert_eq!(
+            parse_path("packages.json"),
+            Some(ComposerPath::PackagesJson)
+        );
+        assert_eq!(
+            parse_path("/packages.json"),
+            Some(ComposerPath::PackagesJson)
+        );
     }
 
     #[test]

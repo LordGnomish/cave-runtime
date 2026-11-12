@@ -13,7 +13,7 @@
 
 use crate::bundle::CosignBundle;
 use crate::error::{Result, SignError};
-use crate::rekor::{decode_entry_body, RekorClient};
+use crate::rekor::{RekorClient, decode_entry_body};
 
 /// Confirm that a bundle is consistent with the Rekor entry it points at.
 pub fn verify_against_rekor(bundle: &CosignBundle, rekor: &RekorClient) -> Result<()> {
@@ -33,10 +33,14 @@ pub fn verify_against_rekor(bundle: &CosignBundle, rekor: &RekorClient) -> Resul
         )));
     }
     if body.signature_b64 != bundle.signed_payload_b64 {
-        return Err(SignError::Tlog("rekor signature bytes diverge from bundle".into()));
+        return Err(SignError::Tlog(
+            "rekor signature bytes diverge from bundle".into(),
+        ));
     }
     if body.public_key_pem != bundle.cert_pem {
-        return Err(SignError::Tlog("rekor public key/cert diverges from bundle".into()));
+        return Err(SignError::Tlog(
+            "rekor public key/cert diverges from bundle".into(),
+        ));
     }
     if let Some(uuid) = &bundle.rekor_uuid {
         if uuid != &entry.uuid {
@@ -53,10 +57,7 @@ pub fn verify_against_rekor(bundle: &CosignBundle, rekor: &RekorClient) -> Resul
 
 /// Build a witness — `(tree_size, root_hash, inclusion_proof)` — that a
 /// caller can pin into an audit trail.
-pub fn build_witness(
-    bundle: &CosignBundle,
-    rekor: &RekorClient,
-) -> Result<TlogWitness> {
+pub fn build_witness(bundle: &CosignBundle, rekor: &RekorClient) -> Result<TlogWitness> {
     let log_index = bundle
         .rekor_log_index
         .ok_or_else(|| SignError::Tlog("bundle missing rekor_log_index".into()))?;

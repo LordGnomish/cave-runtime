@@ -88,8 +88,7 @@ fn search_finds_vulnerability_by_id() {
     let results = search_all("CVE-2021-44228", &[], &[], &vulns);
     assert!(
         results.iter().any(|r| {
-            matches!(r.kind, SearchResultKind::Vulnerability)
-                && r.label.contains("CVE-2021-44228")
+            matches!(r.kind, SearchResultKind::Vulnerability) && r.label.contains("CVE-2021-44228")
         }),
         "should find vulnerability by exact CVE ID"
     );
@@ -100,7 +99,9 @@ fn search_finds_vulnerability_by_title() {
     let vulns = vec![mk_vuln("CVE-2021-44228", "Log4Shell Remote Code Execution")];
     let results = search_all("Log4Shell", &[], &[], &vulns);
     assert!(
-        results.iter().any(|r| matches!(r.kind, SearchResultKind::Vulnerability)),
+        results
+            .iter()
+            .any(|r| matches!(r.kind, SearchResultKind::Vulnerability)),
         "should find vulnerability by title keyword"
     );
 }
@@ -113,9 +114,15 @@ fn search_returns_results_from_all_entity_types() {
     let comps = vec![mk_comp("log4j", "2.17.1", Some("Apache-2.0"))];
     let vulns = vec![mk_vuln("CVE-2021-44228", "Log4Shell (log4j)")];
     let results = search_all("log4j", &projects, &comps, &vulns);
-    let has_proj = results.iter().any(|r| matches!(r.kind, SearchResultKind::Project));
-    let has_comp = results.iter().any(|r| matches!(r.kind, SearchResultKind::Component));
-    let has_vuln = results.iter().any(|r| matches!(r.kind, SearchResultKind::Vulnerability));
+    let has_proj = results
+        .iter()
+        .any(|r| matches!(r.kind, SearchResultKind::Project));
+    let has_comp = results
+        .iter()
+        .any(|r| matches!(r.kind, SearchResultKind::Component));
+    let has_vuln = results
+        .iter()
+        .any(|r| matches!(r.kind, SearchResultKind::Vulnerability));
     assert!(has_proj, "should return project results");
     assert!(has_comp, "should return component results");
     assert!(has_vuln, "should return vulnerability results");
@@ -127,10 +134,7 @@ fn search_returns_results_from_all_entity_types() {
 fn search_empty_query_returns_nothing() {
     let projects = vec![mk_project("my-app")];
     let results = search_all("", &projects, &[], &[]);
-    assert!(
-        results.is_empty(),
-        "empty query should return no results"
-    );
+    assert!(results.is_empty(), "empty query should return no results");
 }
 
 #[test]
@@ -138,7 +142,10 @@ fn search_no_match_returns_empty() {
     let projects = vec![mk_project("backend")];
     let comps = vec![mk_comp("lodash", "4.17.21", Some("MIT"))];
     let results = search_all("xyzzy-nonexistent", &projects, &comps, &[]);
-    assert!(results.is_empty(), "no-match query should return empty list");
+    assert!(
+        results.is_empty(),
+        "no-match query should return empty list"
+    );
 }
 
 // ─── 4. SearchResult structure ───────────────────────────────────────────────
@@ -161,8 +168,14 @@ fn search_is_case_insensitive() {
     let comps = vec![mk_comp("OpenSSL", "3.0.0", Some("Apache-2.0"))];
     let results_lower = search_all("openssl", &[], &comps, &[]);
     let results_upper = search_all("OPENSSL", &[], &comps, &[]);
-    assert!(!results_lower.is_empty(), "lowercase query should find OpenSSL");
-    assert!(!results_upper.is_empty(), "uppercase query should find OpenSSL");
+    assert!(
+        !results_lower.is_empty(),
+        "lowercase query should find OpenSSL"
+    );
+    assert!(
+        !results_upper.is_empty(),
+        "uppercase query should find OpenSSL"
+    );
 }
 
 // ─── 6. Limit / pagination awareness ─────────────────────────────────────────

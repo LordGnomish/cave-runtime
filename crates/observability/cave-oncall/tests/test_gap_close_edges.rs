@@ -176,7 +176,9 @@ fn current_oncall_daily_rotation_cycles_users() {
         "carol"
     );
     assert_eq!(
-        current_oncall(&schedule, &[rotation], &[], day3).unwrap().user,
+        current_oncall(&schedule, &[rotation], &[], day3)
+            .unwrap()
+            .user,
         "alice"
     );
 }
@@ -206,7 +208,9 @@ fn current_oncall_custom_rotation_uses_shift_duration() {
         "bob"
     );
     assert_eq!(
-        current_oncall(&schedule, &[rotation], &[], t2).unwrap().user,
+        current_oncall(&schedule, &[rotation], &[], t2)
+            .unwrap()
+            .user,
         "alice"
     );
 }

@@ -232,14 +232,23 @@ mod tests {
 
     #[test]
     fn port_ratio_is_cave_over_upstream() {
-        let cave = LocStats { code: 800, ..Default::default() };
-        let up = LocStats { code: 4000, ..Default::default() };
+        let cave = LocStats {
+            code: 800,
+            ..Default::default()
+        };
+        let up = LocStats {
+            code: 4000,
+            ..Default::default()
+        };
         assert_eq!(port_ratio(Some(cave), Some(up)), Some(0.2));
     }
 
     #[test]
     fn port_ratio_guards_missing_and_zero() {
-        let some = LocStats { code: 10, ..Default::default() };
+        let some = LocStats {
+            code: 10,
+            ..Default::default()
+        };
         assert_eq!(port_ratio(None, Some(some)), None);
         assert_eq!(port_ratio(Some(some), None), None);
         assert_eq!(
@@ -272,12 +281,27 @@ mod tests {
         let mut upstream = HashMap::new();
         upstream.insert(
             "kubernetes/kubernetes".to_string(),
-            LocStats { code: 5_000_000, ..Default::default() },
+            LocStats {
+                code: 5_000_000,
+                ..Default::default()
+            },
         );
         let mut cave = HashMap::new();
         // Two of the five k8s rows have a cave measurement.
-        cave.insert("cave-apiserver".to_string(), LocStats { code: 50_000, ..Default::default() });
-        cave.insert("cave-scheduler".to_string(), LocStats { code: 25_000, ..Default::default() });
+        cave.insert(
+            "cave-apiserver".to_string(),
+            LocStats {
+                code: 50_000,
+                ..Default::default()
+            },
+        );
+        cave.insert(
+            "cave-scheduler".to_string(),
+            LocStats {
+                code: 25_000,
+                ..Default::default()
+            },
+        );
         let src = FakeSource {
             upstream,
             cave,
@@ -290,7 +314,10 @@ mod tests {
         // The upstream was cloned exactly once despite the fan-out.
         assert_eq!(*src.hits.borrow().get("kubernetes/kubernetes").unwrap(), 1);
         // apiserver: 50_000 / 5_000_000 = 0.01.
-        let apiserver = ms.iter().find(|m| m.cave_module == "cave-apiserver").unwrap();
+        let apiserver = ms
+            .iter()
+            .find(|m| m.cave_module == "cave-apiserver")
+            .unwrap();
         assert_eq!(apiserver.ratio, Some(0.01));
         // A row with no cave measurement reports ratio None, not 0.
         let unmeasured = ms.iter().find(|m| m.cave.is_none());

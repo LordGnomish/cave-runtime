@@ -34,11 +34,7 @@ impl Blocklist {
     /// Construct a rule owned by `workspace_member_id`. An empty `handle`
     /// is stored verbatim (Twenty permits a transient empty draft) but
     /// blocks nothing until a real handle is set.
-    pub fn new(
-        workspace_id: Uuid,
-        workspace_member_id: Uuid,
-        handle: impl Into<String>,
-    ) -> Self {
+    pub fn new(workspace_id: Uuid, workspace_member_id: Uuid, handle: impl Into<String>) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),

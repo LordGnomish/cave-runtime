@@ -195,11 +195,7 @@ impl ResourceProvider for MockProvider {
         }
     }
 
-    async fn describe(
-        &self,
-        id: &str,
-        _rt: &ResourceType,
-    ) -> Result<serde_json::Value, String> {
+    async fn describe(&self, id: &str, _rt: &ResourceType) -> Result<serde_json::Value, String> {
         Ok(serde_json::json!({ "id": id, "status": "running" }))
     }
 }
@@ -240,16 +236,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_failing_provider() {
-        let provider = MockProvider::failing("fail-cloud", vec![ResourceType::Vm, ResourceType::Vpc]);
+        let provider =
+            MockProvider::failing("fail-cloud", vec![ResourceType::Vm, ResourceType::Vpc]);
         let resource = make_vm_resource();
 
         let result = provider.provision(&resource).await;
         assert!(!result.success);
         assert_eq!(result.error.as_deref(), Some("mock failure"));
 
-        let deprov = provider
-            .deprovision("prov-xyz", &ResourceType::Vm)
-            .await;
+        let deprov = provider.deprovision("prov-xyz", &ResourceType::Vm).await;
         assert!(deprov.is_err());
     }
 }

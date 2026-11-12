@@ -7,8 +7,8 @@ use cave_admission::engine::{
     evaluate_validation_rule, evaluate_verify_images, matches_policy,
 };
 use cave_admission::models::{
-    MutationPatch, Operation, PatchOp, Policy, PolicyMatch, PolicyRule, PolicySpec,
-    VerifyImagesRule, Resource, ResourceMeta,
+    MutationPatch, Operation, PatchOp, Policy, PolicyMatch, PolicyRule, PolicySpec, Resource,
+    ResourceMeta, VerifyImagesRule,
 };
 use chrono::Utc;
 use std::collections::HashMap;
@@ -72,20 +72,36 @@ fn label_selector_filters_correctly() {
     p.match_criteria.label_selector = Some(sel);
 
     let mut r = bare_resource("Pod", "p");
-    assert!(!matches_policy(&p, &r, Operation::Create), "Missing label should not match");
+    assert!(
+        !matches_policy(&p, &r, Operation::Create),
+        "Missing label should not match"
+    );
     r.metadata.labels.insert("team".into(), "platform".into());
-    assert!(matches_policy(&p, &r, Operation::Create), "Matching label should match");
+    assert!(
+        matches_policy(&p, &r, Operation::Create),
+        "Matching label should match"
+    );
 }
 
 // --- evaluate_validation_rule -------------------------------------------
 
 #[test]
 fn required_annotation_passes_when_present() {
-    let rule = PolicyRule::RequiredAnnotation { key: "owner".into() };
+    let rule = PolicyRule::RequiredAnnotation {
+        key: "owner".into(),
+    };
     let mut r = bare_resource("Pod", "p");
-    assert!(evaluate_validation_rule(&rule, &r).is_some(), "Missing annotation → violation");
-    r.metadata.annotations.insert("owner".into(), "platform".into());
-    assert!(evaluate_validation_rule(&rule, &r).is_none(), "Present annotation → ok");
+    assert!(
+        evaluate_validation_rule(&rule, &r).is_some(),
+        "Missing annotation → violation"
+    );
+    r.metadata
+        .annotations
+        .insert("owner".into(), "platform".into());
+    assert!(
+        evaluate_validation_rule(&rule, &r).is_none(),
+        "Present annotation → ok"
+    );
 }
 
 #[test]
@@ -93,14 +109,22 @@ fn max_replicas_rule() {
     let rule = PolicyRule::MaxReplicas { max: 3 };
     let mut r = bare_resource("Deployment", "d");
     r.spec = serde_json::json!({"replicas": 5});
-    assert!(evaluate_validation_rule(&rule, &r).is_some(), "5 > 3 → violation");
+    assert!(
+        evaluate_validation_rule(&rule, &r).is_some(),
+        "5 > 3 → violation"
+    );
     r.spec = serde_json::json!({"replicas": 3});
-    assert!(evaluate_validation_rule(&rule, &r).is_none(), "3 == max → ok");
+    assert!(
+        evaluate_validation_rule(&rule, &r).is_none(),
+        "3 == max → ok"
+    );
 }
 
 #[test]
 fn required_namespace_rule() {
-    let rule = PolicyRule::RequiredNamespace { namespaces: vec!["prod".into()] };
+    let rule = PolicyRule::RequiredNamespace {
+        namespaces: vec!["prod".into()],
+    };
     let r_prod = {
         let mut r = bare_resource("Pod", "p");
         r.metadata.namespace = Some("prod".into());
@@ -120,8 +144,16 @@ fn required_namespace_rule() {
 #[test]
 fn mutation_returns_all_patches() {
     let patches = vec![
-        MutationPatch { op: PatchOp::Add, path: "/metadata/labels/env".into(), value: Some(serde_json::json!("prod")) },
-        MutationPatch { op: PatchOp::Remove, path: "/metadata/annotations/debug".into(), value: None },
+        MutationPatch {
+            op: PatchOp::Add,
+            path: "/metadata/labels/env".into(),
+            value: Some(serde_json::json!("prod")),
+        },
+        MutationPatch {
+            op: PatchOp::Remove,
+            path: "/metadata/annotations/debug".into(),
+            value: None,
+        },
     ];
     let r = bare_resource("Pod", "p");
     let result = evaluate_mutation(&patches, &r);
@@ -140,7 +172,10 @@ fn verify_images_allows_digest_ref() {
     };
     let mut r = bare_resource("Pod", "p");
     r.spec = serde_json::json!({"image": "gcr.io/project/app@sha256:abc123"});
-    assert!(evaluate_verify_images(&rule, &r).is_none(), "Digest ref should be treated as signed");
+    assert!(
+        evaluate_verify_images(&rule, &r).is_none(),
+        "Digest ref should be treated as signed"
+    );
 }
 
 #[test]
@@ -160,13 +195,19 @@ fn verify_images_blocks_wrong_registry() {
 #[test]
 fn audit_mode_allows_but_records_violation() {
     let mut policy = minimal_policy(PolicySpec::Validate {
-        rules: vec![PolicyRule::RequiredLabel { key: "env".into(), allowed_values: vec![] }],
+        rules: vec![PolicyRule::RequiredLabel {
+            key: "env".into(),
+            allowed_values: vec![],
+        }],
     });
     policy.audit_mode = true;
     let r = bare_resource("Pod", "p");
     let result = evaluate_policy(&policy, &r, Operation::Create);
     assert!(result.allowed, "Audit mode must allow");
-    assert!(!result.violations.is_empty(), "Violation should still be recorded");
+    assert!(
+        !result.violations.is_empty(),
+        "Violation should still be recorded"
+    );
 }
 
 #[test]
@@ -194,11 +235,19 @@ fn generate_policy_builds_companion_resource() {
 #[test]
 fn evaluate_all_policies_merges_mutations() {
     let mut p1 = minimal_policy(PolicySpec::Mutate {
-        patches: vec![MutationPatch { op: PatchOp::Add, path: "/metadata/labels/a".into(), value: Some(serde_json::json!("1")) }],
+        patches: vec![MutationPatch {
+            op: PatchOp::Add,
+            path: "/metadata/labels/a".into(),
+            value: Some(serde_json::json!("1")),
+        }],
     });
     p1.match_criteria.kinds = vec!["Pod".into()];
     let mut p2 = minimal_policy(PolicySpec::Mutate {
-        patches: vec![MutationPatch { op: PatchOp::Add, path: "/metadata/labels/b".into(), value: Some(serde_json::json!("2")) }],
+        patches: vec![MutationPatch {
+            op: PatchOp::Add,
+            path: "/metadata/labels/b".into(),
+            value: Some(serde_json::json!("2")),
+        }],
     });
     p2.name = "p2".into();
     p2.match_criteria.kinds = vec!["Pod".into()];

@@ -100,14 +100,8 @@ impl Transaction {
             summary.insert("operation".into(), op.into());
             summary.insert("added-records".into(), plan.added_records().to_string());
             summary.insert("deleted-records".into(), plan.deleted_records().to_string());
-            summary.insert(
-                "added-data-files".into(),
-                plan.appended.len().to_string(),
-            );
-            summary.insert(
-                "deleted-data-files".into(),
-                plan.deleted.len().to_string(),
-            );
+            summary.insert("added-data-files".into(), plan.appended.len().to_string());
+            summary.insert("deleted-data-files".into(), plan.deleted.len().to_string());
 
             let manifest_list = format!(
                 "{}/metadata/snap-{}-{}-{}.avro",
@@ -128,10 +122,12 @@ impl Transaction {
             new_meta.current_snapshot_id = Some(snap_id);
             new_meta.last_sequence_number = sequence_number;
             new_meta.last_updated_ms = now_ms;
-            new_meta.snapshot_log.push(crate::table_metadata::SnapshotLogEntry {
-                snapshot_id: snap_id,
-                timestamp_ms: now_ms,
-            });
+            new_meta
+                .snapshot_log
+                .push(crate::table_metadata::SnapshotLogEntry {
+                    snapshot_id: snap_id,
+                    timestamp_ms: now_ms,
+                });
 
             last_parent = Some(snap_id);
             snap_id += 1;
@@ -270,7 +266,10 @@ mod tests {
         tx.overwrite_files(plan);
         let after = tx.build_metadata(100);
         let snap = after.current_snapshot().unwrap();
-        assert_eq!(snap.summary.get("operation"), Some(&"overwrite".to_string()));
+        assert_eq!(
+            snap.summary.get("operation"),
+            Some(&"overwrite".to_string())
+        );
         assert_eq!(snap.summary.get("added-records"), Some(&"11".to_string()));
         assert_eq!(snap.summary.get("deleted-records"), Some(&"7".to_string()));
     }
@@ -309,10 +308,12 @@ mod tests {
         // file_path here doubles as the target path for the test.
         let after = rewrite_manifest(&base, &plan);
         assert_eq!(after.entries.len(), 2);
-        assert!(after
-            .entries
-            .iter()
-            .all(|e| e.data_file.file_path != "data/b.parquet"));
+        assert!(
+            after
+                .entries
+                .iter()
+                .all(|e| e.data_file.file_path != "data/b.parquet")
+        );
         assert!(after.entries.iter().all(|e| e.is_live()));
     }
 

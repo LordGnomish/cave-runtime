@@ -64,8 +64,10 @@ pub fn get_all_messages_up_to_parent(
     messages: &[ConvoNode],
     target_message_id: &str,
 ) -> Vec<ConvoNode> {
-    let by_id: HashMap<&str, &ConvoNode> =
-        messages.iter().map(|m| (m.message_id.as_str(), m)).collect();
+    let by_id: HashMap<&str, &ConvoNode> = messages
+        .iter()
+        .map(|m| (m.message_id.as_str(), m))
+        .collect();
 
     let target = match by_id.get(target_message_id) {
         Some(t) => *t,
@@ -195,10 +197,7 @@ pub fn get_messages_up_to_target_level(
 /// target-level messages are reparented to [`NO_PARENT`].
 ///
 /// Faithful port of `splitAtTargetLevel` (fork.js L287-354).
-pub fn split_at_target_level(
-    messages: &[ConvoNode],
-    target_message_id: &str,
-) -> Vec<ConvoNode> {
+pub fn split_at_target_level(messages: &[ConvoNode], target_message_id: &str) -> Vec<ConvoNode> {
     // Map of parentMessageId -> children messages.
     let mut parent_to_children: HashMap<&str, Vec<&ConvoNode>> = HashMap::new();
     for message in messages {

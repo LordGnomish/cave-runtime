@@ -149,7 +149,10 @@ pub fn build_controller_manager(input: &ControlPlaneInput) -> Container {
     args.insert("--cluster-name".into(), input.name.clone());
     args.insert("--cluster-signing-cert-file".into(), pki("ca.crt"));
     args.insert("--cluster-signing-key-file".into(), pki("ca.key"));
-    args.insert("--controllers".into(), "*,bootstrapsigner,tokencleaner".into());
+    args.insert(
+        "--controllers".into(),
+        "*,bootstrapsigner,tokencleaner".into(),
+    );
     args.insert("--kubeconfig".into(), kubeconfig.into());
     args.insert("--leader-elect".into(), "true".into());
     args.insert(
@@ -180,7 +183,10 @@ fn apiserver_command(input: &ControlPlaneInput) -> BTreeMap<String, String> {
     let mut args = BTreeMap::new();
     args.insert("--allow-privileged".into(), "true".into());
     args.insert("--authorization-mode".into(), "Node,RBAC".into());
-    args.insert("--advertise-address".into(), input.advertise_address.clone());
+    args.insert(
+        "--advertise-address".into(),
+        input.advertise_address.clone(),
+    );
     args.insert("--client-ca-file".into(), pki("ca.crt"));
     args.insert(
         "--enable-admission-plugins".into(),

@@ -723,8 +723,7 @@ async fn api_parity() -> axum::response::Response {
     use axum::response::IntoResponse;
 
     const EMBEDDED: &str = include_str!("../../../../docs/parity/parity-index.json");
-    let workspace_root =
-        std::env::var("CAVE_WORKSPACE_ROOT").unwrap_or_else(|_| ".".into());
+    let workspace_root = std::env::var("CAVE_WORKSPACE_ROOT").unwrap_or_else(|_| ".".into());
     let on_disk = std::path::Path::new(&workspace_root).join("docs/parity/parity-index.json");
     let body = std::fs::read_to_string(&on_disk).unwrap_or_else(|_| EMBEDDED.to_string());
     (

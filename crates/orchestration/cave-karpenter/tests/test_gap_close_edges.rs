@@ -126,7 +126,10 @@ fn schedule_exists_operator_always_matches() {
 
 #[test]
 fn schedule_does_not_exist_operator_always_blocks() {
-    let p = pool_with_req("blocked", req("region", RequirementOperator::DoesNotExist, &[]));
+    let p = pool_with_req(
+        "blocked",
+        req("region", RequirementOperator::DoesNotExist, &[]),
+    );
     let outcome = schedule_first_match(&[p], &[("region".into(), "us-west-1".into())]);
     assert!(matches!(outcome, ScheduleOutcome::NoMatch { .. }));
 }
@@ -233,7 +236,10 @@ fn nodepool_serde_roundtrip_preserves_full_envelope() {
     assert_eq!(back.template_hash.as_deref(), Some("abc123"));
     assert_eq!(back.template.spec.requirements[0].min_values, Some(2));
     assert_eq!(back.disruption.as_ref().unwrap().budgets.len(), 1);
-    assert_eq!(back.limits.as_ref().unwrap().resources.get("cpu").unwrap(), "100");
+    assert_eq!(
+        back.limits.as_ref().unwrap().resources.get("cpu").unwrap(),
+        "100"
+    );
 }
 
 #[test]
@@ -590,7 +596,10 @@ fn launch_uses_default_instance_when_no_hint() {
         _ => panic!("expected fresh launch"),
     }
     assert!(c.created_at.is_some());
-    assert_eq!(c.status.as_ref().unwrap().node_name.as_deref(), Some("no-hint-node"));
+    assert_eq!(
+        c.status.as_ref().unwrap().node_name.as_deref(),
+        Some("no-hint-node")
+    );
 }
 
 #[test]

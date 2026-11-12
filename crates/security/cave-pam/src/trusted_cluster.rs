@@ -199,10 +199,7 @@ impl TrustStore {
             .read()
             .unwrap()
             .values()
-            .filter(|c| {
-                &c.direction == direction
-                    || c.direction == TrustDirection::Bidirectional
-            })
+            .filter(|c| &c.direction == direction || c.direction == TrustDirection::Bidirectional)
             .cloned()
             .collect()
     }
@@ -223,7 +220,10 @@ mod tests {
             metadata: HashMap::new(),
         };
         store.register(cluster.clone()).unwrap();
-        assert_eq!(store.register(cluster).unwrap_err(), TrustError::DuplicateName);
+        assert_eq!(
+            store.register(cluster).unwrap_err(),
+            TrustError::DuplicateName
+        );
     }
 
     #[test]

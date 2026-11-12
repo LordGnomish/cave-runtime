@@ -279,9 +279,9 @@ pub fn should_run(sched: &ExperimentSchedule, now: &DateTime<Utc>) -> ScheduledR
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::ExperimentSchedule;
     use chrono::{TimeZone, Utc};
     use uuid::Uuid;
-    use crate::models::ExperimentSchedule;
 
     #[test]
     fn test_wildcard_matches_all() {
@@ -402,6 +402,9 @@ mod tests {
             max_runs: Some(3),
             run_count: 3,
         };
-        assert_eq!(should_run(&sched, &Utc::now()), ScheduledRunDecision::Exhausted);
+        assert_eq!(
+            should_run(&sched, &Utc::now()),
+            ScheduledRunDecision::Exhausted
+        );
     }
 }

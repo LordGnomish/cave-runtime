@@ -281,11 +281,10 @@ impl Maintenance {
                     m.weekdays.contains(&wd)
                 })
             }
-            MaintenanceStrategy::RecurringDayOfMonth => {
-                self.in_recurring_window(now, |m, day_start| {
+            MaintenanceStrategy::RecurringDayOfMonth => self
+                .in_recurring_window(now, |m, day_start| {
                     m.days_of_month.contains(&day_start.day())
-                })
-            }
+                }),
             MaintenanceStrategy::RecurringInterval => {
                 // Every `interval_day` days. Without an anchor date upstream
                 // keys off the cron `*/N` field; we treat any day as eligible
@@ -312,10 +311,7 @@ impl Maintenance {
 
         // Case A: same-day window [start, end) on an eligible day.
         if !crosses_midnight {
-            if secs_today >= tr.start_secs
-                && secs_today < tr.end_secs
-                && day_eligible(self, now)
-            {
+            if secs_today >= tr.start_secs && secs_today < tr.end_secs && day_eligible(self, now) {
                 return true;
             }
             return false;

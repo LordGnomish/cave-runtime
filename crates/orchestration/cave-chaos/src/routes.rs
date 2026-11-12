@@ -2,10 +2,10 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-chaos — Chaos Mesh-compatible REST API.
 
+use crate::State;
 use crate::models::{
     BlastRadius, ChaosExperiment, ExperimentParams, ExperimentStatus, SafetyGuard,
 };
-use crate::State;
 use axum::{
     Json, Router,
     extract::{Path, State as AxumState},
@@ -40,9 +40,7 @@ async fn health() -> Json<serde_json::Value> {
 
 // ─── List experiments ─────────────────────────────────────────────────────────
 
-async fn list_experiments(
-    AxumState(state): AxumState<Arc<State>>,
-) -> Json<Vec<ChaosExperiment>> {
+async fn list_experiments(AxumState(state): AxumState<Arc<State>>) -> Json<Vec<ChaosExperiment>> {
     let mut list = state.store.list();
     list.sort_by(|a, b| a.created_at.cmp(&b.created_at));
     Json(list)
@@ -93,11 +91,7 @@ async fn get_experiment(
     AxumState(state): AxumState<Arc<State>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ChaosExperiment>, StatusCode> {
-    state
-        .store
-        .get(id)
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    state.store.get(id).map(Json).ok_or(StatusCode::NOT_FOUND)
 }
 
 // ─── Delete experiment ────────────────────────────────────────────────────────

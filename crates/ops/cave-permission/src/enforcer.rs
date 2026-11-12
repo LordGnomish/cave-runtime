@@ -17,7 +17,7 @@
 //! decision functions live alongside the store (see the `enforce` impl block).
 
 use crate::matchers::key_match;
-use crate::rbac::{RoleManager, DEFAULT_MAX_HIERARCHY_LEVEL};
+use crate::rbac::{DEFAULT_MAX_HIERARCHY_LEVEL, RoleManager};
 
 /// A single `p` policy rule: `[sub, obj, act]`.
 pub type PolicyRule = Vec<String>;
@@ -102,7 +102,10 @@ impl Enforcer {
 
     /// Whether a `g` rule is present. Upstream: `HasGroupingPolicy`.
     pub fn has_grouping_policy(&self, child: &str, parent: &str) -> bool {
-        self.role_manager.get_roles(child).iter().any(|r| r == parent)
+        self.role_manager
+            .get_roles(child)
+            .iter()
+            .any(|r| r == parent)
     }
 
     /// The role manager backing the `g` rules (read access for enforce/tests).

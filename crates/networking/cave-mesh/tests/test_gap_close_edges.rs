@@ -23,13 +23,37 @@ use std::time::Duration;
 
 #[test]
 fn mesh_error_display_includes_context() {
-    assert!(MeshError::ServiceNotFound("svc".into()).to_string().contains("svc"));
+    assert!(
+        MeshError::ServiceNotFound("svc".into())
+            .to_string()
+            .contains("svc")
+    );
     assert!(MeshError::NotFound("vs".into()).to_string().contains("vs"));
-    assert!(MeshError::CircuitOpen("dst".into()).to_string().contains("dst"));
-    assert!(MeshError::MtlsRejected("bad-cert".into()).to_string().contains("bad-cert"));
-    assert!(MeshError::AuthzDenied("user".into()).to_string().contains("user"));
-    assert!(MeshError::Jwt("expired".into()).to_string().contains("expired"));
-    assert!(MeshError::RateLimited("svc".into()).to_string().contains("svc"));
+    assert!(
+        MeshError::CircuitOpen("dst".into())
+            .to_string()
+            .contains("dst")
+    );
+    assert!(
+        MeshError::MtlsRejected("bad-cert".into())
+            .to_string()
+            .contains("bad-cert")
+    );
+    assert!(
+        MeshError::AuthzDenied("user".into())
+            .to_string()
+            .contains("user")
+    );
+    assert!(
+        MeshError::Jwt("expired".into())
+            .to_string()
+            .contains("expired")
+    );
+    assert!(
+        MeshError::RateLimited("svc".into())
+            .to_string()
+            .contains("svc")
+    );
     assert!(MeshError::FaultAbort(503).to_string().contains("503"));
 }
 
@@ -37,7 +61,10 @@ fn mesh_error_display_includes_context() {
 fn mesh_error_helper_constructors() {
     assert!(matches!(MeshError::not_found("x"), MeshError::NotFound(_)));
     assert!(matches!(MeshError::conflict("x"), MeshError::Conflict(_)));
-    assert!(matches!(MeshError::invalid_input("x"), MeshError::InvalidInput(_)));
+    assert!(matches!(
+        MeshError::invalid_input("x"),
+        MeshError::InvalidInput(_)
+    ));
 }
 
 #[test]
@@ -49,8 +76,12 @@ fn mesh_error_serialization_from_serde_json() {
 
 #[test]
 fn mesh_result_ok_and_err_alias() {
-    fn good() -> MeshResult<i32> { Ok(1) }
-    fn bad() -> MeshResult<i32> { Err(MeshError::Timeout("up".into())) }
+    fn good() -> MeshResult<i32> {
+        Ok(1)
+    }
+    fn bad() -> MeshResult<i32> {
+        Err(MeshError::Timeout("up".into()))
+    }
     assert_eq!(good().unwrap(), 1);
     assert!(bad().is_err());
 }
@@ -134,8 +165,14 @@ fn meta(ns: &str, name: &str) -> ServiceMeta {
 #[test]
 fn registry_register_and_resolve_returns_endpoints() {
     let r = ServiceRegistry::new();
-    r.register(meta("default", "svc"), Endpoint::new("10.0.0.1", 80).healthy());
-    r.register(meta("default", "svc"), Endpoint::new("10.0.0.2", 80).healthy());
+    r.register(
+        meta("default", "svc"),
+        Endpoint::new("10.0.0.1", 80).healthy(),
+    );
+    r.register(
+        meta("default", "svc"),
+        Endpoint::new("10.0.0.2", 80).healthy(),
+    );
     let eps = r.resolve("default/svc");
     assert_eq!(eps.len(), 2);
 }
@@ -144,7 +181,10 @@ fn registry_register_and_resolve_returns_endpoints() {
 fn registry_register_duplicate_endpoint_replaces_in_place() {
     let r = ServiceRegistry::new();
     r.register(meta("default", "svc"), Endpoint::new("10.0.0.1", 80));
-    r.register(meta("default", "svc"), Endpoint::new("10.0.0.1", 80).healthy());
+    r.register(
+        meta("default", "svc"),
+        Endpoint::new("10.0.0.1", 80).healthy(),
+    );
     let eps = r.resolve("default/svc");
     assert_eq!(eps.len(), 1);
     assert_eq!(eps[0].health, HealthStatus::Healthy);
@@ -173,7 +213,10 @@ fn registry_resolve_filters_unhealthy_by_default() {
     let mut unhealthy = Endpoint::new("10.0.0.1", 80);
     unhealthy.health = HealthStatus::Unhealthy;
     r.register(meta("default", "svc"), unhealthy);
-    r.register(meta("default", "svc"), Endpoint::new("10.0.0.2", 80).healthy());
+    r.register(
+        meta("default", "svc"),
+        Endpoint::new("10.0.0.2", 80).healthy(),
+    );
 
     let healthy = r.resolve("default/svc");
     assert_eq!(healthy.len(), 1);
@@ -189,7 +232,10 @@ fn registry_update_health_changes_status() {
     r.register(meta("default", "svc"), Endpoint::new("10.0.0.1", 80));
     r.update_health("default", "svc", "10.0.0.1", 80, HealthStatus::Unhealthy);
     let healthy = r.resolve("default/svc");
-    assert!(healthy.is_empty(), "marked unhealthy must drop from healthy resolution");
+    assert!(
+        healthy.is_empty(),
+        "marked unhealthy must drop from healthy resolution"
+    );
 }
 
 #[test]
@@ -282,7 +328,10 @@ fn rule(rps: u64) -> RateLimitPolicy {
         name: "svc".into(),
         namespace: "default".into(),
         selector: None,
-        rules: vec![RateLimitRule { requests_per_unit: rps, unit: RateLimitUnit::Second }],
+        rules: vec![RateLimitRule {
+            requests_per_unit: rps,
+            unit: RateLimitUnit::Second,
+        }],
         created_at: Utc::now(),
         updated_at: Utc::now(),
     }
@@ -292,7 +341,10 @@ fn rule(rps: u64) -> RateLimitPolicy {
 fn rate_limiter_no_policy_allows_everything() {
     let rl = RateLimiter::new();
     for _ in 0..1000 {
-        assert!(matches!(rl.check_and_consume("anything"), RateLimitDecision::Allowed));
+        assert!(matches!(
+            rl.check_and_consume("anything"),
+            RateLimitDecision::Allowed
+        ));
     }
 }
 
@@ -304,7 +356,11 @@ fn rate_limiter_burst_bounded_by_capacity() {
         .filter(|_| matches!(rl.check_and_consume("svc"), RateLimitDecision::Allowed))
         .count();
     // capacity = 2 → at most 2-3 initial passes (refill is time-dependent).
-    assert!(allowed <= 4, "burst should be bounded near capacity, got {}", allowed);
+    assert!(
+        allowed <= 4,
+        "burst should be bounded near capacity, got {}",
+        allowed
+    );
 }
 
 #[test]

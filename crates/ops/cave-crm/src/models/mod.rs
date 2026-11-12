@@ -18,8 +18,8 @@ pub mod calendar_event;
 pub mod company;
 pub mod connected_account;
 pub mod custom_field;
-pub mod dashboard;
 pub mod custom_object;
+pub mod dashboard;
 pub mod lead;
 pub mod message;
 pub mod opportunity;
@@ -40,10 +40,9 @@ pub use calendar_event::{
 };
 pub use company::Company;
 pub use connected_account::{ConnectedAccount, ConnectedAccountProvider};
-pub use dashboard::{ActorContext, ActorMetadata, ActorSource, Dashboard};
-pub use task_target::{TaskTarget, TaskTargetKind};
 pub use custom_field::{FieldKind, FieldMetadata};
 pub use custom_object::ObjectMetadata;
+pub use dashboard::{ActorContext, ActorMetadata, ActorSource, Dashboard};
 pub use lead::{Lead, LeadStatus};
 pub use message::{
     Message, MessageChannel, MessageChannelMessageAssociation, MessageChannelSyncStatus,
@@ -54,6 +53,7 @@ pub use opportunity::{Opportunity, OpportunityStatus};
 pub use person::Person;
 pub use pipeline_step::PipelineStep;
 pub use task::{Task, TaskStatus};
+pub use task_target::{TaskTarget, TaskTargetKind};
 pub use user::User;
 pub use view::{View, ViewKind};
 pub use workspace::{Workspace, WorkspaceMember, WorkspaceMemberRole};

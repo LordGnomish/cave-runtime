@@ -121,9 +121,10 @@ impl Subresource {
             | Subresource::FilesystemList
             | Subresource::Freeze
             | Subresource::Unfreeze => VirtLauncher,
-            Subresource::Pause | Subresource::Unpause | Subresource::Migrate | Subresource::SoftReboot => {
-                VirtHandler
-            }
+            Subresource::Pause
+            | Subresource::Unpause
+            | Subresource::Migrate
+            | Subresource::SoftReboot => VirtHandler,
             Subresource::Start
             | Subresource::Stop
             | Subresource::Restart

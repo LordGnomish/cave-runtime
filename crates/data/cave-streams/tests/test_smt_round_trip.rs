@@ -505,10 +505,7 @@ fn flatten_three_level_depth_with_custom_delim() {
     let mut cfg = BTreeMap::new();
     cfg.insert("delimiter".into(), "::".into());
     let f = Flatten::from_config(&cfg).unwrap();
-    let deep = obj(&[(
-        "lvl1",
-        obj(&[("lvl2", obj(&[("lvl3", Value::Int(7))]))]),
-    )]);
+    let deep = obj(&[("lvl1", obj(&[("lvl2", obj(&[("lvl3", Value::Int(7))]))]))]);
     let r = RecordEnvelope::new("t", deep);
     let out = f.apply(r).unwrap().unwrap();
     let m = out.value.as_object().unwrap();

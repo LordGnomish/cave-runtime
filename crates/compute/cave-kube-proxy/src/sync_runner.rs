@@ -112,7 +112,10 @@ impl ProxySyncRunner {
     /// Cite: `pkg/proxy/iptables/proxier.go:638` (syncProxyRules) —
     /// full datapath emission. Returns the rendered ruleset payload the
     /// caller hands to iptables-restore / `nft -f`.
-    pub fn sync_proxy_rules(&mut self, services: &[ServicePortInfo]) -> KubeProxyResult<Vec<String>> {
+    pub fn sync_proxy_rules(
+        &mut self,
+        services: &[ServicePortInfo],
+    ) -> KubeProxyResult<Vec<String>> {
         // Cross-tenant guard: every input must match the runner's tenant.
         for s in services {
             if s.tenant_id != self.tenant_id {
@@ -138,7 +141,9 @@ impl ProxySyncRunner {
                     payload.extend(svc_ips);
                     payload.push("}".to_string());
                 }
-                let np = self.nftables.build_service_nodeports_map_entries(services)?;
+                let np = self
+                    .nftables
+                    .build_service_nodeports_map_entries(services)?;
                 if !np.is_empty() {
                     payload.push(format!("add element inet kube-proxy service-nodeports {{"));
                     payload.extend(np);

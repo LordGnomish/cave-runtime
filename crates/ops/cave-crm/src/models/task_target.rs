@@ -109,8 +109,18 @@ mod tests {
 
     #[test]
     fn new_assigns_unique_ids_and_timestamps() {
-        let a = TaskTarget::new(Uuid::nil(), Uuid::new_v4(), TaskTargetKind::Company, Uuid::new_v4());
-        let b = TaskTarget::new(Uuid::nil(), Uuid::new_v4(), TaskTargetKind::Company, Uuid::new_v4());
+        let a = TaskTarget::new(
+            Uuid::nil(),
+            Uuid::new_v4(),
+            TaskTargetKind::Company,
+            Uuid::new_v4(),
+        );
+        let b = TaskTarget::new(
+            Uuid::nil(),
+            Uuid::new_v4(),
+            TaskTargetKind::Company,
+            Uuid::new_v4(),
+        );
         assert_ne!(a.id, b.id);
         assert!(a.created_at <= b.created_at);
     }

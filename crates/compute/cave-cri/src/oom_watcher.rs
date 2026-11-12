@@ -339,9 +339,7 @@ mod tests {
         let p = src.memory_events_path("c-deadbeef");
         assert_eq!(
             p,
-            std::path::PathBuf::from(
-                "/sys/fs/cgroup/kubepods.slice/c-deadbeef/memory.events"
-            )
+            std::path::PathBuf::from("/sys/fs/cgroup/kubepods.slice/c-deadbeef/memory.events")
         );
         assert_eq!(
             src.cgroup_root(),

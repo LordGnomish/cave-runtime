@@ -163,7 +163,11 @@ impl Reconciler {
             &mut self.conditions,
             ConditionType::ControlPlaneHealthy,
             tri(control_plane),
-            if control_plane { "Healthy" } else { "Provisioning" },
+            if control_plane {
+                "Healthy"
+            } else {
+                "Provisioning"
+            },
             "dedicated apiserver/controller-manager/scheduler materialised",
         );
         set_condition(
@@ -177,7 +181,11 @@ impl Reconciler {
             &mut self.conditions,
             ConditionType::KonnectivityHealthy,
             tri(konnectivity),
-            if konnectivity { "Healthy" } else { "Provisioning" },
+            if konnectivity {
+                "Healthy"
+            } else {
+                "Provisioning"
+            },
             "konnectivity tunnel established",
         );
         set_condition(

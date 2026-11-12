@@ -13,9 +13,9 @@
 //!   GET    /api/slo/stats              — aggregate stats
 
 use crate::{
-    engine::{calculate_error_budget, is_compliant},
-    models::{MetricType, SloStatus, SLO},
     State,
+    engine::{calculate_error_budget, is_compliant},
+    models::{MetricType, SLO, SloStatus},
 };
 use axum::{
     Json, Router,
@@ -139,20 +139,27 @@ async fn update_slo(
     Json(req): Json<UpdateSloRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let mut slo = state.store.get(id).ok_or(StatusCode::NOT_FOUND)?;
-    if let Some(name) = req.name { slo.name = name; }
-    if let Some(description) = req.description { slo.description = description; }
-    if let Some(target) = req.target_percentage { slo.target_percentage = target; }
-    if let Some(days) = req.window_days { slo.window_days = days; }
-    if let Some(mt) = req.metric_type { slo.metric_type = mt; }
+    if let Some(name) = req.name {
+        slo.name = name;
+    }
+    if let Some(description) = req.description {
+        slo.description = description;
+    }
+    if let Some(target) = req.target_percentage {
+        slo.target_percentage = target;
+    }
+    if let Some(days) = req.window_days {
+        slo.window_days = days;
+    }
+    if let Some(mt) = req.metric_type {
+        slo.metric_type = mt;
+    }
     let json = serde_json::to_value(&slo).unwrap();
     state.store.update(slo);
     Ok(Json(json))
 }
 
-async fn delete_slo(
-    AxumState(state): AxumState<Arc<State>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_slo(AxumState(state): AxumState<Arc<State>>, Path(id): Path<Uuid>) -> StatusCode {
     if state.store.delete(id) {
         StatusCode::NO_CONTENT
     } else {
@@ -178,9 +185,7 @@ async fn get_budget(
     Ok(Json(val))
 }
 
-async fn get_stats(
-    AxumState(state): AxumState<Arc<State>>,
-) -> Json<serde_json::Value> {
+async fn get_stats(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
     let stats = state.store.compute_stats();
     Json(serde_json::to_value(stats).unwrap())
 }

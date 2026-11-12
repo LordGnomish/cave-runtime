@@ -77,7 +77,11 @@ fn make_cluster(name: &str, status: ClusterStatus) -> ClusterDestination {
     }
 }
 
-fn make_pipeline_run(id: Uuid, resource_request_id: Uuid, status: PipelineRunStatus) -> PipelineRun {
+fn make_pipeline_run(
+    id: Uuid,
+    resource_request_id: Uuid,
+    status: PipelineRunStatus,
+) -> PipelineRun {
     PipelineRun {
         id,
         resource_request_id,
@@ -99,7 +103,11 @@ fn make_pipeline_run(id: Uuid, resource_request_id: Uuid, status: PipelineRunSta
 #[test]
 fn test_run_pipeline_validate_failure_skips_remaining() {
     let stages = vec![
-        make_stage("validate", PipelineStageType::Validate, serde_json::json!({})),
+        make_stage(
+            "validate",
+            PipelineStageType::Validate,
+            serde_json::json!({}),
+        ),
         make_stage("deploy", PipelineStageType::Deploy, serde_json::json!({})),
         make_stage("notify", PipelineStageType::Notify, serde_json::json!({})),
     ];

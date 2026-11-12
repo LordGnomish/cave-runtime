@@ -6,7 +6,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use cave_devlake::{router, State};
+use cave_devlake::{State, router};
 use std::sync::Arc;
 use tower::ServiceExt;
 

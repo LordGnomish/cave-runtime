@@ -3,9 +3,9 @@
 //! Integration tests for accounts-receivable balance computation.
 //! These tests exercise cave_erp::ar which does not yet exist.
 
-use cave_erp::ar::{compute_partner_balance, PartnerBalance, BalanceDirection};
+use cave_erp::ar::{BalanceDirection, PartnerBalance, compute_partner_balance};
 use cave_erp::models::{
-    Invoice, InvoiceKind, InvoiceState, InvoiceLine, Payment, PaymentMethod, PaymentState,
+    Invoice, InvoiceKind, InvoiceLine, InvoiceState, Payment, PaymentMethod, PaymentState,
 };
 use chrono::Utc;
 use uuid::Uuid;
@@ -62,7 +62,11 @@ fn test_partner_balance_with_posted_invoice_and_no_payment() {
     let balance = compute_partner_balance(partner_id, &[inv], &[]);
 
     // 1000 outstanding, no payments yet
-    assert!((balance.outstanding - 1000.0).abs() < 0.01, "outstanding={}", balance.outstanding);
+    assert!(
+        (balance.outstanding - 1000.0).abs() < 0.01,
+        "outstanding={}",
+        balance.outstanding
+    );
     assert_eq!(balance.direction, BalanceDirection::Receivable);
     assert_eq!(balance.invoice_count, 1);
     assert!((balance.paid - 0.0).abs() < 0.01);
@@ -79,7 +83,11 @@ fn test_partner_balance_partial_payment() {
 
     // paid=400, outstanding=600
     assert!((balance.paid - 400.0).abs() < 0.01);
-    assert!((balance.outstanding - 600.0).abs() < 0.01, "outstanding={}", balance.outstanding);
+    assert!(
+        (balance.outstanding - 600.0).abs() < 0.01,
+        "outstanding={}",
+        balance.outstanding
+    );
     assert_eq!(balance.direction, BalanceDirection::Receivable);
 }
 
@@ -106,7 +114,11 @@ fn test_partner_balance_multiple_invoices() {
     let balance = compute_partner_balance(partner_id, &[inv1, inv2], &[payment]);
 
     // inv1 fully paid, inv2 still open → outstanding=1200
-    assert!((balance.outstanding - 1200.0).abs() < 0.01, "outstanding={}", balance.outstanding);
+    assert!(
+        (balance.outstanding - 1200.0).abs() < 0.01,
+        "outstanding={}",
+        balance.outstanding
+    );
     assert_eq!(balance.invoice_count, 2);
     assert_eq!(balance.direction, BalanceDirection::Receivable);
 }
@@ -121,6 +133,10 @@ fn test_partner_balance_ignores_draft_invoices() {
     let balance = compute_partner_balance(partner_id, &[inv_draft, inv_posted], &[]);
 
     // Only posted invoice counts
-    assert!((balance.outstanding - 300.0).abs() < 0.01, "outstanding={}", balance.outstanding);
+    assert!(
+        (balance.outstanding - 300.0).abs() < 0.01,
+        "outstanding={}",
+        balance.outstanding
+    );
     assert_eq!(balance.invoice_count, 1); // only the posted one
 }

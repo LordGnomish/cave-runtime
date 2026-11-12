@@ -132,7 +132,10 @@ impl<'a> Cursor<'a> {
 
     fn take(&mut self, n: usize) -> Result<&'a [u8], GgufError> {
         let end = self.pos.checked_add(n).ok_or(GgufError::UnexpectedEof)?;
-        let slice = self.buf.get(self.pos..end).ok_or(GgufError::UnexpectedEof)?;
+        let slice = self
+            .buf
+            .get(self.pos..end)
+            .ok_or(GgufError::UnexpectedEof)?;
         self.pos = end;
         Ok(slice)
     }

@@ -45,11 +45,7 @@ pub struct PluginInfo {
 }
 
 impl PluginInfo {
-    pub fn new(
-        kind: PluginKind,
-        name: impl Into<String>,
-        version: impl Into<String>,
-    ) -> Self {
+    pub fn new(kind: PluginKind, name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
             kind,
             name: name.into(),
@@ -302,7 +298,10 @@ mod tests {
         assert_eq!(p.name, "registry");
         assert_eq!(p.version, "1.2.3");
         assert_eq!(p.capabilities, vec!["pull", "push"]);
-        assert_eq!(p.exports.get("transport").map(String::as_str), Some("https"));
+        assert_eq!(
+            p.exports.get("transport").map(String::as_str),
+            Some("https")
+        );
         assert_eq!(p.exports.get("auth").map(String::as_str), Some("bearer"));
     }
 

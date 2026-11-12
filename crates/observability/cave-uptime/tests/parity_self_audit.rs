@@ -87,7 +87,11 @@ fn assertion_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 // ─── Assertion 4: parity_ratio_source = "manifest" ──────────────────────────

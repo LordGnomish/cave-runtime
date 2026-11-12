@@ -46,9 +46,9 @@ pub fn verify(req: VerifyRequest<'_>) -> Result<VerifyResult> {
 
     // 2. Rekor binding when the bundle claims one.
     if req.bundle.has_rekor_entry() {
-        let rk = req
-            .rekor
-            .ok_or_else(|| SignError::Tlog("bundle has rekor entry but no client provided".into()))?;
+        let rk = req.rekor.ok_or_else(|| {
+            SignError::Tlog("bundle has rekor entry but no client provided".into())
+        })?;
         crate::tlog::verify_against_rekor(req.bundle, rk)?;
     }
 
@@ -118,11 +118,7 @@ fn signature_from_bundle(b: &CosignBundle) -> Signature {
 
 /// Verify a base64-encoded raw signature directly. Used by callers that
 /// don't bother with a full bundle.
-pub fn verify_raw_signature(
-    payload: &[u8],
-    sig_b64: &str,
-    public_key_pem: &str,
-) -> Result<()> {
+pub fn verify_raw_signature(payload: &[u8], sig_b64: &str, public_key_pem: &str) -> Result<()> {
     let sig = base64::engine::general_purpose::STANDARD
         .decode(sig_b64.as_bytes())
         .map_err(|e| SignError::InvalidSignature(format!("sig base64: {}", e)))?;
@@ -134,10 +130,10 @@ pub fn verify_raw_signature(
 mod tests {
     use super::*;
     use crate::blob::{sign_blob_keypair, sign_blob_keypair_with_rekor};
-    use crate::keyless::KeylessSigner;
     use crate::fulcio::FulcioClient;
+    use crate::keyless::KeylessSigner;
     use crate::models::KeyAlgorithm;
-    use crate::oidc::{build_fixture_jwt, IdToken};
+    use crate::oidc::{IdToken, build_fixture_jwt};
     use crate::policy::Rule;
     use crate::signature::Keypair;
     use serde_json::json;
@@ -187,8 +183,12 @@ mod tests {
         let rk = RekorClient::default();
         let out = signer.sign_blob(b"abc", &token(), &rk).unwrap();
         let policy = Policy::new("cave-default")
-            .require(Rule::CertificateIdentity { glob: "*@example.com".into() })
-            .require(Rule::CertificateIssuer { exact: "https://oidc.cave.svc".into() })
+            .require(Rule::CertificateIdentity {
+                glob: "*@example.com".into(),
+            })
+            .require(Rule::CertificateIssuer {
+                exact: "https://oidc.cave.svc".into(),
+            })
             .require(Rule::RequireRekorEntry);
         let req = VerifyRequest {
             payload: b"abc",

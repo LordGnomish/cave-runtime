@@ -123,7 +123,10 @@ mod tests {
 
     #[test]
     fn format_roundtrip_text_and_md() {
-        assert_eq!(format_message_text("A", "b", ExportFormat::Text), ">> A:\nb");
+        assert_eq!(
+            format_message_text("A", "b", ExportFormat::Text),
+            ">> A:\nb"
+        );
         assert_eq!(
             format_message_text("A", "b", ExportFormat::Markdown),
             "**A**\nb"

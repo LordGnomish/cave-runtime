@@ -161,26 +161,38 @@ mod tests {
 
     #[test]
     fn lgpl21_is_weakcopyleft() {
-        assert!(license_belongs_to_group("LGPL-2.1", LicenseGroup::WeakCopyleft));
+        assert!(license_belongs_to_group(
+            "LGPL-2.1",
+            LicenseGroup::WeakCopyleft
+        ));
     }
 
     #[test]
     fn unknown_is_no_group() {
-        assert!(!license_belongs_to_group("SomeUnknownLicense", LicenseGroup::Permissive));
+        assert!(!license_belongs_to_group(
+            "SomeUnknownLicense",
+            LicenseGroup::Permissive
+        ));
     }
 
     #[test]
     fn case_insensitive_match() {
         assert!(license_belongs_to_group("mit", LicenseGroup::Permissive));
         assert!(license_belongs_to_group("MIT", LicenseGroup::Permissive));
-        assert!(license_belongs_to_group("Apache-2.0", LicenseGroup::Permissive));
+        assert!(license_belongs_to_group(
+            "Apache-2.0",
+            LicenseGroup::Permissive
+        ));
     }
 
     #[test]
     fn parse_group_name_case_insensitive() {
         assert_eq!(parse_group_name("Copyleft"), Some(LicenseGroup::Copyleft));
         assert_eq!(parse_group_name("copyleft"), Some(LicenseGroup::Copyleft));
-        assert_eq!(parse_group_name("PERMISSIVE"), Some(LicenseGroup::Permissive));
+        assert_eq!(
+            parse_group_name("PERMISSIVE"),
+            Some(LicenseGroup::Permissive)
+        );
     }
 
     #[test]

@@ -64,9 +64,7 @@ pub fn verify(svid: &X509Svid, bundle: &Bundle) -> Result<()> {
         ));
     }
     if bundle.x509_authorities.is_empty() {
-        return Err(IdentityError::SvidVerificationFailed(
-            "empty bundle".into(),
-        ));
+        return Err(IdentityError::SvidVerificationFailed("empty bundle".into()));
     }
     // Check that some bundle authority "chains" — placeholder: at least one
     // bundle authority appears as an intermediate or is bit-identical to

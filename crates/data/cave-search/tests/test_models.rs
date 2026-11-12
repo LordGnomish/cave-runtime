@@ -2,13 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for IndexSchema, Document, SearchRequest/Response, highlight_field, paginate.
 
-use std::str::FromStr;
 use cave_search::models::{
-    Document, FieldType, FieldMapping, IndexSchema,
-    SearchRequest, SearchResponse, HitDocument, HighlightSnippet,
-    highlight_field, paginate,
+    Document, FieldMapping, FieldType, HighlightSnippet, HitDocument, IndexSchema, SearchRequest,
+    SearchResponse, highlight_field, paginate,
 };
 use cave_search::tenant::TenantId;
+use std::str::FromStr;
 
 fn tenant() -> TenantId {
     TenantId::from_str("test-tenant").unwrap()
@@ -71,14 +70,12 @@ fn search_request_default_pagination() {
     let req = SearchRequest::new("quick fox");
     assert_eq!(req.query_text(), "quick fox");
     assert_eq!(req.from(), 0);
-    assert_eq!(req.size(), 10);  // default page size
+    assert_eq!(req.size(), 10); // default page size
 }
 
 #[test]
 fn search_request_custom_pagination() {
-    let req = SearchRequest::new("test")
-        .with_from(20)
-        .with_size(5);
+    let req = SearchRequest::new("test").with_from(20).with_size(5);
     assert_eq!(req.from(), 20);
     assert_eq!(req.size(), 5);
 }
@@ -94,8 +91,16 @@ fn search_request_with_index() {
 #[test]
 fn search_response_total_hits() {
     let hits = vec![
-        HitDocument { doc_id: 1, score: 2.5, fields: std::collections::HashMap::new() },
-        HitDocument { doc_id: 2, score: 1.8, fields: std::collections::HashMap::new() },
+        HitDocument {
+            doc_id: 1,
+            score: 2.5,
+            fields: std::collections::HashMap::new(),
+        },
+        HitDocument {
+            doc_id: 2,
+            score: 1.8,
+            fields: std::collections::HashMap::new(),
+        },
     ];
     let resp = SearchResponse::new(hits, 42);
     assert_eq!(resp.total(), 42);
@@ -115,8 +120,11 @@ fn search_response_empty() {
 fn highlight_wraps_matching_term() {
     let snippets = highlight_field("the quick brown fox", "quick", "<em>", "</em>");
     assert!(
-        snippets.iter().any(|s| s.fragment.contains("<em>quick</em>")),
-        "highlight should wrap 'quick' with em tags; got: {:?}", snippets
+        snippets
+            .iter()
+            .any(|s| s.fragment.contains("<em>quick</em>")),
+        "highlight should wrap 'quick' with em tags; got: {:?}",
+        snippets
     );
 }
 

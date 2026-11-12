@@ -7,8 +7,8 @@
 //! based on the highest evidence severity attached.
 
 use crate::error::{ForensicsError, Result};
-use crate::evidence::build_evidence_item;
 use crate::events::KernelEvent;
+use crate::evidence::build_evidence_item;
 use crate::models::{CaseStatus, EvidenceItem, EvidenceType, ForensicCase, ForensicSeverity};
 use chrono::Utc;
 use dashmap::DashMap;
@@ -159,7 +159,9 @@ mod tests {
     #[test]
     fn test_transition_on_missing_case_errors() {
         let s = CaseStore::new();
-        let err = s.transition(Uuid::new_v4(), CaseStatus::Closed).unwrap_err();
+        let err = s
+            .transition(Uuid::new_v4(), CaseStatus::Closed)
+            .unwrap_err();
         assert!(matches!(err, ForensicsError::CaseNotFound(_)));
     }
 
@@ -184,7 +186,9 @@ mod tests {
     fn test_ingest_event_creates_log_file_evidence() {
         let s = CaseStore::new();
         let c = s.open("t", "d", ForensicSeverity::High);
-        let after = s.ingest_event(c.id, &make_event(), "tetragon-agent").unwrap();
+        let after = s
+            .ingest_event(c.id, &make_event(), "tetragon-agent")
+            .unwrap();
         assert_eq!(after.evidence.len(), 1);
         let ev = &after.evidence[0];
         assert!(matches!(ev.evidence_type, EvidenceType::LogFile));

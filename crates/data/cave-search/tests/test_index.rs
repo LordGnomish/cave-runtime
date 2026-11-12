@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for the inverted index: PostingList + Index + phrase matching + BM25 corpus stats.
 
-use std::str::FromStr;
 use cave_search::index::{Index, PostingList};
 use cave_search::tenant::TenantId;
+use std::str::FromStr;
 
 fn tenant() -> TenantId {
     TenantId::from_str("test-tenant").unwrap()
@@ -132,7 +132,7 @@ fn index_avg_doc_len_computes_correctly() {
     let t = tenant();
     let mut idx = Index::new(&t, "test");
     idx.add_document(1, "one two three"); // 3 tokens
-    idx.add_document(2, "one");           // 1 token
+    idx.add_document(2, "one"); // 1 token
     // avg = (3+1)/2 = 2.0
     let avg = idx.avg_doc_len();
     assert!((avg - 2.0).abs() < 1e-9, "expected avg 2.0, got {}", avg);
@@ -163,7 +163,10 @@ fn index_phrase_candidates_intersects_posting_lists() {
     idx.add_document(2, "slow brown dog");
     let terms: Vec<String> = vec!["quick".into(), "brown".into()];
     let candidates = idx.phrase_candidates(&terms);
-    assert!(candidates.contains(&1), "doc 1 has both 'quick' and 'brown'");
+    assert!(
+        candidates.contains(&1),
+        "doc 1 has both 'quick' and 'brown'"
+    );
     assert!(!candidates.contains(&2), "doc 2 doesn't have 'quick'");
 }
 

@@ -38,8 +38,7 @@ pub struct CosignBundle {
 
 impl CosignBundle {
     pub fn encode_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(self)
-            .map_err(|e| SignError::Bundle(format!("encode: {}", e)))
+        serde_json::to_string_pretty(self).map_err(|e| SignError::Bundle(format!("encode: {}", e)))
     }
 
     pub fn decode_json(s: &str) -> Result<Self> {

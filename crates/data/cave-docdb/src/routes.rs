@@ -378,7 +378,10 @@ async fn sql_translate(
         crate::sql::pipeline_to_sql(&req.collection, pipeline)
             .ok_or_else(|| err_bad_request("pipeline contains a stage not translatable to SQL"))?
     } else {
-        let filter = req.filter.clone().unwrap_or(Value::Object(Default::default()));
+        let filter = req
+            .filter
+            .clone()
+            .unwrap_or(Value::Object(Default::default()));
         crate::sql::find_to_sql(
             &req.collection,
             &filter,
