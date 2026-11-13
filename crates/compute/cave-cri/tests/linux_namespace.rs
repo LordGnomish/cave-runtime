@@ -7,10 +7,17 @@
 //! `CLONE_NEW*` constants of the kernel ABI (`include/uapi/linux/sched.h`,
 //! listed in clone(2) and namespaces(7)); they are spelled out here instead
 //! of being imported, so the test does not share a source with the code.
+//!
+//! `enter_namespaces` ends in setns(2), which needs `CAP_SYS_ADMIN`. The one
+//! case that needs no privilege is covered here: a target whose namespaces
+//! are the caller's own. Joining a namespace that really differs is not
+//! exercised by any test in this crate.
 
 #![cfg(target_os = "linux")]
 
-use cave_cri::namespace::{build_clone_flags, create_namespaces, NamespaceConfig};
+use cave_cri::namespace::{
+    build_clone_flags, create_namespaces, enter_namespaces, NamespaceConfig,
+};
 
 const CLONE_NEWNS: i32 = 0x0002_0000;
 const CLONE_NEWUTS: i32 = 0x0400_0000;
@@ -148,4 +155,24 @@ fn create_namespaces_records_the_flags_for_its_config() {
     let set = create_namespaces(&config).unwrap();
 
     assert_eq!(set.clone_flags, CLONE_NEWNET | CLONE_NEWUTS);
+}
+
+/// namespaces(7): two processes are in the same namespace when their
+/// `/proc/<pid>/ns/<kind>` entries have the same device and inode number.
+/// A target that shares every namespace with the caller leaves nothing to
+/// join, so no setns(2) call and no privilege is needed. Attempting the
+/// calls anyway fails: with `EPERM` for an unprivileged caller, and with
+/// `EINVAL` on the mount namespace for any multi-threaded caller (such as
+/// this test binary), even as root.
+#[test]
+fn entering_namespaces_the_caller_is_already_in_needs_no_setns() {
+    for kind in ["pid", "net", "mnt", "uts", "ipc"] {
+        let entry = format!("/proc/{}/ns/{kind}", std::process::id());
+        assert!(
+            std::fs::metadata(&entry).is_ok(),
+            "{entry} must be readable, or this test would pass without comparing anything"
+        );
+    }
+
+    enter_namespaces(std::process::id()).unwrap();
 }
