@@ -14,6 +14,12 @@
 //! The other tests cover `get_container_logs`, which reads the container's
 //! real log file on Linux, and `restore_container`, whose result decides
 //! which process `stop`, `kill` and `pause` send real signals to.
+//!
+//! `start`, `stop`, `kill`, `pause` and `unpause` are run against real
+//! processes as well: children of the test process, which any user may
+//! signal. On Linux `start_container` currently forks and execs the command
+//! without entering any namespace, cgroup or root filesystem, so that is
+//! all these tests can claim about it.
 
 #![cfg(target_os = "linux")]
 
@@ -21,8 +27,13 @@ use cave_cri::error::CriResult;
 use cave_cri::models::{
     Container, ContainerSpec, ContainerStatus, ExecRequest, ExecResult, NetworkMode, RestartPolicy,
 };
-use cave_cri::runtime::{exec_in_container, get_container_logs, restore_container, stop_container};
+use cave_cri::runtime::{
+    exec_in_container, get_container_logs, kill_container, pause_container, restore_container,
+    start_container, stop_container, unpause_container,
+};
 use cave_cri::store::ContainerStore;
+use std::os::unix::process::ExitStatusExt;
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
@@ -330,4 +341,215 @@ async fn a_restored_container_records_no_pid_it_did_not_start() {
     // With no pid there is nobody to signal: stopping only updates state.
     stop_container(id, 0, &store).await.unwrap();
     assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Stopped);
+}
+
+// ── signals to real processes ────────────────────────────────────────────────
+
+const SIGKILL: i32 = 9;
+const SIGTERM: i32 = 15;
+
+/// A real process standing in for a container's init process: a child of
+/// the test, killed and reaped when the test ends, whatever its outcome.
+struct ContainerProcess(Child);
+
+impl ContainerProcess {
+    fn spawn(script: &str) -> Self {
+        let child = Command::new("/bin/sh")
+            .args(["-c", script])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        Self(child)
+    }
+
+    fn pid(&self) -> u32 {
+        self.0.id()
+    }
+
+    /// Wait up to 10 s for the process to end.
+    async fn exit_status(&mut self) -> ExitStatus {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if let Some(status) = self.0.try_wait().unwrap() {
+                return status;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "process {} is still running",
+                self.pid()
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+}
+
+impl Drop for ContainerProcess {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// The state letter from `/proc/<pid>/stat` (proc(5)): `R` running, `S`
+/// sleeping, `T` stopped by a signal, `Z` zombie. `None` if there is no
+/// such process.
+fn process_state(pid: u32) -> Option<char> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    stat.rsplit(')').next()?.trim_start().chars().next()
+}
+
+/// The parent pid from `/proc/<pid>/stat`.
+fn parent_pid(pid: u32) -> Option<u32> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    stat.rsplit(')')
+        .next()?
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()
+}
+
+/// Poll until `condition` holds, for at most 10 s.
+async fn eventually(what: &str, mut condition: impl FnMut() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !condition() {
+        assert!(Instant::now() < deadline, "timed out waiting until {what}");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[tokio::test]
+async fn pause_and_unpause_stop_and_continue_the_container_process() {
+    let process = ContainerProcess::spawn("exec sleep 30");
+    let pid = process.pid();
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Running, Some(pid));
+
+    pause_container(id, &store).await.unwrap();
+
+    eventually("the process is stopped", || process_state(pid) == Some('T')).await;
+    assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Paused);
+
+    unpause_container(id, &store).await.unwrap();
+
+    eventually("the process runs again", || {
+        matches!(process_state(pid), Some('S' | 'R'))
+    })
+    .await;
+    assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Running);
+}
+
+#[tokio::test]
+async fn kill_container_delivers_the_requested_signal() {
+    let mut process = ContainerProcess::spawn("exec sleep 30");
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Running, Some(process.pid()));
+
+    kill_container(id, SIGTERM, &store).await.unwrap();
+
+    assert_eq!(process.exit_status().await.signal(), Some(SIGTERM));
+}
+
+#[tokio::test]
+async fn kill_container_rejects_a_number_that_is_no_signal() {
+    let process = ContainerProcess::spawn("exec sleep 30");
+    let pid = process.pid();
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Running, Some(pid));
+
+    let err = kill_container(id, 4096, &store).await.unwrap_err();
+
+    assert!(
+        err.to_string().contains("invalid signal: 4096"),
+        "got: {err}"
+    );
+    assert!(matches!(process_state(pid), Some('S' | 'R')));
+}
+
+#[tokio::test]
+async fn stop_container_terminates_the_container_process() {
+    let mut process = ContainerProcess::spawn("exec sleep 30");
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Running, Some(process.pid()));
+
+    stop_container(id, 0, &store).await.unwrap();
+
+    // SIGTERM is sent first and is fatal for `sleep`. With a grace period
+    // of 0 s the SIGKILL follows at once, so either may be reported.
+    let signal = process.exit_status().await.signal();
+    assert!(
+        signal == Some(SIGTERM) || signal == Some(SIGKILL),
+        "expected death by SIGTERM or SIGKILL, got {signal:?}"
+    );
+    let stopped = store.get(&id).unwrap();
+    assert_eq!(stopped.status, ContainerStatus::Stopped);
+    assert!(stopped.finished_at.is_some());
+}
+
+/// A process that ignores SIGTERM is killed once the grace period is over.
+#[tokio::test]
+async fn stop_container_kills_a_process_that_ignores_sigterm() {
+    // An ignored signal stays ignored across exec (signal(7)).
+    let mut process = ContainerProcess::spawn("trap '' TERM; exec sleep 30");
+    let pid = process.pid();
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Running, Some(pid));
+    // `SigIgn` in /proc/<pid>/status is a hex mask, bit (n - 1) for signal n.
+    eventually("the process ignores SIGTERM", || {
+        std::fs::read_to_string(format!("/proc/{pid}/status"))
+            .ok()
+            .and_then(|status| {
+                let line = status.lines().find(|l| l.starts_with("SigIgn:"))?;
+                u64::from_str_radix(line.split_whitespace().nth(1)?, 16).ok()
+            })
+            .is_some_and(|ignored| ignored & (1 << (SIGTERM - 1)) != 0)
+    })
+    .await;
+    let started = Instant::now();
+
+    stop_container(id, 1, &store).await.unwrap();
+
+    assert_eq!(process.exit_status().await.signal(), Some(SIGKILL));
+    assert!(
+        started.elapsed() >= Duration::from_secs(1),
+        "SIGKILL must wait for the grace period, took {:?}",
+        started.elapsed()
+    );
+    assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Stopped);
+}
+
+/// On Linux `start_container` forks and execs the container's command as a
+/// child of the runtime and records its pid.
+#[tokio::test]
+async fn start_container_runs_the_command_as_a_child_process() {
+    use nix::sys::signal::Signal;
+    use nix::sys::wait::{waitpid, WaitStatus};
+    use nix::unistd::Pid;
+
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Created, None);
+    let mut container = store.get(&id).unwrap();
+    container.spec.command = vec!["sleep".into(), "30".into()];
+    store.update(container);
+
+    start_container(id, &store).await.unwrap();
+
+    let started = store.get(&id).unwrap();
+    assert_eq!(started.status, ContainerStatus::Running);
+    let pid = started.pid.expect("a started container has a pid");
+    assert_eq!(parent_pid(pid), Some(std::process::id()));
+    // Between fork and exec the child still carries the test's name.
+    eventually("the child has exec'd the command", || {
+        std::fs::read_to_string(format!("/proc/{pid}/comm")).is_ok_and(|comm| comm == "sleep\n")
+    })
+    .await;
+
+    // Clean up through the API under test, then reap our child.
+    kill_container(id, SIGKILL, &store).await.unwrap();
+    let child = Pid::from_raw(pid as i32);
+    assert_eq!(
+        waitpid(child, None).unwrap(),
+        WaitStatus::Signaled(child, Signal::SIGKILL, false)
+    );
 }
