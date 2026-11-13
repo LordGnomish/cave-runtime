@@ -391,7 +391,9 @@ pub fn get_container_logs(
         use std::io::BufRead;
         if let Ok(file) = std::fs::File::open(&container.log_path) {
             let reader = std::io::BufReader::new(file);
-            for line in reader.lines().flatten() {
+            // Stop at the first read error: `lines()` would hand out the
+            // same error again and again (e.g. EISDIR for a directory).
+            for line in reader.lines().map_while(Result::ok) {
                 // Parse JSON log format: {"time":"...","stream":"stdout","log":"..."}
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                     let timestamp = v["time"]
