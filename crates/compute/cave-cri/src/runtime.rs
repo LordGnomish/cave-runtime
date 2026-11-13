@@ -807,10 +807,36 @@ mod tests {
 
     #[test]
     fn test_get_container_logs_running() {
+        // On Linux the entries are read from the container's log file (one
+        // simulated entry elsewhere), so the container gets a log file.
+        let dir = tempfile::tempdir().unwrap();
+        let log_path = dir.path().join("container.log");
+        std::fs::write(
+            &log_path,
+            concat!(
+                r#"{"time":"2026-01-02T03:04:05Z","stream":"stderr","log":"hello\n"}"#,
+                "\n",
+                "not json\n",
+            ),
+        )
+        .unwrap();
         let store = ContainerStore::new();
         let id = make_running(&store);
+        let mut container = store.get(&id).unwrap();
+        container.log_path = log_path;
+        store.update(container);
+
         let logs = get_container_logs(id, None, &store).unwrap();
         assert!(!logs.is_empty());
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(logs.len(), 2);
+            assert_eq!(logs[0].timestamp.to_rfc3339(), "2026-01-02T03:04:05+00:00");
+            assert_eq!(logs[0].stream, "stderr");
+            assert_eq!(logs[0].message, "hello");
+            assert_eq!(logs[1].stream, "stdout");
+            assert_eq!(logs[1].message, "not json");
+        }
     }
 
     #[test]
@@ -823,10 +849,22 @@ mod tests {
 
     #[test]
     fn test_list_processes_running() {
+        // On Linux the process is looked up in /proc/<pid>/status, so the
+        // container gets the pid of a process that exists: this one.
         let store = ContainerStore::new();
         let id = make_running(&store);
+        let mut container = store.get(&id).unwrap();
+        container.pid = Some(std::process::id());
+        store.update(container);
+
         let procs = list_container_processes(id, &store).unwrap();
         assert!(!procs.is_empty());
+        assert_eq!(procs[0].pid, std::process::id());
+        #[cfg(target_os = "linux")]
+        {
+            let comm = std::fs::read_to_string("/proc/self/comm").unwrap();
+            assert_eq!(procs[0].command, comm.trim_end());
+        }
     }
 
     #[test]
