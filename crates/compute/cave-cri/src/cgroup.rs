@@ -516,6 +516,139 @@ mod tests {
         assert_eq!(stats.pids_current, 0);
     }
 
+    // ── create_cgroup on Linux, hierarchy root injected ──────────────────────
+    //
+    // `create_cgroup_at` is `create_cgroup` with the hierarchy root as a
+    // parameter. None of these tests needs privileges or touches
+    // /sys/fs/cgroup, and each gives the same result with and without root.
+
+    /// sysfs refuses mkdir(2) for every caller (EPERM for root, EACCES for
+    /// anyone else), which makes it a stand-in for a cgroup hierarchy this
+    /// process may not write to. Fails loudly instead of creating
+    /// directories somewhere else if /sys is not sysfs.
+    #[cfg(target_os = "linux")]
+    fn unwritable_hierarchy() -> &'static Path {
+        use nix::sys::statfs::{statfs, SYSFS_MAGIC};
+        let root = Path::new("/sys/kernel");
+        let fs = statfs(root).expect("statfs(/sys/kernel)");
+        assert_eq!(
+            fs.filesystem_type(),
+            SYSFS_MAGIC,
+            "/sys/kernel must be on sysfs for this test"
+        );
+        root
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_creates_the_cgroup_and_writes_the_limits() {
+        let root = tempfile::tempdir().unwrap();
+        let limits = ResourceLimits {
+            cpu_shares: Some(512),
+            cpu_quota: Some(50_000),
+            memory_limit: Some(256 * 1024 * 1024),
+            pids_limit: Some(128),
+        };
+
+        let h = create_cgroup_at(root.path(), "ctr-create", &limits).unwrap();
+
+        assert_eq!(h.path, root.path().join("cave/default/ctr-create"));
+        assert!(h.path.is_dir());
+        let read = |file: &str| std::fs::read_to_string(h.path.join(file)).unwrap();
+        assert_eq!(read("cpu.weight"), "512");
+        assert_eq!(read("cpu.max"), "50000 100000");
+        assert_eq!(read("memory.max"), "268435456");
+        assert_eq!(read("pids.max"), "128");
+    }
+
+    /// Same rule as runc's fs2 manager (`Manager.Apply`): without permission
+    /// to create the cgroup, a container that asks for no limits still
+    /// starts; it just has no cgroup of its own.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_without_limits_tolerates_an_unwritable_hierarchy() {
+        let root = unwritable_hierarchy();
+
+        let h = create_cgroup_at(root, "ctr-no-limits", &ResourceLimits::default()).unwrap();
+
+        assert_eq!(h.container_id, "ctr-no-limits");
+        assert_eq!(h.path, root.join("cave/default/ctr-no-limits"));
+        assert!(!h.path.exists());
+    }
+
+    /// A limit that cannot be enforced is an error, never a warning.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_with_limits_fails_on_an_unwritable_hierarchy() {
+        let root = unwritable_hierarchy();
+        let limits = ResourceLimits {
+            pids_limit: Some(64),
+            ..Default::default()
+        };
+
+        let err = create_cgroup_at(root, "ctr-limits", &limits).unwrap_err();
+
+        assert!(matches!(err, CriError::Cgroup(_)), "got {err:?}");
+        assert!(!root.join("cave").exists());
+    }
+
+    /// Only a missing permission is tolerated. Here the hierarchy root is a
+    /// regular file, so mkdir fails with ENOTDIR, with or without limits.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_does_not_tolerate_other_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let not_a_dir = dir.path().join("hierarchy");
+        std::fs::write(&not_a_dir, b"").unwrap();
+
+        let err =
+            create_cgroup_at(&not_a_dir, "ctr-enotdir", &ResourceLimits::default()).unwrap_err();
+
+        assert!(matches!(err, CriError::Cgroup(_)), "got {err:?}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn only_missing_permission_counts_as_an_unwritable_hierarchy() {
+        use nix::libc::{EACCES, EBUSY, EINVAL, ENOENT, ENOSPC, ENOTDIR, EPERM, EROFS};
+        let os_error = std::io::Error::from_raw_os_error;
+
+        for errno in [EACCES, EPERM, EROFS] {
+            assert!(hierarchy_not_writable(&os_error(errno)), "errno {errno}");
+        }
+        for errno in [ENOENT, ENOTDIR, ENOSPC, EBUSY, EINVAL] {
+            assert!(!hierarchy_not_writable(&os_error(errno)), "errno {errno}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn every_set_limit_counts_as_requested() {
+        assert!(!requests_any_limit(&ResourceLimits::default()));
+
+        let one_at_a_time = [
+            ResourceLimits {
+                cpu_shares: Some(100),
+                ..Default::default()
+            },
+            ResourceLimits {
+                cpu_quota: Some(50_000),
+                ..Default::default()
+            },
+            ResourceLimits {
+                memory_limit: Some(4096),
+                ..Default::default()
+            },
+            ResourceLimits {
+                pids_limit: Some(0),
+                ..Default::default()
+            },
+        ];
+        for limits in &one_at_a_time {
+            assert!(requests_any_limit(limits), "{limits:?}");
+        }
+    }
+
     // ── v2 stats ──────────────────────────────────────────────────────────────
 
     #[test]
