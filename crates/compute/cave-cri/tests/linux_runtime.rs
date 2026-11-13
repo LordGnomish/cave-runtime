@@ -10,6 +10,10 @@
 //! container that really has namespaces of its own.
 //!
 //! The commands are `/bin/sh` scripts using only POSIX utilities.
+//!
+//! The other tests cover `get_container_logs`, which reads the container's
+//! real log file on Linux, and `restore_container`, whose result decides
+//! which process `stop`, `kill` and `pause` send real signals to.
 
 #![cfg(target_os = "linux")]
 
@@ -17,13 +21,17 @@ use cave_cri::error::CriResult;
 use cave_cri::models::{
     Container, ContainerSpec, ContainerStatus, ExecRequest, ExecResult, NetworkMode, RestartPolicy,
 };
-use cave_cri::runtime::exec_in_container;
+use cave_cri::runtime::{exec_in_container, get_container_logs, restore_container, stop_container};
 use cave_cri::store::ContainerStore;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 /// A running container whose process is this test process.
 fn running_container(store: &ContainerStore) -> Uuid {
+    insert_container(store, ContainerStatus::Running, Some(std::process::id()))
+}
+
+fn insert_container(store: &ContainerStore, status: ContainerStatus, pid: Option<u32>) -> Uuid {
     let id = Uuid::new_v4();
     store.insert(Container {
         id,
@@ -42,8 +50,8 @@ fn running_container(store: &ContainerStore) -> Uuid {
             network_mode: NetworkMode::Bridge,
             restart_policy: RestartPolicy::Never,
         },
-        status: ContainerStatus::Running,
-        pid: Some(std::process::id()),
+        status,
+        pid,
         created_at: chrono::Utc::now(),
         started_at: Some(chrono::Utc::now()),
         finished_at: None,
@@ -261,4 +269,65 @@ async fn exec_kills_the_command_when_the_caller_stops_waiting() {
         "took {:?}, the command ran to its end",
         started.elapsed()
     );
+}
+
+/// A directory can be opened for reading, but every read(2) from it fails
+/// with `EISDIR`. A log that cannot be read ends the listing; it must not
+/// be retried forever.
+#[test]
+fn get_container_logs_ends_when_the_log_file_cannot_be_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = ContainerStore::new();
+    let id = running_container(&store);
+    let mut container = store.get(&id).unwrap();
+    container.log_path = dir.path().to_path_buf();
+    store.update(container);
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(get_container_logs(id, None, &store));
+    });
+    let entries = rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("get_container_logs did not return within 10 s")
+        .unwrap();
+
+    assert!(entries.is_empty());
+}
+
+/// `restore_container` verifies the checkpoint manifest and marks the
+/// container running; it does not start a process. So there is no pid to
+/// record, and on Linux a made-up one is dangerous: `stop_container`,
+/// `kill_container` and `pause_container` would send real signals to
+/// whichever process happens to have that number.
+#[tokio::test]
+async fn a_restored_container_records_no_pid_it_did_not_start() {
+    let store = ContainerStore::new();
+    let id = insert_container(&store, ContainerStatus::Stopped, None);
+    let checkpoint = tempfile::tempdir().unwrap();
+    cave_cri::criu::write_manifest(
+        checkpoint.path(),
+        &cave_cri::criu::CheckpointManifest {
+            container_id: id,
+            container_name: "linux-runtime-test".into(),
+            image_reference: "test:latest".into(),
+            runtime_handler: None,
+            created_at: chrono::Utc::now(),
+            criu_version: "3.19".into(),
+            options: Default::default(),
+        },
+    )
+    .unwrap();
+
+    restore_container(id, checkpoint.path().to_str().unwrap(), &store)
+        .await
+        .unwrap();
+
+    let restored = store.get(&id).unwrap();
+    assert_eq!(restored.status, ContainerStatus::Running);
+    assert_eq!(restored.pid, None);
+
+    // With no pid there is nobody to signal: stopping only updates state.
+    stop_container(id, 0, &store).await.unwrap();
+    assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Stopped);
 }
