@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-21";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.65;
 const PINNED_VERSION: &str = "v1.52.0";
 const PINNED_SHA: &str = "9866eba85aed1b0a66a77c8c6928a372edc5040f";
@@ -261,9 +261,16 @@ fn assertion_9_jaeger_surface_intact() {
     let _adaptive: AdaptiveSampler = AdaptiveSampler::new(0.05, 50.0, Duration::from_secs(60));
     let _tail: TailSampler = TailSampler::new(vec![
         TailRule::AlwaysOnError,
-        TailRule::SlowTrace { threshold_ns: 1_000_000 },
-        TailRule::TagMatch { key: "x".into(), value: "y".into() },
-        TailRule::ServiceMatch { service: "api".into() },
+        TailRule::SlowTrace {
+            threshold_ns: 1_000_000,
+        },
+        TailRule::TagMatch {
+            key: "x".into(),
+            value: "y".into(),
+        },
+        TailRule::ServiceMatch {
+            service: "api".into(),
+        },
         TailRule::Probabilistic { rate: 0.5 },
     ]);
     let sample_yes = SamplingDecision::Sample;

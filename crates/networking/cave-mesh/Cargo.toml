@@ -28,3 +28,6 @@ prometheus-client = { workspace = true }
 jsonwebtoken       = { workspace = true }
 regex              = { workspace = true }
 rcgen              = "0.13"
+
+[dev-dependencies]
+proptest = "1"

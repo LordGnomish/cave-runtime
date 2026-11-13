@@ -12,9 +12,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "source", rename_all = "PascalCase")]
 pub enum Credentials {
-    Secret { namespace: String, name: String, key: String },
-    Filesystem { path: String },
-    Environment { var: String },
+    Secret {
+        namespace: String,
+        name: String,
+        key: String,
+    },
+    Filesystem {
+        path: String,
+    },
+    Environment {
+        var: String,
+    },
     None,
 }
 
@@ -117,15 +125,17 @@ mod tests {
     #[test]
     fn empty_name_rejected() {
         let s = ProviderConfigStore::new();
-        assert!(s
-            .upsert(ProviderConfig::new("", Credentials::None))
-            .is_err());
+        assert!(
+            s.upsert(ProviderConfig::new("", Credentials::None))
+                .is_err()
+        );
     }
 
     #[test]
     fn usage_increment_decrement() {
         let s = ProviderConfigStore::new();
-        s.upsert(ProviderConfig::new("p", Credentials::None)).unwrap();
+        s.upsert(ProviderConfig::new("p", Credentials::None))
+            .unwrap();
         assert_eq!(s.add_usage("p"), 1);
         assert_eq!(s.add_usage("p"), 2);
         assert_eq!(s.release_usage("p"), 1);
@@ -135,7 +145,8 @@ mod tests {
     #[test]
     fn delete_with_usage_errors() {
         let s = ProviderConfigStore::new();
-        s.upsert(ProviderConfig::new("p", Credentials::None)).unwrap();
+        s.upsert(ProviderConfig::new("p", Credentials::None))
+            .unwrap();
         s.add_usage("p");
         assert!(s.delete("p").is_err());
     }
@@ -143,7 +154,8 @@ mod tests {
     #[test]
     fn delete_zero_usage_ok() {
         let s = ProviderConfigStore::new();
-        s.upsert(ProviderConfig::new("p", Credentials::None)).unwrap();
+        s.upsert(ProviderConfig::new("p", Credentials::None))
+            .unwrap();
         s.delete("p").unwrap();
         assert!(s.get("p").is_err());
     }
@@ -151,8 +163,10 @@ mod tests {
     #[test]
     fn list_returns_all() {
         let s = ProviderConfigStore::new();
-        s.upsert(ProviderConfig::new("a", Credentials::None)).unwrap();
-        s.upsert(ProviderConfig::new("b", Credentials::None)).unwrap();
+        s.upsert(ProviderConfig::new("a", Credentials::None))
+            .unwrap();
+        s.upsert(ProviderConfig::new("b", Credentials::None))
+            .unwrap();
         assert_eq!(s.list().len(), 2);
     }
 
@@ -170,7 +184,8 @@ mod tests {
     #[test]
     fn release_usage_floor_zero() {
         let s = ProviderConfigStore::new();
-        s.upsert(ProviderConfig::new("p", Credentials::None)).unwrap();
+        s.upsert(ProviderConfig::new("p", Credentials::None))
+            .unwrap();
         assert_eq!(s.release_usage("p"), 0);
         assert_eq!(s.release_usage("p"), 0);
     }

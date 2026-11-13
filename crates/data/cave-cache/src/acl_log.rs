@@ -97,7 +97,9 @@ impl AclLogEntry {
 }
 
 fn escape(s: &str) -> String {
-    s.replace('\\', r"\\").replace('\t', r"\t").replace('\n', r"\n")
+    s.replace('\\', r"\\")
+        .replace('\t', r"\t")
+        .replace('\n', r"\n")
 }
 
 fn unescape(s: &str) -> String {

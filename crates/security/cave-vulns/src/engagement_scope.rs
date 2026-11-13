@@ -202,7 +202,8 @@ mod tests {
     #[test]
     fn exclude_false_positive() {
         let mut f = mkf(FindingSeverity::High, "x");
-        f.transition(StateTransition::MarkFalsePositive, "a").unwrap();
+        f.transition(StateTransition::MarkFalsePositive, "a")
+            .unwrap();
         let s = EngagementScope::new().exclude_false_positive();
         assert!(!s.includes(&f, None, None));
     }

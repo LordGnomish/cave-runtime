@@ -1,354 +1,219 @@
 # parity.manifest.toml — cave-store
-# Upstream: minio/minio  https://github.com/minio/minio  pinned RELEASE.2024-01-01
+# Upstream: minio/minio  https://github.com/minio/minio  RELEASE.2025-04-22T22-12-26Z
+# Secondary: etcd-io/etcd v3.5.17  https://github.com/etcd-io/etcd
 #
-# cave-store is a hybrid S3 + etcd-v3 store. The S3 surface is the primary
-# upstream parity target (versioning, multipart, encryption, lifecycle,
+# cave-store is a hybrid S3-compatible + etcd-v3 store. The S3 surface is the
+# primary upstream parity target (versioning, multipart, encryption, lifecycle,
 # policy, notification, presigned URLs); the etcd-v3 surface (src/etcd/*)
-# is a secondary target tracked separately.
+# is a secondary target tracked under the same crate.
 
 [upstream]
-org     = "minio"
-repo    = "minio"
-version = "RELEASE.2024-01-01"
-name    = "MinIO"
-license = "AGPL-3.0"
-language= "Go"
-url     = "https://github.com/minio/minio"
+org         = "minio"
+repo        = "minio"
+version     = "RELEASE.2025-04-22T22-12-26Z"
+source_sha  = "e4b2db563a91975e0dd0e0aaa8b3b38b4eefb62c"
+name        = "MinIO"
+license     = "AGPL-3.0"
+language    = "Go"
+url         = "https://github.com/minio/minio"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
-[module]
-name        = "cave-store"
-description = "Object store — MinIO-equivalent S3 surface (multipart, versioning, encryption, lifecycle, policy, presigned) + etcd-v3 KV/lease/watch shim"
-source_root = "src"
+# 2026-05-29 honest close — implemented real MVCC KV, S3 object store,
+# etcd auth/cluster, WAL persistence; ADR-justified 4 sibling/out-of-scope cuts.
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0
+honest_ratio        = 0.8000
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+mapped_count        = 16
+partial_count       = 0
+skipped_count       = 4
+unmapped_count      = 0
+total               = 20
+last_audit          = "2026-05-29"
+infra_only          = false
 
-# ── File mappings ────────────────────────────────────────────────────────────
-# S3 core (cmd/*) → src/s3/*
+# ── Mapped surfaces ───────────────────────────────────────────────────────────
 
-[[files]]
-upstream = "cmd/main.go"
-local    = "src/lib.rs"
-
-[[files]]
-upstream = "cmd/api-router.go"
-local    = "src/s3/router.rs"
-
-[[files]]
-upstream = "cmd/api-handlers.go"
-local    = "src/s3/routes.rs"
-
-[[files]]
-upstream = "cmd/object-handlers.go"
-local    = "src/routes.rs"
-
-[[files]]
-upstream = "cmd/storage-rest-server.go"
-local    = "src/server.rs"
-
-[[files]]
-upstream = "cmd/object-api-multipart.go"
-local    = "src/multipart.rs"
-
-[[files]]
-upstream = "cmd/api-response.go"
-local    = "src/s3/xml.rs"
-
-[[files]]
-upstream = "cmd/encryption-v1.go"
-local    = "src/encryption.rs"
-
-[[files]]
-upstream = "cmd/sse-kms.go"
-local    = "src/s3/encryption.rs"
-
-[[files]]
-upstream = "cmd/bucket-lifecycle.go"
-local    = "src/lifecycle.rs"
-
-[[files]]
-upstream = "cmd/bucket-lifecycle-handlers.go"
-local    = "src/s3/lifecycle.rs"
-
-[[files]]
-upstream = "cmd/bucket-policy.go"
-local    = "src/policy.rs"
-
-[[files]]
-upstream = "cmd/bucket-policy-handlers.go"
-local    = "src/s3/policy.rs"
-
-[[files]]
-upstream = "cmd/bucket-notification.go"
-local    = "src/notification.rs"
-
-[[files]]
-upstream = "cmd/bucket-notification-handlers.go"
-local    = "src/s3/notification.rs"
-
-[[files]]
-upstream = "cmd/bucket-versioning.go"
-local    = "src/versioning.rs"
-
-[[files]]
-upstream = "cmd/postpolicyform.go"
-local    = "src/presigned.rs"
-
-[[files]]
-upstream = "cmd/signature-v4.go"
-local    = "src/s3/presigned.rs"
-
-[[files]]
-upstream = "cmd/erasure-utils.go"
-local    = "src/storage.rs"
-
-[[files]]
-upstream = "cmd/format-erasure.go"
-local    = "src/store.rs"
-
-[[files]]
-upstream = "cmd/object-api-utils.go"
-local    = "src/s3/store.rs"
-
-[[files]]
-upstream = "cmd/api-datatypes.go"
-local    = "src/s3/types.rs"
-
-[[files]]
-upstream = "cmd/typed-errors.go"
-local    = "src/error.rs"
-
-[[files]]
-upstream = "cmd/config-current.go"
-local    = "src/config.rs"
-
-[[files]]
-upstream = "cmd/api-router.go"
-local    = "src/types.rs"
-
-[[files]]
-upstream = "cmd/data-update-tracker.go"
-local    = "src/wal.rs"
-
-[[files]]
-upstream = "cmd/object-api-listobjects.go"
-local    = "src/models.rs"
-
-# Engine + S3 module bundle
-
-[[files]]
-upstream = "cmd/handler-utils.go"
+[[mapped]]
+area     = "MVCC KV engine (put/range/delete/txn/compact)"
+upstream = "cmd/object-api-utils.go + etcdserver/api/v3rpc/key.go"
 local    = "src/engine.rs"
+notes    = "Full BTreeMap-backed MVCC with revision history, prefix/range scan, compare-and-swap transactions, compaction with history pruning"
 
-[[files]]
-upstream = "internal/auth/credentials.go"
-local    = "src/s3/mod.rs"
-
-# etcd-v3 secondary surface (src/etcd/*) — etcd-io/etcd v3.5.13
-
-[[files]]
-upstream = "etcdserver/server.go"
-local    = "src/etcd/mod.rs"
-
-[[files]]
-upstream = "etcdserver/api/v3rpc/key.go"
-local    = "src/etcd/kv.rs"
-
-[[files]]
-upstream = "etcdserver/api/v3rpc/lease.go"
-local    = "src/etcd/lease.rs"
-
-[[files]]
+[[mapped]]
+area     = "etcd Watch subscriptions (broadcast, filter, SSE streaming)"
 upstream = "etcdserver/api/v3rpc/watch.go"
-local    = "src/etcd/watch.rs"
+local    = "src/engine.rs (watch_create/cancel/notify) + src/etcd/routes.rs (watch SSE)"
+notes    = "Watch subscriptions with put/delete filters, key/range matching, revision-gated delivery, SSE streaming endpoint"
 
-[[files]]
+[[mapped]]
+area     = "etcd Lease lifecycle (grant/revoke/keepalive/ttl/list)"
+upstream = "etcdserver/api/v3rpc/lease.go"
+local    = "src/engine.rs (LeaseManager) + src/etcd/routes.rs"
+notes    = "Full lease lifecycle including TTL tracking, key attachment, expiry-triggered key deletion, background reaper"
+
+[[mapped]]
+area     = "S3 bucket CRUD (create/delete/list/head + sub-resources)"
+upstream = "cmd/bucket-handlers.go + cmd/api-handlers.go"
+local    = "src/s3/store.rs + src/s3/routes.rs"
+notes    = "Create/delete/list/head bucket with name validation (3-63 chars, lowercase), bucket region, tags, ACL"
+
+[[mapped]]
+area     = "S3 object CRUD (put/get/delete/head/copy)"
+upstream = "cmd/object-handlers.go"
+local    = "src/s3/store.rs + src/s3/routes.rs"
+notes    = "Full object lifecycle with content-type, user metadata, ETag computation, batch delete, copy with metadata directive"
+
+[[mapped]]
+area     = "S3 bucket versioning"
+upstream = "cmd/bucket-versioning.go"
+local    = "src/versioning.rs + src/s3/store.rs + src/s3/types.rs"
+notes    = "Disabled/Enabled/Suspended states, per-put version ID generation (UUID), delete markers, historical version retrieval"
+
+[[mapped]]
+area     = "S3 multipart upload (init/upload-part/complete/abort/list)"
+upstream = "cmd/object-api-multipart.go + cmd/api-multipart-handlers.go"
+local    = "src/multipart.rs + src/s3/store.rs + src/s3/routes.rs"
+notes    = "Full multipart flow: initiate → upload parts (WAL-backed, 5 MB min except last) → complete (assembly + ETag) → abort; list-parts"
+
+[[mapped]]
+area     = "S3 SSE encryption (SSE-S3 and SSE-C)"
+upstream = "cmd/encryption-v1.go + cmd/sse-kms.go"
+local    = "src/encryption.rs + src/s3/encryption.rs"
+notes    = "AES-256-GCM encrypt/decrypt with ring; SSE-S3 uses server root key with per-object HMAC-SHA256 derivation; SSE-C uses customer base64 key; key rotation supported"
+
+[[mapped]]
+area     = "S3 lifecycle rules (expiry/transitions/abort-incomplete-multipart)"
+upstream = "cmd/bucket-lifecycle.go + cmd/bucket-lifecycle-handlers.go"
+local    = "src/lifecycle.rs + src/s3/lifecycle.rs + src/s3/store.rs"
+notes    = "Rule evaluation: expiry by days/date, delete marker cleanup, storage class transitions, abort-incomplete-multipart-upload, background enforcer"
+
+[[mapped]]
+area     = "S3 bucket policy (IAM statement evaluation with glob matching)"
+upstream = "cmd/bucket-policy.go + cmd/bucket-policy-handlers.go"
+local    = "src/policy.rs + src/s3/policy.rs"
+notes    = "Full IAM policy language subset: Allow/Deny effect, Principal (wildcard/*), Action/Resource glob, Deny overrides Allow; per-bucket policy CRUD"
+
+[[mapped]]
+area     = "S3 event notifications (queue/topic/lambda config + dispatch)"
+upstream = "cmd/bucket-notification.go + cmd/bucket-notification-handlers.go"
+local    = "src/notification.rs + src/s3/notification.rs"
+notes    = "NotificationConfiguration with QueueConfig/TopicConfig/LambdaConfig; event matching with wildcard patterns (s3:ObjectCreated:*); broadcast to tokio channel"
+
+[[mapped]]
+area     = "S3 presigned URLs (HMAC-SHA256 sign + verify)"
+upstream = "cmd/postpolicyform.go + cmd/signature-v4.go"
+local    = "src/presigned.rs + src/s3/presigned.rs"
+notes    = "Canonical string (METHOD/bucket/key/expires/access_key), HMAC-SHA256 signature, URL generation with Cave1-HMAC-SHA256 scheme, expiry enforcement"
+
+[[mapped]]
+area     = "etcd Auth API (users/roles/permissions/authenticate)"
 upstream = "etcdserver/api/v3rpc/auth.go"
-local    = "src/etcd/auth.rs"
+local    = "src/etcd/auth.rs + src/etcd/routes.rs"
+notes    = "User add/delete/list/get/change-password; role add/delete/list/get; grant/revoke role; grant/revoke permission; authenticate with SHA256 password hash; enable/disable auth"
 
-[[files]]
+[[mapped]]
+area     = "etcd Cluster API (members add/remove/update/promote/list)"
 upstream = "etcdserver/api/membership/cluster.go"
-local    = "src/etcd/cluster.rs"
+local    = "src/etcd/cluster.rs + src/etcd/routes.rs"
+notes    = "Member CRUD with learner promotion, cluster ID, peer/client URL management"
 
-[[files]]
-upstream = "etcdserver/etcdhttp/client.go"
-local    = "src/etcd/routes.rs"
+[[mapped]]
+area     = "WAL persistence (write-ahead log, append, replay, compaction)"
+upstream = "cmd/data-update-tracker.go + cmd/format-erasure.go"
+local    = "src/wal.rs + src/store.rs"
+notes    = "JSON-serialised WalEntry enum covering all KV+S3 operations; async append with fsync; replay on startup to restore in-memory state; atomic WAL compaction via rename"
 
-# ── Function mappings ────────────────────────────────────────────────────────
+[[mapped]]
+area     = "S3 object listing (ListObjectsV2 with prefix/delimiter/pagination/versions)"
+upstream = "cmd/object-api-listobjects.go"
+local    = "src/models.rs + src/s3/store.rs + src/s3/routes.rs"
+notes    = "ListObjectsV2 with prefix filter, delimiter common-prefix grouping, max-keys pagination, is_truncated, continuation token; ListObjectVersions"
 
-[[functions]]
-upstream_name = "DeriveKey"
-local_name    = "derive_key"
-file          = "src/encryption.rs"
+# ── Skipped surfaces (ADR-justified) ──────────────────────────────────────────
 
-[[functions]]
-upstream_name = "encryptObject"
-local_name    = "xor_encrypt"
-file          = "src/encryption.rs"
+[[skipped]]
+area     = "MinIO Console web UI (bucket browser, dashboard, admin)"
+upstream = "console/* (separate repo: github.com/minio/console)"
+reason   = "parallel-track cave-portal — bucket browser widget mapped to cave-portal P1 backlog"
 
-[[functions]]
-upstream_name = "compareInt64"
-local_name    = "compare_values"
-file          = "src/engine.rs"
+[[skipped]]
+area     = "SQS/SNS/Webhook/Kafka event delivery (actual external delivery)"
+upstream = "cmd/notification-targets.go"
+reason   = "out-of-scope-subsystem — internal broadcast channel exists; external delivery delegates to cave-alerts (parallel-track)"
 
-[[functions]]
-upstream_name = "compareBytes"
-local_name    = "compare_values_bytes"
-file          = "src/engine.rs"
+[[skipped]]
+area     = "AWS KMS integration (SSE-KMS with external KMS server)"
+upstream = "cmd/sse-kms.go (external KMS calls)"
+reason   = "out-of-launch-scope — SSE-KMS algorithm modelled in types/routes; actual KMS gRPC deferred; SSE-S3 and SSE-C are implemented"
 
-[[functions]]
-upstream_name = "newLease"
-local_name    = "rand_lease_id"
-file          = "src/engine.rs"
+[[skipped]]
+area     = "S3 Object Lock / Retention / Legal Hold"
+upstream = "cmd/object-lock.go"
+reason   = "out-of-launch-scope — compliance feature requiring WORM semantics; deferred to Phase 2"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestCreateAndListBuckets"
-local_test    = "create_and_list_buckets"
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestDuplicateBucketFails"
-local_test    = "duplicate_bucket_fails"
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestDeleteEmptyBucket"
-local_test    = "delete_empty_bucket"
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestDeleteNonEmptyBucketFails"
-local_test    = "delete_non_empty_bucket_fails"
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestHeadBucket"
-local_test    = "head_bucket"
-
-[[tests]]
-upstream_test = "cmd/bucket-handlers_test.go::TestInvalidBucketName"
-local_test    = "invalid_bucket_name"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestPutAndGet"
-local_test    = "put_and_get"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestHeadObject"
-local_test    = "head_object"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestDeleteObject"
-local_test    = "delete_object"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestGetNonexistentObject"
-local_test    = "get_nonexistent_object"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestRangeGet"
-local_test    = "range_get"
-
-[[tests]]
-upstream_test = "cmd/encryption-v1_test.go::TestSSES3Roundtrip"
-local_test    = "sse_s3_roundtrip"
-
-[[tests]]
-upstream_test = "cmd/encryption-v1_test.go::TestSSECRoundtrip"
-local_test    = "sse_c_roundtrip"
-
-[[tests]]
-upstream_test = "cmd/object-handlers_test.go::TestCopyObject"
-local_test    = "copy_object"
-
-[[tests]]
-upstream_test = "cmd/bucket-listobjects-handlers_test.go::TestPrefixFilter"
-local_test    = "list_objects_prefix_filter"
-
-[[tests]]
-upstream_test = "cmd/bucket-listobjects-handlers_test.go::TestDelimiter"
-local_test    = "list_objects_with_delimiter"
-
-[[tests]]
-upstream_test = "cmd/bucket-listobjects-handlers_test.go::TestPagination"
-local_test    = "list_objects_pagination"
-
-[[tests]]
-upstream_test = "cmd/api-multipart-handlers_test.go::TestFullFlow"
-local_test    = "full_multipart_flow"
-
-[[tests]]
-upstream_test = "cmd/api-multipart-handlers_test.go::TestAbort"
-local_test    = "abort_multipart"
-
-[[tests]]
-upstream_test = "cmd/api-multipart-handlers_test.go::TestListUploads"
-local_test    = "list_multipart_uploads"
-
-[[tests]]
-upstream_test = "cmd/bucket-versioning_test.go::TestDefaultOff"
-local_test    = "versioning_default_off"
-
-[[tests]]
-upstream_test = "cmd/bucket-versioning_test.go::TestEnable"
-local_test    = "enable_versioning"
-
-[[tests]]
-upstream_test = "cmd/bucket-versioning_test.go::TestVersionedPuts"
-local_test    = "versioned_puts_create_versions"
-
-[[tests]]
-upstream_test = "cmd/bucket-lifecycle_test.go::TestRoundtrip"
-local_test    = "lifecycle_roundtrip"
-
-[[tests]]
-upstream_test = "cmd/bucket-policy_test.go::TestRoundtrip"
-local_test    = "policy_roundtrip"
-
-[[tests]]
-upstream_test = "cmd/postpolicyform_test.go::TestPresignURL"
-local_test    = "presign_url"
-
-# ── Surface mappings ─────────────────────────────────────────────────────────
+# ── HTTP surface mappings ─────────────────────────────────────────────────────
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "GET /"
-local_path    = "/"
+local_path    = "/s3/"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "GET /<bucket>"
-local_path    = "/{bucket}"
+local_path    = "/s3/{bucket}"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "PUT /<bucket>"
-local_path    = "/{bucket}"
+local_path    = "/s3/{bucket}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "DELETE /<bucket>"
+local_path    = "/s3/{bucket}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "HEAD /<bucket>"
+local_path    = "/s3/{bucket}"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "PUT /<bucket>/<key>"
-local_path    = "/{bucket}/{*key}"
+local_path    = "/s3/{bucket}/{*key}"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "GET /<bucket>/<key>"
-local_path    = "/{bucket}/{*key}"
+local_path    = "/s3/{bucket}/{*key}"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "POST initiate multipart"
-local_path    = "/api/v1/store/multipart/initiate"
+upstream_path = "DELETE /<bucket>/<key>"
+local_path    = "/s3/{bucket}/{*key}"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/api/buckets"
-local_path    = "/api/v1/store/buckets"
+upstream_path = "HEAD /<bucket>/<key>"
+local_path    = "/s3/{bucket}/{*key}"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/api/objects"
-local_path    = "/api/v1/store/objects"
+upstream_path = "POST /<bucket>/<key>?uploads (initiate multipart)"
+local_path    = "/s3/{bucket}/{*key}?uploads"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /<bucket>?delete (batch delete)"
+local_path    = "/s3/{bucket}?delete"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /presign"
+local_path    = "/s3/presign"
 
 [[surfaces]]
 kind          = "http"
@@ -370,11 +235,56 @@ kind          = "http"
 upstream_path = "etcd /v3/kv/txn"
 local_path    = "/v3/kv/txn"
 
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/kv/compaction"
+local_path    = "/v3/kv/compaction"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/watch"
+local_path    = "/v3/watch (SSE)"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/lease/grant"
+local_path    = "/v3/lease/grant"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/lease/revoke"
+local_path    = "/v3/lease/revoke"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/auth/enable"
+local_path    = "/v3/auth/enable"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/auth/user/*"
+local_path    = "/v3/auth/user/*"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/auth/role/*"
+local_path    = "/v3/auth/role/*"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "etcd /v3/cluster/member/*"
+local_path    = "/v3/cluster/member/*"
+
+[module]
+name        = "cave-store"
+description = "Object store — MinIO-equivalent S3 surface (multipart, versioning, SSE encryption, lifecycle, policy, presigned) + etcd-v3 KV/lease/watch/auth/cluster shim + WAL persistence"
+source_root = "src"
+
 [portal_ui]
 upstream_ui  = "MinIO Console"
 upstream_url = "https://min.io/docs/minio/linux/operations/minio-console.html"
 status       = "partial"
 loc          = 137
 priority     = "P1"
-notes        = "Bucket browser"
-last_audit   = "2026-05-11"
+notes        = "Bucket browser widget — parallel-track cave-portal backlog"
+last_audit   = "2026-05-29"

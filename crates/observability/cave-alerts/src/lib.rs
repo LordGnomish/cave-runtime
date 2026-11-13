@@ -23,6 +23,7 @@ pub mod grouping;
 pub mod inhibit;
 pub mod matcher;
 pub mod models;
+pub mod nflog;
 pub mod receivers;
 pub mod routes;
 pub mod routing;

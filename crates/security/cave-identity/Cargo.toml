@@ -40,4 +40,5 @@ p256 = { workspace = true }
 jsonwebtoken = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 serde_json = { workspace = true }

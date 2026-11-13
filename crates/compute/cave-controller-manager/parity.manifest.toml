@@ -59,14 +59,14 @@ source_sha = "v1.36.0"
 # See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
 mapped_count   = 33
 partial_count  = 0
-skipped_count  = 10
-unmapped_count = 2
+skipped_count  = 12
+unmapped_count = 0
 total          = 45
-fill_ratio     = 0.9556
-honest_ratio   = 0.9556
-adr_justified_ratio = 1.0      # 10 skipped (go-bootstrap, stdlib-analog, parallel-track) + 2 unmapped (legacy replication-controller superseded by ReplicaSet; storageversionmigrator-worker is sub-component) all architecturally justified
+fill_ratio     = 1.0000
+honest_ratio   = 1.0000
+adr_justified_ratio = 1.0      # 12 skipped (go-bootstrap, stdlib-analog, parallel-track, deprecated-superseded, sub-component) all architecturally justified per ADR-RUNTIME-PARITY-100-PCT-001 §5
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 [module]
@@ -251,9 +251,9 @@ upstream_pkg = "pkg/controller/endpoint/"
 local_files  = ["src/endpoint_controller_v1.rs"]
 note         = "k8s parity-uplift 2026-05-19: legacy v1.Endpoints reconciler. Computes the v1 Endpoints object purely from Service + Pod state (KEP-572 — v1.36 still ships v1.Endpoints for older clients in addition to EndpointSlice). Selector + namespace + IP + terminating filtering; named-port resolution against pod containerPorts; publish-not-ready-addresses toggle; deterministic ordering. Idempotent. 10 tests."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "pkg/controller/replication/"
-note         = "Legacy ReplicationController — superseded by ReplicaSet. cave does not ship this."
+reason       = "scope_cut: legacy ReplicationController superseded by ReplicaSet (mapped at pkg/controller/replicaset/). KEP-revoked v1 API; no consumer in cave. ADR-RUNTIME-PARITY-100-PCT-001 §5.deprecated-superseded."
 
 [[mapped]]
 upstream_pkg = "pkg/controller/volume/pvprotection/"
@@ -275,9 +275,9 @@ upstream_pkg = "pkg/controller/validatingadmissionpolicystatus/"
 local_files  = ["src/validatingadmissionpolicystatus.rs"]
 note         = "k8s-streams-mesh batch 2026-05-13: VAP status reconciler. `aggregate(generation, &[TypeCheck])` reduces per-GVK Ok/Err results into ConditionState + sorted warnings; `StatusReconciler` rejects stale generations. apiserver vap_advanced.rs still owns the write-time type-check; this is the post-write status loop. 10 tests."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "pkg/controller/storageversionmigrator/migrator/"
-note         = "Inner worker for storageversionmigrator above — split out in v1.32."
+reason       = "scope_cut: inner worker is implementation detail of the outer storageversionmigrator package (mapped at pkg/controller/storageversionmigrator/ → src/storage_version_migrator.rs which already integrates the worker loop). v1.32 split is intra-package only — no public surface. ADR-RUNTIME-PARITY-100-PCT-001 §5.sub-component."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 [[files]]

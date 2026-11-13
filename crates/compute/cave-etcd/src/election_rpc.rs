@@ -286,10 +286,11 @@ mod tests {
             value: b"B".to_vec(),
         })
         .unwrap();
-        let l = s.leader(LeaderRequest {
-            name: b"/svc".to_vec(),
-        })
-        .unwrap();
+        let l = s
+            .leader(LeaderRequest {
+                name: b"/svc".to_vec(),
+            })
+            .unwrap();
         let kv = l.kv.expect("leader");
         assert_eq!(kv.lease, 1);
         assert_eq!(kv.value, b"A");
@@ -298,10 +299,11 @@ mod tests {
     #[test]
     fn leader_with_no_candidates_returns_none() {
         let s = svc();
-        let l = s.leader(LeaderRequest {
-            name: b"/svc".to_vec(),
-        })
-        .unwrap();
+        let l = s
+            .leader(LeaderRequest {
+                name: b"/svc".to_vec(),
+            })
+            .unwrap();
         assert!(l.kv.is_none());
     }
 
@@ -320,10 +322,11 @@ mod tests {
             value: b"v2".to_vec(),
         })
         .unwrap();
-        let l = s.leader(LeaderRequest {
-            name: b"/svc".to_vec(),
-        })
-        .unwrap();
+        let l = s
+            .leader(LeaderRequest {
+                name: b"/svc".to_vec(),
+            })
+            .unwrap();
         assert_eq!(l.kv.unwrap().value, b"v2");
     }
 
@@ -369,10 +372,11 @@ mod tests {
         })
         .unwrap();
         s.resign(ResignRequest { leader: c1.leader }).unwrap();
-        let l = s.leader(LeaderRequest {
-            name: b"/svc".to_vec(),
-        })
-        .unwrap();
+        let l = s
+            .leader(LeaderRequest {
+                name: b"/svc".to_vec(),
+            })
+            .unwrap();
         assert_eq!(l.kv.unwrap().lease, 2);
     }
 
@@ -409,14 +413,16 @@ mod tests {
         })
         .unwrap();
         assert_eq!(s.election_count(), 2);
-        let la = s.leader(LeaderRequest {
-            name: b"/a".to_vec(),
-        })
-        .unwrap();
-        let lb = s.leader(LeaderRequest {
-            name: b"/b".to_vec(),
-        })
-        .unwrap();
+        let la = s
+            .leader(LeaderRequest {
+                name: b"/a".to_vec(),
+            })
+            .unwrap();
+        let lb = s
+            .leader(LeaderRequest {
+                name: b"/b".to_vec(),
+            })
+            .unwrap();
         assert_eq!(la.kv.unwrap().lease, 1);
         assert_eq!(lb.kv.unwrap().lease, 2);
     }

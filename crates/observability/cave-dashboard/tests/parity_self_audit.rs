@@ -20,12 +20,14 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.50;
 const CRATE_NAME: &str = "cave-dashboard";
+const CRATE_THEME_PATH: &str = "crates/observability/cave-dashboard";
 
 fn workspace_root() -> PathBuf {
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+    p.pop();
     p.pop();
     p.pop();
     p
@@ -117,9 +119,11 @@ fn assertion_5_crate_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
     assert!(
-        cargo.contains(&format!("\"crates/{}\"", CRATE_NAME)),
-        "root Cargo.toml [workspace.members] must list \"crates/{}\"",
-        CRATE_NAME
+        cargo.contains("\"crates/*/*\"")
+            || cargo.contains(&format!("\"{}\"", CRATE_THEME_PATH))
+            || cargo.contains(&format!("\"crates/{}\"", CRATE_NAME)),
+        "root Cargo.toml [workspace.members] must include {} via glob \"crates/*/*\" or explicit path",
+        CRATE_THEME_PATH
     );
 }
 

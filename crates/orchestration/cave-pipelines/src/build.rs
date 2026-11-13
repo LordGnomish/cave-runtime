@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //! Build strategies: Dockerfile, Buildpacks, Kaniko, S2I.
+//!
+//! Ports: pkg/image/build.go (Tekton Pipelines v0.55.0)
 
-use crate::engine::interpolate_params;
-use crate::models::ParameterValue;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -63,6 +63,13 @@ pub enum BuildError {
     UnsupportedStrategy(BuildStrategy),
 }
 
+/// A simple key/value parameter pair used for template interpolation.
+#[derive(Debug, Clone)]
+pub struct BuildParam {
+    pub name: String,
+    pub value: String,
+}
+
 // ---------------------------------------------------------------------------
 // BuildConfig impl
 // ---------------------------------------------------------------------------
@@ -94,18 +101,18 @@ impl BuildConfig {
         }
     }
 
-    /// Return a copy with parameter placeholders resolved.
-    pub fn interpolated(&self, params: &[ParameterValue]) -> Self {
+    /// Return a copy with `$(params.NAME)` placeholders resolved.
+    pub fn interpolated(&self, params: &[BuildParam]) -> Self {
         Self {
-            image: interpolate_params(&self.image, params),
-            context: interpolate_params(&self.context, params),
-            dockerfile: self.dockerfile.as_deref().map(|d| interpolate_params(d, params)),
+            image: interpolate(&self.image, params),
+            context: interpolate(&self.context, params),
+            dockerfile: self.dockerfile.as_deref().map(|d| interpolate(d, params)),
             build_args: self
                 .build_args
                 .iter()
                 .map(|a| BuildArg {
                     name: a.name.clone(),
-                    value: interpolate_params(&a.value, params),
+                    value: interpolate(&a.value, params),
                 })
                 .collect(),
             ..self.clone()
@@ -128,7 +135,10 @@ impl BuildConfig {
             a.extend(["-f".to_string(), df.clone()]);
         }
         for arg in &self.build_args {
-            a.extend(["--build-arg".to_string(), format!("{}={}", arg.name, arg.value)]);
+            a.extend([
+                "--build-arg".to_string(),
+                format!("{}={}", arg.name, arg.value),
+            ]);
         }
         if let Some(cache) = &self.cache {
             for src in &cache.cache_from {
@@ -145,7 +155,10 @@ impl BuildConfig {
             a.extend(["--dockerfile".to_string(), df.clone()]);
         }
         for arg in &self.build_args {
-            a.extend(["--build-arg".to_string(), format!("{}={}", arg.name, arg.value)]);
+            a.extend([
+                "--build-arg".to_string(),
+                format!("{}={}", arg.name, arg.value),
+            ]);
         }
         if let Some(cache) = &self.cache {
             a.push("--cache=true".to_string());
@@ -167,8 +180,22 @@ impl BuildConfig {
     }
 
     fn s2i_args(&self) -> Vec<String> {
-        vec!["build".to_string(), self.context.clone(), self.image.clone()]
+        vec![
+            "build".to_string(),
+            self.context.clone(),
+            self.image.clone(),
+        ]
     }
+}
+
+/// Resolve `$(params.NAME)` placeholders in a template string.
+fn interpolate(template: &str, params: &[BuildParam]) -> String {
+    let mut result = template.to_string();
+    for p in params {
+        let placeholder = format!("$(params.{})", p.name);
+        result = result.replace(&placeholder, &p.value);
+    }
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +205,13 @@ impl BuildConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn param(name: &str, value: &str) -> BuildParam {
+        BuildParam {
+            name: name.to_string(),
+            value: value.to_string(),
+        }
+    }
 
     #[test]
     fn test_dockerfile_cli_args_contain_required_flags() {
@@ -192,7 +226,10 @@ mod tests {
     #[test]
     fn test_build_arg_included_in_docker_args() {
         let mut cfg = BuildConfig::dockerfile("img:v1", ".");
-        cfg.build_args.push(BuildArg { name: "APP_VERSION".to_string(), value: "1.2".to_string() });
+        cfg.build_args.push(BuildArg {
+            name: "APP_VERSION".to_string(),
+            value: "1.2".to_string(),
+        });
         let args = cfg.cli_args();
         assert!(args.contains(&"--build-arg".to_string()));
         assert!(args.contains(&"APP_VERSION=1.2".to_string()));
@@ -210,9 +247,9 @@ mod tests {
     fn test_build_config_interpolation() {
         let cfg = BuildConfig::dockerfile("$(params.registry)/$(params.app):$(params.tag)", ".");
         let params = vec![
-            ParameterValue { name: "registry".to_string(), value: "ghcr.io/acme".to_string() },
-            ParameterValue { name: "app".to_string(), value: "backend".to_string() },
-            ParameterValue { name: "tag".to_string(), value: "v3.1".to_string() },
+            param("registry", "ghcr.io/acme"),
+            param("app", "backend"),
+            param("tag", "v3.1"),
         ];
         let resolved = cfg.interpolated(&params);
         assert_eq!(resolved.image, "ghcr.io/acme/backend:v3.1");

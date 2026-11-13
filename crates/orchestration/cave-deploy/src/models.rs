@@ -539,8 +539,17 @@ impl Manifest {
         let kind = raw.get("kind")?.as_str()?.to_string();
         let meta = raw.get("metadata")?;
         let name = meta.get("name")?.as_str()?.to_string();
-        let namespace = meta.get("namespace").and_then(|v| v.as_str()).map(String::from);
-        Some(Manifest { api_version, kind, name, namespace, raw })
+        let namespace = meta
+            .get("namespace")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        Some(Manifest {
+            api_version,
+            kind,
+            name,
+            namespace,
+            raw,
+        })
     }
 }
 

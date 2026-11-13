@@ -224,7 +224,7 @@ pub fn validate_application(
     violations
 }
 
-fn glob_match(pattern: &str, value: &str) -> bool {
+pub(crate) fn glob_match(pattern: &str, value: &str) -> bool {
     if pattern == "*" {
         return true;
     }

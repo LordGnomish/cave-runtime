@@ -39,6 +39,7 @@ pub mod routes;
 pub mod sampling;
 pub mod spm;
 pub mod storage;
+pub mod tracegen;
 pub mod traceql;
 pub mod types;
 

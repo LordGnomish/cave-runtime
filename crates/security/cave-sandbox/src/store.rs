@@ -47,7 +47,9 @@ pub struct SandboxStore {
 }
 
 impl SandboxStore {
-    pub fn new() -> Self { SandboxStore::default() }
+    pub fn new() -> Self {
+        SandboxStore::default()
+    }
 
     pub fn put(&self, sandbox: Sandbox) {
         let lifecycle = LifecycleMachine::new(sandbox.runtime.clone());
@@ -67,11 +69,20 @@ impl SandboxStore {
         self.inner.remove(id).map(|(_, v)| v)
     }
 
-    pub fn len(&self) -> usize { self.inner.len() }
-    pub fn is_empty(&self) -> bool { self.inner.is_empty() }
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 
     /// Drive a lifecycle transition; updates the sandbox's surface state too.
-    pub fn transition(&self, id: &str, to: LifecycleState, reason: Option<String>) -> Result<(), String> {
+    pub fn transition(
+        &self,
+        id: &str,
+        to: LifecycleState,
+        reason: Option<String>,
+    ) -> Result<(), String> {
         let mut entry = self.inner.get_mut(id).ok_or("not-found")?;
         entry.lifecycle.transition(to, reason)?;
         entry.sandbox.state = entry.lifecycle.state.to_sandbox_state();
@@ -80,12 +91,19 @@ impl SandboxStore {
 
     /// Lookup the lifecycle event log for one sandbox.
     pub fn history(&self, id: &str) -> Vec<LifecycleEvent> {
-        self.inner.get(id).map(|v| v.lifecycle.history.clone()).unwrap_or_default()
+        self.inner
+            .get(id)
+            .map(|v| v.lifecycle.history.clone())
+            .unwrap_or_default()
     }
 
     /// Filter by runtime.
     pub fn by_runtime(&self, r: &Runtime) -> Vec<StoredSandbox> {
-        self.inner.iter().filter(|v| &v.value().sandbox.runtime == r).map(|v| v.value().clone()).collect()
+        self.inner
+            .iter()
+            .filter(|v| &v.value().sandbox.runtime == r)
+            .map(|v| v.value().clone())
+            .collect()
     }
 
     /// Snapshot count by state — for observability.

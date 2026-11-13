@@ -22,13 +22,15 @@
 #       * namespace   — typo-squatting + Levenshtein distance detection
 #   - Finding model + Severity ordering + Ecosystem tagging
 #   - Verdict decision + scan stats
+#   - OpenVEX statement-evaluation matcher (not_affected/fixed suppression)
 #   - 12-route axum HTTP surface under /api/container-scan/*
 #
 # Trivy areas out of MVP (skipped — handled by sibling cave-* crates):
 #   - Trivy CLI binary + server mode → cavectl scan (cave-cli)
 #   - Trivy DB BoltDB / persistent index → cave-scan-db
 #   - Trivy CVE / CWE / MITRE correlation enrichment → cave-vulns
-#   - Trivy VEX evaluation → cave-sign
+#   - Trivy VEX *document signing* → cave-sign (the in-memory VEX *filter
+#     matcher* is line-ported in-crate: src/vex.rs, mapped 2026-05-30)
 #   - Trivy SBOM generation → cave-sbom
 #   - Trivy license scanner → cave-sbom
 #   - Trivy AWS account / K8s cluster / VM image full-blown scans
@@ -49,14 +51,14 @@ source_sha = "8a3177aedf7ee0864920eb1852eef031cd3742b8"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000   # both [[unmapped]] entries are already routed to sibling crates in [[scope_cuts]] groups (vuln-db→cave-vulns, artifact-layer-extract→cave-artifacts); raising fill to honest 1.0 since no gap is un-owned
-honest_ratio        = 0.7115
+honest_ratio        = 0.7308   # (mapped 36 + partial 2) / 52 — preserves the BASE (mapped+partial)/total convention; rose from 0.7115 on the 2026-05-30 trivy-vex-evaluation skip→mapped conversion
 adr_justified_ratio = 1.0000   # 8 scope_cut groups assign every skipped/unmapped item to a sibling cave-* owner (parallel-track) or Phase-2-deferred (out-of-launch-scope). 2 partials (image-tar-extract, cve-enrichment-inline) are listed in those same groups — sibling-owned. CLI replacement covered by cave-cli (cavectl scan).
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-23"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 35
+mapped_count        = 36
 partial_count       = 2
-skipped_count       = 15      # 13 [[skipped]] + 2 [[unmapped]] both sibling-owned via [[scope_cuts]] groups
+skipped_count       = 14      # 12 [[skipped]] + 2 [[unmapped]] both sibling-owned via [[scope_cuts]] groups
 unmapped_count      = 0       # all gaps routed to sibling crates
 total               = 52
 
@@ -75,6 +77,23 @@ total               = 52
 #     skipped subsystems are honestly cut to cave-cli / cave-scan-db /
 #     cave-vulns / cave-sign / cave-sbom / cave-scan / cave-secrets, not
 #     silently absent.
+#
+# 2026-05-30 honest-uplift — claude/hu-cave-container-scan-2026-05-30:
+#   * Converted 1 skip → mapped via strict TDD: trivy-vex-evaluation, the
+#     OpenVEX statement-evaluation matcher. cave-sign retains VEX document
+#     *signing / cosign attestation*; the VEX *filter matcher* (suppressing
+#     this scanner's own findings whose vuln id carries a not_affected/fixed
+#     statement) is pure in-crate result-filtering logic — exactly where
+#     Trivy itself places it (pkg/vex feeding pkg/result, not the signing
+#     path). Faithful line-port of pkg/vex/openvex.go (NotAffected / Matches
+#     / findingStatus) + the filterVulnerabilities driver in pkg/vex/vex.go,
+#     restricted to the flat product-PURL match (the SBOM dependency-tree
+#     reachRoot variant needs pkg/sbom/core.BOM → stays cave-sbom).
+#   * New subsystem-count formula: fill_ratio (subsystem) = (mapped 36 +
+#     partial 2 + skipped 12) / 52 = 50 / 52 = 0.9615 (unchanged; one item
+#     moved skipped→mapped). Declared fill_ratio stays 1.0 (every gap owned).
+#   * honest_ratio = (mapped 36 + partial 2) / 52 = 38 / 52 = 0.7308
+#     (was 0.7115). The vex-sign scope_cut group now lists no items.
 #   * Upstream bumped Trivy main (floating) → v0.70.0 (latest stable
 #     2026-05; the 2026-05-02 version-audit had flagged the floating
 #     "main" pin as a Charter v2 violation).
@@ -263,6 +282,11 @@ name = "container-scan-store"
 upstream = "pkg/report storage"
 note = "In-memory ScanResult store keyed by id. src/routes.rs::ContainerScanStore."
 
+[[mapped]]
+name = "trivy-vex-evaluation"
+upstream = "pkg/vex/openvex.go + pkg/vex/vex.go"
+note = "OpenVEX statement-evaluation matcher — suppresses findings whose vuln id carries a not_affected/fixed VEX statement for the matching product PURL, taking the latest statement per (vuln, product). Faithful line-port of OpenVEX.NotAffected/Matches/findingStatus + filterVulnerabilities (flat product-PURL match). src/vex.rs::OpenVex. cave-sign retains VEX *document signing / cosign attestation*; the SBOM dependency-tree reachRoot variant stays cave-sbom. 2026-05-30 strict-TDD skip→mapped (tests/vex_eval_tdd.rs)."
+
 # ─── Partial subsystems (2) ─────────────────────────────────────────────────
 
 [[partial]]
@@ -275,7 +299,7 @@ name = "sarif-output"
 upstream = "pkg/report/sarif"
 note = "Findings -> SARIF 2.1 JSON minimal emit (runs[].results[].ruleId + message + locations). Missing: runs[].tool.driver.rules[] catalog + invocations[] + tool extensions; consumer dashboards work with the minimal shape we emit."
 
-# ─── Skipped subsystems (13 — formalised scope cuts) ───────────────────────
+# ─── Skipped subsystems (12 — formalised scope cuts) ───────────────────────
 
 [[skipped]]
 name = "trivy-cli-binary"
@@ -296,11 +320,6 @@ reason = "Persistent vuln-DB store — cave-scan-db owns the DB lifecycle; cave-
 name = "trivy-cve-cwe-mitre-correlation"
 upstream = "pkg/vex + pkg/types/cwe"
 reason = "CVE↔CWE↔MITRE enrichment lives in cave-vulns (DependencyTrack mapping)."
-
-[[skipped]]
-name = "trivy-vex-evaluation"
-upstream = "pkg/vex"
-reason = "OpenVEX statement evaluation — cave-sign owns VEX (alongside cosign attestations)."
 
 [[skipped]]
 name = "trivy-sbom-generation"
@@ -369,7 +388,10 @@ items = ["trivy-db-bolt-persistence", "trivy-cve-cwe-mitre-correlation", "cve-cw
 [[scope_cuts]]
 group = "vex-sign"
 crates = ["cave-sign"]
-items = ["trivy-vex-evaluation"]
+# trivy-vex-evaluation (the OpenVEX *filter matcher*) was line-ported in-crate
+# on 2026-05-30 → now [[mapped]] (src/vex.rs). cave-sign retains only VEX
+# *document signing / cosign attestation*, which has no separate skip entry.
+items = []
 
 [[scope_cuts]]
 group = "sbom-license"

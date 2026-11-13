@@ -64,13 +64,18 @@ fn gate_10_adr_justified_ratio_is_one() {
     let m = a::manifest_text();
     let s = a::extract_scalar(&m, "adr_justified_ratio").expect("adr_justified_ratio key");
     let v: f64 = s.parse().expect("adr_justified_ratio is a float");
-    assert!((v - 1.0).abs() < 1e-9, "adr_justified_ratio must be 1.0, got {v}");
+    assert!(
+        (v - 1.0).abs() < 1e-9,
+        "adr_justified_ratio must be 1.0, got {v}"
+    );
 }
 
 #[test]
 fn gate_11_adr_justification_cites_no_ffi_adr() {
     let m = a::manifest_text();
     let s = a::extract_scalar(&m, "adr_justification").unwrap_or_default();
-    assert!(s.contains("ADR-RUNTIME-SANDBOX-NO-FFI-001"),
-        "adr_justification must cite SANDBOX-NO-FFI ADR, got '{s}'");
+    assert!(
+        s.contains("ADR-RUNTIME-SANDBOX-NO-FFI-001"),
+        "adr_justification must cite SANDBOX-NO-FFI ADR, got '{s}'"
+    );
 }

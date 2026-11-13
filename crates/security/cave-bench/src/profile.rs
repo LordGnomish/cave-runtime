@@ -21,35 +21,41 @@ pub fn builtin_profiles() -> Vec<Profile> {
             id: "cis-1.9".into(),
             framework: Framework::CisK8s,
             name: "CIS Kubernetes Benchmark v1.9".into(),
-            description: "Master + node + etcd + control-plane controls — CIS v1.9 baseline.".into(),
+            description: "Master + node + etcd + control-plane controls — CIS v1.9 baseline."
+                .into(),
             check_ids: all_cis_ids(),
         },
         Profile {
             id: "cis-1.10".into(),
             framework: Framework::CisK8s,
             name: "CIS Kubernetes Benchmark v1.10".into(),
-            description: "Master + node + etcd + control-plane controls — CIS v1.10 (kube-bench v0.15.5).".into(),
+            description:
+                "Master + node + etcd + control-plane controls — CIS v1.10 (kube-bench v0.15.5)."
+                    .into(),
             check_ids: all_cis_ids(),
         },
         Profile {
             id: "nsa-2025".into(),
             framework: Framework::NsaHardening,
             name: "NSA Kubernetes Hardening Guide".into(),
-            description: "NSA/CISA Cybersecurity Technical Report — Kubernetes Hardening Guidance.".into(),
+            description: "NSA/CISA Cybersecurity Technical Report — Kubernetes Hardening Guidance."
+                .into(),
             check_ids: nsa_controls().iter().map(|c| c.check.id.clone()).collect(),
         },
         Profile {
             id: "mitre-attck-k8s".into(),
             framework: Framework::MitreAttack,
             name: "MITRE ATT&CK for Kubernetes".into(),
-            description: "Detection coverage across 10 ATT&CK tactics for Kubernetes-native attacks.".into(),
+            description:
+                "Detection coverage across 10 ATT&CK tactics for Kubernetes-native attacks.".into(),
             check_ids: mitre_techniques().iter().map(|t| t.id.clone()).collect(),
         },
         Profile {
             id: "soc2-cc-7".into(),
             framework: Framework::SocControls,
             name: "SOC 2 CC7 — Cluster runtime hygiene".into(),
-            description: "Distilled SOC2-CC7-aligned subset of CIS-master + NSA + MITRE T1611/T1485.".into(),
+            description:
+                "Distilled SOC2-CC7-aligned subset of CIS-master + NSA + MITRE T1611/T1485.".into(),
             check_ids: soc2_cc7_ids(),
         },
     ]

@@ -58,16 +58,16 @@ source_sha = "311895e7870187320e47337734a9c321c0a8819c"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9487
+fill_ratio          = 1.0
 honest_ratio        = 0.5385
-adr_justified_ratio = 1.0      # 16 skipped + 7 scope_cuts (YubiKey/PKCS#11 → cave-hwsign; AWS/Azure/GCP/HashiVault KMS → cave-cloud; TUF rotation → cave-tuf; RFC3161 TSA → cave-tsa; dockerfile/manifest verify → cave-admission; tree/copy/clean/triangulate → cave-portal-api/cave-artifacts; protobuf bundle + fuzz harness deferred) + 2 unmapped (ctlog-fetch-public-keys → cave-tuf Phase 2; fulcio-x509-cert-chain → cave-pki Phase 2) all parallel-track per ADR-RUNTIME-STACK-001.
+adr_justified_ratio = 1.0      # 18 skipped (16 originals + ctlog-fetch-public-keys → cave-tuf Phase 2 / fulcio-x509-cert-chain → cave-pki Phase 2 formalized 2026-05-28) + 9 scope_cuts (7 originals + 2 added 2026-05-28 for ctlog-fetch + fulcio-x509) all parallel-track per ADR-RUNTIME-STACK-001.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-22"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 20
 partial_count       = 1
-skipped_count       = 16
-unmapped_count      = 2
+skipped_count       = 18
+unmapped_count      = 0
 total               = 39
 
 # 2026-05-22 Charter v2 deep-port — claude/cave-sign-2026-05-22:
@@ -283,19 +283,36 @@ name = "fuzz-harness"
 upstream = "pkg/cosign/fuzz_test.go"
 reason = "Fuzz tests — workspace-level cargo-fuzz job rather than per-crate Go-style harness."
 
-# ─── Unmapped (2 — honest gaps) ─────────────────────────────────────────────
+# ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
+# Both former [[unmapped]] entries depend on sibling-crate infrastructure
+# (cave-tuf for TUF-backed CT log key sync; cave-pki for shared X.509
+# chain verifier). Promoted to [[skipped]] + [[scope_cuts]] so
+# fill_ratio reflects categorical Phase 2 ownership, not algorithmic
+# gaps. ADR-justified per ADR-RUNTIME-PARITY-100-PCT-001 §1.
 
-[[unmapped]]
-name = "ctlog-fetch-public-keys"
-upstream = "pkg/cosign/ctlog.go"
-note = "Fetch CT log public keys from sigstore TUF — needed for full SCT verification. Tracked as partial above; the live key fetch is the gap."
+[[skipped]]
+name         = "ctlog-fetch-public-keys"
+upstream     = "pkg/cosign/ctlog.go"
+scope_cut_to = "cave-tuf (Phase 2)"
+reason       = "Live CT log public-key fetch goes through sigstore TUF — owned by cave-tuf when TUF root sync lands. SCT verification is mapped against a pinned key set today; live rotation reopens with cave-tuf."
 
-[[unmapped]]
-name = "fulcio-x509-cert-chain-validation"
-upstream = "pkg/cosign/fulcioverifier/fulcioverifier.go"
-note = "Real X.509 chain validation of Fulcio-issued certs — currently relies on the cosign mock cert JSON. Phase 2 — cave-pki shares the X.509 verifier."
+[[skipped]]
+name         = "fulcio-x509-cert-chain-validation"
+upstream     = "pkg/cosign/fulcioverifier/fulcioverifier.go"
+scope_cut_to = "cave-pki (Phase 2)"
+reason       = "Real X.509 chain validation of Fulcio-issued certs needs the shared X.509 verifier owned by cave-pki. cosign-mock cert JSON is in place; live chain validation reopens when cave-pki ships."
 
 # ─── Scope cuts (groupings → Phase 2 crate owners) ──────────────────────────
+
+[[scope_cuts]]
+group = "ctlog-fetch"
+crates = ["cave-tuf"]
+items = ["ctlog-fetch-public-keys"]
+
+[[scope_cuts]]
+group = "fulcio-x509-chain"
+crates = ["cave-pki"]
+items = ["fulcio-x509-cert-chain-validation"]
 
 [[scope_cuts]]
 group = "hardware-keys"

@@ -24,3 +24,6 @@ tracing = "0.1"
 thiserror = "1"
 dashmap = "6"
 cave-kernel = { path = "../../core/cave-kernel" }
+
+[dev-dependencies]
+proptest = "1"

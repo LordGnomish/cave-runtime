@@ -110,16 +110,14 @@ pub fn slack_color(trigger: &NotificationTrigger) -> &'static str {
 /// In a real install the webhook URL is looked up from configuration; we keep
 /// the channel-derived stub URL for test determinism.
 fn slack_webhook_url(channel: &str) -> String {
-    format!("https://hooks.slack.example/{}", channel.trim_start_matches('#'))
+    format!(
+        "https://hooks.slack.example/{}",
+        channel.trim_start_matches('#')
+    )
 }
 
 /// Build a Slack Block-Kit attachment payload.
-pub fn build_slack_payload(
-    app: &Application,
-    message: &str,
-    color: &str,
-    channel: &str,
-) -> Value {
+pub fn build_slack_payload(app: &Application, message: &str, color: &str, channel: &str) -> Value {
     let project = &app.spec.project;
     let repo = &app.spec.source.repo_url;
     let (health, sync, revision) = match &app.status {
@@ -149,13 +147,12 @@ pub fn build_slack_payload(
     })
 }
 
-fn build_webhook_payload(
-    app: &Application,
-    message: &str,
-    trigger: &NotificationTrigger,
-) -> Value {
+fn build_webhook_payload(app: &Application, message: &str, trigger: &NotificationTrigger) -> Value {
     let (health, sync) = match &app.status {
-        Some(s) => (format!("{:?}", s.health.status), format!("{:?}", s.sync.status)),
+        Some(s) => (
+            format!("{:?}", s.health.status),
+            format!("{:?}", s.sync.status),
+        ),
         None => ("Unknown".to_string(), "Unknown".to_string()),
     };
     json!({
@@ -252,7 +249,10 @@ mod tests {
 
     #[test]
     fn slack_color_succeeded_is_green() {
-        assert_eq!(slack_color(&NotificationTrigger::OnSyncSucceeded), "#36a64f");
+        assert_eq!(
+            slack_color(&NotificationTrigger::OnSyncSucceeded),
+            "#36a64f"
+        );
         assert_eq!(slack_color(&NotificationTrigger::OnSyncFailed), "#ff0000");
         assert_eq!(slack_color(&NotificationTrigger::OnSyncRunning), "#ffaa00");
     }

@@ -33,7 +33,6 @@
 #   - Workflow integration       → cave-workflow (Argo Workflows hooks)
 #   - argocd-dex-server runtime  → cave-auth/keycloak covers SSO
 #   - Multi-cluster federation   → Phase 2 cluster-cache replication
-#   - Sync-windows cron          → Phase 2
 #   - GPG signature verification → Phase 2
 #   - Jsonnet renderer (`jsonnet`subprocess) → Phase 2
 #   - Plugin generator           → Phase 2
@@ -53,23 +52,29 @@ source_sha = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 1.0000
-honest_ratio        = 0.6579
-adr_justified_ratio = 1.0     # 13 skipped scope_cut to siblings (cave-notify / cave-workflow / cave-portal-ui / cave-auth Dex / cave-deploy-runtime Phase 2 for multi-cluster + sync-windows + GPG sig + jsonnet + plugin/PR/SCM generators) = out-of-scope-subsystem. 3 partial (helm-render-exec, kustomize-render-exec, kube-apply-client — all defer subprocess + kube::Client to cave-{helm,kustomize,deploy}-runtime Phase 2) = out-of-launch-scope. helm-deps-resolution absorbed into src/helm_deps.rs by eksik-sweep pt2 2026-05-24 → no remaining unmapped.
+honest_ratio        = 0.6667
+adr_justified_ratio = 1.0     # 12 skipped scope_cut to siblings (cave-notify / cave-workflow / cave-portal-ui / cave-auth Dex / cave-deploy-runtime Phase 2 for multi-cluster + GPG sig + jsonnet + plugin/PR/SCM generators) = out-of-scope-subsystem. 3 partial (helm-render-exec, kustomize-render-exec, kube-apply-client — all defer subprocess + kube::Client to cave-{helm,kustomize,deploy}-runtime Phase 2) = out-of-launch-scope. helm-deps-resolution absorbed into src/helm_deps.rs by eksik-sweep pt2 2026-05-24 → no remaining unmapped. sync-windows-cron promoted scope_cut → mapped 2026-05-30 (src/sync_windows.rs — pure in-crate cron/duration/window-decision port; only the .tgz/multi-cluster operational pieces stay deferred).
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-24"
+last_audit          = "2026-05-30"
 infra_only          = false
-mapped_count        = 22
+mapped_count        = 23
 partial_count       = 3
 skipped_count       = 13
 unmapped_count      = 0
-total               = 38
+total               = 39
 
 # 2026-05-24 Charter v2 close-out + Image Updater (ADR-155):
 #   * 14 src/ modules (~6 000 LOC), 14 lib tests files, 108 lib + 9 self-audit
 #     + 27 smoke = 144 PASS.
 #   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
-#                              = (21 + 3 + 13) / 38 = 0.9737.
-#   * honest_ratio = (mapped + partial) / total = 24 / 38 = 0.6316.
+#                              = (23 + 3 + 13) / 39 = 1.0000.
+#   * honest_ratio = (mapped + partial) / total = 26 / 39 = 0.6667
+#     (sync-windows-cron promoted scope_cut → mapped 2026-05-30).
+#   * Counts realigned to actual block totals 2026-05-30: BASE declared
+#     skipped_count=13 / total=38 but enumerated 14 scope_cut items (a stale
+#     off-by-one from the argocd-cli-grpc demotion). After the sync-windows-cron
+#     promotion the live blocks are 23 mapped / 3 partial / 13 skipped = 39, so
+#     declared counts now equal block counts exactly.
 #   * source_sha pinned to v3.4.2 commit
 #     0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e.
 #   * parity_ratio_source = "manifest" (manifest count is the source of truth).
@@ -84,7 +89,7 @@ name        = "cave-deploy"
 description = "GitOps deployment engine — ArgoCD parity (Application + AppProject + AppSet CRDs, sync engine with hooks + waves, diff, health, RBAC, rollback, rollout strategies, notifications)"
 source_root = "src"
 
-# ─── Mapped subsystems (20) ──────────────────────────────────────────────────
+# ─── Mapped subsystems (23) ──────────────────────────────────────────────────
 
 [[mapped]]
 name = "application-crd"
@@ -191,6 +196,12 @@ name = "image-updater"
 upstream = "argoproj-labs/argocd-image-updater v0.16.0"
 note = "Argo CD Image Updater parity: ImageRef parser (docker.io defaulting + digest pin) + TagSelector (semver / newest-build / digest / latest / regex-lite) + UpdateStrategy (annotation-write + git-write) + RegistryEndpoint (keychain-only credential ref) + ImageUpdater orchestrator with plan(). 16 lib tests; src/image_updater.rs. ADR-155."
 
+[[mapped]]
+name = "sync-windows-cron"
+upstream = "util/argo/sync_windows.go"
+local_files = ["src/sync_windows.rs"]
+note = "promoted scope_cut → mapped 2026-05-30 (strict-TDD, tests/sync_windows_tdd.rs): pure in-crate port of SyncWindow.Active / SyncWindows.matchingWindows / InactiveAllows / CanSync. Includes a 5-field standard cron parser (Vixie DOM/DOW OR-rule, */step, ranges, lists) + time.ParseDuration subset, both ported in-crate (no new dep). Decision logic: deny-window precedence, allow-window gating, per-window manualSync override. Only the operational scheduler tick + multi-cluster window replication stay deferred to cave-deploy-runtime Phase 2."
+
 # ─── Partial subsystems (3) — shape present, runtime deferred ───────────────
 
 [[partial]]
@@ -209,6 +220,7 @@ upstream = "controller/sync.go::syncTask + util/kube/kubectl.go"
 note = "URL builders + tracking-label injection + sync-engine wave ordering are present; the kube::Client / Server-Side-Apply PATCH path is deferred to Phase 2 (cave-deploy-runtime) so the MVP stays dependency-light. Dry-run + diff paths are fully exercised."
 
 # ─── Skipped subsystems (12) — scope_cuts to other crates ───────────────────
+# (sync-windows-cron was promoted scope_cut → mapped 2026-05-30; src/sync_windows.rs.)
 
 [[scope_cuts]]
 group = "cave-notify"
@@ -232,10 +244,9 @@ items = ["argocd-dex-server-runtime"]
 
 [[scope_cuts]]
 group = "cave-deploy-runtime-phase-2"
-reason = "Operational k8s + helm + kustomize subprocess pipelines, multi-cluster cache replication, cron-driven sync windows, GPG commit-signature verification, jsonnet rendering, plugin generator runtime, pull-request generator (GitHub/GitLab/Bitbucket scanning), and scm-provider generator (org-wide repo scanning) all defer to a dedicated cave-deploy-runtime Phase 2 crate so the MVP stays dependency-light."
+reason = "Operational k8s + helm + kustomize subprocess pipelines, multi-cluster cache replication, GPG commit-signature verification, jsonnet rendering, plugin generator runtime, pull-request generator (GitHub/GitLab/Bitbucket scanning), and scm-provider generator (org-wide repo scanning) all defer to a dedicated cave-deploy-runtime Phase 2 crate so the MVP stays dependency-light. (sync-windows-cron promoted to mapped 2026-05-30 — see [[mapped]] src/sync_windows.rs.)"
 items = [
     "multi-cluster-federation",
-    "sync-windows-cron",
     "gpg-signature-verification",
     "jsonnet-render",
     "plugin-generator-runtime",
@@ -289,6 +300,10 @@ local    = "src/notifications.rs"
 [[files]]
 upstream = "util/rbac/rbac.go"
 local    = "src/rbac.rs"
+
+[[files]]
+upstream = "util/argo/sync_windows.go"
+local    = "src/sync_windows.rs"
 
 [[files]]
 upstream = "controller/sync.go"

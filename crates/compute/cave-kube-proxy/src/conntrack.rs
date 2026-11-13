@@ -90,10 +90,7 @@ pub fn apply_conntrack_sysctls<B: ConntrackBackend>(
     let clamped = total.min(u32::MAX as u64) as u32;
     backend.set_sysctl("nf_conntrack_max", clamped)?;
     backend.set_sysctl("nf_conntrack_tcp_be_liberal", liberal_tcp as u32)?;
-    backend.set_sysctl(
-        "nf_conntrack_tcp_timeout_established",
-        tcp_established_secs,
-    )?;
+    backend.set_sysctl("nf_conntrack_tcp_timeout_established", tcp_established_secs)?;
     backend.set_sysctl("nf_conntrack_tcp_timeout_close_wait", tcp_close_wait_secs)?;
     Ok(())
 }
@@ -142,7 +139,10 @@ mod tests {
         let mut b = CapturedConntrack::default();
         apply_conntrack_sysctls(&mut b, 32_768, 8, 86_400, 3_600, true).unwrap();
         assert_eq!(b.sysctls.get("nf_conntrack_max").copied(), Some(262_144));
-        assert_eq!(b.sysctls.get("nf_conntrack_tcp_be_liberal").copied(), Some(1));
+        assert_eq!(
+            b.sysctls.get("nf_conntrack_tcp_be_liberal").copied(),
+            Some(1)
+        );
         assert_eq!(
             b.sysctls
                 .get("nf_conntrack_tcp_timeout_established")
@@ -167,11 +167,8 @@ mod tests {
     #[test]
     fn flush_stale_node_ports_pushes_each() {
         let mut b = CapturedConntrack::default();
-        flush_stale_node_ports(
-            &mut b,
-            &[(30_001, Protocol::Tcp), (30_002, Protocol::Udp)],
-        )
-        .unwrap();
+        flush_stale_node_ports(&mut b, &[(30_001, Protocol::Tcp), (30_002, Protocol::Udp)])
+            .unwrap();
         assert_eq!(b.cleared_ports.len(), 2);
     }
 

@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-30";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v3.4.2";
 const PINNED_SHA: &str = "0dc6b1b57dd5bb925d5b03c3d09419ab9fb4225e";
@@ -87,7 +87,11 @@ fn assertion_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 // ─── Assertion 4: parity_ratio_source = "manifest" ──────────────────────────
@@ -219,35 +223,35 @@ fn assertion_8_no_stub_macros_in_src() {
 #[test]
 fn assertion_9_deploy_surface_intact() {
     use cave_deploy::appset::{
-        evaluate_list_generator, evaluate_matrix_generator, evaluate_merge_generator, Generator,
-        ListGenerator,
+        Generator, ListGenerator, evaluate_list_generator, evaluate_matrix_generator,
+        evaluate_merge_generator,
     };
-    use cave_deploy::cluster::{build_resource_url, kind_to_plural, Cluster, TRACKING_LABEL};
-    use cave_deploy::diff::{compute_diff, normalize_resource, DiffType};
+    use cave_deploy::cluster::{Cluster, TRACKING_LABEL, build_resource_url, kind_to_plural};
+    use cave_deploy::diff::{DiffType, compute_diff, normalize_resource};
     use cave_deploy::error::DeployError;
     use cave_deploy::gitops::{
         auto_sync, detect_drift, parse_json_documents, parse_yaml_documents, render_manifests,
         sync_application,
     };
-    use cave_deploy::health::{check_deployment, check_pod, HealthCheckRegistry};
+    use cave_deploy::health::{HealthCheckRegistry, check_deployment, check_pod};
     use cave_deploy::models::{
         Application, ApplicationSource, ApplicationSpec, AutomatedSyncPolicy, Destination,
         HealthCondition, HealthStatus, NotificationDestination, NotificationTrigger,
-        ResourceTracking, RolloutStatus, RolloutStrategy, SSOProvider, SyncCondition,
-        SyncPhase, SyncPolicy, SyncStatus,
+        ResourceTracking, RolloutStatus, RolloutStrategy, SSOProvider, SyncCondition, SyncPhase,
+        SyncPolicy, SyncStatus,
     };
-    use cave_deploy::notifications::{build_slack_payload, slack_color, NotificationEngine};
+    use cave_deploy::notifications::{NotificationEngine, build_slack_payload, slack_color};
     use cave_deploy::rbac::{
-        has_permission, is_destination_allowed, is_source_allowed, AppProject, AppProjectSpec,
-        GroupKind, RbacAction,
+        AppProject, AppProjectSpec, GroupKind, RbacAction, has_permission, is_destination_allowed,
+        is_source_allowed,
     };
     use cave_deploy::rollout::{
         blue_green_deploy, canary_deploy, promote_canary, rolling_update, traffic_split,
     };
     use cave_deploy::store::DeployStore;
     use cave_deploy::sync::{
-        group_by_wave, initiate_rollback, parse_hook_phases, parse_sync_options, parse_wave,
-        should_auto_sync, ManifestResource, RollbackRequest, SyncStrategy,
+        ManifestResource, RollbackRequest, SyncStrategy, group_by_wave, initiate_rollback,
+        parse_hook_phases, parse_sync_options, parse_wave, should_auto_sync,
     };
     use std::collections::HashMap;
     use uuid::Uuid;
@@ -307,10 +311,7 @@ fn assertion_9_deploy_surface_intact() {
     let waves = group_by_wave(&resources);
     assert_eq!(waves[0].0, 0);
     let mut anno = HashMap::new();
-    anno.insert(
-        "argocd.argoproj.io/sync-wave".to_string(),
-        "7".to_string(),
-    );
+    anno.insert("argocd.argoproj.io/sync-wave".to_string(), "7".to_string());
     anno.insert(
         "argocd.argoproj.io/hook".to_string(),
         "PreSync,PostSync".to_string(),
@@ -391,7 +392,10 @@ fn assertion_9_deploy_surface_intact() {
             orphaned_resources: None,
         },
     };
-    assert!(is_source_allowed(&project, "https://github.com/example/app"));
+    assert!(is_source_allowed(
+        &project,
+        "https://github.com/example/app"
+    ));
     let dest = Destination {
         server: "https://k.example".into(),
         name: None,

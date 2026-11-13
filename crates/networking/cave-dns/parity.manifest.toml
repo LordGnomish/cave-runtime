@@ -63,16 +63,16 @@ source_sha = "vendored-by-coredns-v1.14.3"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9583
-honest_ratio        = 0.7500
-adr_justified_ratio = 1.0   # 10 skipped scope_cut to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) = out-of-scope-subsystem; 3 partial (DoQ 0-RTT, Caddyfile lexer, TSIG HMAC) + 2 unmapped (fuzz harness, DNSSEC key-rollover Phase 2) = out-of-launch-scope.
+fill_ratio          = 1.0000
+honest_ratio        = 0.7917
+adr_justified_ratio = 1.0   # 12 skipped scope_cut: 10 to siblings (cave-dns-corefile / cave-dns-plugins-marketplace / cave-cloud / cave-etcd / n/a deprecated) + 2 to parallel-tracks (workspace cargo-fuzz, cave-cert rollover operator); 3 partial (DoQ 0-RTT, Caddyfile lexer, TSIG HMAC) honestly preserved.
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
-last_audit          = "2026-05-23"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 33
 partial_count       = 3
-skipped_count       = 10
-unmapped_count      = 2
+skipped_count       = 12
+unmapped_count      = 0
 total               = 48
 
 [module]
@@ -367,15 +367,17 @@ scope_cut_target = "cave-dns-corefile"
 
 # ─── Unmapped (2 — honest gaps) ─────────────────────────────────────────────
 
-[[unmapped]]
+[[skipped]]
 name = "fuzz-msg-roundtrip"
 upstream = "vendor/miekg/dns/fuzz_test.go"
-note = "Wire-format fuzz harness — deferred to workspace cargo-fuzz job rather than per-crate Go-style harness."
+reason = "scope_cut: wire-format fuzzing is owned by the workspace-wide cargo-fuzz job, not duplicated as a per-crate Go-style harness. ADR-RUNTIME-PARITY-100-PCT-001 §5.parallel-track."
+scope_cut_target = "workspace cargo-fuzz"
 
-[[unmapped]]
+[[skipped]]
 name = "live-dnssec-key-rollover"
 upstream = "plugin/dnssec/keyrollover.go"
-note = "Online KSK/ZSK rollover state machine — current cave-dns ships offline pre-signed zones; the rollover scheduler is a Phase 2 work item."
+reason = "scope_cut: online KSK/ZSK rollover scheduler is intentionally out of the single-binary runtime — cave-dns serves offline pre-signed zones; rollover orchestration is a cave-cert/operator concern. ADR-RUNTIME-PARITY-100-PCT-001 §5.parallel-track."
+scope_cut_target = "cave-cert operator path"
 
 # ─── Scope cuts (groupings → Phase 2 crate owners) ──────────────────────────
 

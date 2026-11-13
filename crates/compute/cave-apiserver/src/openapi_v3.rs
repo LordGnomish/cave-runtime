@@ -357,7 +357,9 @@ mod tests {
         r.register(pod_reg());
         let d = r.build();
         assert!(d.paths.contains_key("/api/v1/namespaces/{namespace}/pods"));
-        assert!(d.paths.contains_key("/api/v1/namespaces/{namespace}/pods/{name}"));
+        assert!(d
+            .paths
+            .contains_key("/api/v1/namespaces/{namespace}/pods/{name}"));
     }
 
     #[test]

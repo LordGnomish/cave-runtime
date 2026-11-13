@@ -43,21 +43,27 @@ version    = "v1.36.0"
 source_sha = "v1.36.0"
 
 [parity]
+# 2026-05-28 honest close — implemented real preemption-victim-recovery loop;
+# ADR-justified 7 sibling/stdlib/test-harness/parallel-track cuts.
+#
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
 #   fill_ratio = (mapped + skipped) / total
 # On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
 # measured value: kubernetes/kubernetes v1.31.x pkg/scheduler/* packages
 # enumerated and classified honestly.
 # See docs/parity/cave-scheduler-port-2026-05-12.md for methodology.
-mapped_count   = 21
+# 2026-05-28: preemption-victim-recovery closed (EvictionRecoveryLoop +
+# mark_failed/take_failed/failed_evictions in default_preemption.rs).
+parity_ratio_source = "manifest"
+mapped_count   = 22
 partial_count  = 0
 skipped_count  = 7
-unmapped_count = 1
+unmapped_count = 0
 total          = 29
-fill_ratio     = 0.9655
-honest_ratio   = 0.9655
-adr_justified_ratio = 0.9655   # 7 skipped (go-bootstrap + stdlib-analog + test-harness + parallel-track metrics) are ADR-justified; 1 unmapped (preemption-victim-recovery — transient apiserver failure during eviction leaks victim state) is a REAL correctness gap that ADR-RUNTIME-PARITY-100-PCT-001 §5 explicitly excludes from categorical justification. Next parity ray must absorb the upstream pkg/scheduler/framework/preemption recovery loop.
-adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only — preemption-victim-recovery preserved as honest unmapped per §5 exception), ADR-RUNTIME-STACK-001"
+fill_ratio     = 1.0
+honest_ratio   = 0.7586
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 last_audit     = "2026-05-24"
 infra_only     = false
 
@@ -201,9 +207,10 @@ upstream_pkg = "pkg/scheduler/framework/plugins/volumezone/"
 local_files  = ["src/volumezone_plugin.rs", "src/volume.rs"]
 note         = "2026-05-19 uplift: dedicated module mirroring upstream's package layout. Filter rejects nodes whose `topology.kubernetes.io/{zone,region}` (or legacy `failure-domain.beta.*`) label isn't in the pod's bound PV's `node_affinity` allow-list. Unbound PVCs skip; PVs without zone affinity are unconstrained; missing node label is a hard reject."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/scheduler/framework/preemption/recovery"
-note         = "Preemption-victim restoration after API failure during the victim eviction window. cave preempt.rs aborts and re-queues but does not re-add the would-have-victims, so transient apiserver errors can leak victim state."
+local_files  = ["src/default_preemption.rs"]
+note         = "2026-05-28 close: EvictionRecoveryLoop + mark_failed/take_failed/failed_evictions added to AsyncPreemptHandle in default_preemption.rs. When the apiserver returns a transient error during eviction, mark_failed() moves the task from pending→failed; drain_failed() atomically drains the failed list, clears preemptor nominations (so the next cycle can pick a different node), and returns the failed tasks for re-admission — mirrors upstream pkg/scheduler/framework/preemption/preemption.go §handlePreemptionResult error-path."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

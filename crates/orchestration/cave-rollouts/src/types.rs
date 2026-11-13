@@ -28,7 +28,10 @@ pub enum RolloutPhase {
 
 impl RolloutPhase {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, RolloutPhase::Healthy | RolloutPhase::Degraded | RolloutPhase::Error)
+        matches!(
+            self,
+            RolloutPhase::Healthy | RolloutPhase::Degraded | RolloutPhase::Error
+        )
     }
 }
 
@@ -349,7 +352,9 @@ pub enum NotificationEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NotificationChannel {
-    Webhook { url: String },
+    Webhook {
+        url: String,
+    },
     Slack {
         webhook_url: String,
         channel: String,

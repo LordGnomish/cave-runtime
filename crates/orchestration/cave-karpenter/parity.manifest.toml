@@ -29,23 +29,30 @@ source_sha  = "v1.4.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 1.0000  # mapped / (mapped + partial + unmapped) = 19/19
-honest_ratio        = 0.8636  # mapped / total = 19/22 (skipped excluded from credit)
-last_audit          = "2026-05-19"
+fill_ratio          = 1.0000  # mapped / (mapped + partial + unmapped) = 22/22
+honest_ratio        = 0.8800  # mapped / total = 22/25 (skipped excluded from credit)
+last_audit          = "2026-06-07"
 infra_only          = false
-mapped_count        = 19
+mapped_count        = 22
 partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
-total               = 22
+total               = 25
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (19) + partial (0) + unmapped (0) = 19 in-scope subsystems
-#   19 / 19 = 1.0000
+#   mapped (22) + partial (0) + unmapped (0) = 22 in-scope subsystems
+#   22 / 22 = 1.0000
 #
 # 2026-05-19 c-tier uplift — drain-controller promoted partial → mapped via
 # in-crate `src/drain.rs` (DrainPlan + PodDisruptionBudget arbitration);
 # the eviction loop no longer delegates to cave-kubelet's evict path.
+#
+# 2026-06-07 real-impl ray — three NEW mapped subsystems via strict TDD
+# against pinned upstream v1.4.0 (line-by-line from gh-fetched Go source):
+#   multi-cloud-provider-registry  src/provider/mod.rs       (cloudprovider/types.go)
+#   consolidation-engine           src/consolidation.rs      (disruption/{,multinode,singlenode}consolidation.go)
+#   provisioning-controller        src/provisioning.rs       (provisioning/provisioner.go)
+# mapped 19 → 22, total 22 → 25 (skipped held at 3). +32 strict-TDD tests.
 #
 # Supplementary LOC measurement (transparency):
 #   impl_lines               = ~860  (cave-karpenter src/, excl #[cfg(test)] + blanks/comments)
@@ -72,8 +79,9 @@ source_root = "src"
 pump_priority = "HIGH"
 target_tests = 50
 
-# 4-track status (honest, Phase 2):
-#   Backend     : 2/4 — Phase 2 deep-port complete
+# 4-track status (honest, Phase 2 + 2026-06-07 real-impl ray):
+#   Backend     : 2/4 — Phase 2 deep-port + provider-registry / consolidation
+#                       engine / provisioning controller (workload-aware)
 #   Portal      : 0/4 — admin/karpenter Phase 3 alongside cave-ccm
 #   cavectl     : 0/4 — `cavectl karpenter` Phase 3
 #   Observ.     : 0/4 — alerts + dashboard Phase 3
@@ -148,6 +156,40 @@ local    = "src/nodeclaim_lifecycle.rs"
 upstream = "pkg/cloudprovider/cloudprovider.go"
 local    = "src/provider/mod.rs"
 
+# ── 2026-06-07 real-impl ray ────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/cloudprovider/types.go"
+local    = "src/provider/mod.rs"
+
+[[files]]
+upstream = "karpenter-provider-aws:pkg/apis/v1/ec2nodeclass_types.go"
+local    = "src/provider/mod.rs"
+
+[[files]]
+upstream = "karpenter-provider-gcp:pkg/apis/v1/gcenodeclass_types.go"
+local    = "src/provider/mod.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/consolidation.go"
+local    = "src/consolidation.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/multinodeconsolidation.go"
+local    = "src/consolidation.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/singlenodeconsolidation.go"
+local    = "src/consolidation.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/types.go"
+local    = "src/consolidation.rs"
+
+[[files]]
+upstream = "pkg/controllers/provisioning/provisioner.go"
+local    = "src/provisioning.rs"
+
 [[files]]
 # 2026-05-19 c-tier uplift — in-crate PDB-aware pod-eviction loop.
 upstream = "pkg/controllers/node/termination/terminator/terminator.go"
@@ -213,6 +255,52 @@ file          = "src/nodeclaim_lifecycle.rs"
 upstream_name = "cloudprovider.CloudProvider.Create"
 local_name    = "CloudProvider::create"
 file          = "src/provider/mod.rs"
+
+# 2026-06-07 real-impl ray function mappings.
+[[functions]]
+upstream_name = "cloudprovider.CloudProvider.GetSupportedNodeClasses"
+local_name    = "ProviderRegistry::for_node_class"
+file          = "src/provider/mod.rs"
+
+[[functions]]
+upstream_name = "disruption.Command.Decision"
+local_name    = "Command::decision"
+file          = "src/consolidation.rs"
+
+[[functions]]
+upstream_name = "disruption.consolidation.computeConsolidation"
+local_name    = "compute_consolidation"
+file          = "src/consolidation.rs"
+
+[[functions]]
+upstream_name = "disruption.SimulateScheduling"
+local_name    = "simulate_scheduling"
+file          = "src/consolidation.rs"
+
+[[functions]]
+upstream_name = "disruption.MultiNodeConsolidation.firstNConsolidationOption"
+local_name    = "multi_node_consolidation"
+file          = "src/consolidation.rs"
+
+[[functions]]
+upstream_name = "disruption.SingleNodeConsolidation.ComputeCommand"
+local_name    = "single_node_consolidation"
+file          = "src/consolidation.rs"
+
+[[functions]]
+upstream_name = "provisioning.Provisioner.Schedule"
+local_name    = "provisioning::schedule"
+file          = "src/provisioning.rs"
+
+[[functions]]
+upstream_name = "provisioning.Provisioner.CreateNodeClaims"
+local_name    = "provisioning::create_node_claims"
+file          = "src/provisioning.rs"
+
+[[functions]]
+upstream_name = "provisioning.Provisioner.Reconcile"
+local_name    = "provisioning::reconcile"
+file          = "src/provisioning.rs"
 
 [[functions]]
 upstream_name = "v1.NodePool.zz_generated.deepcopy.DeepCopy"
@@ -371,6 +459,29 @@ local_files  = ["src/drain.rs", "src/nodeclaim_lifecycle.rs"]
 name         = "drain-controller"
 upstream     = "pkg/controllers/node/termination/terminator/{terminator,eviction}.go"
 note         = "In-crate DrainPlan + PodDisruptionBudget arbitration: DaemonSet pods skipped; PDB violations defer; grace-deadline force-evicts."
+
+# ── Mapped (2026-06-07 real-impl ray) ───────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/cloudprovider"
+local_files  = ["src/provider/mod.rs"]
+name         = "multi-cloud-provider-registry"
+upstream     = "pkg/cloudprovider/types.go"
+note         = "ProviderRegistry routes a NodeClass by (group,kind) GVK to the owning CloudProvider — the GetSupportedNodeClasses dispatch. EC2NodeClass (AWS) + GCENodeClass (GCP) envelopes added alongside Hetzner/Azure; all four register at equal level (alphabetical names(), no privileged first-party)."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/consolidation"
+local_files  = ["src/consolidation.rs"]
+name         = "consolidation-engine-multinode"
+upstream     = "pkg/controllers/disruption/{consolidation,multinodeconsolidation,singlenodeconsolidation,types}.go"
+note         = "computeConsolidation (Delete/Replace/NoOp) over SimulateScheduling; MultiNodeConsolidation firstNConsolidationOption binary-search merges N under-utilised nodes into the largest consolidatable batch (→ fewer nodes); SingleNodeConsolidation first-non-NoOp. Command/Decision exact. Orchestration queue + validation TTL stay with cluster-state."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/provisioning"
+local_files  = ["src/provisioning.rs"]
+name         = "provisioning-controller"
+upstream     = "pkg/controllers/provisioning/provisioner.go"
+note         = "Workload-aware Reconcile: route each pending pod to the first satisfying NodePool, binpack matched pods onto candidate instance types (taint-aware), launch each NodeClaim through the CloudProvider. Schedule + CreateNodeClaims + Reconcile."
 
 # ── Partial subsystems (none after 2026-05-19 uplift) ────────────────────────
 

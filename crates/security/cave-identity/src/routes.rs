@@ -26,10 +26,10 @@ use crate::oidc;
 use crate::server_ca::ServerCa;
 use crate::store::MemStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -54,7 +54,10 @@ pub fn create_router(state: Arc<IdentityState>) -> Router {
         .route("/api/identity/agent/attest", post(attest_agent))
         .route("/api/identity/agents", get(list_agents))
         .route("/api/identity/bundle", get(get_bundle))
-        .route("/api/identity/federation/bundle", post(push_federation_bundle))
+        .route(
+            "/api/identity/federation/bundle",
+            post(push_federation_bundle),
+        )
         .route("/api/identity/federation", get(list_federations))
         .route(
             "/api/identity/oidc/.well-known/openid-configuration",
@@ -78,17 +81,11 @@ async fn create_entry(
     State(state): State<Arc<IdentityState>>,
     Json(req): Json<CreateEntryReq>,
 ) -> Result<(StatusCode, Json<CreateEntryResp>), (StatusCode, String)> {
-    let e = state
-        .store
-        .entries
-        .create(req.entry)
-        .map_err(to_http)?;
+    let e = state.store.entries.create(req.entry).map_err(to_http)?;
     Ok((StatusCode::CREATED, Json(CreateEntryResp { entry: e })))
 }
 
-async fn list_entries(
-    State(state): State<Arc<IdentityState>>,
-) -> Json<Vec<RegistrationEntry>> {
+async fn list_entries(State(state): State<Arc<IdentityState>>) -> Json<Vec<RegistrationEntry>> {
     Json(state.store.entries.list())
 }
 

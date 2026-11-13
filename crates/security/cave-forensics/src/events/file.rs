@@ -76,8 +76,16 @@ impl FileEvent {
     pub fn is_write(&self) -> bool {
         matches!(
             self.op,
-            FileOp::Write | FileOp::Truncate | FileOp::Chmod | FileOp::Chown | FileOp::Unlink | FileOp::Rename
-        ) || self.flags.is_some_and(|f| OpenFlags::from_bits_truncate(f).intersects(OpenFlags::O_WRONLY | OpenFlags::O_RDWR | OpenFlags::O_TRUNC))
+            FileOp::Write
+                | FileOp::Truncate
+                | FileOp::Chmod
+                | FileOp::Chown
+                | FileOp::Unlink
+                | FileOp::Rename
+        ) || self.flags.is_some_and(|f| {
+            OpenFlags::from_bits_truncate(f)
+                .intersects(OpenFlags::O_WRONLY | OpenFlags::O_RDWR | OpenFlags::O_TRUNC)
+        })
     }
 
     /// True if path is inside `/proc` (`/proc/self/...`, `/proc/<pid>/...`).
@@ -169,7 +177,11 @@ mod tests {
     #[test]
     fn test_sensitive_paths_detected() {
         for p in ["/etc/shadow", "/etc/sudoers.d/x", "/root/.ssh/id_rsa"] {
-            assert!(ev(FileOp::Read, p).is_sensitive(), "{} should be sensitive", p);
+            assert!(
+                ev(FileOp::Read, p).is_sensitive(),
+                "{} should be sensitive",
+                p
+            );
         }
         assert!(!ev(FileOp::Read, "/tmp/random").is_sensitive());
         assert!(ev(FileOp::Read, "/var/run/docker.sock").is_sensitive());

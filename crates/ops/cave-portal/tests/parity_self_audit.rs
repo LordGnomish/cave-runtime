@@ -8,17 +8,11 @@
 //! 0.25 audit-fallback and prevented source="manifest" from being
 //! reachable.
 //!
-//! This file is the RED signal for the close-out — it parses the
-//! manifest as plain text (no new dependency) and asserts:
-//!
-//! 1. `[upstream] version` is the pinned `v1.50.3`.
-//! 2. `[upstream] source_sha` exists (commit hash or tag).
-//! 3. `[parity] fill_ratio` is present and `>= 0.65`.
-//! 4. `[parity] last_audit` is the 2026-05-19 close-out.
-//! 5. At least 60 `[[mapped]]` blocks exist (one per admin sub-page).
-//! 6. At least 4 `[[surfaces]]` blocks exist (HTTP routes).
-//! 7. At least 4 `[[tests]]` blocks exist (Backstage Cypress mappings).
-//! 8. `[parity].infra_only` is `false` (Backstage IS the upstream now).
+//! Updated 2026-05-28 for honest close-out:
+//!   - `unmapped_count` must be 0 (all surfaces are now mapped or ADR-justified)
+//!   - `fill_ratio` must be exactly 1.0 (fully closed)
+//!   - `adr_justified_ratio` must be 1.0
+//!   - `last_audit` bumped to 2026-05-28
 
 use std::fs;
 use std::path::PathBuf;
@@ -65,34 +59,63 @@ fn upstream_source_sha_is_present() {
 }
 
 #[test]
-fn parity_fill_ratio_is_measured_and_at_least_0_65() {
+fn parity_fill_ratio_is_exactly_1_0() {
     let m = manifest_text();
     let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
         .as_deref()
-        .expect("[parity] fill_ratio must be present after close-out")
+        .expect("[parity] fill_ratio must be present after honest close-out")
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.65,
-        "Charter v2 floor: fill_ratio must be >= 0.65 (got {})",
-        ratio
-    );
-    assert!(
-        ratio <= 1.0,
-        "fill_ratio must be a fraction (got {})",
+        (ratio - 1.0).abs() < 1e-9,
+        "honest close requires fill_ratio == 1.0 (got {}); all unmapped surfaces must be resolved",
         ratio
     );
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_19() {
+fn parity_unmapped_count_is_zero() {
+    let m = manifest_text();
+    let read = |k: &str| -> Option<u64> {
+        let s = extract_after(&m, &format!("\n{} ", k))
+            .or_else(|| extract_after(&m, &format!("\n{}=", k)))?;
+        s.parse().ok()
+    };
+    let unmapped = read("unmapped_count").expect("unmapped_count must be present");
+    assert_eq!(
+        unmapped, 0,
+        "all surfaces must be mapped, partial, or skipped; unmapped_count must be 0 (got {})",
+        unmapped
+    );
+}
+
+#[test]
+fn parity_adr_justified_ratio_is_1_0() {
+    let m = manifest_text();
+    let raw = extract_after(&m, "\nadr_justified_ratio ")
+        .or_else(|| extract_after(&m, "\nadr_justified_ratio="));
+    let ratio: f64 = raw
+        .as_deref()
+        .expect("[parity] adr_justified_ratio must be present after close-out")
+        .parse()
+        .expect("adr_justified_ratio must parse as float");
+    assert!(
+        (ratio - 1.0).abs() < 1e-9,
+        "adr_justified_ratio must be 1.0 (got {})",
+        ratio
+    );
+}
+
+#[test]
+fn parity_last_audit_is_2026_05_28() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-19"),
-        "[parity] last_audit must reflect the close-out date"
+        Some("2026-05-28"),
+        "[parity] last_audit must reflect the honest close-out date 2026-05-28 (got {:?})",
+        when
     );
 }
 

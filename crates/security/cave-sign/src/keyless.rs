@@ -184,7 +184,8 @@ mod tests {
 
     #[test]
     fn keyless_sign_with_ed25519() {
-        let signer = KeylessSigner::new(FulcioClient::default()).with_algorithm(KeyAlgorithm::Ed25519);
+        let signer =
+            KeylessSigner::new(FulcioClient::default()).with_algorithm(KeyAlgorithm::Ed25519);
         let rk = RekorClient::default();
         let out = signer.sign_blob(b"abc", &token(), &rk).unwrap();
         assert!(out.signature.cert_pem.contains("CERTIFICATE"));

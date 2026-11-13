@@ -271,6 +271,11 @@ pub enum AutoSealType {
     OciKms,
     /// `vault/seal/pkcs11` — KMIP / PKCS#11 HSM.
     Pkcs11,
+    /// cave PQC seal — wraps the master key under a local ML-KEM-768
+    /// (FIPS 203) KEM-DEM envelope. Charter PQC-ready baseline; see
+    /// [`crate::core::pqc_seal`]. Auto-unseals via the held decapsulation
+    /// key and backs the master key up with Shamir recovery shares.
+    MlKem768,
     /// Built-in Shamir (no auto-unseal). Used when no `seal {}` block
     /// is configured.
     Shamir,
@@ -287,6 +292,7 @@ impl AutoSealType {
             Self::GcpCkms => "gcpckms",
             Self::OciKms => "ocikms",
             Self::Pkcs11 => "pkcs11",
+            Self::MlKem768 => "mlkem768",
             Self::Shamir => "shamir",
         }
     }
@@ -334,7 +340,10 @@ impl AutoSealConfig {
             }
             return Ok(());
         }
-        if self.endpoint.trim().is_empty() {
+        // The PQC seal is local (the ML-KEM keypair lives in-process / HSM),
+        // so it has no remote endpoint — only the recovery-share quorum is
+        // validated below.
+        if self.seal_type != AutoSealType::MlKem768 && self.endpoint.trim().is_empty() {
             return Err(VaultError::InvalidRequest(
                 "auto-seal endpoint must not be empty".into(),
             ));
@@ -492,6 +501,35 @@ mod tests {
             key_id: "k".into(),
         };
         assert!(ok.validate().is_ok());
+    }
+
+    #[test]
+    fn test_autoseal_pqc_is_local_recovery_seal() {
+        // The PQC (ML-KEM-768) seal is local: no remote endpoint, but it is a
+        // non-Shamir auto-seal so it supports recovery shares.
+        assert_eq!(AutoSealType::MlKem768.barrier_type(), "mlkem768");
+        assert!(AutoSealType::MlKem768.stores_keys_remotely());
+        assert!(AutoSealType::MlKem768.supports_recovery_key());
+
+        // Empty endpoint is OK for PQC (unlike AwsKms), recovery quorum still
+        // validated.
+        let ok = AutoSealConfig {
+            seal_type: AutoSealType::MlKem768,
+            recovery_shares: 5,
+            recovery_threshold: 3,
+            endpoint: String::new(),
+            key_id: String::new(),
+        };
+        assert!(ok.validate().is_ok());
+
+        let bad = AutoSealConfig {
+            seal_type: AutoSealType::MlKem768,
+            recovery_shares: 3,
+            recovery_threshold: 5, // threshold > shares
+            endpoint: String::new(),
+            key_id: String::new(),
+        };
+        assert!(bad.validate().is_err());
     }
 
     #[test]

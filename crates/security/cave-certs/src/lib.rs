@@ -6,13 +6,20 @@
 //! Features: ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs
 
 pub mod acme_client;
+pub mod cert_request;
+pub mod cr_approval_validation;
 pub mod crds;
+pub mod csr;
 pub mod engine;
+pub mod issuers;
 pub mod models;
 pub mod pqc;
 pub mod renewal;
 pub mod routes;
+pub mod routes_api;
 pub mod solvers;
+pub mod store;
+pub mod webhook_validation;
 
 use axum::Router;
 

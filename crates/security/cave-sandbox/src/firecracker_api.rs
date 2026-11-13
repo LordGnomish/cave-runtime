@@ -7,14 +7,15 @@
 //! VMM is OUT OF SCOPE.
 
 use crate::firecracker_vmm::{
-    Balloon, BootSource, Drive, Entropy, Logger, MachineConfig, Metrics, NetworkInterface, VmResources, Vsock,
+    Balloon, BootSource, Drive, Entropy, Logger, MachineConfig, Metrics, NetworkInterface,
+    VmResources, Vsock,
 };
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post, put},
-    Json, Router,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -60,13 +61,18 @@ pub enum ActionType {
 }
 
 impl VmmState {
-    pub fn new() -> Self { VmmState::default() }
+    pub fn new() -> Self {
+        VmmState::default()
+    }
 }
 
 pub fn router(state: VmmState) -> Router {
     Router::new()
         .route("/", get(get_instance))
-        .route("/machine-config", put(put_machine_config).patch(patch_machine_config))
+        .route(
+            "/machine-config",
+            put(put_machine_config).patch(patch_machine_config),
+        )
         .route("/boot-source", put(put_boot_source))
         .route("/drives/{id}", put(put_drive))
         .route("/network-interfaces/{id}", put(put_netif))
@@ -84,12 +90,18 @@ async fn get_instance(State(s): State<VmmState>) -> impl IntoResponse {
     (StatusCode::OK, Json(info))
 }
 
-async fn put_machine_config(State(s): State<VmmState>, Json(body): Json<MachineConfig>) -> StatusCode {
+async fn put_machine_config(
+    State(s): State<VmmState>,
+    Json(body): Json<MachineConfig>,
+) -> StatusCode {
     s.inner.write().machine_config = body;
     StatusCode::NO_CONTENT
 }
 
-async fn patch_machine_config(State(s): State<VmmState>, Json(body): Json<MachineConfig>) -> StatusCode {
+async fn patch_machine_config(
+    State(s): State<VmmState>,
+    Json(body): Json<MachineConfig>,
+) -> StatusCode {
     s.inner.write().machine_config = body;
     StatusCode::NO_CONTENT
 }
@@ -99,7 +111,11 @@ async fn put_boot_source(State(s): State<VmmState>, Json(body): Json<BootSource>
     StatusCode::NO_CONTENT
 }
 
-async fn put_drive(State(s): State<VmmState>, Path(id): Path<String>, Json(mut body): Json<Drive>) -> StatusCode {
+async fn put_drive(
+    State(s): State<VmmState>,
+    Path(id): Path<String>,
+    Json(mut body): Json<Drive>,
+) -> StatusCode {
     body.drive_id = id;
     let mut g = s.inner.write();
     g.drives.retain(|d| d.drive_id != body.drive_id);
@@ -107,7 +123,11 @@ async fn put_drive(State(s): State<VmmState>, Path(id): Path<String>, Json(mut b
     StatusCode::NO_CONTENT
 }
 
-async fn put_netif(State(s): State<VmmState>, Path(id): Path<String>, Json(mut body): Json<NetworkInterface>) -> StatusCode {
+async fn put_netif(
+    State(s): State<VmmState>,
+    Path(id): Path<String>,
+    Json(mut body): Json<NetworkInterface>,
+) -> StatusCode {
     body.iface_id = id;
     let mut g = s.inner.write();
     g.network_interfaces.retain(|n| n.iface_id != body.iface_id);
@@ -172,7 +192,9 @@ mod tests {
     use axum::http::Request;
     use tower::ServiceExt;
 
-    fn body(s: &impl Serialize) -> Body { Body::from(serde_json::to_vec(s).unwrap()) }
+    fn body(s: &impl Serialize) -> Body {
+        Body::from(serde_json::to_vec(s).unwrap())
+    }
 
     #[tokio::test]
     async fn get_root_returns_instance_info() {
@@ -186,18 +208,34 @@ mod tests {
     async fn put_boot_source_then_start() {
         let state = VmmState::new();
         let app = router(state.clone());
-        let bs = BootSource { kernel_image_path: "/k".into(), boot_args: None, initrd_path: None };
+        let bs = BootSource {
+            kernel_image_path: "/k".into(),
+            boot_args: None,
+            initrd_path: None,
+        };
         let req = Request::builder()
-            .method("PUT").uri("/boot-source")
+            .method("PUT")
+            .uri("/boot-source")
             .header("content-type", "application/json")
-            .body(body(&bs)).unwrap();
-        assert_eq!(app.clone().oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&bs))
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
 
         let req = Request::builder()
-            .method("POST").uri("/actions")
+            .method("POST")
+            .uri("/actions")
             .header("content-type", "application/json")
-            .body(body(&ActionBody { action_type: ActionType::InstanceStart })).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&ActionBody {
+                action_type: ActionType::InstanceStart,
+            }))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
         assert_eq!(state.instance_info.read().state, "Running");
     }
 
@@ -206,10 +244,17 @@ mod tests {
         let state = VmmState::new();
         let app = router(state.clone());
         let req = Request::builder()
-            .method("POST").uri("/actions")
+            .method("POST")
+            .uri("/actions")
             .header("content-type", "application/json")
-            .body(body(&ActionBody { action_type: ActionType::InstanceStart })).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::BAD_REQUEST);
+            .body(body(&ActionBody {
+                action_type: ActionType::InstanceStart,
+            }))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[tokio::test]
@@ -217,15 +262,25 @@ mod tests {
         let state = VmmState::new();
         let app = router(state.clone());
         let d = Drive {
-            drive_id: "rootfs".into(), path_on_host: "/r".into(),
-            is_root_device: true, is_read_only: true,
-            partuuid: None, io_engine: None, cache_type: None, rate_limiter: None,
+            drive_id: "rootfs".into(),
+            path_on_host: "/r".into(),
+            is_root_device: true,
+            is_read_only: true,
+            partuuid: None,
+            io_engine: None,
+            cache_type: None,
+            rate_limiter: None,
         };
         let req = Request::builder()
-            .method("PUT").uri("/drives/rootfs")
+            .method("PUT")
+            .uri("/drives/rootfs")
             .header("content-type", "application/json")
-            .body(body(&d)).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&d))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
         assert_eq!(state.inner.read().drives.len(), 1);
     }
 
@@ -233,12 +288,21 @@ mod tests {
     async fn put_netif_persists() {
         let state = VmmState::new();
         let app = router(state.clone());
-        let n = NetworkInterface { iface_id: "eth0".into(), host_dev_name: "tap0".into(), ..NetworkInterface::default() };
+        let n = NetworkInterface {
+            iface_id: "eth0".into(),
+            host_dev_name: "tap0".into(),
+            ..NetworkInterface::default()
+        };
         let req = Request::builder()
-            .method("PUT").uri("/network-interfaces/eth0")
+            .method("PUT")
+            .uri("/network-interfaces/eth0")
             .header("content-type", "application/json")
-            .body(body(&n)).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&n))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
         assert_eq!(state.inner.read().network_interfaces.len(), 1);
     }
 
@@ -246,12 +310,21 @@ mod tests {
     async fn put_vsock_persists() {
         let state = VmmState::new();
         let app = router(state.clone());
-        let v = Vsock { vsock_id: "v0".into(), guest_cid: 3, uds_path: "/run/v.sock".into() };
+        let v = Vsock {
+            vsock_id: "v0".into(),
+            guest_cid: 3,
+            uds_path: "/run/v.sock".into(),
+        };
         let req = Request::builder()
-            .method("PUT").uri("/vsock")
+            .method("PUT")
+            .uri("/vsock")
             .header("content-type", "application/json")
-            .body(body(&v)).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&v))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
         assert!(state.inner.read().vsock.is_some());
     }
 
@@ -259,12 +332,21 @@ mod tests {
     async fn put_machine_config_persists() {
         let state = VmmState::new();
         let app = router(state.clone());
-        let m = MachineConfig { vcpu_count: 2, mem_size_mib: 512, ..MachineConfig::default() };
+        let m = MachineConfig {
+            vcpu_count: 2,
+            mem_size_mib: 512,
+            ..MachineConfig::default()
+        };
         let req = Request::builder()
-            .method("PUT").uri("/machine-config")
+            .method("PUT")
+            .uri("/machine-config")
             .header("content-type", "application/json")
-            .body(body(&m)).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&m))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
         assert_eq!(state.inner.read().machine_config.vcpu_count, 2);
     }
 
@@ -273,9 +355,16 @@ mod tests {
         let state = VmmState::new();
         let app = router(state);
         let req = Request::builder()
-            .method("POST").uri("/actions")
+            .method("POST")
+            .uri("/actions")
             .header("content-type", "application/json")
-            .body(body(&ActionBody { action_type: ActionType::FlushMetrics })).unwrap();
-        assert_eq!(app.oneshot(req).await.unwrap().status(), StatusCode::NO_CONTENT);
+            .body(body(&ActionBody {
+                action_type: ActionType::FlushMetrics,
+            }))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
     }
 }

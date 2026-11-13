@@ -5,7 +5,8 @@
 //! Function pipeline → XPKG install → cavectl dispatch.
 
 use cave_crossplane::{
-    cli::{dispatch, run_cli, InfraAction, InfraSubcommand},
+    CrossplaneState,
+    cli::{InfraAction, InfraSubcommand, dispatch, run_cli},
     composition::pipeline::PipelineExecutor,
     composition::step::Step,
     conditions::{propagate_composed_to_xr, propagate_xr_to_claim},
@@ -17,11 +18,13 @@ use cave_crossplane::{
     xpkg::{
         dependency::DependencyGraph,
         install::install_package,
-        pull::{write_fixture_xpkg, pull_offline, PackageKind},
+        pull::{PackageKind, pull_offline, write_fixture_xpkg},
     },
-    xr::{bind::bind_claim_to_xr, lifecycle::{plan_deletion, XrEvent, XrPhase}},
+    xr::{
+        bind::bind_claim_to_xr,
+        lifecycle::{XrEvent, XrPhase, plan_deletion},
+    },
     xrd::{defaulting::apply_defaults, schema_validate::validate_spec},
-    CrossplaneState,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -126,13 +129,12 @@ fn smoke_xrd_composition_claim_e2e() {
     assert!(cat["items"].as_array().unwrap().len() >= 3);
 
     // 8. Condition propagation
-    let composed = vec![json!({"status":{"conditions":[{"type":"Ready","status":"True"},{"type":"Synced","status":"True"},{"type":"Healthy","status":"True"}]}})];
+    let composed = vec![
+        json!({"status":{"conditions":[{"type":"Ready","status":"True"},{"type":"Synced","status":"True"},{"type":"Healthy","status":"True"}]}}),
+    ];
     let xr = propagate_composed_to_xr(&json!({}), &composed);
     let claim = propagate_xr_to_claim(&json!({}), &xr);
-    assert_eq!(
-        claim["status"]["conditions"][0]["type"],
-        json!("Ready")
-    );
+    assert_eq!(claim["status"]["conditions"][0]["type"], json!("Ready"));
 }
 
 #[test]

@@ -35,4 +35,5 @@ base64 = { workspace = true }
 reqwest = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }

@@ -73,7 +73,10 @@ pub async fn execute_plan(
             "Executing plan step"
         );
 
-        match registry.execute_tool(&step.provider, &tool, &step.params).await {
+        match registry
+            .execute_tool(&step.provider, &tool, &step.params)
+            .await
+        {
             Ok(output) => {
                 outputs.push(StepOutput {
                     step_id: step.id,
@@ -156,7 +159,10 @@ pub async fn rollback(
             "Rollback step"
         );
 
-        match registry.execute_tool(&step.provider, &tool, &step.params).await {
+        match registry
+            .execute_tool(&step.provider, &tool, &step.params)
+            .await
+        {
             Ok(output) => {
                 outputs.push(StepOutput {
                     step_id: step.id,

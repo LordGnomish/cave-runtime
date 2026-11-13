@@ -14,16 +14,16 @@ source_sha = "838d4e792be666ec11bd0c80331e0c5511b5010e"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9677
+fill_ratio          = 1.0
 honest_ratio        = 0.7097
-adr_justified_ratio = 1.0      # 8 scope_cuts + 1 unmapped (pod-event-stream → parallel-track to cave-controller-manager) all ADR-justified
+adr_justified_ratio = 1.0      # 9 scope_cuts (8 originals + pod-event-stream → parallel-track cave-controller-manager Informer/EventBroadcaster) + 9 skipped (8 originals + 1 formalized 2026-05-28) all ADR-justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
-last_audit          = "2026-05-24"
+last_audit          = "2026-05-28"
 infra_only          = false
 mapped_count        = 22
 partial_count       = 0
-skipped_count       = 8
-unmapped_count      = 1
+skipped_count       = 9
+unmapped_count      = 0
 total               = 31
 
 # 2026-05-24 close-out — claude/cave-rollouts-close-2026-05-24:
@@ -168,14 +168,23 @@ group = "cave-gateway"
 reason = "Traefik / Contour / Ambassador / Gloo traffic providers belong in cave-gateway alongside the gateway runtime — cave-rollouts ships the six providers Argo Rollouts treats as first-party (Istio, SMI, NGINX, ALB, Apisix, Plugin)."
 items = ["traefik-traffic-provider", "contour-traffic-provider", "ambassador-traffic-provider", "gloo-traffic-provider"]
 
-[[unmapped]]
-name = "pod-event-stream"
-upstream = "rollout/pods.go (PodController + WatchPodsForRollout)"
-note = "Live Kubernetes pod-event watch (used to surface CrashLoopBackOff / OOMKilled in the dashboard mid-flight) is unimplemented — cave-rollouts ships the reducer side; the watch is Phase 2 (cave-controller-manager wiring)."
-next_pass_needed  = true
-deferred_reason   = "Requires cave-controller-manager K8s watch infrastructure (Informer + EventBroadcaster) to land first; reopen when that arrives. Marked 2026-05-24 by eksik-sweep pt2."
-category          = "parallel-track"   # ADR-RUNTIME-PARITY-100-PCT-001 §1: K8s watch infrastructure owned by sibling crate cave-controller-manager
-adr_justified     = true
+# ─── Formally scope-cut 2026-05-28 (uplift-pz ray) ──────────────────────────
+# pod-event-stream was already adr_justified=true with category =
+# "parallel-track" — promoted to [[scope_cuts]] + [[skipped]] so
+# fill_ratio reflects its categorical Phase 2 owner. ADR-justified per
+# ADR-RUNTIME-PARITY-100-PCT-001 §1 (K8s watch infrastructure owned by
+# sibling crate cave-controller-manager).
+
+[[scope_cuts]]
+group = "cave-controller-manager"
+reason = "Live Kubernetes pod-event watch (PodController + WatchPodsForRollout) requires Informer + EventBroadcaster infrastructure owned by cave-controller-manager. cave-rollouts ships the reducer side; the watch wiring lands when cave-controller-manager's K8s watch infra arrives (Phase 2)."
+items = ["pod-event-stream"]
+
+[[skipped]]
+name         = "pod-event-stream"
+upstream     = "rollout/pods.go (PodController + WatchPodsForRollout)"
+scope_cut_to = "cave-controller-manager (Phase 2)"
+reason       = "Pod-event reducer is mapped; the live K8s watch is owned by cave-controller-manager (Informer + EventBroadcaster). Parallel-track per ADR-RUNTIME-PARITY-100-PCT-001 §1."
 
 [portal_ui]
 upstream_ui  = "Argo Rollouts UI"

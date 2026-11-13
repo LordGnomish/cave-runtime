@@ -276,8 +276,11 @@ mod tests {
         let mut ctx = PromptContext::new();
         ctx.set_list("items", ["a", "b"]);
         ctx.set_bool("flag", true);
-        let out =
-            render("{{ range items }}({{ if flag }}{{ it }}{{ end }}){{ end }}", &ctx).unwrap();
+        let out = render(
+            "{{ range items }}({{ if flag }}{{ it }}{{ end }}){{ end }}",
+            &ctx,
+        )
+        .unwrap();
         assert_eq!(out, "(a)(b)");
     }
 

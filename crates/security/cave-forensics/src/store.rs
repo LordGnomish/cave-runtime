@@ -56,10 +56,7 @@ impl PolicyStore {
     }
 
     /// Return every policy whose pod selector matches the given pod-info.
-    pub fn matching(
-        &self,
-        pod: &crate::selectors::PodInfo,
-    ) -> Vec<TracingPolicy> {
+    pub fn matching(&self, pod: &crate::selectors::PodInfo) -> Vec<TracingPolicy> {
         self.inner
             .iter()
             .filter(|r| {
@@ -157,7 +154,8 @@ mod tests {
     #[test]
     fn test_install_namespaced_policy() {
         let s = PolicyStore::new();
-        s.install(minimal_policy("p1", Some("kube-system"))).unwrap();
+        s.install(minimal_policy("p1", Some("kube-system")))
+            .unwrap();
         assert_eq!(s.count(), 1);
     }
 
@@ -197,7 +195,8 @@ mod tests {
         let s = PolicyStore::new();
         s.install(minimal_policy("cluster-p", None)).unwrap();
         s.install(minimal_policy("ns-p", Some("default"))).unwrap();
-        s.install(minimal_policy("kube-p", Some("kube-system"))).unwrap();
+        s.install(minimal_policy("kube-p", Some("kube-system")))
+            .unwrap();
         let pod = PodInfo {
             name: "p".into(),
             namespace: "default".into(),

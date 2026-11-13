@@ -18,7 +18,10 @@ fn ip(a: u8, b: u8, c: u8, d: u8) -> IpAddr {
 }
 
 fn labels(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -112,8 +115,18 @@ fn netstate_update_endpoints_replaces_list() {
     let s = NetState::new();
     s.register_service(svc("api", "default"));
     let eps = vec![
-        Endpoint { ip: ip(10, 0, 0, 1), port: 8080, pod_name: "p1".into(), ready: true },
-        Endpoint { ip: ip(10, 0, 0, 2), port: 8080, pod_name: "p2".into(), ready: false },
+        Endpoint {
+            ip: ip(10, 0, 0, 1),
+            port: 8080,
+            pod_name: "p1".into(),
+            ready: true,
+        },
+        Endpoint {
+            ip: ip(10, 0, 0, 2),
+            port: 8080,
+            pod_name: "p2".into(),
+            ready: false,
+        },
     ];
     s.update_endpoints("api", "default", eps);
     let key = "default/api";
@@ -149,22 +162,34 @@ fn policy(name: &str, ns: &str, ingress: Vec<IngressRule>) -> NetworkPolicy {
 #[test]
 fn check_policy_allows_when_no_policies_in_namespace() {
     let s = NetState::new();
-    assert_eq!(s.check_policy("a", "ns1", "b", "ns2", 80), FlowVerdict::Allowed);
+    assert_eq!(
+        s.check_policy("a", "ns1", "b", "ns2", 80),
+        FlowVerdict::Allowed
+    );
 }
 
 #[test]
 fn check_policy_denies_with_empty_ingress() {
     let s = NetState::new();
     s.apply_policy(policy("deny", "prod", vec![]));
-    assert_eq!(s.check_policy("any", "other", "dst", "prod", 80), FlowVerdict::Denied);
+    assert_eq!(
+        s.check_policy("any", "other", "dst", "prod", 80),
+        FlowVerdict::Denied
+    );
 }
 
 #[test]
 fn check_policy_allows_with_empty_from_rule() {
     let s = NetState::new();
-    let allow_all = vec![IngressRule { from: vec![], ports: vec![] }];
+    let allow_all = vec![IngressRule {
+        from: vec![],
+        ports: vec![],
+    }];
     s.apply_policy(policy("allow", "prod", allow_all));
-    assert_eq!(s.check_policy("any", "ns", "dst", "prod", 80), FlowVerdict::Allowed);
+    assert_eq!(
+        s.check_policy("any", "ns", "dst", "prod", 80),
+        FlowVerdict::Allowed
+    );
 }
 
 #[test]
@@ -172,7 +197,10 @@ fn remove_policy_reverts_to_default_allow() {
     let s = NetState::new();
     s.apply_policy(policy("deny", "prod", vec![]));
     s.remove_policy("deny", "prod");
-    assert_eq!(s.check_policy("a", "ns", "dst", "prod", 80), FlowVerdict::Allowed);
+    assert_eq!(
+        s.check_policy("a", "ns", "dst", "prod", 80),
+        FlowVerdict::Allowed
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -242,9 +270,22 @@ fn policy_type_serde_round_trip() {
 
 #[test]
 fn ingress_egress_rules_default_construct() {
-    let i = IngressRule { from: vec![], ports: vec![PolicyPort { port: 80, protocol: Protocol::TCP }] };
+    let i = IngressRule {
+        from: vec![],
+        ports: vec![PolicyPort {
+            port: 80,
+            protocol: Protocol::TCP,
+        }],
+    };
     assert_eq!(i.ports.len(), 1);
-    let e = EgressRule { to: vec![PeerSelector { pod_selector: None, namespace_selector: None, ip_block: None }], ports: vec![] };
+    let e = EgressRule {
+        to: vec![PeerSelector {
+            pod_selector: None,
+            namespace_selector: None,
+            ip_block: None,
+        }],
+        ports: vec![],
+    };
     assert_eq!(e.to.len(), 1);
 }
 

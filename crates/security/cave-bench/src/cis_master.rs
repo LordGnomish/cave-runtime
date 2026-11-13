@@ -337,7 +337,14 @@ fn make_meta(id: &str, title: &str, severity: Severity) -> Check {
     c
 }
 
-fn flag_eq_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_eq_check(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -350,7 +357,14 @@ fn flag_eq_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: S
     (meta, rule)
 }
 
-fn flag_neq_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_neq_check(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -363,7 +377,14 @@ fn flag_neq_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: 
     (meta, rule)
 }
 
-fn flag_has_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_has_check(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -376,7 +397,14 @@ fn flag_has_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: 
     (meta, rule)
 }
 
-fn flag_gte_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_gte_check(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -389,7 +417,13 @@ fn flag_gte_check(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: 
     (meta, rule)
 }
 
-fn file_mode_check(id: &str, title: &str, path: &str, expected: &str, sev: Severity) -> (Check, CisRule) {
+fn file_mode_check(
+    id: &str,
+    title: &str,
+    path: &str,
+    expected: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     let op = if expected.contains(':') {
@@ -454,7 +488,14 @@ mod tests {
 
     #[test]
     fn test_authz_mode_has_rbac() {
-        let (meta, rule) = flag_has_check("cis-1.2.8", "rbac", "apiserver", "--authorization-mode", "RBAC", Severity::High);
+        let (meta, rule) = flag_has_check(
+            "cis-1.2.8",
+            "rbac",
+            "apiserver",
+            "--authorization-mode",
+            "RBAC",
+            Severity::High,
+        );
         let mut ctx = CisContext::default();
         ctx.set_flag("apiserver", "--authorization-mode", "Node,RBAC,Webhook");
         let f = evaluate_rule(&rule, &meta, &ctx, "apiserver", "n1");
@@ -463,7 +504,14 @@ mod tests {
 
     #[test]
     fn test_audit_log_maxage_gte() {
-        let (meta, rule) = flag_gte_check("cis-1.2.17", "maxage", "apiserver", "--audit-log-maxage", "30", Severity::Medium);
+        let (meta, rule) = flag_gte_check(
+            "cis-1.2.17",
+            "maxage",
+            "apiserver",
+            "--audit-log-maxage",
+            "30",
+            Severity::Medium,
+        );
         let mut ctx = CisContext::default();
         ctx.set_flag("apiserver", "--audit-log-maxage", "60");
         let f = evaluate_rule(&rule, &meta, &ctx, "apiserver", "n1");
@@ -472,7 +520,8 @@ mod tests {
 
     #[test]
     fn test_file_mode_lte() {
-        let (meta, rule) = file_mode_check("cis-1.1.1", "perms", "/etc/k.yaml", "600", Severity::High);
+        let (meta, rule) =
+            file_mode_check("cis-1.1.1", "perms", "/etc/k.yaml", "600", Severity::High);
         let mut ctx = CisContext::default();
         ctx.set_file("/etc/k.yaml", "400", "root:root");
         let f = evaluate_rule(&rule, &meta, &ctx, "apiserver", "n1");
@@ -482,7 +531,12 @@ mod tests {
     #[test]
     fn test_master_checks_all_node_type_master() {
         for (c, _) in master_checks() {
-            assert_eq!(c.node_type, NodeType::Master, "{} expected NodeType::Master", c.id);
+            assert_eq!(
+                c.node_type,
+                NodeType::Master,
+                "{} expected NodeType::Master",
+                c.id
+            );
         }
     }
 }

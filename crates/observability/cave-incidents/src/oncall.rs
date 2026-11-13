@@ -52,14 +52,15 @@ impl OnCallEngine {
         let elapsed_secs = (now - layer.starts_at).num_seconds().max(0);
         let period_secs = period_days * 86_400;
         let periods_elapsed = elapsed_secs / period_secs;
-        let current_period_start = layer.starts_at + Duration::seconds(periods_elapsed * period_secs);
+        let current_period_start =
+            layer.starts_at + Duration::seconds(periods_elapsed * period_secs);
 
         let mut shifts = Vec::with_capacity(count);
         for i in 0..count {
             let shift_start = current_period_start + Duration::seconds(i as i64 * period_secs);
             let shift_end = shift_start + Duration::seconds(period_secs);
-            let idx = ((periods_elapsed + i as i64) as usize + layer.current_index)
-                % layer.users.len();
+            let idx =
+                ((periods_elapsed + i as i64) as usize + layer.current_index) % layer.users.len();
             let user_name = layer.users[idx].name.clone();
             shifts.push((shift_start, shift_end, user_name));
         }
@@ -67,11 +68,7 @@ impl OnCallEngine {
     }
 
     /// Page the on-call user for an incident (simulated).
-    pub fn page_oncall(
-        &self,
-        incident: &Incident,
-        schedule: &OnCallSchedule,
-    ) -> Option<Responder> {
+    pub fn page_oncall(&self, incident: &Incident, schedule: &OnCallSchedule) -> Option<Responder> {
         let user = self.current_oncall(schedule, Utc::now())?;
         let now = Utc::now();
         tracing::info!(

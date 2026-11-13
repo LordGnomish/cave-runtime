@@ -99,10 +99,7 @@ impl QuotaTracker {
 
     pub fn register_tenant(&self, prefix: impl Into<Vec<u8>>, limits: QuotaLimits) {
         let mut g = self.inner.lock().unwrap();
-        g.tenants
-            .entry(prefix.into())
-            .or_default()
-            .limits = Some(limits);
+        g.tenants.entry(prefix.into()).or_default().limits = Some(limits);
     }
 
     pub fn unregister_tenant(&self, prefix: &[u8]) -> Option<UsageSnapshot> {
@@ -205,7 +202,13 @@ mod tests {
         q.record_put(b"/k1", 40);
         q.record_put(b"/k2", 40);
         let d = q.check_put(b"/k3", 1);
-        assert!(matches!(d, QuotaDecision::DenyMaxKeys { current: 2, limit: 2 }));
+        assert!(matches!(
+            d,
+            QuotaDecision::DenyMaxKeys {
+                current: 2,
+                limit: 2
+            }
+        ));
     }
 
     #[test]
@@ -230,7 +233,13 @@ mod tests {
         q.register_tenant(b"/orgs/acme/".to_vec(), QuotaLimits::new(1, 10_000));
         q.record_put(b"/orgs/acme/k1", 1);
         let d = q.check_put(b"/orgs/acme/k2", 1);
-        assert!(matches!(d, QuotaDecision::DenyMaxKeys { current: 1, limit: 1 }));
+        assert!(matches!(
+            d,
+            QuotaDecision::DenyMaxKeys {
+                current: 1,
+                limit: 1
+            }
+        ));
         // unrelated /orgs/ key is fine
         assert!(q.check_put(b"/orgs/other/k1", 1).is_allow());
     }
@@ -291,16 +300,7 @@ mod tests {
         let q = QuotaTracker::new();
         q.register_tenant(b"/orgs/acme/".to_vec(), QuotaLimits::new(10, 1_000));
         q.record_put(b"/orgs/other/x", 50); // does not charge acme
-        assert_eq!(
-            q.usage_for(b"/orgs/acme/"),
-            UsageSnapshot::default()
-        );
-        assert_eq!(
-            q.global_usage(),
-            UsageSnapshot {
-                keys: 1,
-                bytes: 50
-            }
-        );
+        assert_eq!(q.usage_for(b"/orgs/acme/"), UsageSnapshot::default());
+        assert_eq!(q.global_usage(), UsageSnapshot { keys: 1, bytes: 50 });
     }
 }

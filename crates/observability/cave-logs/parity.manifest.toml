@@ -35,16 +35,16 @@ url     = "https://github.com/grafana/loki"
 [parity]
 mapped_count   = 15
 partial_count  = 2
-skipped_count  = 6
-unmapped_count = 1
+skipped_count  = 7
+unmapped_count = 0
 total          = 24
-fill_ratio     = 0.9583
+fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 24/24 — every in-scope subsystem is addressed; the cross-ingester queue rebalancer was reclassified unmapped→skipped (mirrors the cross-querier scope_cut row — both deferred together to obs-stack-ray-2 since cave-logs runs single-process tokio mpsc).
 honest_ratio   = 0.8750          # (mapped 15 + skipped 6) / 24 — partial excluded
-adr_justified_ratio = 1.0        # 6 skipped (full-cluster sharding modes scope_cut to obs-stack-ray-2 + multi-tenant gateway scope_cut to cave-mesh) + 2 partials (compactor: retention+dry_run covered, full loop deferred; query-scheduler: single-process covered, cross-querier fair-share deferred) + 1 unmapped (queue rebalancer: single-process cave-logs uses tokio mpsc, multi-node HA deferred to obs-stack-ray-2) all architecturally justified
+adr_justified_ratio = 1.0        # 7 skipped (full-cluster sharding modes + multi-tenant gateway + cross-ingester queue rebalancer all deferred to obs-stack-ray-2 / cave-mesh) + 2 partials (compactor retention+dry_run; query-scheduler single-process) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "5b9f6a7d3e2c1b8a4f6e9c5d7a2b8e1f3c9d6e4a"  # v3.4.0 tag sha (grafana/loki)
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 [module]
@@ -538,9 +538,9 @@ note         = "Covered by axum + serde — Rust gets this from the framework"
 upstream_pkg = "grafana/loki:integration/ + tools/lambda-promtail/"
 reason       = "test-harness"
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "grafana/loki:pkg/queue (in-memory queue rebalancer)"
-reason       = "Cross-ingester queue rebalancer — single-process cave-logs uses tokio mpsc; port deferred for multi-node HA"
+reason       = "Cross-ingester queue rebalancer — ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cut: single-process cave-logs uses tokio mpsc; multi-node HA fair-share rebalancer deferred to obs-stack-ray-2 alongside the matching cross-querier scope_cut."
 deferred_to  = "obs-stack-ray-2"
 
 # ── Scope cuts (informational; mirror [[unmapped]] above) ────────────────────

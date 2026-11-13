@@ -43,8 +43,8 @@ impl IdToken {
         let claims_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(claims_b64.as_bytes())
             .map_err(|e| SignError::Oidc(format!("base64url claims: {}", e)))?;
-        let claims: serde_json::Value =
-            serde_json::from_slice(&claims_bytes).map_err(|e| SignError::Oidc(format!("json: {}", e)))?;
+        let claims: serde_json::Value = serde_json::from_slice(&claims_bytes)
+            .map_err(|e| SignError::Oidc(format!("json: {}", e)))?;
 
         let issuer = claims["iss"]
             .as_str()
@@ -56,11 +56,12 @@ impl IdToken {
             .to_string();
         let audience = match &claims["aud"] {
             serde_json::Value::String(s) => s.clone(),
-            serde_json::Value::Array(a) => a
-                .first()
-                .and_then(|v| v.as_str())
-                .map(str::to_string)
-                .ok_or_else(|| SignError::Oidc("empty aud array".into()))?,
+            serde_json::Value::Array(a) => {
+                a.first()
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+                    .ok_or_else(|| SignError::Oidc("empty aud array".into()))?
+            }
             _ => return Err(SignError::Oidc("aud must be string or array".into())),
         };
         let exp = claims["exp"]

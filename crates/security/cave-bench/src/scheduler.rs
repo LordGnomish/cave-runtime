@@ -29,7 +29,11 @@ pub enum NotifyAction {
 }
 
 impl ScheduledScan {
-    pub fn new(id: impl Into<String>, profile_id: impl Into<String>, cron: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        profile_id: impl Into<String>,
+        cron: impl Into<String>,
+    ) -> Self {
         ScheduledScan {
             id: id.into(),
             profile_id: profile_id.into(),
@@ -124,7 +128,9 @@ fn field_matches(field: &str, val: u32) -> bool {
             return val % step == 0;
         }
     }
-    field.split(',').any(|p| p.trim().parse::<u32>().map(|n| n == val).unwrap_or(false))
+    field
+        .split(',')
+        .any(|p| p.trim().parse::<u32>().map(|n| n == val).unwrap_or(false))
 }
 
 #[cfg(test)]

@@ -82,10 +82,15 @@ fn empty_object_schema() -> Value {
 
 /// Parse a tool_use payload emitted by an assistant turn back into a
 /// normalised `ToolInvocation`. Accepts both Anthropic and OpenAI/Ollama shapes.
-pub fn parse_tool_use(provider: ToolProvider, payload: &Value) -> Result<ToolInvocation, EncodingError> {
+pub fn parse_tool_use(
+    provider: ToolProvider,
+    payload: &Value,
+) -> Result<ToolInvocation, EncodingError> {
     match provider {
         ToolProvider::Anthropic => parse_anthropic(payload),
-        ToolProvider::OpenAi | ToolProvider::Ollama | ToolProvider::OpenRouter => parse_openai(payload),
+        ToolProvider::OpenAi | ToolProvider::Ollama | ToolProvider::OpenRouter => {
+            parse_openai(payload)
+        }
     }
 }
 
@@ -101,7 +106,9 @@ fn parse_anthropic(payload: &Value) -> Result<ToolInvocation, EncodingError> {
         .cloned()
         .ok_or(EncodingError::MissingField("input"))?;
     if !arguments.is_object() {
-        return Err(EncodingError::InvalidArgumentType("Anthropic input must be object"));
+        return Err(EncodingError::InvalidArgumentType(
+            "Anthropic input must be object",
+        ));
     }
     Ok(ToolInvocation {
         call_id,
@@ -121,16 +128,18 @@ fn parse_openai(payload: &Value) -> Result<ToolInvocation, EncodingError> {
         .ok_or(EncodingError::MissingField("function.name"))?
         .to_string();
     let arguments = match func.get("arguments") {
-        Some(Value::String(s)) => {
-            serde_json::from_str::<Value>(s).map_err(|_| {
-                EncodingError::InvalidArgumentType("OpenAI tool arguments must be JSON string of an object")
-            })?
-        }
+        Some(Value::String(s)) => serde_json::from_str::<Value>(s).map_err(|_| {
+            EncodingError::InvalidArgumentType(
+                "OpenAI tool arguments must be JSON string of an object",
+            )
+        })?,
         Some(other) => other.clone(),
         None => return Err(EncodingError::MissingField("function.arguments")),
     };
     if !arguments.is_object() {
-        return Err(EncodingError::InvalidArgumentType("OpenAI arguments must decode to object"));
+        return Err(EncodingError::InvalidArgumentType(
+            "OpenAI arguments must decode to object",
+        ));
     }
     Ok(ToolInvocation {
         call_id,

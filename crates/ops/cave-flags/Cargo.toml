@@ -25,3 +25,6 @@ deadpool-postgres = { workspace = true }
 tokio-postgres = { workspace = true }
 # Crypto
 sha2 = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

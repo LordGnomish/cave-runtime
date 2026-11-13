@@ -90,4 +90,5 @@ kerberos-gssapi = ["dep:libgssapi"]
 kerberos-integration-tests = ["kerberos-gssapi"]
 
 [dev-dependencies]
+proptest = "1"
 urlencoding = "2"

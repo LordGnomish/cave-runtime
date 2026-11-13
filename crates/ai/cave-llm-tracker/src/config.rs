@@ -141,8 +141,7 @@ impl TrackerConfig {
     pub fn validate(&self) -> TrackerResult<()> {
         if self.selection.auto_swap {
             return Err(TrackerError::Config(
-                "selection.auto_swap MUST be false in Phase 0 — Burak mandate"
-                    .to_string(),
+                "selection.auto_swap MUST be false in Phase 0 — Burak mandate".to_string(),
             ));
         }
         if self.guards.license_allowlist.is_empty() {
@@ -166,7 +165,10 @@ impl TrackerConfig {
     /// Expand a leading `~` in `report.output_dir` using `$HOME`. Returns
     /// the path unchanged on a non-Unix host or when `$HOME` is unset.
     pub fn expanded_output_dir(&self) -> String {
-        Self::expand_tilde(&self.report.output_dir, std::env::var("HOME").ok().as_deref())
+        Self::expand_tilde(
+            &self.report.output_dir,
+            std::env::var("HOME").ok().as_deref(),
+        )
     }
 
     /// Pure-function variant of [`expanded_output_dir`] — explicit
@@ -196,7 +198,9 @@ mod tests {
     #[test]
     fn default_enables_all_four_sources() {
         let s = TrackerConfig::default_config().sources;
-        assert!(s.huggingface && s.ollama_library && s.lmsys_leaderboard && s.github_backend_releases);
+        assert!(
+            s.huggingface && s.ollama_library && s.lmsys_leaderboard && s.github_backend_releases
+        );
     }
 
     #[test]
@@ -216,7 +220,10 @@ mod tests {
         assert!(!c.selection.auto_swap);
         let mut bad = c.clone();
         bad.selection.auto_swap = true;
-        assert!(bad.validate().is_err(), "auto_swap=true must fail validate()");
+        assert!(
+            bad.validate().is_err(),
+            "auto_swap=true must fail validate()"
+        );
     }
 
     #[test]

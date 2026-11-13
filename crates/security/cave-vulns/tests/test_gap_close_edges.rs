@@ -6,13 +6,15 @@
 // product-style hierarchy validation via the scan-result aggregation.
 
 use cave_vulns::{
-    dedup::{legacy_vuln_dedup_key as dedup_key, deduplicate, is_sla_breached, sla_days, sla_deadline},
+    MODULE_NAME, State,
+    dedup::{
+        deduplicate, is_sla_breached, legacy_vuln_dedup_key as dedup_key, sla_days, sla_deadline,
+    },
     engine::{
         build_scan_result, count_by_severity, cvss_to_severity, find_for_component, is_affected,
         version_lt,
     },
     models::{ComponentVersion, Severity, VulnScanResult, VulnState, Vulnerability},
-    MODULE_NAME, State,
 };
 use chrono::{Duration, TimeZone, Utc};
 use std::sync::Arc;
@@ -165,15 +167,36 @@ fn is_affected_matches_one_of_many_versions() {
 #[test]
 fn is_affected_is_component_case_sensitive() {
     // Component matching is case-sensitive — "OpenSSL" != "openssl".
-    let v = fixture("CVE-X", "openssl", &["1.0.1"], Severity::High, 7.5, VulnState::Open);
+    let v = fixture(
+        "CVE-X",
+        "openssl",
+        &["1.0.1"],
+        Severity::High,
+        7.5,
+        VulnState::Open,
+    );
     assert!(!is_affected(&v, "OpenSSL", "1.0.1"));
 }
 
 #[test]
 fn find_for_component_returns_empty_when_no_match() {
     let vulns = vec![
-        fixture("CVE-A", "openssl", &["1.0.1"], Severity::High, 7.5, VulnState::Open),
-        fixture("CVE-B", "libcurl", &["2.0"], Severity::Medium, 5.0, VulnState::Open),
+        fixture(
+            "CVE-A",
+            "openssl",
+            &["1.0.1"],
+            Severity::High,
+            7.5,
+            VulnState::Open,
+        ),
+        fixture(
+            "CVE-B",
+            "libcurl",
+            &["2.0"],
+            Severity::Medium,
+            5.0,
+            VulnState::Open,
+        ),
     ];
     let needle = ComponentVersion {
         name: "nginx".to_string(),
@@ -186,9 +209,30 @@ fn find_for_component_returns_empty_when_no_match() {
 #[test]
 fn find_for_component_returns_all_matching() {
     let vulns = vec![
-        fixture("CVE-A", "openssl", &["1.0.1"], Severity::High, 7.5, VulnState::Open),
-        fixture("CVE-B", "openssl", &["1.0.1"], Severity::Critical, 9.5, VulnState::Open),
-        fixture("CVE-C", "openssl", &["1.1.0"], Severity::High, 7.5, VulnState::Open),
+        fixture(
+            "CVE-A",
+            "openssl",
+            &["1.0.1"],
+            Severity::High,
+            7.5,
+            VulnState::Open,
+        ),
+        fixture(
+            "CVE-B",
+            "openssl",
+            &["1.0.1"],
+            Severity::Critical,
+            9.5,
+            VulnState::Open,
+        ),
+        fixture(
+            "CVE-C",
+            "openssl",
+            &["1.1.0"],
+            Severity::High,
+            7.5,
+            VulnState::Open,
+        ),
     ];
     let needle = ComponentVersion {
         name: "openssl".to_string(),
@@ -203,8 +247,22 @@ fn find_for_component_returns_all_matching() {
 #[test]
 fn dedup_key_distinct_on_version_set() {
     // Same CVE+component, but different affected-version sets must be distinct.
-    let a = fixture("CVE-X", "openssl", &["1.0.1"], Severity::High, 7.5, VulnState::Open);
-    let b = fixture("CVE-X", "openssl", &["1.0.2"], Severity::High, 7.5, VulnState::Open);
+    let a = fixture(
+        "CVE-X",
+        "openssl",
+        &["1.0.1"],
+        Severity::High,
+        7.5,
+        VulnState::Open,
+    );
+    let b = fixture(
+        "CVE-X",
+        "openssl",
+        &["1.0.2"],
+        Severity::High,
+        7.5,
+        VulnState::Open,
+    );
     assert_ne!(dedup_key(&a), dedup_key(&b));
 }
 
@@ -218,8 +276,22 @@ fn deduplicate_empty_input_yields_empty() {
 fn deduplicate_keeps_critical_over_low_regardless_of_input_order() {
     // Lower severity arrives first — Critical must still win.
     let findings = vec![
-        fixture("CVE-1", "openssl", &["1"], Severity::Low, 2.0, VulnState::Open),
-        fixture("CVE-1", "openssl", &["1"], Severity::Critical, 9.5, VulnState::Open),
+        fixture(
+            "CVE-1",
+            "openssl",
+            &["1"],
+            Severity::Low,
+            2.0,
+            VulnState::Open,
+        ),
+        fixture(
+            "CVE-1",
+            "openssl",
+            &["1"],
+            Severity::Critical,
+            9.5,
+            VulnState::Open,
+        ),
     ];
     let out = deduplicate(findings);
     assert_eq!(out.len(), 1);
@@ -378,7 +450,14 @@ fn engagement_lifecycle_count_excludes_info_from_top_four() {
     let findings = vec![
         fixture("CVE-1", "a", &["1"], Severity::Info, 0.0, VulnState::Open),
         fixture("CVE-2", "b", &["1"], Severity::Info, 0.0, VulnState::Open),
-        fixture("CVE-3", "c", &["1"], Severity::Critical, 9.5, VulnState::Open),
+        fixture(
+            "CVE-3",
+            "c",
+            &["1"],
+            Severity::Critical,
+            9.5,
+            VulnState::Open,
+        ),
     ];
     let (c, h, m, l) = count_by_severity(&findings);
     assert_eq!((c, h, m, l), (1, 0, 0, 0));
@@ -414,8 +493,22 @@ fn product_test_hierarchy_build_scan_result_distinct_scan_ids() {
 #[test]
 fn product_test_hierarchy_scan_result_serde_round_trip() {
     let findings = vec![
-        fixture("CVE-A", "openssl", &["1.0.1"], Severity::Critical, 9.5, VulnState::Open),
-        fixture("CVE-B", "libcurl", &["7.0"], Severity::Medium, 5.0, VulnState::Mitigated),
+        fixture(
+            "CVE-A",
+            "openssl",
+            &["1.0.1"],
+            Severity::Critical,
+            9.5,
+            VulnState::Open,
+        ),
+        fixture(
+            "CVE-B",
+            "libcurl",
+            &["7.0"],
+            Severity::Medium,
+            5.0,
+            VulnState::Mitigated,
+        ),
     ];
     let result: VulnScanResult = build_scan_result("svc-x", findings);
     let json = serde_json::to_string(&result).unwrap();

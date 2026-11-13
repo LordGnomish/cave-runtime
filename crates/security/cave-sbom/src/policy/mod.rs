@@ -8,8 +8,11 @@
 pub mod age;
 pub mod coordinates;
 pub mod license;
+pub mod license_group;
 pub mod router;
+pub mod version_distance;
 pub mod vuln;
+pub mod vuln_id;
 
 use crate::components::ComponentRecord;
 use crate::models::VulnIntel;
@@ -65,6 +68,24 @@ pub enum PolicyCondition {
         name: String,
         version: Option<String>,
     },
+    /// Match components whose SPDX license belongs to a named group
+    /// (Permissive / Copyleft / WeakCopyleft / Proprietary).
+    /// Mirrors `LicenseGroupPolicyEvaluator`.
+    LicenseInGroup {
+        group_name: String,
+    },
+    /// Violation when the component is more than `max_versions_behind`
+    /// releases behind the latest known version.
+    /// Mirrors `VersionDistancePolicyEvaluator`.
+    VersionDistanceAtLeast {
+        max_versions_behind: u32,
+        available_versions: Vec<String>,
+    },
+    /// Violation when the component has the specific vulnerability ID.
+    /// Mirrors `VulnerabilityIdPolicyEvaluator`.
+    VulnerabilityId {
+        vuln_id: String,
+    },
 }
 
 /// One concrete violation, mirroring `org.dependencytrack.model.PolicyViolation`.
@@ -107,6 +128,20 @@ pub fn evaluate_pipeline(
                         name,
                         version,
                     } => coordinates::violates(c, group.as_deref(), name, version.as_deref()),
+                    PolicyCondition::LicenseInGroup { group_name } => {
+                        license_group::violates_license_in_group(c, group_name)
+                    }
+                    PolicyCondition::VersionDistanceAtLeast {
+                        max_versions_behind,
+                        available_versions,
+                    } => version_distance::violates_version_distance(
+                        c,
+                        *max_versions_behind,
+                        available_versions,
+                    ),
+                    PolicyCondition::VulnerabilityId { vuln_id } => {
+                        vuln_id::component_has_vuln_id(c, vulns, vuln_id)
+                    }
                 };
                 if let Some(msg) = hit {
                     hits.push((i, msg));

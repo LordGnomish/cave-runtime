@@ -90,7 +90,8 @@ mod tests {
     #[test]
     fn test_notification_payload_from_rollout() {
         let rollout = promoted_rollout();
-        let payload = NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
+        let payload =
+            NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
         assert_eq!(payload.rollout_name, "my-app");
         assert_eq!(payload.namespace, "production");
         assert!(payload.phase.contains("Healthy"));
@@ -100,7 +101,8 @@ mod tests {
     #[test]
     fn test_slack_message_contains_channel() {
         let rollout = promoted_rollout();
-        let payload = NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
+        let payload =
+            NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
         let msg = slack_message(&payload, "#deployments");
         assert_eq!(msg["channel"], "#deployments");
     }
@@ -108,7 +110,8 @@ mod tests {
     #[test]
     fn test_slack_message_healthy_emoji() {
         let rollout = promoted_rollout();
-        let payload = NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
+        let payload =
+            NotificationPayload::from_rollout(&NotificationEvent::RolloutPromoted, &rollout);
         let msg = slack_message(&payload, "#ops");
         let text = msg["text"].as_str().unwrap_or("");
         assert!(text.contains(":white_check_mark:"));
@@ -117,7 +120,8 @@ mod tests {
     #[test]
     fn test_webhook_body_serializes() {
         let rollout = promoted_rollout();
-        let payload = NotificationPayload::from_rollout(&NotificationEvent::RolloutStarted, &rollout);
+        let payload =
+            NotificationPayload::from_rollout(&NotificationEvent::RolloutStarted, &rollout);
         let body = webhook_body(&payload);
         assert!(body["rollout_name"].as_str().is_some());
     }
@@ -128,7 +132,13 @@ mod tests {
             NotificationEvent::RolloutPromoted,
             NotificationEvent::RolloutRolledBack,
         ];
-        assert!(should_notify(&configured, &NotificationEvent::RolloutPromoted));
-        assert!(!should_notify(&configured, &NotificationEvent::RolloutStarted));
+        assert!(should_notify(
+            &configured,
+            &NotificationEvent::RolloutPromoted
+        ));
+        assert!(!should_notify(
+            &configured,
+            &NotificationEvent::RolloutStarted
+        ));
     }
 }

@@ -12,6 +12,7 @@ pub mod content;
 pub mod distribution;
 pub mod models;
 pub mod rbac;
+pub mod reclaim;
 pub mod repair;
 pub mod repository;
 pub mod routes;

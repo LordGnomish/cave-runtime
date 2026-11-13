@@ -17,10 +17,13 @@ pub mod connector;
 pub mod error;
 pub mod mongo;
 pub mod mysql;
+pub mod offset;
 pub mod outbox;
 pub mod postgres;
 pub mod routing;
 pub mod schema;
+pub mod schema_history;
+pub mod signal;
 pub mod snapshot;
 pub mod streams_sink;
 
@@ -30,10 +33,13 @@ pub use connector::{
 pub use error::{CdcError, CdcResult};
 pub use mongo::{MongoDbConnector, OplogEvent, OplogOp};
 pub use mysql::{BinlogEvent, BinlogEventType, MySqlConnector};
+pub use offset::{OffsetKey, OffsetStore};
 pub use outbox::{OutboxEntry, OutboxEventRouter};
 pub use postgres::{PostgresConnector, ReplicationSlotConfig, WalEvent, WalEventKind};
 pub use routing::{RoutingPolicy, TopicRouter};
 pub use schema::{Compatibility, Schema, SchemaFormat, SchemaRegistry};
+pub use schema_history::{HistoryRecord, HistorySource, SchemaHistory};
+pub use signal::{Signal, SignalKind, SignalTable};
 pub use snapshot::{SnapshotMode, SnapshotProgress};
 pub use streams_sink::{ProduceResult, StreamsSink};
 

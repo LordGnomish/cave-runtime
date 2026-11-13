@@ -44,16 +44,12 @@ impl LlmProvider for LlamaCppProvider {
             "{}/v1/chat/completions",
             self.config.base_url.trim_end_matches('/')
         );
-        let resp = self
-            .client
-            .post(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| GatewayError::ProviderUnavailable {
+        let resp = self.client.post(&url).json(req).send().await.map_err(|e| {
+            GatewayError::ProviderUnavailable {
                 provider: self.config.name.clone(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let body = resp.text().await.unwrap_or_default();

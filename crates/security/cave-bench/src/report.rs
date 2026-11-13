@@ -73,7 +73,8 @@ fn to_json(findings: &[Finding], summary: &ScanSummary) -> String {
     serde_json::to_string_pretty(&serde_json::json!({
         "summary": summary,
         "findings": findings,
-    })).unwrap_or_else(|_| "{}".into())
+    }))
+    .unwrap_or_else(|_| "{}".into())
 }
 
 fn to_sarif(findings: &[Finding]) -> Result<String, serde_json::Error> {
@@ -100,7 +101,9 @@ fn to_sarif(findings: &[Finding]) -> Result<String, serde_json::Error> {
                         Verdict::Info => "note".into(),
                         Verdict::NotApplicable => "none".into(),
                     },
-                    message: SarifMessage { text: f.message.clone() },
+                    message: SarifMessage {
+                        text: f.message.clone(),
+                    },
                 })
                 .collect(),
         }],
@@ -114,11 +117,20 @@ fn to_html(findings: &[Finding], summary: &ScanSummary) -> String {
     s.push_str("<title>cave-bench report</title>");
     s.push_str("<style>body{font-family:system-ui,sans-serif;margin:2em}");
     s.push_str("table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4em .8em}");
-    s.push_str(".pass{color:#0a0}.fail{color:#c00;font-weight:bold}.warn{color:#a60}</style></head><body>");
-    s.push_str(&format!("<h1>cave-bench report — {}</h1>", summary.profile_id));
+    s.push_str(
+        ".pass{color:#0a0}.fail{color:#c00;font-weight:bold}.warn{color:#a60}</style></head><body>",
+    );
+    s.push_str(&format!(
+        "<h1>cave-bench report — {}</h1>",
+        summary.profile_id
+    ));
     s.push_str(&format!(
         "<p>Total: {} · Pass: {} · Fail: {} · Warn: {} · Score: {:.2}%</p>",
-        summary.total, summary.passed, summary.failed, summary.warned, summary.score * 100.0
+        summary.total,
+        summary.passed,
+        summary.failed,
+        summary.warned,
+        summary.score * 100.0
     ));
     s.push_str("<table><thead><tr><th>ID</th><th>Verdict</th><th>Severity</th><th>Host</th><th>Message</th></tr></thead><tbody>");
     for f in findings {
@@ -143,7 +155,10 @@ fn to_html(findings: &[Finding], summary: &ScanSummary) -> String {
 
 fn to_markdown(findings: &[Finding], summary: &ScanSummary) -> String {
     let mut s = String::new();
-    s.push_str(&format!("# cave-bench report — `{}`\n\n", summary.profile_id));
+    s.push_str(&format!(
+        "# cave-bench report — `{}`\n\n",
+        summary.profile_id
+    ));
     s.push_str(&format!(
         "**Total:** {} · **Pass:** {} · **Fail:** {} · **Warn:** {} · **Errored:** {} · **Score:** {:.2}%\n\n",
         summary.total, summary.passed, summary.failed, summary.warned, summary.errored, summary.score * 100.0
@@ -153,7 +168,10 @@ fn to_markdown(findings: &[Finding], summary: &ScanSummary) -> String {
     for f in findings {
         s.push_str(&format!(
             "| {} | {} | {} | {} | {} |\n",
-            f.check_id, f.verdict.as_str(), f.severity.as_str(), f.host,
+            f.check_id,
+            f.verdict.as_str(),
+            f.severity.as_str(),
+            f.host,
             f.message.replace('|', "\\|")
         ));
     }
@@ -161,7 +179,10 @@ fn to_markdown(findings: &[Finding], summary: &ScanSummary) -> String {
 }
 
 fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 #[cfg(test)]
@@ -170,7 +191,12 @@ mod tests {
     use crate::models::{Check, Framework, NodeType, Severity, Target};
 
     fn fixture() -> (Vec<Finding>, ScanSummary) {
-        let c = Check::new("cis-1.2.1", Framework::CisK8s, NodeType::Master, "anonymous-auth");
+        let c = Check::new(
+            "cis-1.2.1",
+            Framework::CisK8s,
+            NodeType::Master,
+            "anonymous-auth",
+        );
         let findings = vec![
             Finding::pass(&c, "n1", "ok"),
             Finding::fail(&c, "n1", "violation"),

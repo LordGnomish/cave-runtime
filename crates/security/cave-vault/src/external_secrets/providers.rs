@@ -23,11 +23,7 @@ pub trait Provider: Send + Sync {
     ) -> Result<BTreeMap<String, Vec<u8>>, VaultError>;
 
     /// Push (write) a secret. Used by `PushSecret` controller.
-    async fn push_secret(
-        &self,
-        remote_ref: &RemoteRef,
-        value: &[u8],
-    ) -> Result<(), VaultError>;
+    async fn push_secret(&self, remote_ref: &RemoteRef, value: &[u8]) -> Result<(), VaultError>;
 
     /// List all secrets in a namespace / regex.
     async fn list_secrets(&self, name_pattern: &str) -> Result<Vec<String>, VaultError>;
@@ -85,14 +81,13 @@ impl Provider for FakeProvider {
             .ok_or_else(|| VaultError::NotFound(format!("fake: key {} not found", remote_ref.key)))
     }
 
-    async fn push_secret(
-        &self,
-        remote_ref: &RemoteRef,
-        value: &[u8],
-    ) -> Result<(), VaultError> {
+    async fn push_secret(&self, remote_ref: &RemoteRef, value: &[u8]) -> Result<(), VaultError> {
         let mut g = self.store.write();
         let m = g.entry(remote_ref.key.clone()).or_default();
-        let prop = remote_ref.property.clone().unwrap_or_else(|| "value".into());
+        let prop = remote_ref
+            .property
+            .clone()
+            .unwrap_or_else(|| "value".into());
         m.insert(prop, value.to_vec());
         Ok(())
     }
@@ -112,9 +107,7 @@ impl Provider for FakeProvider {
 /// Build a `Provider` for the given `ProviderConfig`. The non-Fake variants are
 /// thin wrappers that route into `crate::engines::*` (Vault) or to the
 /// downstream cloud SDK adapters (AWS-SM, GCP-SM, Azure-KV) — see scope_cuts.
-pub fn build_provider(
-    cfg: &ProviderConfig,
-) -> Result<std::sync::Arc<dyn Provider>, VaultError> {
+pub fn build_provider(cfg: &ProviderConfig) -> Result<std::sync::Arc<dyn Provider>, VaultError> {
     match cfg {
         ProviderConfig::Fake => Ok(std::sync::Arc::new(FakeProvider::default())),
         ProviderConfig::Vault { .. } => Ok(std::sync::Arc::new(FakeProvider::default())),

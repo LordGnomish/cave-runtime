@@ -224,7 +224,11 @@ mod tests {
 
     #[test]
     fn reclaimable_bytes_sums_orphan_sizes() {
-        let blobs = vec![blob("a", 100, 3600), blob("b", 200, 3600), blob("c", 50, 3600)];
+        let blobs = vec![
+            blob("a", 100, 3600),
+            blob("b", 200, 3600),
+            blob("c", 50, 3600),
+        ];
         let refs = vec![Reference {
             digest: "b".into(),
             artifact_id: "art".into(),

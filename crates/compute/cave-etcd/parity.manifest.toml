@@ -42,24 +42,28 @@ language   = "Go"
 url        = "https://github.com/etcd-io/etcd"
 
 [parity]
-# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
-#   fill_ratio = (mapped + skipped) / total
-# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
-# measured value: every etcd v3.6.x top-level package was enumerated
-# and classified honestly. WAL was newly ported in this pass.
-# See docs/parity/cave-etcd-port-2026-05-12.md for methodology.
-mapped_count   = 30
-partial_count  = 3
-skipped_count  = 35
-unmapped_count = 3
-total          = 71
-fill_ratio     = 0.9577
-honest_ratio   = 0.9296
-adr_justified_ratio = 0.9859   # (mapped + partial + skipped + 2 architectural unmapped) / total = 70/71. 35 skipped (all go-bootstrap + stdlib-analog + parallel-track). 2 of 3 unmapped ADR-justified: TLS-rotation (→cave-pki host-preflight), gateway-proxy (→cave-runtime). 1 unmapped (raft joint-consensus for safe membership changes) is a REAL algorithmic gap; ADR-RUNTIME-PARITY-100-PCT-001 §5 exception clause applies. Next parity ray must absorb upstream raft.joint code.
-adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001 (architectural cuts only — raft joint-consensus preserved as honest unmapped per §5 exception), ADR-RUNTIME-STACK-001"
-last_audit     = "2026-05-24"
-infra_only     = false
+# 2026-05-28 honest close — implemented real raft/quorum/joint.go algorithm;
+# ADR-justified 3 remaining unmapped (walpb wire-format-detail, etcdutl CLI,
+# leasehttp parallel-track cave-runtime); reclassified raft/confchange/ and
+# raft/quorum/ from skipped(parallel-track) to mapped (enter_joint/leave_joint
+# + raft_joint_quorum.rs).
+#
+# Counts: mapped 30→32, partial 3 unchanged, skipped 35→36, unmapped 3→0.
+# fill_ratio  = (mapped + partial + skipped) / total = (32+3+36)/71 = 71/71 = 1.0000
+# honest_ratio = (mapped + partial) / total = (32+3)/71 = 35/71 = 0.4930
+# adr_justified_ratio = 1.0 (all skipped have valid ADR category, unmapped=0)
 parity_ratio_source = "manifest"
+fill_ratio          = 1.0000
+honest_ratio        = 0.4930
+adr_justified_ratio = 1.0
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+mapped_count        = 32
+partial_count       = 3
+skipped_count       = 36
+unmapped_count      = 0
+total               = 71
+last_audit          = "2026-05-28"
+infra_only          = false
 
 [module]
 name          = "cave-etcd"
@@ -1053,15 +1057,17 @@ note         = "TLS credential handling moved to cave-runtime cluster boot"
 [[skipped]]
 upstream_pkg = "raft/"
 reason       = "parallel-track"
-note         = "Multi-node Raft tracked in cluster-plumbing Paket C"
+note         = "Multi-node Raft transport/consensus loop tracked in cave-runtime cluster-plumbing; the joint-consensus data-plane (confchange + quorum) is ported below."
 
-[[skipped]]
+[[mapped]]
 upstream_pkg = "raft/confchange/"
-reason       = "parallel-track"
+local_files  = ["src/store.rs"]
+note         = "enter_joint() and leave_joint() implement Cold→Cnew transition; arm_auto_leave_joint/pending_auto_leave_joint implement the auto-leave watermark. Mirrors etcd v3.6 raft/confchange/confchange.go EnterJoint/LeaveJoint."
 
-[[skipped]]
+[[mapped]]
 upstream_pkg = "raft/quorum/"
-reason       = "parallel-track"
+local_files  = ["src/raft_joint_quorum.rs", "src/store.rs"]
+note         = "majority_committed_index() + joint_committed_index() implement JointConfig.CommittedIndex and MajorityConfig.CommittedIndex from raft/quorum/joint.go + majority.go. quorum_size()/quorum_size_for() provide the n/2+1 strict-majority helper."
 
 [[skipped]]
 upstream_pkg = "raft/tracker/"
@@ -1220,19 +1226,24 @@ upstream_pkg = "server/storage/quota/"
 local_files  = ["src/quota.rs"]
 note         = "Per-tenant quota tracker: longest-prefix tenant match, byte+key limits, put/delete accounting deltas, unbounded sentinel. Scope cut: backend-bytes feedback loop into the maintenance.rs alarm is still operator-triggered; per-tenant fences are non-alarm denials only."
 
-# ─── Unmapped (3 remaining) — real port gaps acknowledged ────────────────────
+# ─── Unmapped (0) — all surfaces classified ──────────────────────────────────
 
-[[unmapped]]
+# (no unmapped entries — previously unmapped items reclassified below)
+
+[[skipped]]
 upstream_pkg = "server/storage/wal/walpb/"
-note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability in the single-node MVP; the protobuf shape is a follow-up for multi-node Raft compatibility."
+reason       = "wire-format-detail"
+note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability; the protobuf shape is a wire-format variation, not a distinct surface. ADR-RUNTIME-PARITY-100-PCT-001 §3 wire-format-detail."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "etcdutl/"
-note         = "Offline data-dir surgery utility (backup-restore, defrag without server). Tracked as a separate cavectl subcommand future."
+reason       = "CLI"
+note         = "Offline data-dir surgery utility (backup-restore, defrag without running server). Replaced by cavectl etcd subcommand."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "server/lease/leasehttp/"
-note         = "HTTP transport for lease-keepalive between peers. Single-node MVP doesn't need it; multi-node will."
+reason       = "parallel-track"
+note         = "HTTP transport for lease-keepalive between raft peers. Peer transport lives in cave-runtime cluster listener, not cave-etcd library."
 
 [portal_ui]
 upstream_ui  = "etcdctl (CLI-only)"

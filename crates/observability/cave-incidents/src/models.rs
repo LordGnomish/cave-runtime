@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+// ── Core Incident Models ──────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Incident {
     pub id: Uuid,
@@ -13,12 +15,14 @@ pub struct Incident {
     pub severity: IncidentSeverity,
     pub status: IncidentStatus,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub acknowledged_at: Option<DateTime<Utc>>,
     pub resolved_at: Option<DateTime<Utc>>,
     pub created_by: Uuid,
     pub assigned_to: Option<Uuid>,
     pub timeline: Vec<TimelineEntry>,
     pub tags: Vec<String>,
+    pub responders: Vec<Responder>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -49,6 +53,141 @@ pub struct TimelineEntry {
     pub created_by: Uuid,
 }
 
+// ── Responder Models ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Responder {
+    pub user_id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub role: ResponderRole,
+    pub paged_at: DateTime<Utc>,
+    pub acknowledged_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponderRole {
+    CommandingOfficer,
+    Responder,
+    Observer,
+}
+
+// ── PostMortem Models ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PostMortem {
+    pub id: Uuid,
+    pub incident_id: Uuid,
+    pub title: String,
+    pub summary: String,
+    pub root_cause: String,
+    pub action_items: Vec<String>,
+    pub status: PostMortemStatus,
+    pub created_at: DateTime<Utc>,
+    pub published_at: Option<DateTime<Utc>>,
+    pub author_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PostMortemStatus {
+    Draft,
+    InReview,
+    Published,
+}
+
+// ── Incident Metrics ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IncidentMetrics {
+    pub total_incidents: u64,
+    pub open_incidents: u64,
+    pub p1_count: u64,
+    pub p2_count: u64,
+    pub p3_count: u64,
+    pub p4_count: u64,
+    /// Mean time to acknowledge in seconds (None if no resolved incidents)
+    pub avg_time_to_acknowledge_secs: Option<f64>,
+    /// Mean time to resolve in seconds (None if no resolved incidents)
+    pub avg_time_to_resolve_secs: Option<f64>,
+    pub resolved_this_week: u64,
+}
+
+// ── On-Call Schedule Models ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OnCallUser {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub phone: Option<String>,
+    pub notification_prefs: Vec<NotificationChannel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationChannel {
+    Email,
+    Slack,
+    Sms,
+    PagerDuty,
+    Webhook,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ScheduleLayer {
+    pub id: Uuid,
+    pub name: String,
+    pub rotation_type: RotationType,
+    pub rotation_period_days: u32,
+    pub users: Vec<OnCallUser>,
+    pub current_index: usize,
+    pub starts_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum RotationType {
+    Daily,
+    Weekly,
+    Custom,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OnCallSchedule {
+    pub id: Uuid,
+    pub name: String,
+    pub timezone: String,
+    pub layers: Vec<ScheduleLayer>,
+}
+
+// ── Escalation Policy Models ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EscalationPolicy {
+    pub id: Uuid,
+    pub name: String,
+    pub steps: Vec<EscalationStep>,
+    pub repeat_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EscalationStep {
+    pub delay_minutes: u32,
+    pub targets: Vec<EscalationTarget>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case", tag = "type", content = "id")]
+pub enum EscalationTarget {
+    User(Uuid),
+    Schedule(Uuid),
+    Team(String),
+}
+
+// ── Errors ────────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Error)]
 pub enum IncidentError {
     #[error("Invalid state transition from {from:?} to {to:?}")]
@@ -60,9 +199,15 @@ pub enum IncidentError {
     AlreadyResolved,
     #[error("Incident must be acknowledged before resolving")]
     NotAcknowledged,
+    #[error("Incident not found: {0}")]
+    NotFound(Uuid),
+    #[error("PostMortem not found: {0}")]
+    PostMortemNotFound(Uuid),
 }
 
-#[derive(Debug, Deserialize)]
+// ── Requests ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct CreateIncidentRequest {
     pub title: String,
     pub description: String,
@@ -71,24 +216,61 @@ pub struct CreateIncidentRequest {
     pub tags: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcknowledgeRequest {
+    pub user_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResolveRequest {
+    pub user_id: Uuid,
+    pub resolution: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CloseRequest {
+    pub user_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreatePostMortemRequest {
+    pub incident_id: Uuid,
+    pub title: String,
+    pub summary: String,
+    pub root_cause: String,
+    pub action_items: Vec<String>,
+    pub author_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AddResponderRequest {
+    pub user_id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub role: ResponderRole,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn make_incident() -> Incident {
+        let now = Utc::now();
         Incident {
             id: Uuid::new_v4(),
             title: "Database down".to_string(),
             description: "Primary DB is unreachable".to_string(),
             severity: IncidentSeverity::P1,
             status: IncidentStatus::Open,
-            created_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
             acknowledged_at: None,
             resolved_at: None,
             created_by: Uuid::new_v4(),
             assigned_to: None,
             timeline: vec![],
             tags: vec!["database".to_string(), "infra".to_string()],
+            responders: vec![],
         }
     }
 

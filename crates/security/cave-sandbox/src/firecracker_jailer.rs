@@ -72,17 +72,33 @@ impl JailerParams {
     /// Render argv for `exec()` — used for diagnostic CLI surface.
     pub fn to_argv(&self) -> Vec<String> {
         let mut v: Vec<String> = vec![
-            "--id".into(), self.id.clone(),
-            "--exec-file".into(), self.exec_file.clone(),
-            "--uid".into(), self.uid.to_string(),
-            "--gid".into(), self.gid.to_string(),
-            "--chroot-base-dir".into(), self.chroot_base_dir.clone(),
-            "--cgroup-version".into(), self.cgroup_version.to_string(),
+            "--id".into(),
+            self.id.clone(),
+            "--exec-file".into(),
+            self.exec_file.clone(),
+            "--uid".into(),
+            self.uid.to_string(),
+            "--gid".into(),
+            self.gid.to_string(),
+            "--chroot-base-dir".into(),
+            self.chroot_base_dir.clone(),
+            "--cgroup-version".into(),
+            self.cgroup_version.to_string(),
         ];
-        if self.daemonize { v.push("--daemonize".into()); }
-        if self.new_pid_ns { v.push("--new-pid-ns".into()); }
-        if let Some(n) = self.numa_node { v.push("--node".into()); v.push(n.to_string()); }
-        if let Some(p) = &self.parent_cgroup { v.push("--parent-cgroup".into()); v.push(p.clone()); }
+        if self.daemonize {
+            v.push("--daemonize".into());
+        }
+        if self.new_pid_ns {
+            v.push("--new-pid-ns".into());
+        }
+        if let Some(n) = self.numa_node {
+            v.push("--node".into());
+            v.push(n.to_string());
+        }
+        if let Some(p) = &self.parent_cgroup {
+            v.push("--parent-cgroup".into());
+            v.push(p.clone());
+        }
         for c in &self.cgroups {
             v.push("--cgroup".into());
             v.push(format!("{}.{}={}", c.controller, c.key, c.value));
@@ -129,7 +145,11 @@ mod tests {
     #[test]
     fn cgroup_limit_flag_encoding() {
         let mut p = JailerParams::new("v", "/x/fc");
-        p.cgroups.push(CgroupLimit { controller: "cpu".into(), key: "max".into(), value: "200000 100000".into() });
+        p.cgroups.push(CgroupLimit {
+            controller: "cpu".into(),
+            key: "max".into(),
+            value: "200000 100000".into(),
+        });
         let argv = p.to_argv();
         let idx = argv.iter().position(|a| a == "--cgroup").unwrap();
         assert_eq!(argv[idx + 1], "cpu.max=200000 100000");
@@ -138,7 +158,10 @@ mod tests {
     #[test]
     fn resource_limit_encoded() {
         let mut p = JailerParams::new("v", "/x/fc");
-        p.resource_limits.push(ResourceLimit { kind: "no-file".into(), value: 1024 });
+        p.resource_limits.push(ResourceLimit {
+            kind: "no-file".into(),
+            value: 1024,
+        });
         let argv = p.to_argv();
         let idx = argv.iter().position(|a| a == "--resource-limit").unwrap();
         assert_eq!(argv[idx + 1], "no-file=1024");

@@ -15,14 +15,32 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
+const TODAY: &str = "2026-06-07";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 
+/// Walk up from the crate manifest dir until we find the workspace-root
+/// `Cargo.toml` (the one carrying `[workspace]`). Robust against the
+/// theme-reorg that nested crates under `crates/<theme>/<crate>` — a
+/// fixed `pop()` count would land in `crates/` and read the wrong file.
 fn workspace_root() -> PathBuf {
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
-    p.pop();
-    p.pop();
-    p
+    loop {
+        let cargo = p.join("Cargo.toml");
+        if fs::read_to_string(&cargo)
+            .map(|s| s.contains("[workspace]"))
+            .unwrap_or(false)
+        {
+            return p;
+        }
+        if !p.pop() {
+            // Fell off the filesystem root — fall back to the legacy
+            // two-level pop so the assertion message is still meaningful.
+            let mut fallback: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+            fallback.pop();
+            fallback.pop();
+            return fallback;
+        }
+    }
 }
 
 fn manifest_text() -> String {
@@ -114,9 +132,15 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_cave_crm_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // Post theme-reorg the workspace uses a glob (`crates/*/*`) rather than
+    // an explicit per-crate path. Accept either the glob or the legacy
+    // explicit path (`crates/cave-crm` or `crates/<theme>/cave-crm`).
+    let listed = cargo.contains("\"crates/*/*\"")
+        || cargo.contains("\"crates/*\"")
+        || cargo.contains("cave-crm\"");
     assert!(
-        cargo.contains("\"crates/cave-crm\""),
-        "root Cargo.toml [workspace.members] must list \"crates/cave-crm\""
+        listed,
+        "root Cargo.toml [workspace.members] must include cave-crm (glob or explicit path)"
     );
 }
 

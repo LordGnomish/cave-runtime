@@ -112,9 +112,7 @@ pub fn verify(token: &str, audience: &str, bundle: &Bundle) -> Result<JwtSvidCla
         .jwt_authorities
         .iter()
         .find(|a| a.key_id == header.kid)
-        .ok_or_else(|| {
-            IdentityError::JwtInvalid(format!("unknown kid: {}", header.kid))
-        })?;
+        .ok_or_else(|| IdentityError::JwtInvalid(format!("unknown kid: {}", header.kid)))?;
     if authority.tainted {
         return Err(IdentityError::JwtInvalid(format!(
             "kid {} tainted",

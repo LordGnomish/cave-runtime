@@ -52,12 +52,17 @@ time = { version = "0.3", features = ["std"] }
 base64 = "0.22"
 hex = "0.4"
 rand = "0.8"
-rsa = { version = "0.9", features = ["sha2"] }
 sha2 = "0.10"
+rsa = { version = "0.9", features = ["sha2"] }
+# Post-quantum KEM for the seal-wrap barrier (FIPS 203 ML-KEM, RustCrypto).
+# `getrandom` enables SysRng-backed keygen/encapsulation; `hazmat` exposes the
+# deterministic encapsulation used to pin a reproducible KAT in tests.
+ml-kem = { version = "0.3", features = ["getrandom", "hazmat"] }
 async-trait = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }

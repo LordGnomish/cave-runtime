@@ -28,6 +28,7 @@ pub mod file_io;
 pub mod manifest;
 pub mod manifest_list;
 pub mod memory_catalog;
+pub mod metrics_eval;
 pub mod namespace;
 pub mod rest_catalog;
 pub mod scan;
@@ -49,6 +50,7 @@ pub use manifest::{
 };
 pub use manifest_list::{ManifestFile, ManifestList, ManifestListContent};
 pub use memory_catalog::MemoryCatalog;
+pub use metrics_eval::InclusiveMetricsEvaluator;
 pub use namespace::{Namespace, NamespaceIdent};
 pub use rest_catalog::RestCatalog;
 pub use scan::{FileScanTask, ScanBuilder};
@@ -57,7 +59,7 @@ pub use snapshot::{Snapshot, SnapshotRef};
 pub use sort_order::{NullOrder, SortDirection, SortField, SortOrder};
 pub use table::{Table, TableIdent};
 pub use table_metadata::{FormatVersion, TableMetadata, TableMetadataBuilder};
-pub use transaction::{rewrite_manifest, Transaction};
+pub use transaction::{Transaction, rewrite_manifest};
 pub use transform::Transform;
 pub use writer::{DataFileWriter, WriteOperation, WritePlan};
 

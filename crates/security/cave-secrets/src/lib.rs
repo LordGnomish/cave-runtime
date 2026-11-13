@@ -13,6 +13,7 @@ pub mod detector;
 pub mod models;
 pub mod precommit;
 pub mod routes;
+pub mod sanitizer;
 
 use axum::Router;
 use std::sync::Arc;
