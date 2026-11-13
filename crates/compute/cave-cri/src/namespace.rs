@@ -50,7 +50,7 @@ pub fn build_clone_flags(config: &NamespaceConfig) -> i32 {
             flags |= CloneFlags::CLONE_NEWPID.bits();
         }
         if config.net {
-            flags |= CloneFlags::CLONE_NEWNS.bits();
+            flags |= CloneFlags::CLONE_NEWNET.bits();
         }
         if config.mnt {
             flags |= CloneFlags::CLONE_NEWNS.bits();
