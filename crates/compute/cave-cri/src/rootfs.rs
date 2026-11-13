@@ -353,6 +353,79 @@ mod tests {
         assert!(!target.join("subdir").join("old.txt").exists());
     }
 
+    // ── overlay mount arguments (Linux) ───────────────────────────────────────
+    //
+    // The mount itself needs CAP_SYS_ADMIN; what is passed to it is computed
+    // by two pure functions that are tested here.
+
+    #[cfg(target_os = "linux")]
+    fn image_with_blobs(has_blob: &[bool]) -> OciImage {
+        let mut image = make_empty_image();
+        for (i, has_blob) in has_blob.iter().enumerate() {
+            image.layers.push(OciLayer {
+                digest: format!("sha256:{i}"),
+                size: 1,
+                media_type: "application/vnd.oci.image.layer.v1.tar+gzip".into(),
+                local_path: has_blob.then(|| PathBuf::from(format!("/blobs/{i}.tar.gz"))),
+            });
+        }
+        image
+    }
+
+    /// overlayfs stacks `lowerdir=a:b:c` with `a` on top. Image layers are
+    /// listed base first, so the last layer has to come first.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_lists_the_extracted_layers_topmost_first() {
+        let image = image_with_blobs(&[true, true, true]);
+
+        let dirs = overlay_lower_dirs(&image, Path::new("/state/containers/c1"));
+
+        assert_eq!(
+            dirs,
+            [
+                PathBuf::from("/state/containers/c1/layer_2"),
+                PathBuf::from("/state/containers/c1/layer_1"),
+                PathBuf::from("/state/containers/c1/layer_0"),
+            ]
+        );
+    }
+
+    /// A layer without a local blob is never extracted, so its directory
+    /// does not exist; naming it would make mount(2) fail with ENOENT.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_leaves_out_layers_that_were_not_extracted() {
+        let image = image_with_blobs(&[true, false, true, false]);
+
+        let dirs = overlay_lower_dirs(&image, Path::new("/c"));
+
+        assert_eq!(
+            dirs,
+            [PathBuf::from("/c/layer_2"), PathBuf::from("/c/layer_0")]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_is_empty_when_nothing_was_extracted() {
+        assert!(overlay_lower_dirs(&make_empty_image(), Path::new("/c")).is_empty());
+        assert!(overlay_lower_dirs(&image_with_blobs(&[false, false]), Path::new("/c")).is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_options_name_the_lower_upper_and_work_directories() {
+        let lower = [PathBuf::from("/c/layer_1"), PathBuf::from("/c/layer_0")];
+
+        let opts = overlay_options(&lower, Path::new("/c/upper"), Path::new("/c/work"));
+
+        assert_eq!(
+            opts,
+            "lowerdir=/c/layer_1:/c/layer_0,upperdir=/c/upper,workdir=/c/work"
+        );
+    }
+
     #[test]
     fn test_cleanup_rootfs_removes_created_dir() {
         let container_id = "cleanup-test-container";
