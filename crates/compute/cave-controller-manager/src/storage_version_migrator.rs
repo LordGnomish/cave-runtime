@@ -136,12 +136,7 @@ pub trait MigrationSource: Send + Sync {
     /// Re-issue an identity PUT for one instance — re-encoding to the
     /// new storage version. Returns `Ok(true)` on success, `Ok(false)`
     /// if the object already moved storage version (count it, skip it).
-    async fn touch(
-        &self,
-        target: &TargetGvr,
-        namespace: &str,
-        name: &str,
-    ) -> Result<bool, String>;
+    async fn touch(&self, target: &TargetGvr, namespace: &str, name: &str) -> Result<bool, String>;
 }
 
 /// In-memory fake source used by tests and the cave-portal preview.
@@ -274,8 +269,7 @@ impl StorageVersionMigrator {
             Phase::Running => {
                 const BATCH: usize = 64;
                 let take = self.pending_items.len().min(BATCH);
-                let chunk: Vec<(String, String)> =
-                    self.pending_items.drain(..take).collect();
+                let chunk: Vec<(String, String)> = self.pending_items.drain(..take).collect();
                 for (ns, name) in chunk {
                     match self.source.touch(&self.spec.target, &ns, &name).await {
                         Ok(_) => self.status.progress.completed += 1,
@@ -352,11 +346,8 @@ mod tests {
     #[tokio::test]
     async fn run_to_completion_succeeds_when_all_touches_ok() {
         let src = Arc::new(InMemoryMigrationSource::new());
-        src.seed(
-            &sample_target(),
-            vec![("a", "x"), ("b", "y"), ("c", "z")],
-        )
-        .await;
+        src.seed(&sample_target(), vec![("a", "x"), ("b", "y"), ("c", "z")])
+            .await;
         let mut m = StorageVersionMigrator::new(sample_spec(), src);
         let phase = m.run_to_completion(8).await;
         assert_eq!(phase, Phase::Succeeded);

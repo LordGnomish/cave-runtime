@@ -25,4 +25,5 @@ bytes = "1"
 regex = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true, features = ["macros", "rt"] }

@@ -25,7 +25,10 @@ pub enum SubscriberKind {
     /// In-process SSE subscriber (HTTP /api/admin/impressions/stream).
     Sse(String),
     /// External webhook subscriber — POST to URL.
-    Webhook { url: String, signing_secret: Option<String> },
+    Webhook {
+        url: String,
+        signing_secret: Option<String>,
+    },
 }
 
 #[derive(Debug)]
@@ -99,10 +102,7 @@ impl ImpressionBus {
 /// SSE wire encoding (text/event-stream).
 pub fn sse_encode(event: &ImpressionEvent) -> String {
     let payload = serde_json::to_string(event).unwrap_or_else(|_| "{}".into());
-    format!(
-        "event: impression\ndata: {}\n\n",
-        payload
-    )
+    format!("event: impression\ndata: {}\n\n", payload)
 }
 
 /// HMAC-SHA256 webhook signature (hex-encoded) — used so consumers can verify

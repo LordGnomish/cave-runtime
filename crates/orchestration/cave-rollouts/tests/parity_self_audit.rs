@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v1.9.0";
 const PINNED_SHA: &str = "838d4e792be666ec11bd0c80331e0c5511b5010e";
@@ -70,7 +70,11 @@ fn assertion_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 #[test]
@@ -151,7 +155,11 @@ fn assertion_8_no_stub_macros_in_src() {
             }
         }
     });
-    assert!(offenders.is_empty(), "stub gate failed: {}", offenders.join("\n"));
+    assert!(
+        offenders.is_empty(),
+        "stub gate failed: {}",
+        offenders.join("\n")
+    );
 }
 
 #[test]
@@ -159,7 +167,7 @@ fn assertion_9_rollouts_surface_intact() {
     use cave_rollouts::experiment::{
         Experiment, ExperimentAnalysis, ExperimentPhase, ExperimentTemplate,
     };
-    use cave_rollouts::traffic_router::{render_patch, TrafficProvider, WeightSplit};
+    use cave_rollouts::traffic_router::{TrafficProvider, WeightSplit, render_patch};
 
     let mut e = Experiment::new(
         "demo",
@@ -219,9 +227,7 @@ fn assertion_9_rollouts_surface_intact() {
 
     use cave_rollouts::analysis::compute_analysis_phase;
     use cave_rollouts::engine::initial_status;
-    use cave_rollouts::models::{
-        BlueGreenStrategy, CanaryStep, CanaryStrategy, RolloutStrategy,
-    };
+    use cave_rollouts::models::{BlueGreenStrategy, CanaryStep, CanaryStrategy, RolloutStrategy};
     use cave_rollouts::notifications::should_notify;
     use cave_rollouts::types::{NotificationEvent, RolloutPhase};
 

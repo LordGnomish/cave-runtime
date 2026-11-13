@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 pub mod engine;
+pub mod events;
 pub mod executor;
 pub mod models;
 pub mod routes;

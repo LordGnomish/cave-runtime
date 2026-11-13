@@ -209,7 +209,12 @@ fn assertion_8_no_stub_macros_in_src() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut files = Vec::new();
     collect_rs(&root, &mut files);
-    let needles = ["todo!(", "unimplemented!(", "panic!(\"stub", "panic!(\"todo"];
+    let needles = [
+        "todo!(",
+        "unimplemented!(",
+        "panic!(\"stub",
+        "panic!(\"todo",
+    ];
     let mut hits = Vec::new();
     for f in &files {
         let text = fs::read_to_string(f).unwrap_or_default();

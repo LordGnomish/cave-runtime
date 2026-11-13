@@ -11,20 +11,60 @@ use crate::models::{Check, CisLevel, Framework, NodeType, Severity};
 pub fn control_plane_checks() -> Vec<(Check, CisRule)> {
     let mut out = Vec::new();
 
-    out.push(flag_neq("cis-3.1.1", "Client certificate authentication should not be used for users",
-        "apiserver", "--client-ca-file", "", Severity::Medium));
-    out.push(flag_neq("cis-3.2.1", "Ensure that a minimal audit policy is created",
-        "apiserver", "--audit-policy-file", "", Severity::High));
-    out.push(file_exists("cis-3.2.2", "Ensure that the audit-policy file exists on disk",
-        "/etc/kubernetes/audit/audit-policy.yaml", Severity::High));
-    out.push(flag_has("cis-3.2.3", "Ensure audit-policy covers sensitive resources (secrets)",
-        "apiserver", "--audit-policy-file", "audit-policy.yaml", Severity::Medium));
-    out.push(flag_eq("cis-3.3.1", "Ensure the scheduler --bind-address is 127.0.0.1",
-        "scheduler", "--bind-address", "127.0.0.1", Severity::Medium));
-    out.push(flag_eq("cis-3.3.2", "Ensure the controller-manager --bind-address is 127.0.0.1",
-        "controller-manager", "--bind-address", "127.0.0.1", Severity::Medium));
-    out.push(flag_eq("cis-3.4.1", "Ensure --profiling is false on control-plane (apiserver)",
-        "apiserver", "--profiling", "false", Severity::Low));
+    out.push(flag_neq(
+        "cis-3.1.1",
+        "Client certificate authentication should not be used for users",
+        "apiserver",
+        "--client-ca-file",
+        "",
+        Severity::Medium,
+    ));
+    out.push(flag_neq(
+        "cis-3.2.1",
+        "Ensure that a minimal audit policy is created",
+        "apiserver",
+        "--audit-policy-file",
+        "",
+        Severity::High,
+    ));
+    out.push(file_exists(
+        "cis-3.2.2",
+        "Ensure that the audit-policy file exists on disk",
+        "/etc/kubernetes/audit/audit-policy.yaml",
+        Severity::High,
+    ));
+    out.push(flag_has(
+        "cis-3.2.3",
+        "Ensure audit-policy covers sensitive resources (secrets)",
+        "apiserver",
+        "--audit-policy-file",
+        "audit-policy.yaml",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-3.3.1",
+        "Ensure the scheduler --bind-address is 127.0.0.1",
+        "scheduler",
+        "--bind-address",
+        "127.0.0.1",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-3.3.2",
+        "Ensure the controller-manager --bind-address is 127.0.0.1",
+        "controller-manager",
+        "--bind-address",
+        "127.0.0.1",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-3.4.1",
+        "Ensure --profiling is false on control-plane (apiserver)",
+        "apiserver",
+        "--profiling",
+        "false",
+        Severity::Low,
+    ));
 
     out
 }
@@ -37,7 +77,14 @@ fn make_meta(id: &str, title: &str, severity: Severity) -> Check {
     c
 }
 
-fn flag_eq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_eq(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -50,7 +97,14 @@ fn flag_eq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severit
     (meta, rule)
 }
 
-fn flag_neq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_neq(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -63,7 +117,14 @@ fn flag_neq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severi
     (meta, rule)
 }
 
-fn flag_has(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_has(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -109,8 +170,15 @@ mod tests {
     #[test]
     fn test_audit_policy_file_exists() {
         let mut ctx = CisContext::default();
-        ctx.set_file("/etc/kubernetes/audit/audit-policy.yaml", "600", "root:root");
-        let (meta, rule) = control_plane_checks().into_iter().find(|(c, _)| c.id == "cis-3.2.2").unwrap();
+        ctx.set_file(
+            "/etc/kubernetes/audit/audit-policy.yaml",
+            "600",
+            "root:root",
+        );
+        let (meta, rule) = control_plane_checks()
+            .into_iter()
+            .find(|(c, _)| c.id == "cis-3.2.2")
+            .unwrap();
         let f = evaluate_rule(&rule, &meta, &ctx, "apiserver", "n1");
         assert_eq!(f.verdict, crate::Verdict::Pass);
     }

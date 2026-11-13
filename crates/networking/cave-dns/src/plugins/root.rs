@@ -80,7 +80,10 @@ mod tests {
             directory: "/etc/coredns".into(),
         })
         .unwrap();
-        assert_eq!(p.resolve("zones/example.zone"), PathBuf::from("/etc/coredns/zones/example.zone"));
+        assert_eq!(
+            p.resolve("zones/example.zone"),
+            PathBuf::from("/etc/coredns/zones/example.zone")
+        );
     }
 
     #[test]

@@ -21,9 +21,7 @@ use cave_keda::redis_scaler::{RedisDataType, RedisScaler};
 use cave_keda::scaledjob::{ScaledJob, ScalingStrategy};
 use cave_keda::scaledobject::ScaledObject;
 use cave_keda::scaler::{Scaler, ScalerTrait, ScalingModifiers, replicas_from_metric};
-use cave_keda::trigger_authentication::{
-    EnvTargetRef, SecretTargetRef, TriggerAuthentication,
-};
+use cave_keda::trigger_authentication::{EnvTargetRef, SecretTargetRef, TriggerAuthentication};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -223,10 +221,9 @@ fn trigger_auth_env_overrides_secret_when_both_target_same_param() {
     let mut inner = HashMap::new();
     inner.insert("k".to_string(), "from-secret".to_string());
     secrets.insert("s".to_string(), inner);
-    let env: HashMap<String, String> =
-        [("TOKEN".to_string(), "from-env".to_string())]
-            .into_iter()
-            .collect();
+    let env: HashMap<String, String> = [("TOKEN".to_string(), "from-env".to_string())]
+        .into_iter()
+        .collect();
     ta.resolve(&secrets, &env);
     assert_eq!(ta.parameter("token"), Some("from-env"));
 }

@@ -17,9 +17,7 @@ use cave_kamaji::{
     konnectivity::{Konnectivity, KonnectivityMode},
     kubeadm::{KubeadmConfig, render_kubeadm_init_config},
     lifecycle::{deprovision, generate_kubeconfig, health_check, mark_running, provision},
-    models::{
-        CreateTenantRequest, TenantControlPlane, TenantPhase, TenantSpec, TenantStatus,
-    },
+    models::{CreateTenantRequest, TenantControlPlane, TenantPhase, TenantSpec, TenantStatus},
     pod_mgmt::plan_apiserver_pod,
     status::{ConditionStatus, ConditionType, status_summary},
     webhook::{WebhookError, validate_create, validate_update},
@@ -119,7 +117,10 @@ fn generate_kubeconfig_populated_when_endpoint_present() {
     let kc = generate_kubeconfig(&t).expect("kubeconfig");
     assert_eq!(kc["kind"], "Config");
     assert_eq!(kc["current-context"], "alpha");
-    assert_eq!(kc["clusters"][0]["cluster"]["server"], "https://api.alpha:6443");
+    assert_eq!(
+        kc["clusters"][0]["cluster"]["server"],
+        "https://api.alpha:6443"
+    );
 }
 
 // ---- models serde round-trip ------------------------------------------
@@ -261,7 +262,8 @@ fn konnectivity_with_server_host_and_token_propagate() {
     );
     assert!(
         args.iter()
-            .any(|a| a.contains("agent-token-file") && a.starts_with("--service-account-token-path="))
+            .any(|a| a.contains("agent-token-file")
+                && a.starts_with("--service-account-token-path="))
     );
 }
 
@@ -421,9 +423,10 @@ fn status_summary_running_with_endpoint_yields_full_true() {
         ConditionType::KonnectivityHealthy,
         ConditionType::Ready,
     ] {
-        let c = conds.iter().find(|c| c.cond_type == ct).unwrap_or_else(|| {
-            panic!("missing condition {ct:?}")
-        });
+        let c = conds
+            .iter()
+            .find(|c| c.cond_type == ct)
+            .unwrap_or_else(|| panic!("missing condition {ct:?}"));
         assert_eq!(c.status, ConditionStatus::True, "{ct:?} should be True");
     }
 }

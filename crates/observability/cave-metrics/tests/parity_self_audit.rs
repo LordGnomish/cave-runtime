@@ -16,11 +16,14 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.50;
 
 fn workspace_root() -> PathBuf {
+    // Crate lives at crates/<theme>/<crate>/ post-theme-reorg —
+    // pop three components (crate / theme / crates) to reach the workspace root.
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
+    p.pop();
     p.pop();
     p.pop();
     p
@@ -121,9 +124,13 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 fn assertion_5_crate_is_workspace_member() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
+    // Post-theme-reorg the workspace uses the themed glob "crates/*/*";
+    // accept that or the legacy per-crate listing.
+    let themed_glob = cargo.contains("\"crates/*/*\"");
+    let flat_member = cargo.contains("\"crates/cave-metrics\"");
     assert!(
-        cargo.contains("\"crates/cave-metrics\""),
-        "root Cargo.toml [workspace.members] must list \"crates/cave-metrics\""
+        themed_glob || flat_member,
+        "root Cargo.toml [workspace.members] must enumerate crates/cave-metrics or use the themed glob crates/*/*"
     );
 }
 

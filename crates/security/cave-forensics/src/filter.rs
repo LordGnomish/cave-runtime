@@ -261,7 +261,10 @@ impl MatchArg {
     pub fn matches(&self, ev: &KernelEvent) -> Result<bool> {
         let candidates = collect_arg_strings(ev, self.index);
         if candidates.is_empty() {
-            return Ok(matches!(self.operator, FilterOp::NotEqual | FilterOp::NotIn));
+            return Ok(matches!(
+                self.operator,
+                FilterOp::NotEqual | FilterOp::NotIn
+            ));
         }
         let any = |pred: &dyn Fn(&str) -> bool| candidates.iter().any(|s| pred(s));
         let all = |pred: &dyn Fn(&str) -> bool| candidates.iter().all(|s| pred(s));
@@ -308,9 +311,9 @@ fn collect_arg_strings(ev: &KernelEvent, index: u32) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::events::file::{FileEvent, FileOp};
-    use crate::events::network::{ipv4, L4Proto, NetworkEvent, NetworkOp};
+    use crate::events::network::{L4Proto, NetworkEvent, NetworkOp, ipv4};
     use crate::events::process_exec::ProcessExecEvent;
-    use crate::process::{cap, Credentials, Namespaces};
+    use crate::process::{Credentials, Namespaces, cap};
     use chrono::{TimeZone, Utc};
 
     fn ts() -> chrono::DateTime<Utc> {

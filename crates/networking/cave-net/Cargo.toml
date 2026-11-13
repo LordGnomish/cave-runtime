@@ -17,3 +17,6 @@ tracing = "0.1"
 thiserror = "1"
 dashmap = "6"
 ipnet = "2"
+
+[dev-dependencies]
+proptest = "1"

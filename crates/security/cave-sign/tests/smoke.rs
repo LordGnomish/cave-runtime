@@ -13,8 +13,8 @@ use cave_sign::attestation::{
 };
 use cave_sign::blob::{sign_blob_keypair, sign_blob_keypair_with_rekor, verify_blob};
 use cave_sign::bundle::{BundleTriple, CosignBundle};
-use cave_sign::keyless::KeylessSigner;
 use cave_sign::fulcio::FulcioClient;
+use cave_sign::keyless::KeylessSigner;
 use cave_sign::models::{Attestation, KeyAlgorithm, PredicateType, SigKind};
 use cave_sign::oidc::{IdToken, build_fixture_jwt};
 use cave_sign::policy::{Policy, Rule};
@@ -33,7 +33,11 @@ fn smoke_1_keypair_sign_verify_roundtrip() {
         assert!(result.artifact_digest.starts_with("sha256:"));
         assert_eq!(result.signature.kind, SigKind::Keypair);
         verify_blob(payload, &result.bundle).unwrap();
-        let tampered: Vec<u8> = payload.iter().copied().chain(std::iter::once(0xFF)).collect();
+        let tampered: Vec<u8> = payload
+            .iter()
+            .copied()
+            .chain(std::iter::once(0xFF))
+            .collect();
         assert!(verify_blob(&tampered, &result.bundle).is_err());
     }
 }
@@ -110,8 +114,12 @@ fn smoke_5_keyless_end_to_end_with_policy() {
     let token = IdToken::parse(&token_raw).unwrap();
     let ks = signer.sign_blob(b"keyless-payload", &token, &rk).unwrap();
     let policy = Policy::new("cave-prod")
-        .require(Rule::CertificateIdentity { glob: "*@example.com".into() })
-        .require(Rule::CertificateIssuer { exact: "https://oidc.cave.svc".into() })
+        .require(Rule::CertificateIdentity {
+            glob: "*@example.com".into(),
+        })
+        .require(Rule::CertificateIssuer {
+            exact: "https://oidc.cave.svc".into(),
+        })
         .require(Rule::RequireKeyless)
         .require(Rule::RequireRekorEntry);
     let vr = verify(VerifyRequest {

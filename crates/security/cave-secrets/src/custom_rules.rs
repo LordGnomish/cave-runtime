@@ -53,7 +53,9 @@ impl std::fmt::Display for BuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Toml(e) => write!(f, "toml parse error: {}", e),
-            Self::Regex { rule, error } => write!(f, "regex compile failed for `{}`: {}", rule, error),
+            Self::Regex { rule, error } => {
+                write!(f, "regex compile failed for `{}`: {}", rule, error)
+            }
             Self::EmptyName => f.write_str("custom rule name must not be empty"),
             Self::EmptyPattern => f.write_str("custom rule pattern must not be empty"),
         }
@@ -72,7 +74,8 @@ pub fn parse_severity(s: &str) -> Severity {
 }
 
 pub fn load_custom_rules(toml_text: &str) -> Result<Vec<CustomDetector>, BuildError> {
-    let file: CustomRulesFile = toml::from_str(toml_text).map_err(|e| BuildError::Toml(e.to_string()))?;
+    let file: CustomRulesFile =
+        toml::from_str(toml_text).map_err(|e| BuildError::Toml(e.to_string()))?;
     build(file.rules)
 }
 
@@ -194,7 +197,10 @@ mod tests {
             name = ""
             pattern = "x"
         "#;
-        assert!(matches!(load_custom_rules(toml).unwrap_err(), BuildError::EmptyName));
+        assert!(matches!(
+            load_custom_rules(toml).unwrap_err(),
+            BuildError::EmptyName
+        ));
     }
 
     #[test]
@@ -204,7 +210,10 @@ mod tests {
             name = "n"
             pattern = ""
         "#;
-        assert!(matches!(load_custom_rules(toml).unwrap_err(), BuildError::EmptyPattern));
+        assert!(matches!(
+            load_custom_rules(toml).unwrap_err(),
+            BuildError::EmptyPattern
+        ));
     }
 
     #[test]
@@ -251,7 +260,10 @@ mod tests {
     #[test]
     fn invalid_toml_returns_toml_error() {
         let toml = "this is not = valid = toml";
-        assert!(matches!(load_custom_rules(toml).unwrap_err(), BuildError::Toml(_)));
+        assert!(matches!(
+            load_custom_rules(toml).unwrap_err(),
+            BuildError::Toml(_)
+        ));
     }
 
     #[test]

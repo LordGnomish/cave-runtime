@@ -52,3 +52,4 @@ hex = "0.4"
 tokio-postgres = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"

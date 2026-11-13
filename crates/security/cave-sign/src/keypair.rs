@@ -202,7 +202,8 @@ mod tests {
 
     #[test]
     fn rejects_unknown_algorithm() {
-        let bogus = "-----BEGIN PUBLIC KEY-----\nalgorithm: rsa-4096\n\nAAAA\n-----END PUBLIC KEY-----\n";
+        let bogus =
+            "-----BEGIN PUBLIC KEY-----\nalgorithm: rsa-4096\n\nAAAA\n-----END PUBLIC KEY-----\n";
         let err = decode_public_pem(bogus).expect_err("must reject");
         assert!(matches!(err, SignError::Pem(_)));
     }

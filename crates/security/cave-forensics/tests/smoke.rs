@@ -9,17 +9,19 @@
 
 use cave_forensics::case::CaseStore;
 use cave_forensics::enforcer::Enforcer;
-use cave_forensics::events::file::{FileEvent, FileOp, OpenFlags};
-use cave_forensics::events::network::{ipv4, L4Proto, NetworkEvent, NetworkOp};
-use cave_forensics::events::process_exec::ProcessExecEvent;
 use cave_forensics::events::KernelEvent;
-use cave_forensics::evidence::{verify_chain, CustodyEntry};
+use cave_forensics::events::file::{FileEvent, FileOp, OpenFlags};
+use cave_forensics::events::network::{L4Proto, NetworkEvent, NetworkOp, ipv4};
+use cave_forensics::events::process_exec::ProcessExecEvent;
+use cave_forensics::evidence::{CustodyEntry, verify_chain};
 use cave_forensics::export::grpc_codec::{decode_events, encode_event, encode_many};
 use cave_forensics::export::json_stream::{decode_ndjson, encode_ndjson};
-use cave_forensics::filter::{ActionKind, FilterGroup, FilterOp, MatchAction, MatchArg, MatchBinary};
+use cave_forensics::filter::{
+    ActionKind, FilterGroup, FilterOp, MatchAction, MatchArg, MatchBinary,
+};
 use cave_forensics::models::{EvidenceType, ForensicSeverity};
-use cave_forensics::process::{cap, Credentials, Namespaces, Process};
-use cave_forensics::store::{matching_groups, PolicyStore};
+use cave_forensics::process::{Credentials, Namespaces, Process, cap};
+use cave_forensics::store::{PolicyStore, matching_groups};
 use cave_forensics::tracing_policy::{
     KProbeSpec, PolicyKind, PolicyMeta, TracingPolicy, TracingPolicySpec,
 };

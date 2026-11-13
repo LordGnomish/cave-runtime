@@ -38,15 +38,15 @@ url      = "https://github.com/twentyhq/twenty"
 # Counts (mapped + partial + skipped + unmapped) sum to `total`.
 # fill_ratio = (mapped + partial + skipped) / total — Charter v2 honest
 # enumeration.
-mapped_count   = 19
-partial_count  = 4
-skipped_count  = 14
+mapped_count   = 29
+partial_count  = 0
+skipped_count  = 13
 unmapped_count = 0
-total          = 37
+total          = 42
 fill_ratio     = 1.0000
-honest_ratio   = 0.5135
+honest_ratio   = 0.6905
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-06-07"
 infra_only     = false
 
 [module]
@@ -141,29 +141,77 @@ upstream = "packages/twenty-server/src/engine/workspace-manager/workspace-migrat
 local    = "src/indexes.rs"
 notes    = "Workspace index seeds — 18 IndexSpec entries (BTree/Unique/Composite)."
 
-# ─── Partial (4) ─────────────────────────────────────────────────────────────
+# ─── 2026-05-30 honest-uplift: 4 [[partial]] → [[mapped]] ────────────────────
+# Strict-TDD ports closed the deferred runtime behind each partial. The
+# IMAP/Gmail *sync worker* remains a separate scope cut (see the
+# google-gmail-sync skip + messaging-sync scope_cut); these rows cover the
+# control-plane runtime + data models, which are now fully ported.
 
-[[partial]]
-upstream = "packages/twenty-server/src/engine/api/graphql/"
-local    = "src/graphql_schema.rs"
-notes    = "Schema SDL generation from ObjectMetadata + FieldMetadata. Resolver runtime deferred — see [[scope_cuts]] graphql-resolvers."
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/api/graphql/workspace-resolver-builder/"
+local    = "src/graphql_resolver.rs"
+notes    = "GraphQL findOne/findMany execution runtime — hand-rolled parser + executor (filter eq/neq/gt/gte/lt/lte/in/ilike, cascading ASC/DESC orderBy, first+cursor pagination, camelCase projection) wrapping findMany in the Relay Connection envelope {edges:[{node,cursor}],pageInfo,totalCount}. CrmStore::graphql_query bridge + POST /api/crm/{ws}/graphql. graphql_schema.rs generates the SDL this runtime serves. Closed 2026-05-30 (was partial)."
 
-[[partial]]
-upstream = "packages/twenty-server/src/modules/calendar/standard-objects/calendar-event-attendee.workspace-entity.ts"
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/calendar/common/standard-objects/calendar-event-participant.workspace-entity.ts"
 local    = "src/models/calendar_event.rs"
-notes    = "CalendarEventAttendee — model carried, RSVP-state side effects deferred."
+notes    = "CalendarEventAttendee RSVP state — canonical Rsvp enum (NEEDS_ACTION/DECLINED/TENTATIVE/ACCEPTED), respond() overwrite transitions, Google/Microsoft/CalDAV-PARTSTAT provider normalizers, AttendanceTally roll-up. Closed 2026-05-30 (was partial)."
 
-[[partial]]
-upstream = "packages/twenty-server/src/modules/message/standard-objects/message.workspace-entity.ts"
-local    = "src/models/activity.rs"
-notes    = "Thread+message model semantics absorbed into Activity, but IMAP/Gmail wire not implemented."
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/messaging/common/standard-objects/message.workspace-entity.ts"
+local    = "src/models/message.rs"
+notes    = "Messaging workspace-entities — Message/MessageThread/MessageChannel/MessageParticipant/MessageChannelMessageAssociation with exact enum casings (MessageDirection, MessageChannelType incl. EMAIL_GROUP, MessageParticipantRole FROM/TO/CC/BCC, MessageChannelSyncStatus, MessageChannelVisibility). Dedicated models replacing the Activity approximation. IMAP/Gmail sync worker stays scope-cut. Closed 2026-05-30 (was partial on src/models/activity.rs)."
 
-[[partial]]
+[[mapped]]
 upstream = "packages/twenty-server/src/modules/timeline/services/timeline-activity.service.ts"
-local    = "src/models/activity.rs"
-notes    = "ActivityTarget enables a polymorphic feed read; per-event timeline aggregation is deferred."
+local    = "src/timeline.rs"
+notes    = "Per-record timeline read path — timeline_for_target() walks noteTarget/taskTarget polymorphic links + folds TimelineActivity audit rows, newest-first; merge_recent() applies Twenty's 10-minute dedup window. CrmStore::timeline_for_target bridge + timeline_activities map. Closed 2026-05-30 (was partial)."
 
-# ─── Skipped — alt-language / browser-UI / vendor scaffold (12) ──────────────
+# ─── 2026-05-31 honest-uplift cont: +3 [[mapped]] standard-objects ───────────
+# Strict-TDD ports grounded against twentyhq/twenty @ v2.6.0 source. Blocklist
+# moves skipped→mapped (it is a live twenty-server workspace-entity, not a
+# UI affordance); Attachment + ConnectedAccount were missing from the original
+# enumeration and are added as new mapped standard-objects.
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/blocklist/standard-objects/blocklist.workspace-entity.ts"
+local    = "src/models/blocklist.rs"
+notes    = "Blocklist workspace-entity — handle (TEXT nullable) + workspaceMember owner + the messaging-import match semantics: exact case-insensitive address rule vs whole-domain rule (@evil.test or bare evil.test) via is_blocked/is_domain_rule/normalized_handle. Promoted skipped→mapped 2026-05-31 (was wrongly cut as 'anti-spam-handled-elsewhere'; it is a first-class twenty-server backend entity)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/attachment/standard-objects/attachment.workspace-entity.ts"
+local    = "src/models/attachment.rs"
+notes    = "Attachment workspace-entity — name + fullPath + derived fileCategory (Image/Video/Audio/Pdf/Spreadsheet/Presentation/TextDocument/Archive/Other via extension) + author + polymorphic target fan-out (Person/Company/Opportunity/Task/Note/Workflow/Dashboard) collapsed to a single (target_kind,target_id) pair per the ActivityTarget idiom. New mapped 2026-05-31 (was absent from the v2.6.0 enumeration)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/connected-account/standard-objects/connected-account.workspace-entity.ts"
+local    = "src/models/connected_account.rs"
+notes    = "ConnectedAccount workspace-entity — accountOwner + provider (ConnectedAccountProvider: google/microsoft/imap_smtp_caldav/oidc/saml/email_group/app, exact wire casing) + handle/handleAliases/scopes/tokens + credential-health state machine (mark_auth_failed sets authFailedAt, record_refresh clears it) + owns_handle/all_handles. New mapped 2026-05-31. IMAP/Gmail sync worker that consumes these credentials stays scope-cut (messaging-sync ray)."
+
+# ─── 2026-06-07 honest-uplift cont: +3 [[mapped]] backend modules ────────────
+# Strict-TDD ports grounded against twentyhq/twenty @ v2.6.0 source (SHA
+# bad1f200…). Three backend modules that were absent from the original
+# v2.6.0 enumeration: the task-target polymorphic link (twin of the already-
+# mapped note-target), the Dashboard standard-object + shared ActorMetadata
+# audit composite, and the contact-creation-manager pure util layer (ported
+# verbatim against its upstream __tests__ spec vectors).
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/task/standard-objects/task-target.workspace-entity.ts"
+local    = "src/models/task_target.rs"
+notes    = "TaskTarget workspace-entity — the polymorphic link joining a Task to one CRM record. Upstream relation fan-out (task + targetPerson/targetCompany/targetOpportunity) collapsed to a single (target_kind,target_id) pair per the attachment/note-target idiom. Target set is Person/Company/Opportunity only — task-target has no targetLead. New mapped 2026-06-07 (absent from the v2.6.0 enumeration; twin of the mapped note-target)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/dashboard/standard-objects/dashboard.workspace-entity.ts"
+local    = "src/models/dashboard.rs"
+notes    = "Dashboard workspace-entity — title (nullable, lone search field per SEARCH_FIELDS_FOR_DASHBOARD) + pageLayoutId + float position + createdBy/updatedBy ActorMetadata + reorder/rename behaviors. searchVector holds the lowercased title text fed to Postgres to_tsvector (the tsvector itself is a DB GENERATED column). Bundles the shared ActorMetadata composite (packages/twenty-shared/src/types/composite-types/actor.composite-type.ts) — ActorSource (10-variant FieldActorSource: EMAIL/CALENDAR/WORKFLOW/AGENT/API/IMPORT/MANUAL/SYSTEM/WEBHOOK/APPLICATION) + ActorContext{provider?}. New mapped 2026-06-07."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/contact-creation-manager/utils/"
+local    = "src/contact_creation.rs"
+notes    = "contact-creation-manager pure util layer — line-by-line ports of extractDomainFromLink, getDomainNameFromHandle, getCompanyNameFromDomainName, getFirstNameAndLastNameFromHandleAndDisplayName, hasPrimaryEmailChanged, computeChangedAdditionalEmails. The two domain helpers replicate Twenty's psl (Public Suffix List) dependency with a faithful PSL algorithm (exception > longest exact/wildcard > default `*` prevailing rule); single-label TLDs are covered by the default rule, so only multi-label public suffixes (curated IANA ICANN subset) + sample wildcard/exception rules are embedded. All upstream __tests__/*.spec.ts vectors mirrored verbatim. New mapped 2026-06-07. The auto-companies-and-contacts creation job/worker that orchestrates these utils stays scope-cut (messaging-sync ray)."
+
+# ─── Skipped — alt-language / browser-UI / vendor scaffold (11) ──────────────
 
 [[skipped]]
 upstream = "packages/twenty-front/"
@@ -225,17 +273,13 @@ upstream = "packages/twenty-server/src/engine/webhook/"
 local    = "src/webhook.rs"
 note     = "Webhook subscription bus — per-workspace entity-event filter (Create/Update/Delete × workspace-entity), HMAC-SHA256 body signature, in-arrival-order audit log, ready-to-POST WebhookDelivery envelope for the cave-runtime event bus. Wave-3 promotion 2026-05-19."
 
-# ─── 2026-05-19 wave-3 scope cuts: 2 [[skipped]] (favorite + blocklist) ──────
+# ─── 2026-05-19 wave-3 scope cut: 1 [[skipped]] (favorite) ───────────────────
+# (blocklist promoted skipped→mapped 2026-05-31 — see the mapped section above)
 
 [[skipped]]
 upstream = "packages/twenty-server/src/modules/favorite/standard-objects/favorite.workspace-entity.ts"
-reason   = "user-preference-surface"
-note     = "Per-user starred-record UI affordance. cave-portal can implement equivalent persistence on top of the View/User entities without a dedicated Favorite workspace-entity. Was unmapped pre-wave-3."
-
-[[skipped]]
-upstream = "packages/twenty-server/src/modules/blocklist/standard-objects/blocklist.workspace-entity.ts"
-reason   = "anti-spam-handled-elsewhere"
-note     = "Email-address / domain blocklist for inbound CRM signals. cave-runtime's inbound mail pipeline (cave-auth email_listener + cave-runtime middleware) is the right scope; duplicate state inside cave-crm is unnecessary. Was unmapped pre-wave-3."
+reason   = "removed-from-server-backend-at-v2.6.0"
+note     = "The favorite standard-object module no longer exists under packages/twenty-server at the v2.6.0 pin (verified against the source tree 2026-05-31 — only packages/twenty-front/.../favorites remains). Favorites are a front-end navigation affordance in v2.6.0; cave-portal owns the equivalent. Was unmapped pre-wave-3."
 
 # ─── Scope cuts (matches unmapped) — referenced by parity_self_audit ────────
 
@@ -250,9 +294,9 @@ deferred_to = "data-ray-2"
 reason = "Gmail/IMAP/Outlook sync requires OAuth + IMAP/JMAP wire ports — large parallel ray, deferred."
 
 [[scope_cuts]]
-area = "graphql-resolvers"
+area = "graphql-resolvers-write-path"
 deferred_to = "data-ray-2"
-reason = "Apollo-server runtime equivalent. The schema SDL is generated today (`src/graphql_schema.rs`); the resolver runtime + N+1 prevention is deferred."
+reason = "The read path (findOne/findMany + Connection envelope) shipped 2026-05-30 in `src/graphql_resolver.rs`. The mutation runtime (createOne/updateMany/destroy) + N+1 dataloader batching remain deferred."
 
 [[scope_cuts]]
 area = "webhook-bus"
@@ -271,4 +315,4 @@ status       = "partial"
 loc          = 144
 priority     = "P1"
 notes        = "Full CRM React app — cave-portal/src/admin/crm/* is a v0.2 scaffold"
-last_audit   = "2026-05-19"
+last_audit   = "2026-05-31"

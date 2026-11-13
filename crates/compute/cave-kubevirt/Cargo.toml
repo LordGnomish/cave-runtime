@@ -13,3 +13,6 @@ serde_json = { workspace = true }
 
 [features]
 live-integration = []
+
+[dev-dependencies]
+proptest = "1"

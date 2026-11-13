@@ -37,15 +37,15 @@ source_sha  = "v1.0.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 14/14
-honest_ratio        = 0.8235  # mapped / total = 14/17
-last_audit          = "2026-05-19"
+fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 19/19
+honest_ratio        = 0.8636  # mapped / total = 19/22
+last_audit          = "2026-06-07"
 infra_only          = false
-mapped_count        = 14
+mapped_count        = 19
 partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
-total               = 17
+total               = 22
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
 #   mapped (14) + partial (0) + unmapped (0) = 14 in-scope subsystems
@@ -138,6 +138,54 @@ local    = "src/status.rs"
 upstream = "internal/controllers/clusterapi/cluster_handler.go"
 local    = "src/cluster_api.rs"
 
+# 2026-06-07 wave — line-by-line deepening across the 5 mandate areas
+
+[[files]]
+upstream = "internal/datastore/postgresql.go"
+local    = "src/connection.rs"
+
+[[files]]
+upstream = "internal/datastore/mysql.go"
+local    = "src/connection.rs"
+
+[[files]]
+upstream = "internal/resources/datastore/datastore_setup.go"
+local    = "src/ds_setup.rs"
+
+[[files]]
+upstream = "internal/resources/datastore/datastore_storage_config.go"
+local    = "src/ds_setup.rs"
+
+[[files]]
+upstream = "internal/resources/datastore/datastore_multitenancy.go"
+local    = "src/ds_setup.rs"
+
+[[files]]
+upstream = "internal/builders/controlplane/deployment.go"
+local    = "src/components.rs"
+
+[[files]]
+upstream = "internal/utilities/utilities.go"
+local    = "src/isolation.rs"
+
+[[files]]
+upstream = "internal/constants/labels.go"
+local    = "src/isolation.rs"
+
+[[files]]
+upstream = "controllers/resources.go"
+local    = "src/reconcile.rs"
+
+# 2026-06-07 cont2 wave — multi-tenant orchestration depth
+
+[[files]]
+upstream = "controllers/tenantcontrolplane_controller.go"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "internal/datastore/datastore.go"
+local    = "src/connection.rs"
+
 # ── Function mappings ───────────────────────────────────────────────────────
 
 [[functions]]
@@ -210,6 +258,51 @@ upstream_name = "clusterapi.ParseControlPlaneEndpoint"
 local_name    = "parse_control_plane_endpoint"
 file          = "src/cluster_api.rs"
 
+[[functions]]
+upstream_name = "datastore.Connection (postgresql/mysql DDL)"
+local_name    = "connection::{postgres,mysql,kine_table_ddl,FakeConnection}"
+file          = "src/connection.rs"
+
+[[functions]]
+upstream_name = "datastore.Setup.CreateOrUpdate"
+local_name    = "ds_setup::run_setup"
+file          = "src/ds_setup.rs"
+
+[[functions]]
+upstream_name = "datastore.Setup.Delete"
+local_name    = "ds_setup::run_teardown"
+file          = "src/ds_setup.rs"
+
+[[functions]]
+upstream_name = "datastore.MultiTenancy.CreateOrUpdate"
+local_name    = "ds_setup::multitenancy_check"
+file          = "src/ds_setup.rs"
+
+[[functions]]
+upstream_name = "controlplane.Deployment.buildKubeAPIServer"
+local_name    = "components::build_apiserver"
+file          = "src/components.rs"
+
+[[functions]]
+upstream_name = "controlplane.Deployment.buildControllerManager"
+local_name    = "components::build_controller_manager"
+file          = "src/components.rs"
+
+[[functions]]
+upstream_name = "controlplane.Deployment.buildScheduler"
+local_name    = "components::build_scheduler"
+file          = "src/components.rs"
+
+[[functions]]
+upstream_name = "utilities.KamajiLabels / AddTenantPrefix / MergeMaps"
+local_name    = "isolation::{kamaji_labels,add_tenant_prefix,merge_maps}"
+file          = "src/isolation.rs"
+
+[[functions]]
+upstream_name = "controllers.getDefaultResources"
+local_name    = "reconcile::default_pipeline + Reconciler::reconcile"
+file          = "src/reconcile.rs"
+
 # ── Mapped subsystems (Charter v2 [[mapped]]) ────────────────────────────────
 
 [[mapped]]
@@ -275,12 +368,39 @@ note = "Deterministic YAML render of InitConfiguration + ClusterConfiguration."
 [[mapped]]
 name = "status-conditions"
 upstream = "internal/controllers/conditions.go"
-note = "Ready / ControlPlaneHealthy / KubeconfigReady / DataStoreHealthy / KonnectivityHealthy with in-place set_condition."
+note = "Ready / ControlPlaneHealthy / KubeconfigReady / DataStoreHealthy / KonnectivityHealthy with in-place set_condition. cont2 (2026-06-07): reported incrementally by the reconcile loop (Reconciler::conditions/condition_status) + surfaced over REST at GET /api/kamaji/tenants/{id}/status and cavectl `kamaji tenant-status`."
 
 [[mapped]]
 name = "cluster-api-integration"
 upstream = "internal/controllers/clusterapi"
 note = "CAPI bootstrap-provider shape: ControlPlaneEndpoint parse, InfrastructureRef, CapiBootstrapStatus, CapiTenantStatus, ready predicate. Wave-2 close-out 2026-05-19 — promoted partial → mapped via src/cluster_api.rs."
+
+# 2026-06-07 wave — line-by-line deepening (5 mandate areas)
+
+[[mapped]]
+name = "datastore-driver-kine"
+upstream = "internal/datastore/{postgresql,mysql}.go"
+note = "Driver enum (etcd/MySQL/PostgreSQL/NATS), faithful Postgres+MySQL DDL renderers (verbatim *Statement consts, preserved arg order), kine table schema (CREATE TABLE kine + TRUNCATE + 4 indexes + 1 unique index), Connection trait + in-memory FakeConnection backend. cont2 (2026-06-07): concrete kine migration — Connection::execute_ddl + connection::run_migrate run the full kine_table_ddl for kine drivers (no-op for native etcd), driven by the reconcile datastore-migrate step."
+
+[[mapped]]
+name = "datastore-setup-isolation"
+upstream = "internal/resources/datastore/{datastore_setup,datastore_storage_config,datastore_multitenancy}.go"
+note = "Per-tenant resource isolation: tenant_schema ns_name dash->underscore coalesce (issue #328), idempotent createDB->createUser->grant setup + revoke->dropDB->dropUser teardown, OperationResult precedence, ShouldStatusBeUpdated drift, NATS single-tenant boundary."
+
+[[mapped]]
+name = "control-plane-components"
+upstream = "internal/builders/controlplane/deployment.go"
+note = "Per-tenant control-plane component lifecycle: kube-apiserver + kube-controller-manager + kube-scheduler container builders with exact sorted arg maps + etcd-vs-Kine --etcd-servers switch + ComponentImages + ArgsFromMapToSlice. cont2 (2026-06-07): the reconcile `deployment` step now genuinely materialises the 3 containers (Reconciler::control_plane) against the tenant's DatastoreBinding."
+
+[[mapped]]
+name = "multitenancy-boundaries"
+upstream = "internal/utilities/utilities.go + internal/constants/labels.go"
+note = "Tenant security isolation primitives: KamajiLabels (project/name/component), AddTenantPrefix, MergeMaps, per-tenant label selector + cross-tenant ownership boundary, DataStore UsedBy sharing registry. cont2 (2026-06-07): enforced end-to-end by the TenantManager orchestrator (src/manager.rs) — authorize() refuses cross-tenant resource access via the ownership label; provision/delete register/release the shared usedBy claim."
+
+[[mapped]]
+name = "reconcile-pipeline"
+upstream = "controllers/resources.go"
+note = "TenantControlPlane provisioning pipeline (getDefaultResources verbatim 26-step ordering) + convergence-driven phase machine (Provisioning->Running) + GetDeletableResources datastore teardown; datastore-setup step wired to the real ds_setup state machine. cont2 (2026-06-07): datastore-migrate runs the concrete kine migration, deployment materialises the dedicated control plane, and every pass reports incremental status conditions (Reconciler::report_status — DataStore/ControlPlane/Konnectivity/Kubeconfig flip True as stages converge, Ready aggregates at steady state)."
 
 # ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
@@ -305,5 +425,5 @@ upstream_url = "https://kamaji.clastix.io/"
 status       = "phase-3"
 loc          = 164
 priority     = "P2"
-notes        = "Kamaji is CRD/CLI upstream; /admin/kamaji Phase 3 alongside multi-tenant data-plane."
-last_audit   = "2026-05-19"
+notes        = "Kamaji is CRD/CLI upstream; /admin/kamaji surfaces TCP list/scale + dedicated control-plane components (apiserver/controller-manager/scheduler per tenant)."
+last_audit   = "2026-06-07"

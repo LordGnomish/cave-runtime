@@ -29,6 +29,7 @@ pub mod policy;
 pub mod portfolio;
 pub mod routes;
 pub mod sbom;
+pub mod search;
 pub mod vuln_intel;
 
 use axum::Router;

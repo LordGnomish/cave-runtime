@@ -156,16 +156,22 @@ fn gate_g6_observability_artifact() {
 /// G7: source_sha pinned in Cargo.toml + parity.manifest.toml for ALL 3 upstreams.
 #[test]
 fn gate_g7_source_sha_pinned() {
-    let cargo = std::fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
-    )
-    .expect("read");
+    let cargo =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
+            .expect("read");
     let manifest = read_manifest();
     let opa_sha = "85f6d990d19094da38e829561813e7da7fbae272";
     let gk_sha = "eda110bdaf2510288dccd73a1be4dd0c6442a4aa";
     let kv_sha = "ec14520a11cc25432482bfc0baa6a61d3c309524";
-    for (name, sha) in [("OPA", opa_sha), ("Gatekeeper", gk_sha), ("Kyverno", kv_sha)] {
-        assert!(cargo.contains(sha), "G7: Cargo.toml missing {name} source_sha");
+    for (name, sha) in [
+        ("OPA", opa_sha),
+        ("Gatekeeper", gk_sha),
+        ("Kyverno", kv_sha),
+    ] {
+        assert!(
+            cargo.contains(sha),
+            "G7: Cargo.toml missing {name} source_sha"
+        );
         assert!(
             manifest.contains(sha),
             "G7: parity.manifest.toml missing {name} source_sha"
@@ -178,7 +184,10 @@ fn gate_g7_source_sha_pinned() {
 fn gate_g8_mapped_surface_floor() {
     let body = read_manifest();
     let count = body.matches("[[mapped]]").count();
-    assert!(count >= 27, "G8: mapped {count} < 27 (3-upstream umbrella floor)");
+    assert!(
+        count >= 27,
+        "G8: mapped {count} < 27 (3-upstream umbrella floor)"
+    );
 }
 
 /// Roll-up: total surfaces and Charter v2 ratios are consistent.
@@ -193,16 +202,36 @@ fn gate_rollup_consistency() {
     for line in body.lines() {
         let t = line.trim_start();
         if let Some(rhs) = t.strip_prefix("mapped_count") {
-            m = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            m = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("partial_count") {
-            p = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            p = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("skipped_count") {
-            s = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            s = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("unmapped_count") {
-            u = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+            u = rhs
+                .trim_start_matches([' ', '='])
+                .trim()
+                .parse()
+                .unwrap_or(0);
         } else if let Some(rhs) = t.strip_prefix("total") {
             if !t.starts_with("total_") {
-                total = rhs.trim_start_matches([' ', '=']).trim().parse().unwrap_or(0);
+                total = rhs
+                    .trim_start_matches([' ', '='])
+                    .trim()
+                    .parse()
+                    .unwrap_or(0);
             }
         }
     }

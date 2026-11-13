@@ -33,6 +33,7 @@ sha2 = "0.10"
 cel-interpreter = "0.9"
 
 [dev-dependencies]
+proptest = "1"
 reqwest = { workspace = true }
 
 [features]

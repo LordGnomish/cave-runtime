@@ -14,10 +14,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 sled = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tempfile = "3"

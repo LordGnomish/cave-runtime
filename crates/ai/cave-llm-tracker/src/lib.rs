@@ -28,15 +28,20 @@ pub mod registry;
 pub mod report;
 pub mod selection;
 
-pub use bench::{cave_prompts, run_bench, score_response, synth_snapshot, BenchSnapshot, EvalPrompt, EvalResult};
-pub use config::{BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig, TrackerConfig};
-pub use error::{TrackerError, TrackerResult};
-pub use poll::{poll_all, PollSummary};
-pub use registry::{
-    default_backend_repos, seed_catalog, Candidate, LiveFetcher, RegistryEndpoints, SourceKind,
+pub use bench::{
+    BenchSnapshot, EvalPrompt, EvalResult, cave_prompts, run_bench, score_response, synth_snapshot,
 };
-pub use report::{shortlist, ConfigSummary, DailyReport};
-pub use selection::{baseline_verdict, evaluate, SelectionStatus, Verdict};
+pub use config::{
+    BaselineConfig, BenchConfig, GuardsConfig, ReportConfig, SelectionConfig, SourcesConfig,
+    TrackerConfig,
+};
+pub use error::{TrackerError, TrackerResult};
+pub use poll::{PollSummary, poll_all};
+pub use registry::{
+    Candidate, LiveFetcher, RegistryEndpoints, SourceKind, default_backend_repos, seed_catalog,
+};
+pub use report::{ConfigSummary, DailyReport, shortlist};
+pub use selection::{SelectionStatus, Verdict, baseline_verdict, evaluate};
 
 /// Pinned upstream snapshot. cave-llm-tracker has no single upstream;
 /// the per-source pins live in `parity.manifest.toml [upstream] source_sha`

@@ -27,7 +27,11 @@ pub struct ParsedSpiffeId {
 
 impl ParsedSpiffeId {
     pub fn as_spiffe_id(&self) -> SpiffeId {
-        SpiffeId::new(format!("spiffe://{}{}", self.trust_domain.as_str(), self.path))
+        SpiffeId::new(format!(
+            "spiffe://{}{}",
+            self.trust_domain.as_str(),
+            self.path
+        ))
     }
 }
 
@@ -116,7 +120,9 @@ pub fn parse_spiffe_id(s: &str) -> Result<ParsedSpiffeId> {
         .strip_prefix("spiffe://")
         .ok_or_else(|| IdentityError::InvalidSpiffeId("missing spiffe:// prefix".into()))?;
     if rest.is_empty() {
-        return Err(IdentityError::InvalidSpiffeId("missing trust domain".into()));
+        return Err(IdentityError::InvalidSpiffeId(
+            "missing trust domain".into(),
+        ));
     }
     let (td, path) = match rest.find('/') {
         Some(i) => (&rest[..i], &rest[i..]),
@@ -237,7 +243,10 @@ mod tests {
     fn agent_id_compose() {
         let td = TrustDomain::new("example.org");
         let id = agent_id(&td, "k8s_psat", "node-1").unwrap();
-        assert_eq!(id.as_str(), "spiffe://example.org/spire/agent/k8s_psat/node-1");
+        assert_eq!(
+            id.as_str(),
+            "spiffe://example.org/spire/agent/k8s_psat/node-1"
+        );
     }
 
     #[test]

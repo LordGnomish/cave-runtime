@@ -52,7 +52,10 @@ pub fn has_condition_true(resource: &Value, ctype: &str) -> bool {
 pub fn summarize(composed: &[Value], composition_revision: Option<&str>) -> XrStatusSummary {
     let total = composed.len();
     let ready_count = aggregate_ready(composed).len();
-    let synced_count = composed.iter().filter(|v| has_condition_true(v, "Synced")).count();
+    let synced_count = composed
+        .iter()
+        .filter(|v| has_condition_true(v, "Synced"))
+        .count();
 
     let refs: Vec<ComposedRef> = composed
         .iter()
@@ -86,14 +89,8 @@ pub fn write_status(xr: &Value, summary: &XrStatusSummary) -> Value {
         })
         .map(|o| o.to_owned());
     let mut new_status = status_obj.unwrap_or_default();
-    new_status.insert(
-        "ready".to_string(),
-        Value::Bool(summary.ready),
-    );
-    new_status.insert(
-        "synced".to_string(),
-        Value::Bool(summary.synced),
-    );
+    new_status.insert("ready".to_string(), Value::Bool(summary.ready));
+    new_status.insert("synced".to_string(), Value::Bool(summary.synced));
     if let Some(rev) = &summary.composition_revision {
         new_status.insert(
             "compositionRevisionRef".to_string(),

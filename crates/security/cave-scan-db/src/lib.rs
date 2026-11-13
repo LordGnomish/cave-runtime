@@ -13,6 +13,7 @@
 //! * [`IacRuleDb`] — IaC misconfig rule definitions (CIS, CSP).
 //! * [`matcher::match_purl`] — PURL → advisory lookup.
 
+pub mod go_pseudo;
 pub mod matcher;
 pub mod sources;
 pub mod storage;
@@ -165,5 +166,5 @@ pub trait IacRuleDb {
     fn rules_for_provider(&self, provider: &str) -> Result<Vec<IacRule>>;
 }
 
-pub use matcher::{PackageRef, match_purl};
+pub use matcher::{PackageRef, go_version_cmp, match_purl, match_purl_go};
 pub use storage::SledStore;

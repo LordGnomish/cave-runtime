@@ -7,31 +7,32 @@
 //! real Kubernetes cluster.
 
 use cave_deploy::appset::{
-    evaluate_git_directory_generator, evaluate_list_generator, evaluate_matrix_generator,
-    evaluate_merge_generator, ApplicationSet, ApplicationSetSpec, ApplicationSetTemplate,
-    ApplicationSetTemplateMetadata, GitDirectoryFilter, GitGenerator, Generator, ListGenerator,
+    ApplicationSet, ApplicationSetSpec, ApplicationSetTemplate, ApplicationSetTemplateMetadata,
+    Generator, GitDirectoryFilter, GitGenerator, ListGenerator, evaluate_git_directory_generator,
+    evaluate_list_generator, evaluate_matrix_generator, evaluate_merge_generator,
 };
-use cave_deploy::cluster::{build_resource_url, kind_to_plural, TRACKING_LABEL};
-use cave_deploy::diff::{apply_ignored_differences, compute_diff, normalize_resource, DiffType, IgnoredDiff};
+use cave_deploy::cluster::{TRACKING_LABEL, build_resource_url, kind_to_plural};
+use cave_deploy::diff::{
+    DiffType, IgnoredDiff, apply_ignored_differences, compute_diff, normalize_resource,
+};
 use cave_deploy::gitops::{
     auto_sync, detect_drift, parse_json_documents, parse_yaml_documents, render_manifests,
     sync_application,
 };
-use cave_deploy::health::{check_deployment, check_ingress, check_service, HealthCheckRegistry};
+use cave_deploy::health::{HealthCheckRegistry, check_deployment, check_ingress, check_service};
 use cave_deploy::models::*;
-use cave_deploy::notifications::{build_slack_payload, slack_color, NotificationEngine};
+use cave_deploy::notifications::{NotificationEngine, build_slack_payload, slack_color};
 use cave_deploy::rbac::{
-    has_permission, is_destination_allowed, is_source_allowed, validate_application, AppProject,
-    AppProjectSpec, GroupKind, ProjectDestination, ProjectRole, ProjectViolation, RbacAction,
+    AppProject, AppProjectSpec, GroupKind, ProjectDestination, ProjectRole, ProjectViolation,
+    RbacAction, has_permission, is_destination_allowed, is_source_allowed, validate_application,
 };
 use cave_deploy::rollout::{
     blue_green_deploy, canary_deploy, promote_canary, rollback, rolling_update, traffic_split,
 };
 use cave_deploy::store::DeployStore;
 use cave_deploy::sync::{
-    group_by_wave, initiate_rollback, parse_delete_on_success, parse_hook_phases,
-    parse_sync_options, parse_wave, should_auto_sync, should_prune, ManifestResource,
-    RollbackRequest,
+    ManifestResource, RollbackRequest, group_by_wave, initiate_rollback, parse_delete_on_success,
+    parse_hook_phases, parse_sync_options, parse_wave, should_auto_sync, should_prune,
 };
 use chrono::Utc;
 use std::collections::HashMap;
@@ -117,8 +118,16 @@ fn make_project(name: &str) -> AppProject {
 #[test]
 fn applicationset_list_generator_produces_apps() {
     let elements = vec![
-        [("env".to_string(), "staging".to_string()), ("ns".to_string(), "stg".to_string())].into(),
-        [("env".to_string(), "prod".to_string()), ("ns".to_string(), "prod".to_string())].into(),
+        [
+            ("env".to_string(), "staging".to_string()),
+            ("ns".to_string(), "stg".to_string()),
+        ]
+        .into(),
+        [
+            ("env".to_string(), "prod".to_string()),
+            ("ns".to_string(), "prod".to_string()),
+        ]
+        .into(),
     ];
     let params = evaluate_list_generator(&ListGenerator {
         elements,
@@ -141,7 +150,11 @@ fn applicationset_matrix_x_list_explodes() {
     ];
     let exploded = evaluate_matrix_generator(&regions, &envs);
     assert_eq!(exploded.len(), 4);
-    assert!(exploded.iter().any(|p| p["region"] == "us-east-1" && p["env"] == "prod"));
+    assert!(
+        exploded
+            .iter()
+            .any(|p| p["region"] == "us-east-1" && p["env"] == "prod")
+    );
 }
 
 #[test]
@@ -153,11 +166,13 @@ fn applicationset_merge_overrides_by_key() {
         ]
         .into(),
     ];
-    let overrides = vec![[
-        ("cluster".to_string(), "prod".to_string()),
-        ("replicas".to_string(), "5".to_string()),
-    ]
-    .into()];
+    let overrides = vec![
+        [
+            ("cluster".to_string(), "prod".to_string()),
+            ("replicas".to_string(), "5".to_string()),
+        ]
+        .into(),
+    ];
     let merged = evaluate_merge_generator(&base, &overrides, &["cluster".to_string()]);
     assert_eq!(merged[0]["replicas"], "5");
 }
@@ -179,9 +194,7 @@ fn applicationset_git_directory_generator_filters() {
     let paths = ["clusters/prod", "clusters/staging", "other/stuff"];
     let params = evaluate_git_directory_generator(&gg, &paths);
     assert_eq!(params.len(), 2);
-    assert!(params
-        .iter()
-        .any(|p| p["path.basename"] == "prod"));
+    assert!(params.iter().any(|p| p["path.basename"] == "prod"));
 }
 
 #[test]
@@ -203,8 +216,13 @@ fn applicationset_full_fixture_roundtrips() {
                     annotations: Default::default(),
                     finalizers: vec![],
                 },
-                spec: make_app("placeholder", "default", "https://github.com/example/app", "{{env}}")
-                    .spec,
+                spec: make_app(
+                    "placeholder",
+                    "default",
+                    "https://github.com/example/app",
+                    "{{env}}",
+                )
+                .spec,
             },
             sync_policy: None,
             ignore_application_differences: vec![],
@@ -225,7 +243,12 @@ fn applicationset_full_fixture_roundtrips() {
 #[test]
 fn sync_dry_run_does_not_touch_unrelated_status() {
     let store = DeployStore::new();
-    let mut app = make_app("svc-a", "default", "https://github.com/example/svc-a", "prod");
+    let mut app = make_app(
+        "svc-a",
+        "default",
+        "https://github.com/example/svc-a",
+        "prod",
+    );
     store.create_application(app.clone()).unwrap();
     let rev = sync_application(&mut app, Some("abc123".into()), true).unwrap();
     assert_eq!(rev, "abc123");
@@ -236,7 +259,12 @@ fn sync_dry_run_does_not_touch_unrelated_status() {
 
 #[test]
 fn manifest_render_carries_tracking_label() {
-    let mut app = make_app("svc-b", "default", "https://github.com/example/svc-b", "prod");
+    let mut app = make_app(
+        "svc-b",
+        "default",
+        "https://github.com/example/svc-b",
+        "prod",
+    );
     app.spec.source.helm = Some(HelmSource {
         value_files: vec![],
         values: String::new(),
@@ -275,7 +303,12 @@ fn json_array_parser_yields_each_manifest() {
 
 #[test]
 fn drift_then_auto_sync_round_trip() {
-    let mut app = make_app("svc-c", "default", "https://github.com/example/svc-c", "prod");
+    let mut app = make_app(
+        "svc-c",
+        "default",
+        "https://github.com/example/svc-c",
+        "prod",
+    );
     app.spec.sync_policy = Some(SyncPolicy {
         automated: Some(AutomatedSyncPolicy {
             prune: true,
@@ -334,13 +367,12 @@ fn rbac_scope_repo_and_destination_pass() {
         name: None,
         namespace: "prod".into(),
     };
-    assert!(is_source_allowed(&project, "https://github.com/example/svc"));
-    assert!(is_destination_allowed(&project, &dest));
-    let violations = validate_application(
+    assert!(is_source_allowed(
         &project,
-        "https://github.com/example/svc",
-        &dest,
-    );
+        "https://github.com/example/svc"
+    ));
+    assert!(is_destination_allowed(&project, &dest));
+    let violations = validate_application(&project, "https://github.com/example/svc", &dest);
     assert!(violations.is_empty());
 }
 
@@ -354,7 +386,10 @@ fn rbac_blocks_unknown_source_repo() {
     };
     let v = validate_application(&project, "https://evil.com/repo", &dest);
     assert_eq!(v.len(), 1);
-    assert!(matches!(v[0], ProjectViolation::SourceRepoNotAllowed { .. }));
+    assert!(matches!(
+        v[0],
+        ProjectViolation::SourceRepoNotAllowed { .. }
+    ));
 }
 
 #[test]
@@ -386,7 +421,10 @@ fn rbac_role_policy_allows_only_specified_actions() {
 fn hook_lifecycle_full_three_phases() {
     let mut presync_anno = HashMap::new();
     presync_anno.insert("argocd.argoproj.io/hook".into(), "PreSync".into());
-    presync_anno.insert("argocd.argoproj.io/hook-delete-policy".into(), "HookSucceeded".into());
+    presync_anno.insert(
+        "argocd.argoproj.io/hook-delete-policy".into(),
+        "HookSucceeded".into(),
+    );
 
     let mut sync_anno = HashMap::new();
     sync_anno.insert("argocd.argoproj.io/sync-wave".into(), "1".into());
@@ -562,7 +600,10 @@ fn health_registry_routes_by_kind() {
         "kind": "Ingress",
         "status": {}
     });
-    assert_eq!(check_ingress(&ingress_no_lb).status, HealthStatus::Progressing);
+    assert_eq!(
+        check_ingress(&ingress_no_lb).status,
+        HealthStatus::Progressing
+    );
 
     let svc_with_lb = serde_json::json!({
         "spec": { "type": "LoadBalancer" },
@@ -586,7 +627,12 @@ fn deployment_progressing_when_replicas_short() {
 
 #[test]
 fn notification_engine_filters_by_trigger() {
-    let app = make_app("svc-d", "default", "https://github.com/example/svc-d", "prod");
+    let app = make_app(
+        "svc-d",
+        "default",
+        "https://github.com/example/svc-d",
+        "prod",
+    );
     let subs = vec![NotificationConfig {
         id: Uuid::new_v4(),
         name: "on-success".into(),
@@ -601,7 +647,10 @@ fn notification_engine_filters_by_trigger() {
     let payload = build_slack_payload(&app, "synced ok", "#36a64f", "#deploys");
     assert_eq!(payload["channel"], "#deploys");
     assert_eq!(payload["attachments"][0]["color"], "#36a64f");
-    assert_eq!(slack_color(&NotificationTrigger::OnHealthDegraded), "#ff0000");
+    assert_eq!(
+        slack_color(&NotificationTrigger::OnHealthDegraded),
+        "#ff0000"
+    );
 }
 
 // ─── Cluster URL builders ──────────────────────────────────────────────────
@@ -611,12 +660,7 @@ fn cluster_resource_url_round_trip() {
     assert_eq!(kind_to_plural("CronJob"), "cronjobs");
     assert_eq!(kind_to_plural("Ingress"), "ingresses");
     assert_eq!(
-        build_resource_url(
-            "networking.k8s.io/v1",
-            "Ingress",
-            "frontend",
-            Some("prod")
-        ),
+        build_resource_url("networking.k8s.io/v1", "Ingress", "frontend", Some("prod")),
         "/apis/networking.k8s.io/v1/namespaces/prod/ingresses/frontend"
     );
 }

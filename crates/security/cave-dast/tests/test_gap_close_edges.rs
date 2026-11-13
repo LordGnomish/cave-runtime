@@ -26,9 +26,7 @@ use cave_dast::pscan::{
     PassiveScanRegistry, insecure_cookie::InsecureCookieRule,
     security_headers::MissingSecurityHeadersRule,
 };
-use cave_dast::spider::{
-    Discovered, Spider, SpiderConfig, extract_hrefs, parse_robots_disallow,
-};
+use cave_dast::spider::{Discovered, Spider, SpiderConfig, extract_hrefs, parse_robots_disallow};
 use chrono::Utc;
 use uuid::Uuid;
 

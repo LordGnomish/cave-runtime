@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v4.0.5";
 const PINNED_SHA: &str = "0ab1452144d8f4d57c50b37ce50dad218868e950";
@@ -145,7 +145,11 @@ fn assertion_8_no_stub_macros_in_src() {
             }
         }
     });
-    assert!(offenders.is_empty(), "stub gate failed: {}", offenders.join("\n"));
+    assert!(
+        offenders.is_empty(),
+        "stub gate failed: {}",
+        offenders.join("\n")
+    );
 }
 
 #[test]
@@ -155,8 +159,8 @@ fn assertion_9_workflows_surface_intact() {
     };
     use cave_workflows::store::WorkflowStore;
     use cave_workflows::workflow_crd::{
-        topo_order, Arguments, ContainerTemplate, DagTask, DagTemplate, Inputs, Outputs,
-        RetryStrategy, Template, TemplateBody, Workflow, WorkflowPhase, WorkflowSpec,
+        Arguments, ContainerTemplate, DagTask, DagTemplate, Inputs, Outputs, RetryStrategy,
+        Template, TemplateBody, Workflow, WorkflowPhase, WorkflowSpec, topo_order,
     };
     use std::collections::HashMap;
 

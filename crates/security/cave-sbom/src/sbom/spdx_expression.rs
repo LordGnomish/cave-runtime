@@ -213,10 +213,16 @@ impl Parser {
         if rest.is_empty() {
             Ok(left)
         } else {
-            rest.insert(0, std::mem::replace(&mut left, LicenseExpr::License {
-                id: "_".into(),
-                or_later: false,
-            }));
+            rest.insert(
+                0,
+                std::mem::replace(
+                    &mut left,
+                    LicenseExpr::License {
+                        id: "_".into(),
+                        or_later: false,
+                    },
+                ),
+            );
             Ok(LicenseExpr::Or(rest))
         }
     }
@@ -231,10 +237,16 @@ impl Parser {
         if rest.is_empty() {
             Ok(left)
         } else {
-            rest.insert(0, std::mem::replace(&mut left, LicenseExpr::License {
-                id: "_".into(),
-                or_later: false,
-            }));
+            rest.insert(
+                0,
+                std::mem::replace(
+                    &mut left,
+                    LicenseExpr::License {
+                        id: "_".into(),
+                        or_later: false,
+                    },
+                ),
+            );
             Ok(LicenseExpr::And(rest))
         }
     }
@@ -256,10 +268,9 @@ impl Parser {
                 if matches!(self.peek(), Some(Token::With)) {
                     self.bump();
                     match self.bump() {
-                        Some(Token::Ident(ex)) => Ok(LicenseExpr::WithException {
-                            id,
-                            exception: ex,
-                        }),
+                        Some(Token::Ident(ex)) => {
+                            Ok(LicenseExpr::WithException { id, exception: ex })
+                        }
                         _ => Err(ParseError::MissingIdent),
                     }
                 } else {

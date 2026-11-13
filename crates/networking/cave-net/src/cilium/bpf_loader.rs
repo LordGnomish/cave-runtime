@@ -113,10 +113,7 @@ impl BpfLoader {
         self.verifier_log
             .insert(prog.section.clone(), verdict.clone());
         if !verdict.ok {
-            return Err(LoaderError::VerifierRejected(
-                prog.section,
-                verdict.log,
-            ));
+            return Err(LoaderError::VerifierRejected(prog.section, verdict.log));
         }
         self.loaded.insert(prog.section.clone(), prog);
         Ok(())

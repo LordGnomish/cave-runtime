@@ -163,10 +163,7 @@ pub fn sign(body: &str, secret: &str) -> String {
     outer.update(&o_key_pad);
     outer.update(&inner_digest);
     let final_digest = outer.finalize();
-    final_digest
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect()
+    final_digest.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 #[cfg(test)]
@@ -214,9 +211,10 @@ mod tests {
         let mut bus = WebhookBus::default();
         bus.put_subscription(sub("s1", "lead", vec![WebhookOperation::Delete]));
         // Create on Lead — subscription only listens for Delete.
-        assert!(bus
-            .dispatch("ws-1", "lead", WebhookOperation::Create, "{}")
-            .is_empty());
+        assert!(
+            bus.dispatch("ws-1", "lead", WebhookOperation::Create, "{}")
+                .is_empty()
+        );
         // Delete on Lead — fires.
         assert_eq!(
             bus.dispatch("ws-1", "lead", WebhookOperation::Delete, "{}")
@@ -230,9 +228,10 @@ mod tests {
         let mut bus = WebhookBus::default();
         bus.put_subscription(sub("s1", "person", vec![]));
         // Different workspace id — no fire.
-        assert!(bus
-            .dispatch("ws-other", "person", WebhookOperation::Create, "{}")
-            .is_empty());
+        assert!(
+            bus.dispatch("ws-other", "person", WebhookOperation::Create, "{}")
+                .is_empty()
+        );
     }
 
     #[test]

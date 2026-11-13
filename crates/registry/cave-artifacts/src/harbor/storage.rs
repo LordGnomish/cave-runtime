@@ -267,10 +267,7 @@ impl RegistryStorage {
                 None => return false,
             }
         };
-        let removed = idx
-            .by_digest
-            .remove(&(repo.to_string(), digest))
-            .is_some();
+        let removed = idx.by_digest.remove(&(repo.to_string(), digest)).is_some();
         // Remove from repo if no manifests remain
         let still_has = idx.by_digest.keys().any(|(r, _)| r == repo);
         if !still_has {

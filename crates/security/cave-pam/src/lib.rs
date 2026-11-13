@@ -6,9 +6,18 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
+pub mod access_request;
+pub mod audit_log;
+pub mod cert_authority;
 pub mod engine;
 pub mod models;
+pub mod node_inventory;
+pub mod proxy_tunnel;
+pub mod rbac;
 pub mod routes;
+pub mod session_lifecycle;
+pub mod session_recorder;
+pub mod trusted_cluster;
 
 use axum::Router;
 

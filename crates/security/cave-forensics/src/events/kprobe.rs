@@ -102,7 +102,11 @@ mod tests {
 
     #[test]
     fn test_uprobe_crypto_lib_detected() {
-        for lib in ["/usr/lib/libssl.so.3", "/usr/lib/libcrypto.so", "/lib/x86_64-linux-gnu/libnss_files.so"] {
+        for lib in [
+            "/usr/lib/libssl.so.3",
+            "/usr/lib/libcrypto.so",
+            "/lib/x86_64-linux-gnu/libnss_files.so",
+        ] {
             let u = UprobeEvent {
                 policy_name: "p".into(),
                 binary_path: lib.into(),

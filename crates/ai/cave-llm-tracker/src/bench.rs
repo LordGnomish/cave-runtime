@@ -175,10 +175,7 @@ pub fn score_response(prompt: &EvalPrompt, response: &str) -> f32 {
 /// issued via POST `/api/generate` with `stream:false`. Transport or
 /// upstream errors mark the row `timed_out` instead of aborting — the
 /// whole report is best-effort by design.
-pub async fn run_bench(
-    cfg: &TrackerConfig,
-    model_id: &str,
-) -> TrackerResult<BenchSnapshot> {
+pub async fn run_bench(cfg: &TrackerConfig, model_id: &str) -> TrackerResult<BenchSnapshot> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
             cfg.bench.per_prompt_timeout_secs as u64,
@@ -193,7 +190,10 @@ pub async fn run_bench(
             "stream": false,
         });
         let started = std::time::Instant::now();
-        let url = format!("{}/api/generate", cfg.bench.ollama_endpoint.trim_end_matches('/'));
+        let url = format!(
+            "{}/api/generate",
+            cfg.bench.ollama_endpoint.trim_end_matches('/')
+        );
         let response_text = match client.post(&url).json(&body).send().await {
             Ok(resp) => match resp.json::<serde_json::Value>().await {
                 Ok(j) => j
@@ -207,7 +207,11 @@ pub async fn run_bench(
         };
         let elapsed_ms = started.elapsed().as_millis() as u64;
         let timed_out = response_text.is_empty();
-        let quality = if timed_out { 0.0 } else { score_response(&p, &response_text) };
+        let quality = if timed_out {
+            0.0
+        } else {
+            score_response(&p, &response_text)
+        };
         results.push(EvalResult {
             prompt_id: p.id.to_string(),
             category: p.category.to_string(),

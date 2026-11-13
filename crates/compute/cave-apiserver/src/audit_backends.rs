@@ -394,7 +394,10 @@ mod tests {
         e.request_object = Some(serde_json::json!({"k": "v"}));
         tb.process(&e);
         let recorded = inner.events();
-        assert_eq!(recorded[0].request_object, Some(serde_json::json!({"k": "v"})));
+        assert_eq!(
+            recorded[0].request_object,
+            Some(serde_json::json!({"k": "v"}))
+        );
     }
 
     #[test]

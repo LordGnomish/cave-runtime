@@ -22,9 +22,7 @@
 
 use std::collections::HashMap;
 
-use crate::manifest::{
-    DataFile, DataFileContent, FileFormat, ManifestEntry, ManifestEntryStatus,
-};
+use crate::manifest::{DataFile, DataFileContent, FileFormat, ManifestEntry, ManifestEntryStatus};
 
 /// Upstream `WriteOperation` enum. The summary string is written
 /// verbatim into `Snapshot.summary["operation"]`.

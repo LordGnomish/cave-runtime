@@ -47,7 +47,8 @@ pub struct JwkEntry {
     pub spiffe_tainted: Option<bool>,
 }
 
-const B64: base64::engine::general_purpose::GeneralPurpose = base64::engine::general_purpose::STANDARD;
+const B64: base64::engine::general_purpose::GeneralPurpose =
+    base64::engine::general_purpose::STANDARD;
 
 /// Marshal a [`Bundle`] into the JWKS document.
 pub fn marshal(b: &Bundle) -> BundleDoc {
@@ -110,10 +111,9 @@ pub fn unmarshal(td: &TrustDomain, doc: &BundleDoc) -> Result<Bundle> {
                 });
             }
             "jwt-svid" => {
-                let x = k
-                    .x
-                    .as_ref()
-                    .ok_or_else(|| IdentityError::Internal("jwt-svid missing x".into()))?;
+                let x =
+                    k.x.as_ref()
+                        .ok_or_else(|| IdentityError::Internal("jwt-svid missing x".into()))?;
                 let pk = B64
                     .decode(x)
                     .map_err(|e| IdentityError::Internal(format!("base64: {}", e)))?;
@@ -128,7 +128,7 @@ pub fn unmarshal(td: &TrustDomain, doc: &BundleDoc) -> Result<Bundle> {
                 return Err(IdentityError::Internal(format!(
                     "unknown bundle key use: {}",
                     other
-                )))
+                )));
             }
         }
     }

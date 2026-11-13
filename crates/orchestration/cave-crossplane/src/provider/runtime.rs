@@ -98,8 +98,7 @@ impl DeploymentRuntimeConfig {
             }
         });
         if let Some(sa) = &self.service_account_name {
-            res["template"]["spec"]["serviceAccountName"] =
-                serde_json::Value::String(sa.clone());
+            res["template"]["spec"]["serviceAccountName"] = serde_json::Value::String(sa.clone());
         }
         if let Some(r) = &self.resources {
             res["template"]["spec"]["containers"][0]["resources"] = serde_json::json!({
@@ -114,7 +113,8 @@ impl DeploymentRuntimeConfig {
             res["template"]["spec"]["nodeSelector"] = serde_json::Value::Object(ns);
         }
         if !self.tolerations.is_empty() {
-            res["template"]["spec"]["tolerations"] = serde_json::to_value(&self.tolerations).unwrap();
+            res["template"]["spec"]["tolerations"] =
+                serde_json::to_value(&self.tolerations).unwrap();
         }
         res
     }

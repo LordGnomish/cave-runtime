@@ -254,7 +254,10 @@ impl LiveFetcher {
         Ok(parse_ollama_library(&body))
     }
 
-    pub async fn fetch_github_backend(&self, repos: &[(&str, &str)]) -> TrackerResult<Vec<Candidate>> {
+    pub async fn fetch_github_backend(
+        &self,
+        repos: &[(&str, &str)],
+    ) -> TrackerResult<Vec<Candidate>> {
         let mut out = Vec::new();
         for (org, repo) in repos {
             let url = format!(
@@ -412,7 +415,11 @@ mod tests {
     #[test]
     fn seed_catalog_has_at_least_five_candidates() {
         let s = seed_catalog();
-        assert!(s.len() >= 5, "seed catalog must have >= 5 entries; got {}", s.len());
+        assert!(
+            s.len() >= 5,
+            "seed catalog must have >= 5 entries; got {}",
+            s.len()
+        );
         assert!(s.iter().any(|c| c.model_id.starts_with("qwen3.6:35b")));
     }
 

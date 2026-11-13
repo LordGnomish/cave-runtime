@@ -28,6 +28,7 @@ rand           = { workspace = true }
 rustls-pemfile = "2"
 
 [dev-dependencies]
+proptest = "1"
 tokio          = { workspace = true }
 tempfile       = "3"
 rcgen          = "0.13"

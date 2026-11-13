@@ -355,6 +355,7 @@ impl<D: DiskFreeChecker> Daemon<D> {
                 "temperature": 0.1
             })),
             keep_alive: None, // defaults to 24h in OllamaClient
+            images: None,
         };
 
         let response = ollama

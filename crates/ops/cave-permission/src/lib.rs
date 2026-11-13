@@ -7,10 +7,15 @@
 //! - `policy`    — PermissionPolicy trait + AllowAllPermissionPolicy (from @backstage/permission-node)
 //! - `routes`    — POST /api/permission/authorize, GET /api/permission/health
 //! - `catalog`   — Catalog permission constants (from @backstage/catalog-backend)
+//! - `matchers`  — Casbin built-in matcher operators (keyMatch/keyMatch2/keyMatch3/regexMatch/ipMatch)
+//! - `rbac`      — Casbin RBAC role manager + rbac_api role-graph queries (role inheritance)
 
 pub mod catalog;
+pub mod enforcer;
+pub mod matchers;
 pub mod models;
 pub mod policy;
+pub mod rbac;
 pub mod routes;
 
 use axum::Router;

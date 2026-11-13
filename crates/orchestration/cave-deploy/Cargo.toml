@@ -24,3 +24,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 reqwest = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

@@ -24,4 +24,5 @@ dashmap = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 serde_json = { workspace = true }

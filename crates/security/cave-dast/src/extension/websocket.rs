@@ -179,7 +179,12 @@ pub fn parse_frame(buf: &[u8], from_client: bool) -> Result<(WsMessage, usize), 
                 have: buf.len(),
             });
         }
-        let m = [buf[cursor], buf[cursor + 1], buf[cursor + 2], buf[cursor + 3]];
+        let m = [
+            buf[cursor],
+            buf[cursor + 1],
+            buf[cursor + 2],
+            buf[cursor + 3],
+        ];
         cursor += 4;
         Some(m)
     } else {
@@ -285,7 +290,10 @@ mod tests {
     #[test]
     fn parse_truncated_returns_error() {
         let buf = vec![0x81];
-        assert!(matches!(parse_frame(&buf, false), Err(WsError::Truncated { .. })));
+        assert!(matches!(
+            parse_frame(&buf, false),
+            Err(WsError::Truncated { .. })
+        ));
     }
 
     #[test]

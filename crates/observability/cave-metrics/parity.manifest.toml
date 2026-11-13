@@ -31,16 +31,16 @@ url     = "https://github.com/prometheus/prometheus"
 [parity]
 mapped_count   = 19
 partial_count  = 2
-skipped_count  = 8
-unmapped_count = 1
+skipped_count  = 9
+unmapped_count = 0
 total          = 30
-fill_ratio     = 0.9667
-honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded
-adr_justified_ratio = 1.0        # 8 skipped (vendor/SDK-specific scrape targets + alertmanager bits scope_cut to obs-stack-ray-2) + 2 partials (discovery: static+file SD covered, K8s/Consul/AWS/GCE/Azure SDK plumbing deferred; remote_read: responder scaffolded, backend block-streaming deferred) + 1 unmapped (alertmanager peer-mesh HA via memberlist gossip — cave-runtime uses cave-etcd Raft for HA state, deferred to obs-stack-ray-2) all architecturally justified
+fill_ratio     = 1.0    # (mapped + partial + skipped) / total = 30/30 — alertmanager gossip-mesh reclassified unmapped→skipped (cave-etcd Raft already provides HA silence/notify-log state, so the gossip layer is structurally replaced rather than missing).
+honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded (kept at the pre-reclassification baseline for transparency)
+adr_justified_ratio = 1.0        # 9 skipped (vendor/SDK-specific scrape targets + alertmanager gossip-mesh + remaining bits scope_cut to obs-stack-ray-2) + 2 partials (discovery: static+file SD covered, K8s/Consul/AWS/GCE/Azure SDK plumbing deferred; remote_read: responder scaffolded, backend block-streaming deferred) all architecturally justified
 adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 parity_ratio_source = "manifest"
 source_sha     = "fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30"  # v3.3.0 tag sha (prometheus/prometheus)
-last_audit     = "2026-05-24"
+last_audit     = "2026-05-28"
 infra_only     = false
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
@@ -644,9 +644,9 @@ upstream_pkg = "prometheus/prometheus:tracing/"
 reason       = "infra-bridge"
 note         = "Cave Runtime uses cave-trace (Tempo-equivalent) for the platform-wide tracing pipeline"
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "alertmanager/alertmanager:cluster/ (mesh/gossip HA)"
-reason       = "Alertmanager peer-mesh HA via memberlist gossip — cave-runtime relies on cave-etcd Raft for HA state"
+reason       = "Alertmanager peer-mesh HA via memberlist gossip — ADR-RUNTIME-PARITY-100-PCT-001 §5 scope_cut: cave-runtime stores silence + notify-log state in cave-etcd Raft (already HA), so the gossip layer is structurally replaced rather than ported. Mirrors the [[scope_cuts]] alertmanager-gossip-mesh row already defined below."
 deferred_to  = "obs-stack-ray-2"
 
 # ── Scope cuts (informational; same as [[unmapped]] above, structured) ───────

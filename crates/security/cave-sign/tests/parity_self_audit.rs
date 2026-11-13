@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-22";
+const TODAY: &str = "2026-05-28";
 const FLOOR_FILL_RATIO: f64 = 0.65;
 const COSIGN_VERSION: &str = "v3.0.6";
 const COSIGN_SHA: &str = "f1ad3ee952313be5d74a49d67ba0aa8d0d5e351f";
@@ -227,26 +227,28 @@ fn assertion_8_no_stub_macros_in_src() {
 #[test]
 fn assertion_9_cosign_surface_intact() {
     use cave_sign::attestation::{
-        DsseEnvelope, build_slsa_provenance, build_vex_predicate, sign_attestation,
-        subject_sha256, verify_envelope, VexStatement, VexStatus,
+        DsseEnvelope, VexStatement, VexStatus, build_slsa_provenance, build_vex_predicate,
+        sign_attestation, subject_sha256, verify_envelope,
     };
     use cave_sign::blob::{sign_blob_keypair, sign_blob_keypair_with_rekor, verify_blob};
     use cave_sign::bundle::{BundleTriple, CosignBundle};
     use cave_sign::fulcio::FulcioClient;
     use cave_sign::keyless::KeylessSigner;
     use cave_sign::models::{
-        Attestation, ArtifactType, KeyAlgorithm, PredicateType, SigKind, SignedArtifact, Signature,
+        ArtifactType, Attestation, KeyAlgorithm, PredicateType, SigKind, Signature, SignedArtifact,
     };
-    use cave_sign::oci::{ImageRef, sign_image_keypair, sign_image_keypair_with_rekor, verify_image};
-    use cave_sign::oidc::{build_fixture_jwt, IdToken};
-    use cave_sign::policy::{extract_claims, glob_match, Policy, Rule};
+    use cave_sign::oci::{
+        ImageRef, sign_image_keypair, sign_image_keypair_with_rekor, verify_image,
+    };
+    use cave_sign::oidc::{IdToken, build_fixture_jwt};
+    use cave_sign::policy::{Policy, Rule, extract_claims, glob_match};
     use cave_sign::rekor::{HashedRekordEntry, RekorClient, RekorKind};
     use cave_sign::signature::{Keypair, sha256_digest_string};
     use cave_sign::signing_config::{Deployment, SigningConfig};
     use cave_sign::store::SignedArtifactStore;
     use cave_sign::trustedroot::TrustedRoot;
-    use cave_sign::verify::{verify, verify_raw_signature, VerifyRequest};
-    use cave_sign::{State, router, MODULE_NAME};
+    use cave_sign::verify::{VerifyRequest, verify, verify_raw_signature};
+    use cave_sign::{MODULE_NAME, State, router};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -257,10 +259,12 @@ fn assertion_9_cosign_surface_intact() {
     // ── 2. Signing primitives — P-256 + Ed25519 roundtrip ──────────────────
     let kp = Keypair::from_seed(KeyAlgorithm::EcdsaP256, &[1u8; 32]).unwrap();
     let sig = kp.sign(b"x").unwrap();
-    cave_sign::signature::verify(KeyAlgorithm::EcdsaP256, kp.public_key_bytes(), b"x", &sig).unwrap();
+    cave_sign::signature::verify(KeyAlgorithm::EcdsaP256, kp.public_key_bytes(), b"x", &sig)
+        .unwrap();
     let kp2 = Keypair::from_seed(KeyAlgorithm::Ed25519, &[2u8; 32]).unwrap();
     let sig2 = kp2.sign(b"y").unwrap();
-    cave_sign::signature::verify(KeyAlgorithm::Ed25519, kp2.public_key_bytes(), b"y", &sig2).unwrap();
+    cave_sign::signature::verify(KeyAlgorithm::Ed25519, kp2.public_key_bytes(), b"y", &sig2)
+        .unwrap();
     assert!(sha256_digest_string(b"").starts_with("sha256:"));
 
     // ── 3. Blob sign/verify + Rekor binding ────────────────────────────────
@@ -331,8 +335,12 @@ fn assertion_9_cosign_surface_intact() {
     let claims = extract_claims(&ks.bundle.cert_pem).unwrap();
     assert_eq!(claims.identity, "alice@example.com");
     let policy = Policy::new("cave-default")
-        .require(Rule::CertificateIdentity { glob: "*@example.com".into() })
-        .require(Rule::CertificateIssuer { exact: "https://oidc.cave.svc".into() })
+        .require(Rule::CertificateIdentity {
+            glob: "*@example.com".into(),
+        })
+        .require(Rule::CertificateIssuer {
+            exact: "https://oidc.cave.svc".into(),
+        })
         .require(Rule::RequireRekorEntry)
         .require(Rule::RequireKeyless);
     let vr = verify(VerifyRequest {

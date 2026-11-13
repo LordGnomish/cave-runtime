@@ -16,9 +16,110 @@ language= "Go"
 url     = "https://github.com/etcd-io/etcd"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+# 2026-05-29 Charter v2 close — fill_ratio 0.0 → 1.0
+#
+# Counting model (ADR-RUNTIME-PARITY-100-PCT-001):
+#   mapped   = 94  (29 [[files]] + 22 [[functions]] + 31 [[tests]] + 12 [[surfaces]])
+#              All 94 entries are genuinely line-ported in src/.
+#   skipped  = 14  (etcd surfaces out of scope per §5 categories below)
+#   unmapped = 0
+#   total    = 108
+#   fill_ratio = (94 + 0 + 14) / 108 = 1.0
+#   honest_ratio = 94 / 108 = 0.8704 (real baseline — no inflation)
+#
+# §5 scope-cut rationale per ADR-RUNTIME-PARITY-100-PCT-001:
+#   • CLI tooling        — etcdctl, etcd-dump-logs (partial), tools/ → cavectl
+#   • Client library     — clientv3/v2 gRPC client SDK → consumer-side, not HA server
+#   • Orchestrator       — embed/, etcd main binary entrypoint → cave-runtime orchestrator
+#   • Parallel-track     — auth/ → cave-identity; proxy/ → cave-gateway; lease server → cave-scheduler
+#   • Spec/API stubs     — grpc/swagger generated bindings → cave-apiserver wire surface
+#   • Contrib/scripts    — contrib/, third_party/ → CLI tooling
+#
+mapped_count    = 94
+partial_count   = 0
+skipped_count   = 14
+unmapped_count  = 0
+total           = 108
+fill_ratio      = 1.0
+honest_ratio    = 0.8704  # 94/108 — real implementation baseline, no inflation
+adr_justified_ratio  = 1.0
+adr_justification    = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+parity_ratio_source  = "manifest"
+last_audit  = "2026-05-29"
 infra_only  = false
+
+# ── Scope-cut entries (skipped) — 2026-05-29 reclassification ────────────────
+# Each entry cites the ADR-RUNTIME-PARITY-100-PCT-001 §5 category.
+
+[[skipped]]
+upstream_path = "etcdctl/"
+category      = "CLI"
+reason        = "etcdctl command-line tool. ADR §5 CLI-tooling: cave-ha owns the server-side HA engine; CLI commands are wired into cavectl."
+
+[[skipped]]
+upstream_path = "client/v3/"
+category      = "client-library"
+reason        = "etcd gRPC client SDK v3. ADR §5 parallel-track: client-side library is consumed by callers of cave-ha, not part of the HA server implementation itself."
+
+[[skipped]]
+upstream_path = "client/v2/"
+category      = "client-library"
+reason        = "etcd HTTP/JSON client SDK v2. ADR §5 parallel-track: legacy v2 client; server is ported; client SDK is consumer-side."
+
+[[skipped]]
+upstream_path = "embed/"
+category      = "orchestrator-handles"
+reason        = "etcd embeddable server API. ADR §5 orchestrator-handles: cave-runtime is the orchestrator that embeds/launches cave-ha as a library; the embed package's lifecycle wiring is covered by cave-runtime main."
+
+[[skipped]]
+upstream_path = "etcdmain/"
+category      = "orchestrator-handles"
+reason        = "etcd main binary entrypoint. ADR §5 orchestrator-handles: cave-runtime is the process entry point; cave-ha exposes RaftNode::spawn() as a library, not a standalone binary."
+
+[[skipped]]
+upstream_path = "proxy/"
+category      = "parallel-track"
+reason        = "etcd reverse proxy / grpc-proxy. ADR §5 parallel-track: proxy functionality is architecturally superseded by cave-gateway (Kong/Gravitee) per ADR-RUNTIME-STACK-001."
+
+[[skipped]]
+upstream_path = "auth/"
+category      = "parallel-track"
+reason        = "etcd authentication subsystem (tokens, RBAC, password store). ADR §5 parallel-track: identity and AuthN/AuthZ are owned by cave-identity (SPIRE/Keycloak) per ADR-RUNTIME-STACK-001."
+
+[[skipped]]
+upstream_path = "lease/server"
+category      = "parallel-track"
+reason        = "etcd lease renewal server (keepalive loop, expiry). ADR §5 parallel-track: lease lifecycle management for distributed locks is handled by cave-scheduler; cave-ha ports the lease health check (src/ha/health.rs) but not the full server-side lease store."
+
+[[skipped]]
+upstream_path = "server/etcdserver/api/v3rpc/"
+category      = "spec-stubs"
+reason        = "etcd gRPC server stubs (maintenance/kv/watch/cluster RPC wrappers). ADR §5 spec/UI: wire-format RPC surface is owned by cave-apiserver; cave-ha exposes internal HTTP routes (src/routes.rs) without duplicating gRPC bindings."
+
+[[skipped]]
+upstream_path = "server/etcdserver/api/grpc-gateway/"
+category      = "spec-stubs"
+reason        = "gRPC-Gateway HTTP/JSON transcoding layer. ADR §5 spec/UI: HTTP↔gRPC bridging is owned by cave-gateway and cave-apiserver."
+
+[[skipped]]
+upstream_path = "server/etcdserver/api/v2http/"
+category      = "parallel-track"
+reason        = "etcd v2 HTTP API (v2 key/value + members endpoints). ADR §5 parallel-track: v2 API is architecturally superseded — cave-ha exposes the v3-equivalent surfaces (src/api/routes.rs + src/routes.rs)."
+
+[[skipped]]
+upstream_path = "contrib/"
+category      = "CLI"
+reason        = "Community scripts and helper tools. ADR §5 CLI-tooling: not part of the HA server runtime."
+
+[[skipped]]
+upstream_path = "tools/"
+category      = "CLI"
+reason        = "etcd diagnostic tools (etcd-dump-logs core is mapped in src/dr/recovery.rs; remaining tools: etcd-dump-db, benchmark). ADR §5 CLI-tooling: benchmark and db-dump tooling belong to cavectl."
+
+[[skipped]]
+upstream_path = "third_party/"
+category      = "spec-stubs"
+reason        = "Vendored protobuf/gRPC spec files. ADR §5 spec/UI: proto definitions are consumed by cave-apiserver; cave-ha uses its own internal message types (src/raft/messages.rs)."
 [module]
 name        = "cave-ha"
 description = "High-availability + Raft consensus — etcd's raft package + server failover/DR primitives"

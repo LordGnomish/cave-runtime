@@ -161,9 +161,14 @@ impl ResourceProvider for MockProvider {
     }
 
     async fn provision(&self, resource: &crate::state::InfraResource) -> ProvisionResult {
+        // Use actual_id (set by InfraResource::new as the logical string id) or fall back to UUID
+        let resource_id = resource
+            .actual_id
+            .clone()
+            .unwrap_or_else(|| resource.id.to_string());
         if self.should_fail {
             ProvisionResult {
-                resource_id: resource.id.clone(),
+                resource_id,
                 provider_id: String::new(),
                 provider: self.provider_name.clone(),
                 actual_state: serde_json::Value::Null,
@@ -172,10 +177,10 @@ impl ResourceProvider for MockProvider {
             }
         } else {
             ProvisionResult {
-                resource_id: resource.id.clone(),
+                resource_id,
                 provider_id: format!("prov-{}", uuid::Uuid::new_v4()),
                 provider: self.provider_name.clone(),
-                actual_state: resource.spec.clone(),
+                actual_state: serde_json::to_value(&resource.config).unwrap_or_default(),
                 success: true,
                 error: None,
             }
@@ -190,11 +195,7 @@ impl ResourceProvider for MockProvider {
         }
     }
 
-    async fn describe(
-        &self,
-        id: &str,
-        _rt: &ResourceType,
-    ) -> Result<serde_json::Value, String> {
+    async fn describe(&self, id: &str, _rt: &ResourceType) -> Result<serde_json::Value, String> {
         Ok(serde_json::json!({ "id": id, "status": "running" }))
     }
 }
@@ -235,16 +236,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_failing_provider() {
-        let provider = MockProvider::failing("fail-cloud", vec![ResourceType::Vm, ResourceType::Vpc]);
+        let provider =
+            MockProvider::failing("fail-cloud", vec![ResourceType::Vm, ResourceType::Vpc]);
         let resource = make_vm_resource();
 
         let result = provider.provision(&resource).await;
         assert!(!result.success);
         assert_eq!(result.error.as_deref(), Some("mock failure"));
 
-        let deprov = provider
-            .deprovision("prov-xyz", &ResourceType::Vm)
-            .await;
+        let deprov = provider.deprovision("prov-xyz", &ResourceType::Vm).await;
         assert!(deprov.is_err());
     }
 }

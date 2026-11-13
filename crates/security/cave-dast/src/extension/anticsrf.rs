@@ -167,7 +167,9 @@ fn attr_value(tag: &str, attr: &str) -> Option<String> {
         _ => (0, b' '),
     };
     let mut end = start;
-    while end < bytes.len() && bytes[end] != quote && (quote != b' ' || !bytes[end].is_ascii_whitespace())
+    while end < bytes.len()
+        && bytes[end] != quote
+        && (quote != b' ' || !bytes[end].is_ascii_whitespace())
     {
         if quote == b' ' && bytes[end] == b'>' {
             break;
@@ -205,7 +207,8 @@ mod tests {
 
     #[test]
     fn harvest_extracts_django_token() {
-        let html = r#"<form><input type="hidden" name="csrfmiddlewaretoken" value="abc123"></form>"#;
+        let html =
+            r#"<form><input type="hidden" name="csrfmiddlewaretoken" value="abc123"></form>"#;
         let mut r = AntiCsrfRegistry::new();
         let found = r.harvest_from_html(html, "https://x/login");
         assert_eq!(found, vec!["csrfmiddlewaretoken".to_string()]);

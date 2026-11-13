@@ -30,5 +30,6 @@ reqwest = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true }
 

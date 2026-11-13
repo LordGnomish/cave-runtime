@@ -152,10 +152,7 @@ impl RekorClient {
 
     /// Live HTTP upload — `POST /api/v1/log/entries`.
     pub async fn upload(&self, entry: HashedRekordEntry) -> Result<RekorLogEntry> {
-        let url = format!(
-            "{}/api/v1/log/entries",
-            self.base_url.trim_end_matches('/')
-        );
+        let url = format!("{}/api/v1/log/entries", self.base_url.trim_end_matches('/'));
         let client = reqwest::Client::new();
         let body = serde_json::json!({
             "kind": "hashedrekord",
@@ -195,8 +192,8 @@ struct InMemoryLog {
 impl InMemoryLog {
     fn append(&mut self, entry: HashedRekordEntry) -> RekorLogEntry {
         let log_index = self.entries.len() as u64;
-        let body_b64 = base64::engine::general_purpose::STANDARD
-            .encode(serde_json::to_vec(&entry).unwrap());
+        let body_b64 =
+            base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&entry).unwrap());
         let mut h = Sha256::new();
         h.update(body_b64.as_bytes());
         let leaf = h.finalize();
@@ -321,10 +318,7 @@ impl RekorLogEntry {
 
 /// Top-level lookup used by callers that don't want to think about
 /// online vs offline.
-pub fn lookup_in_map(
-    log: &BTreeMap<u64, RekorLogEntry>,
-    log_index: u64,
-) -> Result<&RekorLogEntry> {
+pub fn lookup_in_map(log: &BTreeMap<u64, RekorLogEntry>, log_index: u64) -> Result<&RekorLogEntry> {
     log.get(&log_index)
         .ok_or_else(|| SignError::NotFound(format!("entry {}", log_index)))
 }

@@ -16,50 +16,168 @@ pub fn node_checks() -> Vec<(Check, CisRule)> {
     let mut out = Vec::new();
 
     // ── 4.1.* — Kubelet config files ─────────────────────────────────────────
-    out.push(file_mode("cis-4.1.1", "Ensure kubelet service file permissions are 600 or restrictive",
-        "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf", "600", Severity::High));
-    out.push(file_owner("cis-4.1.2", "Ensure kubelet service file ownership is root:root",
-        "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf", "root:root", Severity::Medium));
-    out.push(file_mode("cis-4.1.3", "Ensure proxy kubeconfig file permissions are 600",
-        "/var/lib/kube-proxy/kubeconfig", "600", Severity::High));
-    out.push(file_owner("cis-4.1.4", "Ensure proxy kubeconfig file ownership is root:root",
-        "/var/lib/kube-proxy/kubeconfig", "root:root", Severity::Medium));
-    out.push(file_mode("cis-4.1.5", "Ensure kubelet.conf file permissions are 600",
-        "/etc/kubernetes/kubelet.conf", "600", Severity::High));
-    out.push(file_owner("cis-4.1.6", "Ensure kubelet.conf file ownership is root:root",
-        "/etc/kubernetes/kubelet.conf", "root:root", Severity::Medium));
-    out.push(file_mode("cis-4.1.9", "Ensure kubelet config file permissions are 600",
-        "/var/lib/kubelet/config.yaml", "600", Severity::High));
-    out.push(file_owner("cis-4.1.10", "Ensure kubelet config file ownership is root:root",
-        "/var/lib/kubelet/config.yaml", "root:root", Severity::Medium));
+    out.push(file_mode(
+        "cis-4.1.1",
+        "Ensure kubelet service file permissions are 600 or restrictive",
+        "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
+        "600",
+        Severity::High,
+    ));
+    out.push(file_owner(
+        "cis-4.1.2",
+        "Ensure kubelet service file ownership is root:root",
+        "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
+        "root:root",
+        Severity::Medium,
+    ));
+    out.push(file_mode(
+        "cis-4.1.3",
+        "Ensure proxy kubeconfig file permissions are 600",
+        "/var/lib/kube-proxy/kubeconfig",
+        "600",
+        Severity::High,
+    ));
+    out.push(file_owner(
+        "cis-4.1.4",
+        "Ensure proxy kubeconfig file ownership is root:root",
+        "/var/lib/kube-proxy/kubeconfig",
+        "root:root",
+        Severity::Medium,
+    ));
+    out.push(file_mode(
+        "cis-4.1.5",
+        "Ensure kubelet.conf file permissions are 600",
+        "/etc/kubernetes/kubelet.conf",
+        "600",
+        Severity::High,
+    ));
+    out.push(file_owner(
+        "cis-4.1.6",
+        "Ensure kubelet.conf file ownership is root:root",
+        "/etc/kubernetes/kubelet.conf",
+        "root:root",
+        Severity::Medium,
+    ));
+    out.push(file_mode(
+        "cis-4.1.9",
+        "Ensure kubelet config file permissions are 600",
+        "/var/lib/kubelet/config.yaml",
+        "600",
+        Severity::High,
+    ));
+    out.push(file_owner(
+        "cis-4.1.10",
+        "Ensure kubelet config file ownership is root:root",
+        "/var/lib/kubelet/config.yaml",
+        "root:root",
+        Severity::Medium,
+    ));
 
     // ── 4.2.* — Kubelet flags ────────────────────────────────────────────────
-    out.push(flag_eq("cis-4.2.1", "Ensure --anonymous-auth=false on kubelet",
-        "kubelet", "--anonymous-auth", "false", Severity::Critical));
-    out.push(flag_neq("cis-4.2.2", "Ensure --authorization-mode is not AlwaysAllow",
-        "kubelet", "--authorization-mode", "AlwaysAllow", Severity::Critical));
-    out.push(flag_neq("cis-4.2.3", "Ensure --client-ca-file is set",
-        "kubelet", "--client-ca-file", "", Severity::High));
-    out.push(flag_eq("cis-4.2.4", "Ensure --read-only-port is 0",
-        "kubelet", "--read-only-port", "0", Severity::High));
-    out.push(flag_neq("cis-4.2.5", "Ensure --streaming-connection-idle-timeout is not 0",
-        "kubelet", "--streaming-connection-idle-timeout", "0", Severity::Medium));
-    out.push(flag_eq("cis-4.2.6", "Ensure --make-iptables-util-chains is true",
-        "kubelet", "--make-iptables-util-chains", "true", Severity::Medium));
-    out.push(flag_eq("cis-4.2.7", "Ensure --hostname-override is not set",
-        "kubelet", "--hostname-override", "", Severity::Low));
-    out.push(flag_gte("cis-4.2.8", "Ensure --event-qps is captured (≥0)",
-        "kubelet", "--event-qps", "0", Severity::Info));
-    out.push(flag_neq("cis-4.2.9", "Ensure --tls-cert-file and --tls-private-key-file are set",
-        "kubelet", "--tls-cert-file", "", Severity::High));
-    out.push(flag_eq("cis-4.2.10", "Ensure --rotate-certificates is true",
-        "kubelet", "--rotate-certificates", "true", Severity::Medium));
-    out.push(flag_eq("cis-4.2.11", "Ensure RotateKubeletServerCertificate is true",
-        "kubelet", "--feature-gates", "RotateKubeletServerCertificate=true", Severity::Medium));
-    out.push(flag_neq("cis-4.2.12", "Ensure --tls-cipher-suites avoids weak ciphers",
-        "kubelet", "--tls-cipher-suites", "TLS_RSA_WITH_RC4_128_SHA", Severity::High));
-    out.push(flag_eq("cis-4.2.13", "Ensure --protect-kernel-defaults is true",
-        "kubelet", "--protect-kernel-defaults", "true", Severity::Medium));
+    out.push(flag_eq(
+        "cis-4.2.1",
+        "Ensure --anonymous-auth=false on kubelet",
+        "kubelet",
+        "--anonymous-auth",
+        "false",
+        Severity::Critical,
+    ));
+    out.push(flag_neq(
+        "cis-4.2.2",
+        "Ensure --authorization-mode is not AlwaysAllow",
+        "kubelet",
+        "--authorization-mode",
+        "AlwaysAllow",
+        Severity::Critical,
+    ));
+    out.push(flag_neq(
+        "cis-4.2.3",
+        "Ensure --client-ca-file is set",
+        "kubelet",
+        "--client-ca-file",
+        "",
+        Severity::High,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.4",
+        "Ensure --read-only-port is 0",
+        "kubelet",
+        "--read-only-port",
+        "0",
+        Severity::High,
+    ));
+    out.push(flag_neq(
+        "cis-4.2.5",
+        "Ensure --streaming-connection-idle-timeout is not 0",
+        "kubelet",
+        "--streaming-connection-idle-timeout",
+        "0",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.6",
+        "Ensure --make-iptables-util-chains is true",
+        "kubelet",
+        "--make-iptables-util-chains",
+        "true",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.7",
+        "Ensure --hostname-override is not set",
+        "kubelet",
+        "--hostname-override",
+        "",
+        Severity::Low,
+    ));
+    out.push(flag_gte(
+        "cis-4.2.8",
+        "Ensure --event-qps is captured (≥0)",
+        "kubelet",
+        "--event-qps",
+        "0",
+        Severity::Info,
+    ));
+    out.push(flag_neq(
+        "cis-4.2.9",
+        "Ensure --tls-cert-file and --tls-private-key-file are set",
+        "kubelet",
+        "--tls-cert-file",
+        "",
+        Severity::High,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.10",
+        "Ensure --rotate-certificates is true",
+        "kubelet",
+        "--rotate-certificates",
+        "true",
+        Severity::Medium,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.11",
+        "Ensure RotateKubeletServerCertificate is true",
+        "kubelet",
+        "--feature-gates",
+        "RotateKubeletServerCertificate=true",
+        Severity::Medium,
+    ));
+    out.push(flag_neq(
+        "cis-4.2.12",
+        "Ensure --tls-cipher-suites avoids weak ciphers",
+        "kubelet",
+        "--tls-cipher-suites",
+        "TLS_RSA_WITH_RC4_128_SHA",
+        Severity::High,
+    ));
+    out.push(flag_eq(
+        "cis-4.2.13",
+        "Ensure --protect-kernel-defaults is true",
+        "kubelet",
+        "--protect-kernel-defaults",
+        "true",
+        Severity::Medium,
+    ));
 
     out
 }
@@ -74,7 +192,14 @@ fn make_meta(id: &str, title: &str, severity: Severity) -> Check {
     c
 }
 
-fn flag_eq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_eq(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -87,7 +212,14 @@ fn flag_eq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severit
     (meta, rule)
 }
 
-fn flag_neq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_neq(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -100,7 +232,14 @@ fn flag_neq(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severi
     (meta, rule)
 }
 
-fn flag_gte(id: &str, title: &str, bin: &str, flag: &str, val: &str, sev: Severity) -> (Check, CisRule) {
+fn flag_gte(
+    id: &str,
+    title: &str,
+    bin: &str,
+    flag: &str,
+    val: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {
@@ -127,7 +266,13 @@ fn file_mode(id: &str, title: &str, path: &str, expected: &str, sev: Severity) -
     (meta, rule)
 }
 
-fn file_owner(id: &str, title: &str, path: &str, expected: &str, sev: Severity) -> (Check, CisRule) {
+fn file_owner(
+    id: &str,
+    title: &str,
+    path: &str,
+    expected: &str,
+    sev: Severity,
+) -> (Check, CisRule) {
     let meta = make_meta(id, title, sev);
     let mut rule = CisRule::new(id, title);
     rule.items.push(TestItem {

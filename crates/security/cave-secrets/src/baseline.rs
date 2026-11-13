@@ -117,7 +117,10 @@ impl Baseline {
                 }
             })
             .collect();
-        let file = BaselineFile { version: 1, entries };
+        let file = BaselineFile {
+            version: 1,
+            entries,
+        };
         let json = serde_json::to_vec_pretty(&file)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         if let Some(parent) = path.as_ref().parent() {
@@ -209,10 +212,8 @@ mod tests {
 
     #[test]
     fn save_then_load_roundtrip() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cave-secrets-baseline-{}.json",
-            std::process::id()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("cave-secrets-baseline-{}.json", std::process::id()));
         let f = mk("aws", "x.env", 7, "AKIA...");
         Baseline::save_json(&tmp, std::slice::from_ref(&f), "test").unwrap();
         let loaded = Baseline::load_json(&tmp).unwrap();

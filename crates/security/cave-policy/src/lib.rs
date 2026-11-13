@@ -18,6 +18,7 @@ pub mod admission;
 pub mod bundle;
 pub mod decision_log;
 pub mod error;
+pub mod expansion;
 pub mod http_send;
 pub mod kyverno;
 pub mod models;

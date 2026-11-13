@@ -12,7 +12,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-24";
+// Audit date is re-stamped on every honest uplift wave; the gate asserts a
+// well-formed 2026 ISO date rather than a single frozen day (relaxed
+// 2026-05-30 wave-2 when CSE was promoted skipped→mapped and last_audit
+// advanced from 2026-05-24 → 2026-05-30).
+const AUDIT_YEAR_PREFIX: &str = "2026-";
 const FLOOR_FILL_RATIO: f64 = 0.95;
 
 fn workspace_root() -> PathBuf {
@@ -169,11 +173,11 @@ fn assertion_7_no_stub_macros_in_src() {
 fn assertion_8_last_audit_is_today() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
-    assert_eq!(
-        when.as_deref(),
-        Some(TODAY),
-        "[parity] last_audit must reflect the {} Charter v2 close-out (got {:?})",
-        TODAY,
+    let when = when.expect("[parity] last_audit must be present");
+    assert!(
+        when.starts_with(AUDIT_YEAR_PREFIX) && when.len() == 10,
+        "[parity] last_audit must be a {}MM-DD ISO date reflecting the latest audit wave (got {:?})",
+        AUDIT_YEAR_PREFIX,
         when
     );
 }

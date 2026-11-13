@@ -281,10 +281,8 @@ mod tests {
     #[test]
     fn extension_glob_matches() {
         let mut c = fixture_claims();
-        c.extensions.insert(
-            "github-workflow-trigger".into(),
-            "push".into(),
-        );
+        c.extensions
+            .insert("github-workflow-trigger".into(), "push".into());
         let p = Policy::new("p").require(Rule::CertificateExtension {
             key: "github-workflow-trigger".into(),
             glob: "p*".into(),

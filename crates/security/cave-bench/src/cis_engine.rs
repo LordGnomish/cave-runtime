@@ -121,10 +121,16 @@ pub struct CisContext {
 
 impl CisContext {
     pub fn set_flag(&mut self, bin: &str, k: &str, v: &str) {
-        self.flags.entry(bin.into()).or_default().insert(k.into(), v.into());
+        self.flags
+            .entry(bin.into())
+            .or_default()
+            .insert(k.into(), v.into());
     }
     pub fn set_path(&mut self, bin: &str, k: &str, v: &str) {
-        self.paths.entry(bin.into()).or_default().insert(k.into(), v.into());
+        self.paths
+            .entry(bin.into())
+            .or_default()
+            .insert(k.into(), v.into());
     }
     pub fn set_file(&mut self, path: &str, mode: &str, owner: &str) {
         self.file_modes.insert(path.into(), mode.into());
@@ -171,7 +177,9 @@ fn eval_op(op: BinOp, actual: &str, expected: &str) -> bool {
         BinOp::Lt => parse_num(actual) < parse_num(expected),
         BinOp::Lte => parse_num(actual) <= parse_num(expected),
         BinOp::BitMaskAnd => (parse_num(actual) as u64) & (parse_num(expected) as u64) != 0,
-        BinOp::Regex => regex::Regex::new(expected).map(|r| r.is_match(actual)).unwrap_or(false),
+        BinOp::Regex => regex::Regex::new(expected)
+            .map(|r| r.is_match(actual))
+            .unwrap_or(false),
         BinOp::ValidElements => {
             // every comma-separated element of expected must appear in actual (comma-separated)
             let act: Vec<&str> = actual.split(',').map(str::trim).collect();
@@ -194,7 +202,13 @@ fn parse_num(s: &str) -> i64 {
 }
 
 /// Run a rule against the context. Returns one Finding.
-pub fn evaluate_rule(rule: &CisRule, check_meta: &Check, ctx: &CisContext, bin: &str, host: &str) -> Finding {
+pub fn evaluate_rule(
+    rule: &CisRule,
+    check_meta: &Check,
+    ctx: &CisContext,
+    bin: &str,
+    host: &str,
+) -> Finding {
     if rule.manual {
         return Finding::warn(check_meta, host, format!("Manual check: {}", rule.title));
     }
@@ -209,8 +223,9 @@ pub fn evaluate_rule(rule: &CisRule, check_meta: &Check, ctx: &CisContext, bin: 
     if pass {
         Finding::pass(check_meta, host, format!("{}: control satisfied", rule.id))
     } else {
-        Finding::fail(check_meta, host, format!("{}: control violated", rule.id))
-            .with_evidence(format!("logic={:?}, items_evaluated={}", rule.logic, evals.len()))
+        Finding::fail(check_meta, host, format!("{}: control violated", rule.id)).with_evidence(
+            format!("logic={:?}, items_evaluated={}", rule.logic, evals.len()),
+        )
     }
 }
 
@@ -222,12 +237,30 @@ pub fn load_rules_yaml(text: &str) -> Result<Vec<CisRule>> {
         return Err(BenchError::ControlInvalid("missing groups[]".into()));
     };
     for g in groups {
-        let Some(checks) = g.get("checks").and_then(|c| c.as_sequence()) else { continue };
+        let Some(checks) = g.get("checks").and_then(|c| c.as_sequence()) else {
+            continue;
+        };
         for c in checks {
-            let id = c.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let title = c.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let remediation = c.get("remediation").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let manual = c.get("scored").and_then(|v| v.as_bool()).map(|s| !s).unwrap_or(false);
+            let id = c
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let title = c
+                .get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let remediation = c
+                .get("remediation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let manual = c
+                .get("scored")
+                .and_then(|v| v.as_bool())
+                .map(|s| !s)
+                .unwrap_or(false);
             let mut rule = CisRule::new(id, title);
             rule.remediation = remediation;
             rule.manual = manual;
@@ -277,7 +310,11 @@ mod tests {
     fn test_context_set_flag_get() {
         let mut ctx = CisContext::default();
         ctx.set_flag("apiserver", "--authorization-mode", "Node,RBAC");
-        assert_eq!(ctx.flag("apiserver", "--authorization-mode").map(String::as_str), Some("Node,RBAC"));
+        assert_eq!(
+            ctx.flag("apiserver", "--authorization-mode")
+                .map(String::as_str),
+            Some("Node,RBAC")
+        );
     }
 
     #[test]

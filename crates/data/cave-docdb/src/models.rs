@@ -84,3 +84,31 @@ pub struct ServerInfo {
 pub struct HealthResponse {
     pub status: String,
 }
+
+/// Request to translate a MongoDB query/pipeline into PostgreSQL SQL.
+///
+/// Provide either a `find` shape (`filter`/`projection`/`sort`/`skip`/`limit`)
+/// or an aggregation `pipeline`. The `pipeline` takes precedence if present.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SqlTranslateRequest {
+    pub collection: String,
+    #[serde(default)]
+    pub filter: Option<Value>,
+    #[serde(default)]
+    pub projection: Option<Value>,
+    #[serde(default)]
+    pub sort: Option<Value>,
+    #[serde(default)]
+    pub skip: Option<i64>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub pipeline: Option<Vec<Value>>,
+}
+
+/// The generated SQL plus its ordered bind parameters.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SqlTranslateResponse {
+    pub sql: String,
+    pub params: Vec<String>,
+}

@@ -18,6 +18,7 @@
 
 pub mod catalog;
 pub mod context;
+pub mod cse;
 pub mod data_source;
 pub mod dataframe;
 pub mod dml;
@@ -34,8 +35,10 @@ pub mod window;
 
 pub use catalog::SessionCatalog;
 pub use context::SessionContext;
+pub use cse::CommonSubexprAnalysis;
 pub use data_source::{CsvSource, MemTable, TableProvider};
 pub use dataframe::DataFrame;
+pub use dml::{DmlPlan, InsertSource, delete, insert_from_plan, insert_values, update};
 pub use error::{Error, Result};
 pub use functions::FunctionRegistry;
 pub use logical_expr::{BinaryOp, LogicalExpr};
@@ -44,7 +47,6 @@ pub use physical_expr::{BinaryPhysicalOp, PhysicalExpr};
 pub use physical_plan::{ExecutionPlan, PhysicalPlan};
 pub use row::{Row, Value};
 pub use schema::{DataType, Field, SchemaRef, TableSchema};
-pub use dml::{delete, insert_from_plan, insert_values, update, DmlPlan, InsertSource};
 pub use sql_parser::parse_sql;
 pub use window::{Frame, WindowFunction};
 

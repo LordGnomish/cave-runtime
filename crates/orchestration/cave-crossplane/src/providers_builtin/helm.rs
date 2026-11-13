@@ -124,7 +124,9 @@ mod tests {
     fn upgrade_increments() {
         let h = HelmProvider::new();
         h.install("ns", "n", "nginx", "1.0", json!({}));
-        let r2 = h.upgrade("ns", "n", "nginx", "1.1", json!({"x":1})).unwrap();
+        let r2 = h
+            .upgrade("ns", "n", "nginx", "1.1", json!({"x":1}))
+            .unwrap();
         assert_eq!(r2.revision, 2);
     }
 

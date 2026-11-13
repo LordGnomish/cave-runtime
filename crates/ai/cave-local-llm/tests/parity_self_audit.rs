@@ -55,10 +55,7 @@ fn gate_2_source_sha_pinned() {
         m.contains("source_sha"),
         "manifest must declare source_sha = ollama release tag"
     );
-    assert!(
-        m.contains("v0.3.0"),
-        "source_sha must pin ollama v0.3.0"
-    );
+    assert!(m.contains("v0.3.0"), "source_sha must pin ollama v0.3.0");
 }
 
 #[test]
@@ -157,12 +154,11 @@ fn gate_7_no_stub_macros_in_src() {
             // tells: the line is inside `r#"..."#` or the macro appears in
             // a backtick code-fence (prompt-template markdown).
             let line_in_raw = in_raw_string || line.contains("\"#");
-            let in_string =
-                line_macro_is_in_string(line, "unimplemented!(")
+            let in_string = line_macro_is_in_string(line, "unimplemented!(")
                 || line_macro_is_in_string(line, "todo!(");
             let in_backticks = line.contains("`todo!(") || line.contains("`unimplemented!(");
-            let escaped_quote_inside = line.contains("todo!(\\\"")
-                || line.contains("unimplemented!(\\\"");
+            let escaped_quote_inside =
+                line.contains("todo!(\\\"") || line.contains("unimplemented!(\\\"");
             if line_in_raw || in_string || in_backticks || escaped_quote_inside {
                 continue;
             }

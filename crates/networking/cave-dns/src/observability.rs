@@ -254,8 +254,14 @@ mod tests {
     #[test]
     fn alerts_include_critical_and_warning() {
         let a = alerts();
-        let crit = a.iter().filter(|r| r.severity == AlertSeverity::Critical).count();
-        let warn = a.iter().filter(|r| r.severity == AlertSeverity::Warning).count();
+        let crit = a
+            .iter()
+            .filter(|r| r.severity == AlertSeverity::Critical)
+            .count();
+        let warn = a
+            .iter()
+            .filter(|r| r.severity == AlertSeverity::Warning)
+            .count();
         assert!(crit >= 2, "expected >= 2 critical alerts, got {crit}");
         assert!(warn >= 2, "expected >= 2 warning alerts, got {warn}");
     }

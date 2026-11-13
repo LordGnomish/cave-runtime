@@ -17,4 +17,5 @@ regex = { workspace = true }
 async-trait = "0.1"
 
 [dev-dependencies]
+proptest = "1"
 tokio = { workspace = true, features = ["full", "macros"] }
