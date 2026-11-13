@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 /// Assemble a rootfs from OCI image layers.
 ///
 /// Uses overlayfs to stack layers (lower=layer1:layer2:..., upper=writable, work=workdir).
+/// If no layer was extracted there is nothing to stack and nothing is
+/// mounted: the returned `merged` directory is then a plain, empty directory.
 pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBuf> {
     let container_dir = paths::container_dir(container_id);
     let rootfs = container_dir.join("rootfs");
@@ -36,32 +38,26 @@ pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBu
     // On Linux: mount overlayfs
     #[cfg(target_os = "linux")]
     {
-        let lower_dirs: Vec<String> = (0..image.layers.len())
-            .rev()
-            .map(|i| {
-                container_dir
-                    .join(format!("layer_{}", i))
-                    .display()
-                    .to_string()
-            })
-            .collect();
-
-        let lower = lower_dirs.join(":");
-        let opts = format!(
-            "lowerdir={},upperdir={},workdir={}",
-            lower,
-            upper.display(),
-            work.display()
-        );
-
-        nix::mount::mount(
-            Some("overlay"),
-            &merged,
-            Some("overlay"),
-            nix::mount::MsFlags::empty(),
-            Some(opts.as_str()),
-        )
-        .map_err(|e| CriError::Rootfs(format!("overlayfs mount failed: {}", e)))?;
+        let lower_dirs = overlay_lower_dirs(image, &container_dir);
+        if lower_dirs.is_empty() {
+            // overlayfs needs at least one lower directory (mount(2) fails
+            // with EINVAL otherwise). With no extracted layer there is
+            // nothing to stack: the empty `merged` directory is the rootfs.
+            tracing::debug!(
+                "no extracted layers for {} — rootfs is a plain directory",
+                container_id
+            );
+        } else {
+            let opts = overlay_options(&lower_dirs, &upper, &work);
+            nix::mount::mount(
+                Some("overlay"),
+                &merged,
+                Some("overlay"),
+                nix::mount::MsFlags::empty(),
+                Some(opts.as_str()),
+            )
+            .map_err(|e| CriError::Rootfs(format!("overlayfs mount failed: {}", e)))?;
+        }
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -71,6 +67,39 @@ pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBu
     }
 
     Ok(merged)
+}
+
+/// The lower directories for the overlay mount: the directory of every layer
+/// that was extracted (a layer without a local blob is skipped by
+/// `assemble_rootfs` and has no directory), topmost layer first. overlayfs
+/// stacks `lowerdir=a:b:c` with `a` on top, image layers are listed base
+/// first.
+#[cfg(target_os = "linux")]
+fn overlay_lower_dirs(image: &OciImage, container_dir: &Path) -> Vec<PathBuf> {
+    image
+        .layers
+        .iter()
+        .enumerate()
+        .rev()
+        .filter(|(_, layer)| layer.local_path.is_some())
+        .map(|(i, _)| container_dir.join(format!("layer_{}", i)))
+        .collect()
+}
+
+/// The option string for mounting an overlay of `lower_dirs` (topmost
+/// first) with a writable `upper` layer and its `work` directory.
+#[cfg(target_os = "linux")]
+fn overlay_options(lower_dirs: &[PathBuf], upper: &Path, work: &Path) -> String {
+    let lower: Vec<String> = lower_dirs
+        .iter()
+        .map(|dir| dir.display().to_string())
+        .collect();
+    format!(
+        "lowerdir={},upperdir={},workdir={}",
+        lower.join(":"),
+        upper.display(),
+        work.display()
+    )
 }
 
 /// Extract a tar.gz layer into a directory, handling OCI whiteout files.
@@ -142,11 +171,11 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
 /// Cleanup rootfs and all container data.
 pub fn cleanup_rootfs(container_id: &str) -> CriResult<()> {
     let container_dir = paths::container_dir(container_id);
-    let _merged = container_dir.join("merged");
 
     // Unmount overlayfs first
     #[cfg(target_os = "linux")]
     {
+        let merged = container_dir.join("merged");
         if merged.exists() {
             let _ = nix::mount::umount(&merged);
         }
@@ -351,6 +380,79 @@ mod tests {
         let archive = make_tar_gz(&dir, &[("subdir/.wh.old.txt", b"")]);
         extract_layer(&archive, &target).unwrap();
         assert!(!target.join("subdir").join("old.txt").exists());
+    }
+
+    // ── overlay mount arguments (Linux) ───────────────────────────────────────
+    //
+    // The mount itself needs CAP_SYS_ADMIN; what is passed to it is computed
+    // by two pure functions that are tested here.
+
+    #[cfg(target_os = "linux")]
+    fn image_with_blobs(has_blob: &[bool]) -> OciImage {
+        let mut image = make_empty_image();
+        for (i, has_blob) in has_blob.iter().enumerate() {
+            image.layers.push(OciLayer {
+                digest: format!("sha256:{i}"),
+                size: 1,
+                media_type: "application/vnd.oci.image.layer.v1.tar+gzip".into(),
+                local_path: has_blob.then(|| PathBuf::from(format!("/blobs/{i}.tar.gz"))),
+            });
+        }
+        image
+    }
+
+    /// overlayfs stacks `lowerdir=a:b:c` with `a` on top. Image layers are
+    /// listed base first, so the last layer has to come first.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_lists_the_extracted_layers_topmost_first() {
+        let image = image_with_blobs(&[true, true, true]);
+
+        let dirs = overlay_lower_dirs(&image, Path::new("/state/containers/c1"));
+
+        assert_eq!(
+            dirs,
+            [
+                PathBuf::from("/state/containers/c1/layer_2"),
+                PathBuf::from("/state/containers/c1/layer_1"),
+                PathBuf::from("/state/containers/c1/layer_0"),
+            ]
+        );
+    }
+
+    /// A layer without a local blob is never extracted, so its directory
+    /// does not exist; naming it would make mount(2) fail with ENOENT.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_leaves_out_layers_that_were_not_extracted() {
+        let image = image_with_blobs(&[true, false, true, false]);
+
+        let dirs = overlay_lower_dirs(&image, Path::new("/c"));
+
+        assert_eq!(
+            dirs,
+            [PathBuf::from("/c/layer_2"), PathBuf::from("/c/layer_0")]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_lower_dirs_is_empty_when_nothing_was_extracted() {
+        assert!(overlay_lower_dirs(&make_empty_image(), Path::new("/c")).is_empty());
+        assert!(overlay_lower_dirs(&image_with_blobs(&[false, false]), Path::new("/c")).is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn overlay_options_name_the_lower_upper_and_work_directories() {
+        let lower = [PathBuf::from("/c/layer_1"), PathBuf::from("/c/layer_0")];
+
+        let opts = overlay_options(&lower, Path::new("/c/upper"), Path::new("/c/work"));
+
+        assert_eq!(
+            opts,
+            "lowerdir=/c/layer_1:/c/layer_0,upperdir=/c/upper,workdir=/c/work"
+        );
     }
 
     #[test]
