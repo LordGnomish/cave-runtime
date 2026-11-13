@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
 const CAVE_CGROUP_PREFIX: &str = "cave";
+const DEFAULT_TENANT: &str = "default";
 
 /// Handle to a container's cgroup. The `tenant_id` segment is part of the
 /// canonical path so every container's cgroup tree is hard-isolated by
@@ -26,7 +27,7 @@ pub struct CgroupHandle {
 
 impl CgroupHandle {
     pub fn new(container_id: &str) -> Self {
-        Self::with_root(container_id, "default", Path::new(CGROUP_ROOT))
+        Self::with_root(container_id, DEFAULT_TENANT, Path::new(CGROUP_ROOT))
     }
 
     /// Tenant-scoped handle rooted at an arbitrary cgroup hierarchy root.
@@ -44,19 +45,46 @@ impl CgroupHandle {
 }
 
 /// Create a cgroup v2 directory and apply resource limits.
+///
+/// On Linux, a hierarchy this process may not write to (not root and no
+/// delegated subtree, or a read-only cgroup mount) is tolerated when the
+/// container asks for no limits: a warning is logged and the container gets
+/// no cgroup of its own. This is the rule of runc's fs2 manager
+/// (`libcontainer/cgroups/fs2/fs2.go`, `Manager.Apply`). If any limit is
+/// requested the failure is an error, because the limit would not be
+/// enforced.
 pub fn create_cgroup(container_id: &str, limits: &ResourceLimits) -> CriResult<CgroupHandle> {
-    let handle = CgroupHandle::new(container_id);
+    create_cgroup_at(Path::new(CGROUP_ROOT), container_id, limits)
+}
+
+/// `create_cgroup` with the hierarchy root as a parameter: `/sys/fs/cgroup`
+/// in production, a directory of their own choosing in tests.
+fn create_cgroup_at(
+    root: &Path,
+    container_id: &str,
+    limits: &ResourceLimits,
+) -> CriResult<CgroupHandle> {
+    let handle = CgroupHandle::with_root(container_id, DEFAULT_TENANT, root);
 
     #[cfg(target_os = "linux")]
     {
-        std::fs::create_dir_all(&handle.path).map_err(|e| {
-            CriError::Cgroup(format!(
-                "failed to create cgroup {}: {}",
-                handle.path.display(),
-                e
-            ))
-        })?;
-        apply_limits(&handle, limits)?;
+        match std::fs::create_dir_all(&handle.path) {
+            Ok(()) => apply_limits(&handle, limits)?,
+            Err(e) if hierarchy_not_writable(&e) && !requests_any_limit(limits) => {
+                tracing::warn!(
+                    "cannot create cgroup {}: {} — no limits requested, continuing without a cgroup",
+                    handle.path.display(),
+                    e
+                );
+            }
+            Err(e) => {
+                return Err(CriError::Cgroup(format!(
+                    "failed to create cgroup {}: {}",
+                    handle.path.display(),
+                    e
+                )));
+            }
+        }
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -65,6 +93,26 @@ pub fn create_cgroup(container_id: &str, limits: &ResourceLimits) -> CriResult<C
     }
 
     Ok(handle)
+}
+
+/// Whether creating a cgroup failed because this process may not write to
+/// the hierarchy: `EACCES` / `EPERM` (not root, subtree not delegated) or
+/// `EROFS` (cgroup filesystem mounted read-only, as inside most containers).
+#[cfg(target_os = "linux")]
+fn hierarchy_not_writable(e: &std::io::Error) -> bool {
+    matches!(
+        e.kind(),
+        std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+    )
+}
+
+/// Whether `apply_limits` would write anything for these limits.
+#[cfg(target_os = "linux")]
+fn requests_any_limit(limits: &ResourceLimits) -> bool {
+    limits.cpu_shares.is_some()
+        || limits.cpu_quota.is_some()
+        || limits.memory_limit.is_some()
+        || limits.pids_limit.is_some()
 }
 
 /// Update resource limits on an existing cgroup.
