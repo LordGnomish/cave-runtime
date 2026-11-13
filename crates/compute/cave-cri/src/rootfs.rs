@@ -142,11 +142,11 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
 /// Cleanup rootfs and all container data.
 pub fn cleanup_rootfs(container_id: &str) -> CriResult<()> {
     let container_dir = paths::container_dir(container_id);
-    let _merged = container_dir.join("merged");
 
     // Unmount overlayfs first
     #[cfg(target_os = "linux")]
     {
+        let merged = container_dir.join("merged");
         if merged.exists() {
             let _ = nix::mount::umount(&merged);
         }

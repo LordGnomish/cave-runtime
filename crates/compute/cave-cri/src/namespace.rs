@@ -41,11 +41,11 @@ pub struct NamespaceSet {
 }
 
 /// Build clone(2) flags from namespace config.
-pub fn build_clone_flags(_config: &NamespaceConfig) -> i32 {
-    let flags: i32 = 0;
+pub fn build_clone_flags(config: &NamespaceConfig) -> i32 {
     #[cfg(target_os = "linux")]
     {
         use nix::sched::CloneFlags;
+        let mut flags: i32 = 0;
         if config.pid {
             flags |= CloneFlags::CLONE_NEWPID.bits();
         }
@@ -64,12 +64,14 @@ pub fn build_clone_flags(_config: &NamespaceConfig) -> i32 {
         if config.user {
             flags |= CloneFlags::CLONE_NEWUSER.bits();
         }
+        flags
     }
     #[cfg(not(target_os = "linux"))]
     {
+        let _ = config;
         tracing::warn!("namespaces not supported on this OS — container isolation disabled");
+        0
     }
-    flags
 }
 
 /// Create namespaces for a container.
@@ -85,24 +87,19 @@ pub fn create_namespaces(config: &NamespaceConfig) -> CriResult<NamespaceSet> {
 pub fn enter_namespaces(pid: u32) -> CriResult<()> {
     #[cfg(target_os = "linux")]
     {
+        use crate::error::CriError;
+        use nix::sched::{setns, CloneFlags};
         use std::fs::File;
-        use std::os::unix::io::AsRawFd;
 
         let ns_types = ["pid", "net", "mnt", "uts", "ipc"];
         for ns in &ns_types {
             let path = format!("/proc/{}/ns/{}", pid, ns);
             match File::open(&path) {
                 Ok(f) => {
-                    let fd = f.as_raw_fd();
-                    unsafe {
-                        if libc::setns(fd, 0) != 0 {
-                            return Err(CriError::Namespace(format!(
-                                "setns({}) failed: {}",
-                                ns,
-                                std::io::Error::last_os_error()
-                            )));
-                        }
-                    }
+                    // An empty flag set is setns(2)'s nstype 0: the fd may
+                    // refer to a namespace of any type.
+                    setns(&f, CloneFlags::empty())
+                        .map_err(|e| CriError::Namespace(format!("setns({}) failed: {}", ns, e)))?;
                     tracing::debug!("entered {} namespace of pid {}", ns, pid);
                 }
                 Err(e) => {

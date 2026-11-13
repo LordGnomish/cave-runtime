@@ -287,20 +287,24 @@ pub async fn exec_in_container(
 
         // Fork a child to exec the command, capture output via pipes
         use nix::sys::wait::{waitpid, WaitStatus};
-        use nix::unistd::{close, fork, pipe, read, ForkResult};
+        use nix::unistd::{dup2, fork, pipe, read, ForkResult};
+        use std::os::fd::AsRawFd;
 
         let (stdout_r, stdout_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
         let (stderr_r, stderr_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
 
         match unsafe { fork() } {
             Ok(ForkResult::Parent { child }) => {
-                close(stdout_w).ok();
-                close(stderr_w).ok();
+                // The pipe ends are `OwnedFd`s: dropping one closes it, exactly
+                // once. The parent must give up its write ends, otherwise the
+                // reads below never see end-of-file.
+                drop(stdout_w);
+                drop(stderr_w);
 
                 let mut stdout_buf = Vec::new();
                 let mut buf = [0u8; 4096];
                 loop {
-                    match read(stdout_r, &mut buf) {
+                    match read(stdout_r.as_raw_fd(), &mut buf) {
                         Ok(0) | Err(_) => break,
                         Ok(n) => stdout_buf.extend_from_slice(&buf[..n]),
                     }
@@ -308,14 +312,14 @@ pub async fn exec_in_container(
 
                 let mut stderr_buf = Vec::new();
                 loop {
-                    match read(stderr_r, &mut buf) {
+                    match read(stderr_r.as_raw_fd(), &mut buf) {
                         Ok(0) | Err(_) => break,
                         Ok(n) => stderr_buf.extend_from_slice(&buf[..n]),
                     }
                 }
 
-                close(stdout_r).ok();
-                close(stderr_r).ok();
+                drop(stdout_r);
+                drop(stderr_r);
 
                 let exit_code = match waitpid(child, None) {
                     Ok(WaitStatus::Exited(_, code)) => code,
@@ -323,20 +327,22 @@ pub async fn exec_in_container(
                 };
 
                 let duration_ms = start.elapsed().as_millis() as u64;
-                return Ok(ExecResult {
+                Ok(ExecResult {
                     exit_code,
                     stdout: String::from_utf8_lossy(&stdout_buf).into_owned(),
                     stderr: String::from_utf8_lossy(&stderr_buf).into_owned(),
                     duration_ms,
-                });
+                })
             }
             Ok(ForkResult::Child) => {
-                use nix::unistd::dup2;
-                use std::os::unix::io::RawFd;
-                dup2(stdout_w, 1 as RawFd).ok();
-                dup2(stderr_w, 2 as RawFd).ok();
-                close(stdout_r).ok();
-                close(stderr_r).ok();
+                // dup2 leaves the pipe open as fd 1 / fd 2; every original
+                // pipe fd is then closed so none leaks into the command.
+                dup2(stdout_w.as_raw_fd(), 1).ok();
+                dup2(stderr_w.as_raw_fd(), 2).ok();
+                drop(stdout_w);
+                drop(stderr_w);
+                drop(stdout_r);
+                drop(stderr_r);
 
                 // Apply working dir
                 if let Some(ref wd) = req.working_dir {
@@ -352,24 +358,22 @@ pub async fn exec_in_container(
                 let _ = nix::unistd::execvp(&c_cmd, &c_args);
                 std::process::exit(127);
             }
-            Err(e) => {
-                return Err(CriError::Exec(format!("fork failed: {}", e)));
-            }
+            Err(e) => Err(CriError::Exec(format!("fork failed: {}", e))),
         }
     }
 
     #[cfg(not(target_os = "linux"))]
     {
         tracing::warn!(container_id = %id, cmd = ?req.command, "simulated exec (non-Linux)");
-    }
 
-    let duration_ms = start.elapsed().as_millis() as u64;
-    Ok(ExecResult {
-        exit_code: 0,
-        stdout: format!("exec: {}", req.command.join(" ")),
-        stderr: String::new(),
-        duration_ms,
-    })
+        let duration_ms = start.elapsed().as_millis() as u64;
+        Ok(ExecResult {
+            exit_code: 0,
+            stdout: format!("exec: {}", req.command.join(" ")),
+            stderr: String::new(),
+            duration_ms,
+        })
+    }
 }
 
 /// Read container log lines (JSON format like Docker/containerd).

@@ -44,7 +44,7 @@ impl CgroupHandle {
 }
 
 /// Create a cgroup v2 directory and apply resource limits.
-pub fn create_cgroup(container_id: &str, _limits: &ResourceLimits) -> CriResult<CgroupHandle> {
+pub fn create_cgroup(container_id: &str, limits: &ResourceLimits) -> CriResult<CgroupHandle> {
     let handle = CgroupHandle::new(container_id);
 
     #[cfg(target_os = "linux")]
@@ -60,6 +60,7 @@ pub fn create_cgroup(container_id: &str, _limits: &ResourceLimits) -> CriResult<
     }
     #[cfg(not(target_os = "linux"))]
     {
+        let _ = limits;
         tracing::warn!("cgroups not supported on this OS — resource limits not enforced");
     }
 
@@ -72,7 +73,7 @@ pub fn update_cgroup(handle: &CgroupHandle, limits: &ResourceLimits) -> CriResul
 }
 
 /// Remove cgroup directory.
-pub fn remove_cgroup(_handle: &CgroupHandle) -> CriResult<()> {
+pub fn remove_cgroup(handle: &CgroupHandle) -> CriResult<()> {
     #[cfg(target_os = "linux")]
     {
         if handle.path.exists() {
@@ -80,49 +81,60 @@ pub fn remove_cgroup(_handle: &CgroupHandle) -> CriResult<()> {
                 .map_err(|e| CriError::Cgroup(format!("failed to remove cgroup: {}", e)))?;
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = handle;
+    }
     Ok(())
 }
 
 /// Read current resource usage from cgroup.
-pub fn read_stats(_handle: &CgroupHandle) -> CriResult<CgroupStats> {
-    let stats = CgroupStats::default();
-
+pub fn read_stats(handle: &CgroupHandle) -> CriResult<CgroupStats> {
     #[cfg(target_os = "linux")]
-    {
-        stats.cpu_usage_usec =
-            read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0);
-        stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
-        stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
-        stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
-    }
+    let stats = CgroupStats {
+        cpu_usage_usec: read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0),
+        memory_current: read_file_u64(&handle.path.join("memory.current")).unwrap_or(0),
+        memory_peak: read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0),
+        pids_current: read_file_u64(&handle.path.join("pids.current")).unwrap_or(0),
+    };
+    #[cfg(not(target_os = "linux"))]
+    let stats = {
+        let _ = handle;
+        CgroupStats::default()
+    };
 
     Ok(stats)
 }
 
 /// Read extended cgroup v2 stats including io.stat, user/sys usec, and throttle info.
-pub fn read_stats_v2(_handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
-    let stats = crate::models::CgroupStatsV2::default();
-
+pub fn read_stats_v2(handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
     #[cfg(target_os = "linux")]
-    {
+    let stats = {
         let cpu_stat_path = handle.path.join("cpu.stat");
-        stats.cpu_usage_usec = read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0);
-        stats.cpu_user_usec = read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0);
-        stats.cpu_system_usec = read_cpu_stat(&cpu_stat_path, "system_usec").unwrap_or(0);
-        stats.cpu_nr_throttled = read_cpu_stat(&cpu_stat_path, "nr_throttled").unwrap_or(0);
-
-        stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
-        stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
-        stats.memory_swap_current =
-            read_file_u64(&handle.path.join("memory.swap.current")).unwrap_or(0);
-
-        stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
-        stats.pids_max_reached = read_pids_events(&handle.path.join("pids.events")).unwrap_or(0);
-
         let (rbytes, wbytes) = read_io_stat(&handle.path.join("io.stat")).unwrap_or((0, 0));
-        stats.io_read_bytes = rbytes;
-        stats.io_write_bytes = wbytes;
-    }
+        crate::models::CgroupStatsV2 {
+            cpu_usage_usec: read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0),
+            cpu_user_usec: read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0),
+            cpu_system_usec: read_cpu_stat(&cpu_stat_path, "system_usec").unwrap_or(0),
+            cpu_nr_throttled: read_cpu_stat(&cpu_stat_path, "nr_throttled").unwrap_or(0),
+
+            memory_current: read_file_u64(&handle.path.join("memory.current")).unwrap_or(0),
+            memory_peak: read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0),
+            memory_swap_current: read_file_u64(&handle.path.join("memory.swap.current"))
+                .unwrap_or(0),
+
+            pids_current: read_file_u64(&handle.path.join("pids.current")).unwrap_or(0),
+            pids_max_reached: read_pids_events(&handle.path.join("pids.events")).unwrap_or(0),
+
+            io_read_bytes: rbytes,
+            io_write_bytes: wbytes,
+        }
+    };
+    #[cfg(not(target_os = "linux"))]
+    let stats = {
+        let _ = handle;
+        crate::models::CgroupStatsV2::default()
+    };
 
     Ok(stats)
 }
