@@ -517,14 +517,20 @@ mod tests {
 
     #[test]
     fn test_create_cgroup_zero_limits() {
+        // On Linux this creates a directory and writes the limit files, so
+        // the hierarchy root is a tempdir instead of the host's
+        // /sys/fs/cgroup, which a test run is not allowed to write to.
+        let root = tempfile::tempdir().unwrap();
         let limits = ResourceLimits {
             cpu_shares: Some(0),
             cpu_quota: Some(0),
             memory_limit: Some(0),
             pids_limit: Some(0),
         };
-        let h = create_cgroup("zero-limits-id", &limits).unwrap();
+        let h = create_cgroup_at(root.path(), "zero-limits-id", &limits).unwrap();
         assert_eq!(h.container_id, "zero-limits-id");
+        #[cfg(target_os = "linux")]
+        assert!(h.path.is_dir());
     }
 
     #[test]
@@ -536,7 +542,12 @@ mod tests {
 
     #[test]
     fn test_update_cgroup_all_limits_set() {
-        let h = CgroupHandle::new("update-all");
+        // Limits can only be written to a cgroup that exists, and on Linux
+        // they really are written: the handle gets a directory in a tempdir
+        // instead of a path under the host's /sys/fs/cgroup.
+        let root = tempfile::tempdir().unwrap();
+        let h = CgroupHandle::with_root("update-all", DEFAULT_TENANT, root.path());
+        std::fs::create_dir_all(&h.path).unwrap();
         let limits = ResourceLimits {
             cpu_shares: Some(1024),
             cpu_quota: Some(50000),
@@ -544,6 +555,14 @@ mod tests {
             pids_limit: Some(100),
         };
         assert!(update_cgroup(&h, &limits).is_ok());
+        #[cfg(target_os = "linux")]
+        {
+            let read = |file: &str| std::fs::read_to_string(h.path.join(file)).unwrap();
+            assert_eq!(read("cpu.weight"), "1024");
+            assert_eq!(read("cpu.max"), "50000 100000");
+            assert_eq!(read("memory.max"), "536870912");
+            assert_eq!(read("pids.max"), "100");
+        }
     }
 
     #[test]
