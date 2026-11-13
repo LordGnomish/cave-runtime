@@ -84,34 +84,109 @@ pub fn create_namespaces(config: &NamespaceConfig) -> CriResult<NamespaceSet> {
 }
 
 /// Enter an existing container's namespaces by PID (for exec).
+///
+/// On Linux every namespace of the target is opened before the first one is
+/// joined: joining the mount namespace changes what `/proc` resolves to, so
+/// an entry opened afterwards could belong to a different process.
+/// Namespaces the calling thread is already in are left alone.
+///
+/// setns(2) moves only the calling thread and refuses to change the mount
+/// namespace of a multi-threaded process. Joining a namespace that really
+/// differs therefore only works from a single-threaded process, such as a
+/// forked child that has not called exec yet.
 pub fn enter_namespaces(pid: u32) -> CriResult<()> {
     #[cfg(target_os = "linux")]
     {
-        use crate::error::CriError;
-        use nix::sched::{setns, CloneFlags};
-        use std::fs::File;
-
-        let ns_types = ["pid", "net", "mnt", "uts", "ipc"];
-        for ns in &ns_types {
-            let path = format!("/proc/{}/ns/{}", pid, ns);
-            match File::open(&path) {
-                Ok(f) => {
-                    // An empty flag set is setns(2)'s nstype 0: the fd may
-                    // refer to a namespace of any type.
-                    setns(&f, CloneFlags::empty())
-                        .map_err(|e| CriError::Namespace(format!("setns({}) failed: {}", ns, e)))?;
-                    tracing::debug!("entered {} namespace of pid {}", ns, pid);
-                }
-                Err(e) => {
-                    tracing::warn!("cannot open {}: {} — skipping", path, e);
-                }
-            }
+        let handles = open_foreign_namespaces(std::path::Path::new("/proc"), pid);
+        join_namespaces(&handles).map_err(|(name, errno)| {
+            crate::error::CriError::Namespace(format!("setns({}) failed: {}", name, errno))
+        })?;
+        for handle in &handles {
+            tracing::debug!("entered {} namespace of pid {}", handle.name, pid);
         }
     }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = pid;
         tracing::warn!("enter_namespaces: not supported on this OS");
+    }
+    Ok(())
+}
+
+/// The namespaces `enter_namespaces` joins, in join order: the entry name
+/// under `/proc/<pid>/ns/` and the type setns(2) must find behind it.
+#[cfg(target_os = "linux")]
+const JOINABLE_NAMESPACES: [(&str, nix::sched::CloneFlags); 5] = [
+    ("pid", nix::sched::CloneFlags::CLONE_NEWPID),
+    ("net", nix::sched::CloneFlags::CLONE_NEWNET),
+    ("mnt", nix::sched::CloneFlags::CLONE_NEWNS),
+    ("uts", nix::sched::CloneFlags::CLONE_NEWUTS),
+    ("ipc", nix::sched::CloneFlags::CLONE_NEWIPC),
+];
+
+/// One namespace of another process, opened and ready for setns(2).
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub(crate) struct NamespaceHandle {
+    /// Entry name under `/proc/<pid>/ns/`.
+    pub(crate) name: &'static str,
+    /// The `CLONE_NEW*` type the descriptor must refer to.
+    pub(crate) kind: nix::sched::CloneFlags,
+    /// The open `/proc/<pid>/ns/<name>` entry (close-on-exec).
+    pub(crate) file: std::fs::File,
+}
+
+/// Open the namespaces of `pid` that the calling thread is not already in.
+///
+/// Two `/proc/<pid>/ns/<name>` entries refer to the same namespace when
+/// their device and inode numbers match (namespaces(7)). An entry that
+/// cannot be opened is skipped with a warning. If the caller's own entry
+/// cannot be read, the target's namespace is treated as foreign.
+///
+/// `proc_root` is `/proc`; it is a parameter so that tests can substitute a
+/// directory of ordinary files.
+#[cfg(target_os = "linux")]
+pub(crate) fn open_foreign_namespaces(
+    proc_root: &std::path::Path,
+    pid: u32,
+) -> Vec<NamespaceHandle> {
+    use std::os::unix::fs::MetadataExt;
+
+    let own_dir = proc_root.join("thread-self").join("ns");
+    let target_dir = proc_root.join(pid.to_string()).join("ns");
+    let identity = |meta: std::fs::Metadata| (meta.dev(), meta.ino());
+
+    let mut handles = Vec::new();
+    for (name, kind) in JOINABLE_NAMESPACES {
+        let path = target_dir.join(name);
+        let file = match std::fs::File::open(&path) {
+            Ok(file) => file,
+            Err(e) => {
+                tracing::warn!("cannot open {}: {} — skipping", path.display(), e);
+                continue;
+            }
+        };
+        let target = file.metadata().map(identity).ok();
+        let own = std::fs::metadata(own_dir.join(name)).map(identity).ok();
+        if target.is_some() && target == own {
+            continue;
+        }
+        handles.push(NamespaceHandle { name, kind, file });
+    }
+    handles
+}
+
+/// Join each namespace with setns(2), in order, stopping at the first
+/// failure and returning the name of that namespace with the error.
+///
+/// This only makes system calls and does not allocate, so it may run in a
+/// forked child before exec.
+#[cfg(target_os = "linux")]
+pub(crate) fn join_namespaces(
+    handles: &[NamespaceHandle],
+) -> Result<(), (&'static str, nix::errno::Errno)> {
+    for handle in handles {
+        nix::sched::setns(&handle.file, handle.kind).map_err(|errno| (handle.name, errno))?;
     }
     Ok(())
 }
