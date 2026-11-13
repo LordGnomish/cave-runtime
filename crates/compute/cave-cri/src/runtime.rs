@@ -541,7 +541,17 @@ pub async fn restore_container(
 
     container.status = ContainerStatus::Running;
     container.started_at = Some(chrono::Utc::now());
-    container.pid = Some(99998);
+    // No process is started here (CRIU is not invoked), so on Linux there is
+    // no pid to record: stop, kill and pause send real signals to
+    // `container.pid`, and a made-up number may belong to another process.
+    #[cfg(target_os = "linux")]
+    {
+        container.pid = None;
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        container.pid = Some(99998);
+    }
     store.update(container);
     tracing::info!(container_id = %id, "container restored from checkpoint");
     Ok(())
