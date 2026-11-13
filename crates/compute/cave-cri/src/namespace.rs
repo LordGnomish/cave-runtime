@@ -231,4 +231,155 @@ mod tests {
         let result = enter_namespaces(0);
         assert!(result.is_ok());
     }
+
+    /// `open_foreign_namespaces` against a fake `/proc`: regular files stand
+    /// in for the namespace entries. Two entries are "the same namespace"
+    /// when they are the same file (a hard link has the same device and
+    /// inode number, which is the comparison namespaces(7) prescribes), so
+    /// this needs no privileges and no second process.
+    #[cfg(target_os = "linux")]
+    mod foreign_namespaces {
+        use super::super::*;
+        use nix::errno::Errno;
+        use nix::sched::CloneFlags;
+        use std::os::unix::fs::MetadataExt;
+        use std::path::{Path, PathBuf};
+
+        const TARGET_PID: u32 = 4242;
+        const KINDS: [&str; 5] = ["pid", "net", "mnt", "uts", "ipc"];
+
+        fn ns_dir(proc_root: &Path, owner: &str) -> PathBuf {
+            let dir = proc_root.join(owner).join("ns");
+            std::fs::create_dir_all(&dir).unwrap();
+            dir
+        }
+
+        /// A fake `/proc` in which the caller has all five namespaces and
+        /// the target has an entry for each kind in `shared` (the caller's
+        /// namespace) and in `foreign` (a namespace of its own).
+        fn fake_proc(shared: &[&str], foreign: &[&str]) -> tempfile::TempDir {
+            let root = tempfile::tempdir().unwrap();
+            let own = ns_dir(root.path(), "thread-self");
+            let target = ns_dir(root.path(), &TARGET_PID.to_string());
+            for kind in KINDS {
+                std::fs::write(own.join(kind), b"").unwrap();
+            }
+            for kind in shared {
+                std::fs::hard_link(own.join(kind), target.join(kind)).unwrap();
+            }
+            for kind in foreign {
+                std::fs::write(target.join(kind), b"").unwrap();
+            }
+            root
+        }
+
+        fn names(handles: &[NamespaceHandle]) -> Vec<&'static str> {
+            handles.iter().map(|h| h.name).collect()
+        }
+
+        #[test]
+        fn namespaces_shared_with_the_caller_are_left_out() {
+            let root = fake_proc(&KINDS, &[]);
+
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+
+            assert!(handles.is_empty(), "got {:?}", names(&handles));
+        }
+
+        #[test]
+        fn foreign_namespaces_are_opened_with_their_kernel_type() {
+            let root = fake_proc(&["pid", "mnt", "ipc"], &["net", "uts"]);
+
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+
+            assert_eq!(names(&handles), ["net", "uts"]);
+            assert_eq!(handles[0].kind, CloneFlags::CLONE_NEWNET);
+            assert_eq!(handles[1].kind, CloneFlags::CLONE_NEWUTS);
+
+            // The descriptor is the target's entry, not the caller's.
+            let target_net = root.path().join("4242/ns/net");
+            let expected = std::fs::metadata(target_net).unwrap();
+            let opened = handles[0].file.metadata().unwrap();
+            assert_eq!(
+                (opened.dev(), opened.ino()),
+                (expected.dev(), expected.ino())
+            );
+        }
+
+        #[test]
+        fn every_kind_is_covered_in_a_fixed_join_order() {
+            let root = fake_proc(&[], &KINDS);
+
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+
+            assert_eq!(names(&handles), ["pid", "net", "mnt", "uts", "ipc"]);
+            let kinds: Vec<CloneFlags> = handles.iter().map(|h| h.kind).collect();
+            assert_eq!(
+                kinds,
+                [
+                    CloneFlags::CLONE_NEWPID,
+                    CloneFlags::CLONE_NEWNET,
+                    CloneFlags::CLONE_NEWNS,
+                    CloneFlags::CLONE_NEWUTS,
+                    CloneFlags::CLONE_NEWIPC,
+                ]
+            );
+        }
+
+        #[test]
+        fn entries_that_cannot_be_opened_are_skipped() {
+            let root = fake_proc(&[], &["mnt"]);
+
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+            assert_eq!(names(&handles), ["mnt"]);
+
+            let gone = open_foreign_namespaces(root.path(), TARGET_PID + 1);
+            assert!(gone.is_empty(), "got {:?}", names(&gone));
+        }
+
+        /// If the caller's own entry cannot be read there is no proof that
+        /// the namespace is shared, so it must still be joined.
+        #[test]
+        fn a_namespace_counts_as_foreign_when_the_callers_own_is_unreadable() {
+            let root = fake_proc(&[], &["net"]);
+            std::fs::remove_file(root.path().join("thread-self/ns/net")).unwrap();
+
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+
+            assert_eq!(names(&handles), ["net"]);
+        }
+
+        #[test]
+        fn the_real_proc_reports_no_foreign_namespace_for_this_process() {
+            for kind in KINDS {
+                let entry = format!("/proc/thread-self/ns/{kind}");
+                assert!(
+                    std::fs::metadata(&entry).is_ok(),
+                    "{entry} must be readable, or nothing is compared"
+                );
+            }
+
+            let handles = open_foreign_namespaces(Path::new("/proc"), std::process::id());
+
+            assert!(handles.is_empty(), "got {:?}", names(&handles));
+        }
+
+        #[test]
+        fn joining_nothing_succeeds() {
+            assert_eq!(join_namespaces(&[]), Ok(()));
+        }
+
+        /// setns(2) rejects a descriptor that is not a namespace with
+        /// `EINVAL` before it looks at the caller's capabilities, so this
+        /// runs the real system call and gets the same answer with or
+        /// without privileges. The error names the namespace that failed.
+        #[test]
+        fn joining_a_descriptor_that_is_no_namespace_fails_with_einval() {
+            let root = fake_proc(&["pid"], &["net", "uts"]);
+            let handles = open_foreign_namespaces(root.path(), TARGET_PID);
+            assert_eq!(names(&handles), ["net", "uts"]);
+
+            assert_eq!(join_namespaces(&handles), Err(("net", Errno::EINVAL)));
+        }
+    }
 }
