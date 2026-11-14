@@ -146,7 +146,10 @@ pub fn write_fixture_xpkg(
     };
     fs::write(
         dir.join("manifest.yaml"),
-        format!("apiVersion: meta.pkg.crossplane.io/v1\nkind: {}\nname: \"{}\"\n", kind_str, name),
+        format!(
+            "apiVersion: meta.pkg.crossplane.io/v1\nkind: {}\nname: \"{}\"\n",
+            kind_str, name
+        ),
     )
     .map_err(|e| CrossplaneError::Internal(e.to_string()))?;
     for (i, m) in manifests.iter().enumerate() {
@@ -174,10 +177,7 @@ mod tests {
 
     #[test]
     fn pull_fixture_roundtrip() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cave-xpkg-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cave-xpkg-test-{}", uuid::Uuid::new_v4()));
         write_fixture_xpkg(
             &tmp,
             "pkg-a",
@@ -196,10 +196,7 @@ mod tests {
 
     #[test]
     fn provider_kind_parsed() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cave-xpkg-prov-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cave-xpkg-prov-{}", uuid::Uuid::new_v4()));
         write_fixture_xpkg(&tmp, "provider-x", PackageKind::Provider, &[]).unwrap();
         let b = pull_offline(&tmp).unwrap();
         assert_eq!(b.kind, PackageKind::Provider);
@@ -208,10 +205,7 @@ mod tests {
 
     #[test]
     fn function_kind_parsed() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cave-xpkg-fn-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cave-xpkg-fn-{}", uuid::Uuid::new_v4()));
         write_fixture_xpkg(&tmp, "function-x", PackageKind::Function, &[]).unwrap();
         let b = pull_offline(&tmp).unwrap();
         assert_eq!(b.kind, PackageKind::Function);
@@ -227,8 +221,14 @@ mod tests {
 
     #[test]
     fn package_kind_from_meta() {
-        assert_eq!(PackageKind::from_meta_kind("Provider"), PackageKind::Provider);
-        assert_eq!(PackageKind::from_meta_kind("Function"), PackageKind::Function);
+        assert_eq!(
+            PackageKind::from_meta_kind("Provider"),
+            PackageKind::Provider
+        );
+        assert_eq!(
+            PackageKind::from_meta_kind("Function"),
+            PackageKind::Function
+        );
         assert_eq!(
             PackageKind::from_meta_kind("Configuration"),
             PackageKind::Configuration
@@ -243,10 +243,7 @@ mod tests {
 
     #[test]
     fn pull_dir_without_manifest_yaml_uses_basename() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cave-xpkg-nm-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cave-xpkg-nm-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&tmp).unwrap();
         fs::write(tmp.join("a.yaml"), "x: 1").unwrap();
         let b = pull_offline(&tmp).unwrap();

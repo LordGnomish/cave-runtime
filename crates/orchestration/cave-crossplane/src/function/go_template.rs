@@ -218,10 +218,7 @@ mod tests {
 
     #[test]
     fn missing_path_empty() {
-        assert_eq!(
-            render_go_template("[{{ .x }}]", &json!({})).unwrap(),
-            "[]"
-        );
+        assert_eq!(render_go_template("[{{ .x }}]", &json!({})).unwrap(), "[]");
     }
 
     #[test]
@@ -246,16 +243,17 @@ mod tests {
 
     #[test]
     fn if_no_else_truthy() {
-        let r =
-            render_go_template("{{ if .x }}HIT{{ end }}", &json!({"x": "y"})).unwrap();
+        let r = render_go_template("{{ if .x }}HIT{{ end }}", &json!({"x": "y"})).unwrap();
         assert_eq!(r, "HIT");
     }
 
     #[test]
     fn range_array() {
-        let r =
-            render_go_template("{{ range .l }}[{{ . }}]{{ end }}", &json!({"l":["a","b","c"]}))
-                .unwrap();
+        let r = render_go_template(
+            "{{ range .l }}[{{ . }}]{{ end }}",
+            &json!({"l":["a","b","c"]}),
+        )
+        .unwrap();
         assert_eq!(r, "[a][b][c]");
     }
 

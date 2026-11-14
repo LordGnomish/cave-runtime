@@ -178,7 +178,9 @@ impl Spec {
                 terminal: false,
                 user: User::default(),
                 args: vec!["/bin/sh".into()],
-                env: vec!["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".into()],
+                env: vec![
+                    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".into(),
+                ],
                 cwd: "/".into(),
                 capabilities: Some(LinuxCapabilities::default_minimal()),
                 no_new_privileges: true,
@@ -186,7 +188,10 @@ impl Spec {
                 selinux_label: None,
                 rlimits: Vec::new(),
             }),
-            root: Some(Root { path: rootfs.into(), readonly: true }),
+            root: Some(Root {
+                path: rootfs.into(),
+                readonly: true,
+            }),
             hostname: Some("cave-sandbox".into()),
             mounts: default_mounts(),
             linux: Some(Linux::default_namespaces()),
@@ -237,7 +242,10 @@ impl Linux {
         Linux {
             namespaces: vec!["pid", "network", "mount", "ipc", "uts"]
                 .into_iter()
-                .map(|t| LinuxNamespace { ns_type: t.into(), path: None })
+                .map(|t| LinuxNamespace {
+                    ns_type: t.into(),
+                    path: None,
+                })
                 .collect(),
             ..Linux::default()
         }
@@ -256,13 +264,23 @@ fn default_mounts() -> Vec<Mount> {
             destination: "/dev".into(),
             source: "tmpfs".into(),
             fs_type: "tmpfs".into(),
-            options: vec!["nosuid".into(), "strictatime".into(), "mode=755".into(), "size=65536k".into()],
+            options: vec![
+                "nosuid".into(),
+                "strictatime".into(),
+                "mode=755".into(),
+                "size=65536k".into(),
+            ],
         },
         Mount {
             destination: "/sys".into(),
             source: "sysfs".into(),
             fs_type: "sysfs".into(),
-            options: vec!["nosuid".into(), "noexec".into(), "nodev".into(), "ro".into()],
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "ro".into(),
+            ],
         },
     ]
 }

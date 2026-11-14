@@ -10,11 +10,15 @@
 //! feeding native verbs, audit-query plus filter cooperation, REPL
 //! transitions across multiple chunks).
 
+use cavectl::approval::ApprovalBackend;
 use cavectl::audit::AuditFilter;
+use cavectl::audit::AuditLog;
 use cavectl::auth::saml::{SamlCmd, parse_argv as saml_parse};
 use cavectl::auth::webauthn::{ParseError, WebAuthnCmd, parse as webauthn_parse};
+use cavectl::chat::conversation::ConversationStore;
 use cavectl::chat::output::{ChatMessage, ChatRole, PipeFormat, StreamChunk};
 use cavectl::chat::repl::ReplMode;
+use cavectl::env::EnvBackend;
 use cavectl::tenant_scope::{
     TenantInputs, TenantSource, parse_config_tenant, resolve, validate_tenant,
 };
@@ -24,10 +28,6 @@ use cavectl::{
     InMemoryTenantBackend, JsonStream, ReplCommand, ReplEffect, ReplState, StreamFormat,
     TenantBackend, TenantLifecycleState, TenantRecord, ToolMode, WatchEvent, WatchTicker,
 };
-use cavectl::approval::ApprovalBackend;
-use cavectl::audit::AuditLog;
-use cavectl::env::EnvBackend;
-use cavectl::chat::conversation::ConversationStore;
 use chrono::{TimeZone, Utc};
 use std::time::Duration;
 
@@ -291,8 +291,7 @@ async fn audit_query_until_excludes_later_entries() {
     log.append(early.clone()).await.unwrap();
     early.at = Utc.with_ymd_and_hms(2026, 4, 28, 10, 0, 0).unwrap();
     log.append(early).await.unwrap();
-    let q = AuditQuery::new("acme")
-        .with_until(Utc.with_ymd_and_hms(2026, 4, 27, 0, 0, 0).unwrap());
+    let q = AuditQuery::new("acme").with_until(Utc.with_ymd_and_hms(2026, 4, 27, 0, 0, 0).unwrap());
     let got = log.query(&q).await.unwrap();
     assert_eq!(got.len(), 1);
 }
@@ -382,7 +381,10 @@ async fn cross_module_tenant_suspend_then_env_cascade_marks_envs() {
         suspend_reason: None,
         updated_at: Utc::now(),
     });
-    let after = tb.suspend("acme", "burak", "billing-overdue").await.unwrap();
+    let after = tb
+        .suspend("acme", "burak", "billing-overdue")
+        .await
+        .unwrap();
     assert_eq!(after.state, TenantLifecycleState::Suspended);
     let changed = eb
         .cascade_suspend("acme", "burak", "billing-overdue")
@@ -429,9 +431,7 @@ fn saml_parse_argv_sign_request_with_dangling_key_flag_returns_none() {
 
 #[test]
 fn saml_parse_metadata_verb_path_and_read_only() {
-    let cmd = SamlCmd::ParseMetadata {
-        source: "x".into(),
-    };
+    let cmd = SamlCmd::ParseMetadata { source: "x".into() };
     assert_eq!(cmd.verb_path().last(), Some(&"parse-metadata"));
     assert!(cmd.is_read_only());
 }
@@ -456,12 +456,8 @@ fn webauthn_parse_register_options_missing_user_id_errors() {
 
 #[test]
 fn webauthn_parse_verify_assertion_missing_resp_file_errors() {
-    let err = webauthn_parse(&argv_strings(&[
-        "verify-assertion",
-        "--challenge",
-        "AAA",
-    ]))
-    .unwrap_err();
+    let err =
+        webauthn_parse(&argv_strings(&["verify-assertion", "--challenge", "AAA"])).unwrap_err();
     assert!(matches!(err, ParseError::MissingFlag("resp-file")));
 }
 
@@ -473,8 +469,7 @@ fn webauthn_parse_error_display_includes_flag_name() {
 
 #[test]
 fn webauthn_parse_assert_options_happy_path() {
-    let cmd = webauthn_parse(&argv_strings(&["assert-options", "--user-id", "u"]))
-        .unwrap();
+    let cmd = webauthn_parse(&argv_strings(&["assert-options", "--user-id", "u"])).unwrap();
     assert_eq!(
         cmd,
         WebAuthnCmd::AssertOptions {

@@ -576,7 +576,9 @@ fn alerting_is_muted_time_range_match() {
         }],
     };
     // 12:30 UTC on an arbitrary day → in range.
-    let inside = chrono::Utc.with_ymd_and_hms(2024, 6, 14, 12, 30, 0).unwrap();
+    let inside = chrono::Utc
+        .with_ymd_and_hms(2024, 6, 14, 12, 30, 0)
+        .unwrap();
     assert!(is_muted(&mt, &inside));
     let outside = chrono::Utc.with_ymd_and_hms(2024, 6, 14, 22, 0, 0).unwrap();
     assert!(!is_muted(&mt, &outside));

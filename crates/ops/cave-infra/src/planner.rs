@@ -6,7 +6,7 @@
 //! (ollama / llama.cpp) and receives a structured ExecutionPlan. Here we implement
 //! a deterministic rule-based planner so the crate compiles without a GPU.
 
-use crate::intent::{diff_state, ChangesetEntry};
+use crate::intent::{ChangesetEntry, diff_state};
 use crate::models::{
     CostEstimate, CostItem, ExecutionPlan, InfraIntent, InfraState, McpProvider, PlanStatus,
     PlanStep, StepAction,
@@ -77,7 +77,9 @@ fn changeset_to_steps(changeset: &[ChangesetEntry], providers: &[McpProvider]) -
             continue;
         }
 
-        let provider_ok = providers.iter().any(|p| p.name == entry.provider && p.healthy);
+        let provider_ok = providers
+            .iter()
+            .any(|p| p.name == entry.provider && p.healthy);
         let mcp_tool = format!("{}_{}", action_verb(&entry.action), entry.resource_type);
 
         let mut params = HashMap::new();
@@ -93,10 +95,7 @@ fn changeset_to_steps(changeset: &[ChangesetEntry], providers: &[McpProvider]) -
             "provider_available".to_string(),
             serde_json::Value::Bool(provider_ok),
         );
-        params.insert(
-            "mcp_tool".to_string(),
-            serde_json::Value::String(mcp_tool),
-        );
+        params.insert("mcp_tool".to_string(), serde_json::Value::String(mcp_tool));
 
         let id = Uuid::new_v4();
         let reversible = entry.action != StepAction::Delete;

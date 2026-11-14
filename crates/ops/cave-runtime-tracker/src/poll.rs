@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::config::TrackerConfig;
-use crate::registry::{drift, DriftStatus, ReleaseFetcher, Upstream};
+use crate::registry::{DriftStatus, ReleaseFetcher, Upstream, drift};
 
 /// One upstream after polling: the registry entry, the fetched latest
 /// tag (if any), and the drift verdict against its pinned baseline.
@@ -169,7 +169,11 @@ mod tests {
         map.insert("kubernetes/kubernetes".to_string(), "v1.33.0".to_string());
         let f = MapFetcher(map);
         let s = poll_all(&cfg, &f).await;
-        assert!(s.results.iter().all(|r| r.latest.as_deref() == Some("v1.33.0")));
+        assert!(
+            s.results
+                .iter()
+                .all(|r| r.latest.as_deref() == Some("v1.33.0"))
+        );
         assert!(s.unresolved.is_empty());
     }
 

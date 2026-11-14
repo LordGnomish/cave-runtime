@@ -9,7 +9,7 @@
 use crate::composition::patch_transform::{PatchTransformEngine, PatchTransformInput};
 use crate::error::CrossplaneResult;
 use crate::function::grpc_codec::RunFunctionRequest;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub fn run_patch_transform_fn(req: &RunFunctionRequest) -> CrossplaneResult<Value> {
     let input: PatchTransformInput = serde_json::from_value(req.input.clone()).unwrap_or_default();
@@ -65,10 +65,7 @@ mod tests {
         let observed = json!({"composite":{"spec":{"size": 7}}});
         let req = RunFunctionRequest::new("c", input, observed);
         let out = run_patch_transform_fn(&req).unwrap();
-        assert_eq!(
-            out["resources"]["r1"]["resource"]["spec"]["size"],
-            json!(7)
-        );
+        assert_eq!(out["resources"]["r1"]["resource"]["spec"]["size"], json!(7));
     }
 
     #[test]

@@ -10,9 +10,9 @@ use cave_chaos::models::{
     BlastRadius, ChaosExperiment, ChaosTarget, ExperimentEvent, ExperimentParams, ExperimentResult,
     ExperimentSchedule, ExperimentStatus, ExperimentType, SafetyGuard,
 };
+use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
 fn make_full_experiment(exp_type: ExperimentType) -> ChaosExperiment {
     ChaosExperiment {

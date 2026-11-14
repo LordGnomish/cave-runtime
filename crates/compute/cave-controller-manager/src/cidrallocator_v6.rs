@@ -403,13 +403,8 @@ mod tests {
 
     #[test]
     fn dual_stack_allocates_both_legs_per_node() {
-        let mut a = DualStackAllocator::new(
-            "10.244.0.0/16",
-            24,
-            "fd00:0:0:0:0:0:0:0/64",
-            72,
-        )
-        .unwrap();
+        let mut a =
+            DualStackAllocator::new("10.244.0.0/16", 24, "fd00:0:0:0:0:0:0:0/64", 72).unwrap();
         let (v4, v6) = a.allocate("nodeA").unwrap();
         assert_eq!(v4.prefix_len, 24);
         assert_eq!(v6.prefix_len, 72);
@@ -421,13 +416,8 @@ mod tests {
         // try to allocate one more — v4 has plenty of headroom, but
         // the v6 leg must fail, and the v4 slot for the failing node
         // must NOT be left held.
-        let mut a = DualStackAllocator::new(
-            "10.244.0.0/16",
-            24,
-            "fd00:0:0:0:0:0:0:0/124",
-            126,
-        )
-        .unwrap();
+        let mut a =
+            DualStackAllocator::new("10.244.0.0/16", 24, "fd00:0:0:0:0:0:0:0/124", 126).unwrap();
         for i in 0..4 {
             a.allocate(&format!("n{i}")).unwrap();
         }
@@ -440,13 +430,8 @@ mod tests {
 
     #[test]
     fn dual_stack_release_frees_both_legs() {
-        let mut a = DualStackAllocator::new(
-            "10.244.0.0/16",
-            24,
-            "fd00:0:0:0:0:0:0:0/64",
-            72,
-        )
-        .unwrap();
+        let mut a =
+            DualStackAllocator::new("10.244.0.0/16", 24, "fd00:0:0:0:0:0:0:0/64", 72).unwrap();
         a.allocate("nodeA").unwrap();
         a.allocate("nodeB").unwrap();
         a.release("nodeA");

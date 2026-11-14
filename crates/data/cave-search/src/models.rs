@@ -53,24 +53,35 @@ pub struct IndexSchema {
 impl IndexSchema {
     /// Create a new schema with the given index name and no fields.
     pub fn new(name: &str) -> Self {
-        IndexSchema { name: name.to_string(), fields: Vec::new() }
+        IndexSchema {
+            name: name.to_string(),
+            fields: Vec::new(),
+        }
     }
 
     /// Return the index name.
-    pub fn name(&self) -> &str { &self.name }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
     /// Add a field to the schema. Replaces if already present.
     pub fn add_field(&mut self, field_name: &str, field_type: FieldType) {
         if let Some(f) = self.fields.iter_mut().find(|f| f.name == field_name) {
             f.field_type = field_type;
         } else {
-            self.fields.push(FieldMapping { name: field_name.to_string(), field_type });
+            self.fields.push(FieldMapping {
+                name: field_name.to_string(),
+                field_type,
+            });
         }
     }
 
     /// Return the `FieldType` for `field_name`, or `None` if not found.
     pub fn field_type(&self, field_name: &str) -> Option<FieldType> {
-        self.fields.iter().find(|f| f.name == field_name).map(|f| f.field_type)
+        self.fields
+            .iter()
+            .find(|f| f.name == field_name)
+            .map(|f| f.field_type)
     }
 
     /// Return all field names in definition order.
@@ -79,7 +90,9 @@ impl IndexSchema {
     }
 
     /// Return all field mappings.
-    pub fn fields(&self) -> &[FieldMapping] { &self.fields }
+    pub fn fields(&self) -> &[FieldMapping] {
+        &self.fields
+    }
 }
 
 // ── Document ──────────────────────────────────────────────────────────────────
@@ -94,11 +107,16 @@ pub struct Document {
 impl Document {
     /// Create a new document with the given `id`.
     pub fn new(id: u32) -> Self {
-        Document { id, fields: HashMap::new() }
+        Document {
+            id,
+            fields: HashMap::new(),
+        }
     }
 
     /// Return the document ID.
-    pub fn id(&self) -> u32 { self.id }
+    pub fn id(&self) -> u32 {
+        self.id
+    }
 
     /// Set a string field value.
     pub fn set_field(&mut self, name: &str, value: &str) {
@@ -111,7 +129,9 @@ impl Document {
     }
 
     /// Return all field entries.
-    pub fn fields(&self) -> &HashMap<String, String> { &self.fields }
+    pub fn fields(&self) -> &HashMap<String, String> {
+        &self.fields
+    }
 }
 
 // ── SearchRequest ─────────────────────────────────────────────────────────────
@@ -128,22 +148,44 @@ pub struct SearchRequest {
 impl SearchRequest {
     /// Create a new search request with default pagination (from=0, size=10).
     pub fn new(query_text: &str) -> Self {
-        SearchRequest { query_text: query_text.to_string(), index: None, from: 0, size: 10 }
+        SearchRequest {
+            query_text: query_text.to_string(),
+            index: None,
+            from: 0,
+            size: 10,
+        }
     }
 
     /// Set the target index name.
-    pub fn with_index(mut self, index: &str) -> Self { self.index = Some(index.to_string()); self }
+    pub fn with_index(mut self, index: &str) -> Self {
+        self.index = Some(index.to_string());
+        self
+    }
 
     /// Set the pagination offset.
-    pub fn with_from(mut self, from: usize) -> Self { self.from = from; self }
+    pub fn with_from(mut self, from: usize) -> Self {
+        self.from = from;
+        self
+    }
 
     /// Set the maximum number of results.
-    pub fn with_size(mut self, size: usize) -> Self { self.size = size; self }
+    pub fn with_size(mut self, size: usize) -> Self {
+        self.size = size;
+        self
+    }
 
-    pub fn query_text(&self) -> &str { &self.query_text }
-    pub fn index(&self) -> Option<&str> { self.index.as_deref() }
-    pub fn from(&self) -> usize { self.from }
-    pub fn size(&self) -> usize { self.size }
+    pub fn query_text(&self) -> &str {
+        &self.query_text
+    }
+    pub fn index(&self) -> Option<&str> {
+        self.index.as_deref()
+    }
+    pub fn from(&self) -> usize {
+        self.from
+    }
+    pub fn size(&self) -> usize {
+        self.size
+    }
 }
 
 // ── SearchResponse / HitDocument ─────────────────────────────────────────────
@@ -170,10 +212,14 @@ impl SearchResponse {
     }
 
     /// Return the total number of matching documents.
-    pub fn total(&self) -> u64 { self.total }
+    pub fn total(&self) -> u64 {
+        self.total
+    }
 
     /// Return the hits for this page.
-    pub fn hits(&self) -> &[HitDocument] { &self.hits }
+    pub fn hits(&self) -> &[HitDocument] {
+        &self.hits
+    }
 }
 
 // ── Highlighting ──────────────────────────────────────────────────────────────
@@ -189,7 +235,12 @@ pub struct HighlightSnippet {
 ///
 /// Returns one snippet per match window (±50 chars). If not found, returns one
 /// snippet with the raw text (up to 200 chars), no markup.
-pub fn highlight_field(text: &str, term: &str, pre_tag: &str, post_tag: &str) -> Vec<HighlightSnippet> {
+pub fn highlight_field(
+    text: &str,
+    term: &str,
+    pre_tag: &str,
+    post_tag: &str,
+) -> Vec<HighlightSnippet> {
     let lower_text = text.to_lowercase();
     let lower_term = term.to_lowercase();
 
@@ -221,8 +272,15 @@ pub fn highlight_field(text: &str, term: &str, pre_tag: &str, post_tag: &str) ->
     }
 
     if !found {
-        let fragment = if text.len() > 200 { text[..200].to_string() } else { text.to_string() };
-        snippets.push(HighlightSnippet { fragment, offset: 0 });
+        let fragment = if text.len() > 200 {
+            text[..200].to_string()
+        } else {
+            text.to_string()
+        };
+        snippets.push(HighlightSnippet {
+            fragment,
+            offset: 0,
+        });
     }
 
     snippets
@@ -232,7 +290,9 @@ pub fn highlight_field(text: &str, term: &str, pre_tag: &str, post_tag: &str) ->
 
 /// Return a slice of `items` starting at `from` with at most `size` elements.
 pub fn paginate<T: Clone>(items: &[T], from: usize, size: usize) -> Vec<T> {
-    if from >= items.len() { return Vec::new(); }
+    if from >= items.len() {
+        return Vec::new();
+    }
     let end = (from + size).min(items.len());
     items[from..end].to_vec()
 }

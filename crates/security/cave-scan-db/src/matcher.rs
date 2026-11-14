@@ -194,8 +194,7 @@ pub fn match_purl_go<D: OsAdvisoryDb + ?Sized>(db: &D, purl: &str) -> Result<Vec
         .into_iter()
         .filter(|a| {
             // Affected-version check (semver range).
-            if !a.affected_version.is_empty()
-                && !version_satisfies(&r.version, &a.affected_version)
+            if !a.affected_version.is_empty() && !version_satisfies(&r.version, &a.affected_version)
             {
                 return false;
             }

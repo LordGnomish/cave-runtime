@@ -10,7 +10,7 @@
 
 use crate::models::{RunStrategy, VirtualMachine, VmPhase};
 use crate::store::Store;
-use crate::virt_controller::{drive, ReconcileAction};
+use crate::virt_controller::{ReconcileAction, drive};
 use std::sync::Arc;
 
 /// Compute the desired VM phase given the VM spec and the *current* observed phase.

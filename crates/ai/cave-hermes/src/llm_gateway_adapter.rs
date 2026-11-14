@@ -260,8 +260,12 @@ mod tests {
     #[tokio::test]
     async fn multi_gateway_dispatches_by_route() {
         let mut g = MultiGateway::with_defaults();
-        let ollama = Arc::new(InMemoryGateway::new(ProviderKind::Ollama).with_response("llama3", "ok-llama"));
-        let openai = Arc::new(InMemoryGateway::new(ProviderKind::OpenAi).with_response("gpt-4", "ok-openai"));
+        let ollama = Arc::new(
+            InMemoryGateway::new(ProviderKind::Ollama).with_response("llama3", "ok-llama"),
+        );
+        let openai = Arc::new(
+            InMemoryGateway::new(ProviderKind::OpenAi).with_response("gpt-4", "ok-openai"),
+        );
         g.register(ProviderKind::Ollama, ollama);
         g.register(ProviderKind::OpenAi, openai);
         let r1 = g

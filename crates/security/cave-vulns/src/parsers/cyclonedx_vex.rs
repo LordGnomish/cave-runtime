@@ -210,14 +210,20 @@ mod tests {
         let stmt = &parse_vex(json).unwrap()[0];
         let an = stmt.analysis.as_ref().unwrap();
         assert_eq!(an.state, VexState::NotAffected);
-        assert_eq!(an.state.into_transition(), Some(StateTransition::MarkOutOfScope));
+        assert_eq!(
+            an.state.into_transition(),
+            Some(StateTransition::MarkOutOfScope)
+        );
     }
 
     #[test]
     fn parse_false_positive() {
         let json = r#"{"vulnerabilities":[{"id":"CVE-X","analysis":{"state":"false_positive"}}]}"#;
         let stmt = &parse_vex(json).unwrap()[0];
-        assert_eq!(stmt.analysis.as_ref().unwrap().state, VexState::FalsePositive);
+        assert_eq!(
+            stmt.analysis.as_ref().unwrap().state,
+            VexState::FalsePositive
+        );
         assert_eq!(
             stmt.analysis.as_ref().unwrap().state.into_transition(),
             Some(StateTransition::MarkFalsePositive)
@@ -239,7 +245,10 @@ mod tests {
     fn vex_state_parse_dash_and_underscore() {
         assert_eq!(VexState::parse("not-affected"), Some(VexState::NotAffected));
         assert_eq!(VexState::parse("not_affected"), Some(VexState::NotAffected));
-        assert_eq!(VexState::parse("False-Positive"), Some(VexState::FalsePositive));
+        assert_eq!(
+            VexState::parse("False-Positive"),
+            Some(VexState::FalsePositive)
+        );
     }
 
     #[test]

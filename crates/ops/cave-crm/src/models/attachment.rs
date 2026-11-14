@@ -70,11 +70,7 @@ pub struct Attachment {
 impl Attachment {
     /// Build an unattached attachment, deriving `file_category` from the
     /// `full_path` extension.
-    pub fn new(
-        workspace_id: Uuid,
-        name: impl Into<String>,
-        full_path: impl Into<String>,
-    ) -> Self {
+    pub fn new(workspace_id: Uuid, name: impl Into<String>, full_path: impl Into<String>) -> Self {
         let full_path = full_path.into();
         let file_category = Self::categorize(&full_path);
         let now = Utc::now();
@@ -143,9 +139,18 @@ mod tests {
         assert_eq!(Attachment::categorize("call.WAV"), FileCategory::Audio);
         assert_eq!(Attachment::categorize("contract.pdf"), FileCategory::Pdf);
         assert_eq!(Attachment::categorize("q3.xlsx"), FileCategory::Spreadsheet);
-        assert_eq!(Attachment::categorize("deck.pptx"), FileCategory::Presentation);
-        assert_eq!(Attachment::categorize("notes.md"), FileCategory::TextDocument);
-        assert_eq!(Attachment::categorize("backup.tar.gz"), FileCategory::Archive);
+        assert_eq!(
+            Attachment::categorize("deck.pptx"),
+            FileCategory::Presentation
+        );
+        assert_eq!(
+            Attachment::categorize("notes.md"),
+            FileCategory::TextDocument
+        );
+        assert_eq!(
+            Attachment::categorize("backup.tar.gz"),
+            FileCategory::Archive
+        );
         assert_eq!(Attachment::categorize("mystery.xyz"), FileCategory::Other);
         assert_eq!(Attachment::categorize("noext"), FileCategory::Other);
     }

@@ -147,10 +147,7 @@ impl TokenExchanger {
         // Policy: every audience must be allowed for this client.
         for aud in &aud_req.audiences {
             if policy.decide(&req.client_id, aud) == PolicyDecision::Deny {
-                return Err(ExchangeError::PolicyDenied(
-                    req.client_id,
-                    aud.clone(),
-                ));
+                return Err(ExchangeError::PolicyDenied(req.client_id, aud.clone()));
             }
         }
 

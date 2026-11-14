@@ -30,10 +30,7 @@ use cave_sbom::policy::{
 };
 use cave_sbom::portfolio::{PortfolioSnapshot, ProjectRisk, vulnerable_trend};
 use cave_sbom::sbom::{
-    BomFormat, cyclonedx,
-    cyclonedx::CycloneDxError,
-    detect_format, spdx,
-    spdx::SpdxError,
+    BomFormat, cyclonedx, cyclonedx::CycloneDxError, detect_format, spdx, spdx::SpdxError,
 };
 use cave_sbom::vuln_intel::{
     epss::{self, EpssError, EpssScore, build_index, join_in_place},
@@ -94,7 +91,8 @@ fn cyclonedx_json_rejects_malformed_json() {
 #[test]
 fn cyclonedx_json_accepts_unset_bom_format() {
     // Per upstream Validator, bomFormat is optional in the wrapper.
-    let blob = br#"{"specVersion":"1.6","components":[{"type":"library","name":"x","version":"1"}]}"#;
+    let blob =
+        br#"{"specVersion":"1.6","components":[{"type":"library","name":"x","version":"1"}]}"#;
     let r = cyclonedx::parse_json(blob).unwrap();
     assert_eq!(r.components.len(), 1);
     assert_eq!(r.components[0].name, "x");
@@ -142,7 +140,8 @@ fn cyclonedx_json_case_insensitive_format_check() {
 
 #[test]
 fn cyclonedx_xml_handles_no_components_block() {
-    let blob = br#"<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.5" version="1.5"/>"#;
+    let blob =
+        br#"<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.5" version="1.5"/>"#;
     let r = cyclonedx::parse_xml(blob).unwrap();
     assert!(r.components.is_empty());
     assert!(r.dependencies.is_empty());
@@ -297,9 +296,7 @@ fn vuln_match_uses_purl_substring_when_present() {
     let mut c = ComponentRecord::new(Uuid::new_v4(), "lodash", "1.0");
     c.purl = None; // forces name fallback
     let v = mk_vuln("lodash", Severity::High, Some(7.5));
-    assert!(
-        vuln::component_has_severity_at_least(&c, &[v], Severity::High).is_some()
-    );
+    assert!(vuln::component_has_severity_at_least(&c, &[v], Severity::High).is_some());
 }
 
 #[test]
@@ -427,7 +424,10 @@ fn dependency_tree_diamond_does_not_double_visit() {
     let mut deps = find_transitive_deps(&tree, "a");
     deps.sort();
     deps.dedup();
-    assert_eq!(deps, vec!["b".to_string(), "c".to_string(), "d".to_string()]);
+    assert_eq!(
+        deps,
+        vec!["b".to_string(), "c".to_string(), "d".to_string()]
+    );
     // Length matches deduped set.
     let deps2 = find_transitive_deps(&tree, "a");
     let unique: std::collections::HashSet<_> = deps2.iter().collect();

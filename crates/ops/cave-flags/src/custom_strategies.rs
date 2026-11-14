@@ -234,7 +234,10 @@ mod tests {
         let mut updated = mk("by-country");
         updated.description = Some("v2".into());
         r.update(updated).unwrap();
-        assert_eq!(r.get("by-country").unwrap().description.as_deref(), Some("v2"));
+        assert_eq!(
+            r.get("by-country").unwrap().description.as_deref(),
+            Some("v2")
+        );
     }
 
     #[test]

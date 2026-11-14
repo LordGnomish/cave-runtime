@@ -99,9 +99,11 @@ fn execute_insert_inner(
                 affected += 1;
                 if capture_returning {
                     if let Some(row) = table.rows.get(idx) {
-                        returning_rows.push(
-                            project_returning(insert.returning.as_deref(), table, row)?,
-                        );
+                        returning_rows.push(project_returning(
+                            insert.returning.as_deref(),
+                            table,
+                            row,
+                        )?);
                     }
                 }
             }
@@ -180,7 +182,9 @@ pub(crate) fn project_returning(
                     .ok_or_else(|| format!("RETURNING column {} not found", name))?;
                 out.push(row.get(idx).cloned().unwrap_or(SqlValue::Null));
             }
-            SelectColumn::Expr(Expr::Literal(lit), _) => out.push(literal_to_value(&Expr::Literal(lit.clone()))?),
+            SelectColumn::Expr(Expr::Literal(lit), _) => {
+                out.push(literal_to_value(&Expr::Literal(lit.clone()))?)
+            }
             _ => return Err("only column references and literals allowed in RETURNING".to_string()),
         }
     }

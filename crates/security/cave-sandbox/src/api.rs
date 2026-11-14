@@ -13,11 +13,11 @@ use crate::lifecycle::LifecycleState;
 use crate::models::{Runtime, Sandbox, SandboxState};
 use crate::store::{SandboxStore, StoredSandbox};
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -29,7 +29,9 @@ pub struct ApiState {
 }
 
 impl ApiState {
-    pub fn new() -> Self { ApiState::default() }
+    pub fn new() -> Self {
+        ApiState::default()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +81,13 @@ async fn create(State(s): State<ApiState>, Json(req): Json<CreateRequest>) -> im
         annotations: req.annotations,
     };
     s.store.put(sandbox);
-    (StatusCode::CREATED, Json(CreateResponse { id, state: SandboxState::Created }))
+    (
+        StatusCode::CREATED,
+        Json(CreateResponse {
+            id,
+            state: SandboxState::Created,
+        }),
+    )
 }
 
 async fn list(State(s): State<ApiState>) -> impl IntoResponse {
@@ -99,26 +107,55 @@ async fn remove(State(s): State<ApiState>, Path(id): Path<String>) -> StatusCode
         return StatusCode::NOT_FOUND;
     }
     // Drive to terminal first so audit-trail captures it.
-    let _ = s.store.transition(&id, LifecycleState::Stopped, Some("api-delete".into()));
-    let _ = s.store.transition(&id, LifecycleState::Removed, Some("api-delete".into()));
+    let _ = s
+        .store
+        .transition(&id, LifecycleState::Stopped, Some("api-delete".into()));
+    let _ = s
+        .store
+        .transition(&id, LifecycleState::Removed, Some("api-delete".into()));
     s.store.remove(&id);
     StatusCode::NO_CONTENT
 }
 
-async fn exec(Path(id): Path<String>, State(s): State<ApiState>, Json(req): Json<ExecRequest>) -> impl IntoResponse {
+async fn exec(
+    Path(id): Path<String>,
+    State(s): State<ApiState>,
+    Json(req): Json<ExecRequest>,
+) -> impl IntoResponse {
     if s.store.get(&id).is_none() {
-        return (StatusCode::NOT_FOUND, Json(ExecResponse { accepted: false, exec_id: String::new() }));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(ExecResponse {
+                accepted: false,
+                exec_id: String::new(),
+            }),
+        );
     }
     if req.argv.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(ExecResponse { accepted: false, exec_id: String::new() }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ExecResponse {
+                accepted: false,
+                exec_id: String::new(),
+            }),
+        );
     }
     // exec is accepted but actual process spawn is OUT OF SCOPE.
     let exec_id = uuid::Uuid::new_v4().to_string();
-    (StatusCode::ACCEPTED, Json(ExecResponse { accepted: true, exec_id }))
+    (
+        StatusCode::ACCEPTED,
+        Json(ExecResponse {
+            accepted: true,
+            exec_id,
+        }),
+    )
 }
 
 async fn pause(Path(id): Path<String>, State(s): State<ApiState>) -> StatusCode {
-    match s.store.transition(&id, LifecycleState::Paused, Some("api-pause".into())) {
+    match s
+        .store
+        .transition(&id, LifecycleState::Paused, Some("api-pause".into()))
+    {
         Ok(()) => StatusCode::NO_CONTENT,
         Err(e) if e == "not-found" => StatusCode::NOT_FOUND,
         Err(_) => StatusCode::CONFLICT,
@@ -126,7 +163,10 @@ async fn pause(Path(id): Path<String>, State(s): State<ApiState>) -> StatusCode 
 }
 
 async fn resume(Path(id): Path<String>, State(s): State<ApiState>) -> StatusCode {
-    match s.store.transition(&id, LifecycleState::Running, Some("api-resume".into())) {
+    match s
+        .store
+        .transition(&id, LifecycleState::Running, Some("api-resume".into()))
+    {
         Ok(()) => StatusCode::NO_CONTENT,
         Err(e) if e == "not-found" => StatusCode::NOT_FOUND,
         Err(_) => StatusCode::CONFLICT,
@@ -136,26 +176,36 @@ async fn resume(Path(id): Path<String>, State(s): State<ApiState>) -> StatusCode
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
     use axum::http::Request;
     use tower::ServiceExt;
 
-    fn json_body<T: Serialize>(t: &T) -> Body { Body::from(serde_json::to_vec(t).unwrap()) }
+    fn json_body<T: Serialize>(t: &T) -> Body {
+        Body::from(serde_json::to_vec(t).unwrap())
+    }
 
     #[tokio::test]
     async fn create_then_describe() {
         let state = ApiState::new();
         let app = router(state.clone());
         let req = Request::builder()
-            .method("POST").uri("/sandbox").header("content-type", "application/json")
-            .body(json_body(&serde_json::json!({"runtime":"Gvisor","bundle":"/b"}))).unwrap();
+            .method("POST")
+            .uri("/sandbox")
+            .header("content-type", "application/json")
+            .body(json_body(
+                &serde_json::json!({"runtime":"Gvisor","bundle":"/b"}),
+            ))
+            .unwrap();
         let r = app.clone().oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::CREATED);
         let bytes = to_bytes(r.into_body(), 1024).await.unwrap();
         let cr: CreateResponse = serde_json::from_slice(&bytes).unwrap();
         let id = cr.id;
 
-        let req = Request::builder().uri(format!("/sandbox/{id}")).body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .uri(format!("/sandbox/{id}"))
+            .body(Body::empty())
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::OK);
     }
@@ -165,10 +215,17 @@ mod tests {
         let state = ApiState::new();
         let app = router(state.clone());
         state.store.put(Sandbox {
-            id: "s".into(), runtime: Runtime::Kata, state: SandboxState::Created,
-            bundle: "/b".into(), annotations: Default::default(),
+            id: "s".into(),
+            runtime: Runtime::Kata,
+            state: SandboxState::Created,
+            bundle: "/b".into(),
+            annotations: Default::default(),
         });
-        let req = Request::builder().method("DELETE").uri("/sandbox/s").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/sandbox/s")
+            .body(Body::empty())
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::NO_CONTENT);
         assert!(state.store.get("s").is_none());
@@ -178,13 +235,19 @@ mod tests {
     async fn exec_no_argv_400s() {
         let state = ApiState::new();
         state.store.put(Sandbox {
-            id: "s".into(), runtime: Runtime::Gvisor, state: SandboxState::Running,
-            bundle: "/b".into(), annotations: Default::default(),
+            id: "s".into(),
+            runtime: Runtime::Gvisor,
+            state: SandboxState::Running,
+            bundle: "/b".into(),
+            annotations: Default::default(),
         });
         let app = router(state);
-        let req = Request::builder().method("POST").uri("/sandbox/s/exec")
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sandbox/s/exec")
             .header("content-type", "application/json")
-            .body(json_body(&serde_json::json!({"argv":[]}))).unwrap();
+            .body(json_body(&serde_json::json!({"argv":[]})))
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::BAD_REQUEST);
     }
@@ -193,13 +256,19 @@ mod tests {
     async fn exec_accepts() {
         let state = ApiState::new();
         state.store.put(Sandbox {
-            id: "s".into(), runtime: Runtime::Gvisor, state: SandboxState::Running,
-            bundle: "/b".into(), annotations: Default::default(),
+            id: "s".into(),
+            runtime: Runtime::Gvisor,
+            state: SandboxState::Running,
+            bundle: "/b".into(),
+            annotations: Default::default(),
         });
         let app = router(state);
-        let req = Request::builder().method("POST").uri("/sandbox/s/exec")
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sandbox/s/exec")
             .header("content-type", "application/json")
-            .body(json_body(&serde_json::json!({"argv":["ls"]}))).unwrap();
+            .body(json_body(&serde_json::json!({"argv":["ls"]})))
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::ACCEPTED);
     }
@@ -208,26 +277,49 @@ mod tests {
     async fn pause_resume_chain() {
         let state = ApiState::new();
         state.store.put(Sandbox {
-            id: "s".into(), runtime: Runtime::Kata, state: SandboxState::Created,
-            bundle: "/b".into(), annotations: Default::default(),
+            id: "s".into(),
+            runtime: Runtime::Kata,
+            state: SandboxState::Created,
+            bundle: "/b".into(),
+            annotations: Default::default(),
         });
         // first drive to running:
-        state.store.transition("s", LifecycleState::Running, None).unwrap();
+        state
+            .store
+            .transition("s", LifecycleState::Running, None)
+            .unwrap();
         let app = router(state.clone());
-        let req = Request::builder().method("POST").uri("/sandbox/s/pause").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sandbox/s/pause")
+            .body(Body::empty())
+            .unwrap();
         let r = app.clone().oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::NO_CONTENT);
-        assert_eq!(state.store.get("s").unwrap().sandbox.state, SandboxState::Paused);
-        let req = Request::builder().method("POST").uri("/sandbox/s/resume").body(Body::empty()).unwrap();
+        assert_eq!(
+            state.store.get("s").unwrap().sandbox.state,
+            SandboxState::Paused
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sandbox/s/resume")
+            .body(Body::empty())
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::NO_CONTENT);
-        assert_eq!(state.store.get("s").unwrap().sandbox.state, SandboxState::Running);
+        assert_eq!(
+            state.store.get("s").unwrap().sandbox.state,
+            SandboxState::Running
+        );
     }
 
     #[tokio::test]
     async fn describe_missing_404() {
         let app = router(ApiState::new());
-        let req = Request::builder().uri("/sandbox/missing").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .uri("/sandbox/missing")
+            .body(Body::empty())
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::NOT_FOUND);
     }
@@ -235,7 +327,10 @@ mod tests {
     #[tokio::test]
     async fn list_initially_empty() {
         let app = router(ApiState::new());
-        let req = Request::builder().uri("/sandbox").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .uri("/sandbox")
+            .body(Body::empty())
+            .unwrap();
         let r = app.oneshot(req).await.unwrap();
         assert_eq!(r.status(), StatusCode::OK);
         let bytes = to_bytes(r.into_body(), 4096).await.unwrap();

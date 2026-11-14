@@ -37,7 +37,10 @@ pub fn dashboard_panels() -> Vec<Panel> {
         Panel {
             title: "Sandbox create rate".into(),
             metric: METRIC_SANDBOX_CREATE_TOTAL.into(),
-            query: format!("sum by (runtime) (rate({}[1m]))", METRIC_SANDBOX_CREATE_TOTAL),
+            query: format!(
+                "sum by (runtime) (rate({}[1m]))",
+                METRIC_SANDBOX_CREATE_TOTAL
+            ),
         },
         Panel {
             title: "Running sandboxes by runtime".into(),
@@ -57,7 +60,10 @@ pub fn dashboard_panels() -> Vec<Panel> {
         Panel {
             title: "gVisor syscall denies / second".into(),
             metric: METRIC_GVISOR_SYSCALL_DENY_TOTAL.into(),
-            query: format!("sum by (syscall) (rate({}[1m]))", METRIC_GVISOR_SYSCALL_DENY_TOTAL),
+            query: format!(
+                "sum by (syscall) (rate({}[1m]))",
+                METRIC_GVISOR_SYSCALL_DENY_TOTAL
+            ),
         },
         Panel {
             title: "Kata shim crashes / hour".into(),
@@ -72,7 +78,10 @@ pub fn dashboard_panels() -> Vec<Panel> {
         Panel {
             title: "Sandbox uptime distribution".into(),
             metric: METRIC_SANDBOX_UPTIME_SECONDS.into(),
-            query: format!("histogram_quantile(0.95, {})", METRIC_SANDBOX_UPTIME_SECONDS),
+            query: format!(
+                "histogram_quantile(0.95, {})",
+                METRIC_SANDBOX_UPTIME_SECONDS
+            ),
         },
         Panel {
             title: "OCI bundle size".into(),
@@ -86,7 +95,10 @@ pub fn alert_rules() -> Vec<AlertRule> {
     vec![
         AlertRule {
             name: "SandboxCreateFailing".into(),
-            expr: format!("rate({}{{result=\"error\"}}[5m]) > 0.1", METRIC_SANDBOX_CREATE_TOTAL),
+            expr: format!(
+                "rate({}{{result=\"error\"}}[5m]) > 0.1",
+                METRIC_SANDBOX_CREATE_TOTAL
+            ),
             for_seconds: 300,
             severity: "warning".into(),
             summary: "cave-sandbox create error rate > 0.1/s for 5m".into(),
@@ -155,10 +167,15 @@ mod tests {
     #[test]
     fn metrics_unique() {
         let names = [
-            METRIC_SANDBOX_CREATE_TOTAL, METRIC_SANDBOX_RUNNING, METRIC_HYPERVISOR_CPU_USAGE,
-            METRIC_HYPERVISOR_MEM_USAGE, METRIC_GVISOR_SYSCALL_DENY_TOTAL,
-            METRIC_KATA_SHIM_CRASHES_TOTAL, METRIC_FC_JAILER_DENIES_TOTAL,
-            METRIC_SANDBOX_UPTIME_SECONDS, METRIC_OCI_BUNDLE_BYTES,
+            METRIC_SANDBOX_CREATE_TOTAL,
+            METRIC_SANDBOX_RUNNING,
+            METRIC_HYPERVISOR_CPU_USAGE,
+            METRIC_HYPERVISOR_MEM_USAGE,
+            METRIC_GVISOR_SYSCALL_DENY_TOTAL,
+            METRIC_KATA_SHIM_CRASHES_TOTAL,
+            METRIC_FC_JAILER_DENIES_TOTAL,
+            METRIC_SANDBOX_UPTIME_SECONDS,
+            METRIC_OCI_BUNDLE_BYTES,
         ];
         let set: std::collections::BTreeSet<&str> = names.iter().copied().collect();
         assert_eq!(set.len(), names.len());

@@ -88,11 +88,7 @@ impl FederationManager {
     }
 
     /// Verify a federated bundle against the relationship's expected profile.
-    pub fn verify_bundle(
-        &self,
-        rel: &FederationRelationship,
-        bundle: &Bundle,
-    ) -> Result<()> {
+    pub fn verify_bundle(&self, rel: &FederationRelationship, bundle: &Bundle) -> Result<()> {
         if bundle.trust_domain != rel.trust_domain {
             return Err(IdentityError::FederationInvalid(format!(
                 "trust domain mismatch: want={} got={}",
@@ -100,7 +96,9 @@ impl FederationManager {
                 bundle.trust_domain.as_str()
             )));
         }
-        if let BundleEndpointProfile::HttpsSpiffe { endpoint_spiffe_id } = &rel.bundle_endpoint_profile {
+        if let BundleEndpointProfile::HttpsSpiffe { endpoint_spiffe_id } =
+            &rel.bundle_endpoint_profile
+        {
             parse_spiffe_id(endpoint_spiffe_id.as_str())?;
         }
         Ok(())
@@ -119,9 +117,12 @@ fn validate(rel: &FederationRelationship) -> Result<()> {
         ));
     }
     if rel.trust_domain.as_str().is_empty() {
-        return Err(IdentityError::FederationInvalid("trust domain empty".into()));
+        return Err(IdentityError::FederationInvalid(
+            "trust domain empty".into(),
+        ));
     }
-    if let BundleEndpointProfile::HttpsSpiffe { endpoint_spiffe_id } = &rel.bundle_endpoint_profile {
+    if let BundleEndpointProfile::HttpsSpiffe { endpoint_spiffe_id } = &rel.bundle_endpoint_profile
+    {
         parse_spiffe_id(endpoint_spiffe_id.as_str())?;
     }
     Ok(())
@@ -147,8 +148,12 @@ mod tests {
         let f = Arc::new(StubBundleFetcher::default());
         let m = FederationManager::new(store, f);
         m.create(rel("peer.org")).unwrap();
-        assert_eq!(m.get(&TrustDomain::new("peer.org")).unwrap().bundle_endpoint_url,
-                   "https://peer.org/bundle");
+        assert_eq!(
+            m.get(&TrustDomain::new("peer.org"))
+                .unwrap()
+                .bundle_endpoint_url,
+            "https://peer.org/bundle"
+        );
     }
 
     #[tokio::test]
@@ -174,10 +179,7 @@ mod tests {
         let stub = Arc::new(StubBundleFetcher::default());
         let m = FederationManager::new(store, stub);
         m.create(rel("peer.org")).unwrap();
-        assert!(m
-            .refresh(&TrustDomain::new("peer.org"))
-            .await
-            .is_err());
+        assert!(m.refresh(&TrustDomain::new("peer.org")).await.is_err());
     }
 
     #[test]

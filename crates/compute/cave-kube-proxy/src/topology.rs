@@ -41,11 +41,7 @@ impl<'a> EndpointCategories<'a> {
 /// cave inputs the per-endpoint zone via `EndpointInfo::zone` and the
 /// service hint flag via the `hints_enabled` argument. The current-node
 /// zone is the third input.
-pub fn can_use_topology(
-    eps: &[&EndpointInfo],
-    hints_enabled: bool,
-    current_zone: &str,
-) -> bool {
+pub fn can_use_topology(eps: &[&EndpointInfo], hints_enabled: bool, current_zone: &str) -> bool {
     if !hints_enabled {
         return false;
     }

@@ -233,7 +233,9 @@ impl OllamaClient {
         if Self::pull_succeeded(&body) {
             Ok(())
         } else {
-            Err(AutopilotError::Llm(format!("pull {model} did not succeed: {body}")))
+            Err(AutopilotError::Llm(format!(
+                "pull {model} did not succeed: {body}"
+            )))
         }
     }
 
@@ -267,7 +269,12 @@ impl OllamaClient {
     }
 
     /// Run a non-streaming generation and return the completion text.
-    pub async fn generate(&self, model: &str, system: Option<&str>, prompt: &str) -> Result<String> {
+    pub async fn generate(
+        &self,
+        model: &str,
+        system: Option<&str>,
+        prompt: &str,
+    ) -> Result<String> {
         let req = Self::build_generate_request(model, system, prompt);
         let url = format!("{}/api/generate", self.base_url);
         let body = self
@@ -312,9 +319,13 @@ mod tests {
 
     #[test]
     fn parse_tags_lists_names() {
-        let body = r#"{"models":[{"name":"qwen3.6:35b-a3b-coding-mxfp8"},{"name":"mellum2:12b-moe"}]}"#;
+        let body =
+            r#"{"models":[{"name":"qwen3.6:35b-a3b-coding-mxfp8"},{"name":"mellum2:12b-moe"}]}"#;
         let names = OllamaClient::parse_tags(body).unwrap();
-        assert_eq!(names, vec!["qwen3.6:35b-a3b-coding-mxfp8", "mellum2:12b-moe"]);
+        assert_eq!(
+            names,
+            vec!["qwen3.6:35b-a3b-coding-mxfp8", "mellum2:12b-moe"]
+        );
     }
 
     #[test]
@@ -322,7 +333,11 @@ mod tests {
         let installed = vec!["qwen3.6:35b-a3b-coding-mxfp8".to_string()];
         // preferred missing -> fallback (resident) wins
         assert_eq!(
-            OllamaClient::resolve_model(&installed, "qwen3-coder-next:80b-moe", "qwen3.6:35b-a3b-coding-mxfp8"),
+            OllamaClient::resolve_model(
+                &installed,
+                "qwen3-coder-next:80b-moe",
+                "qwen3.6:35b-a3b-coding-mxfp8"
+            ),
             Some("qwen3.6:35b-a3b-coding-mxfp8".to_string())
         );
         // preferred present -> preferred wins
@@ -331,14 +346,15 @@ mod tests {
             "qwen3.6:35b-a3b-coding-mxfp8".to_string(),
         ];
         assert_eq!(
-            OllamaClient::resolve_model(&both, "qwen3-coder-next:80b-moe", "qwen3.6:35b-a3b-coding-mxfp8"),
+            OllamaClient::resolve_model(
+                &both,
+                "qwen3-coder-next:80b-moe",
+                "qwen3.6:35b-a3b-coding-mxfp8"
+            ),
             Some("qwen3-coder-next:80b-moe".to_string())
         );
         // neither -> None
-        assert_eq!(
-            OllamaClient::resolve_model(&[], "a", "b"),
-            None
-        );
+        assert_eq!(OllamaClient::resolve_model(&[], "a", "b"), None);
     }
 
     #[test]

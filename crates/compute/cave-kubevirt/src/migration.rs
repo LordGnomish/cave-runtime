@@ -143,9 +143,7 @@ pub enum MigrationTrigger {
 /// In-memory registry of migration objects. Matches `Store`'s pattern.
 #[derive(Debug, Default)]
 pub struct MigrationStore {
-    entries: std::sync::RwLock<
-        std::collections::HashMap<String, VirtualMachineInstanceMigration>,
-    >,
+    entries: std::sync::RwLock<std::collections::HashMap<String, VirtualMachineInstanceMigration>>,
 }
 
 impl MigrationStore {
@@ -170,12 +168,19 @@ impl MigrationStore {
             .cloned()
     }
 
-    pub fn list_for_vmi(&self, namespace: &str, vmi_name: &str) -> Vec<VirtualMachineInstanceMigration> {
+    pub fn list_for_vmi(
+        &self,
+        namespace: &str,
+        vmi_name: &str,
+    ) -> Vec<VirtualMachineInstanceMigration> {
         self.entries
             .read()
             .unwrap()
             .values()
-            .filter(|m| m.namespace.as_deref().unwrap_or("default") == namespace && m.spec.vmi_name == vmi_name)
+            .filter(|m| {
+                m.namespace.as_deref().unwrap_or("default") == namespace
+                    && m.spec.vmi_name == vmi_name
+            })
             .cloned()
             .collect()
     }
@@ -257,11 +262,23 @@ mod tests {
     fn next_phase_full_happy_path() {
         let mut p = MigrationPhase::Pending;
         let path: &[(MigrationTrigger, MigrationPhase)] = &[
-            (MigrationTrigger::ControllerStart, MigrationPhase::Scheduling),
-            (MigrationTrigger::TargetPodReady, MigrationPhase::PreparingTarget),
-            (MigrationTrigger::TargetHandshakeOk, MigrationPhase::TargetReady),
+            (
+                MigrationTrigger::ControllerStart,
+                MigrationPhase::Scheduling,
+            ),
+            (
+                MigrationTrigger::TargetPodReady,
+                MigrationPhase::PreparingTarget,
+            ),
+            (
+                MigrationTrigger::TargetHandshakeOk,
+                MigrationPhase::TargetReady,
+            ),
             (MigrationTrigger::LibvirtStarted, MigrationPhase::Running),
-            (MigrationTrigger::LibvirtCompleted, MigrationPhase::Succeeded),
+            (
+                MigrationTrigger::LibvirtCompleted,
+                MigrationPhase::Succeeded,
+            ),
         ];
         for (t, expected) in path {
             p = next_phase(p, *t);
@@ -358,9 +375,10 @@ mod tests {
     #[test]
     fn store_advance_missing_returns_none() {
         let s = MigrationStore::new();
-        assert!(s
-            .advance("default", "missing", MigrationTrigger::ControllerStart)
-            .is_none());
+        assert!(
+            s.advance("default", "missing", MigrationTrigger::ControllerStart)
+                .is_none()
+        );
     }
 
     #[test]

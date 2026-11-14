@@ -2,11 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for short-lived certificate issuance model.
 
-use cave_pam::cert_authority::{
-    CertAuthority, CertKind, CertRequest, IssuedCert,
-};
-use uuid::Uuid;
+use cave_pam::cert_authority::{CertAuthority, CertKind, CertRequest, IssuedCert};
 use chrono::Duration;
+use uuid::Uuid;
 
 fn make_request(kind: CertKind, user: &str, ttl_hours: i64) -> CertRequest {
     CertRequest {

@@ -74,10 +74,7 @@ fn result_argument(task_results: &[String]) -> Vec<String> {
 /// stdout/stderr-path flags are caller-driven runtime concerns that are not
 /// part of the deterministic ordering core; they are intentionally not
 /// modelled here (those live with cave-cri's container plumbing).
-pub fn order_containers(
-    steps: &[EntrypointStep],
-    task_results: &[String],
-) -> Vec<EntrypointStep> {
+pub fn order_containers(steps: &[EntrypointStep], task_results: &[String]) -> Vec<EntrypointStep> {
     let mut out: Vec<EntrypointStep> = Vec::with_capacity(steps.len());
 
     for (i, s) in steps.iter().enumerate() {

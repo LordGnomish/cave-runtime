@@ -10,7 +10,11 @@ use cave_devlake::store::DevlakeStore;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
-fn make_deployment(env: DeploymentEnv, status: DeploymentStatus, lead_time: Option<f64>) -> Deployment {
+fn make_deployment(
+    env: DeploymentEnv,
+    status: DeploymentStatus,
+    lead_time: Option<f64>,
+) -> Deployment {
     Deployment {
         id: Uuid::new_v4(),
         pipeline_id: None,
@@ -118,7 +122,11 @@ fn store_update_pipeline_status() {
 #[test]
 fn store_insert_and_get_deployment() {
     let store = DevlakeStore::new();
-    let d = make_deployment(DeploymentEnv::Production, DeploymentStatus::Success, Some(3600.0));
+    let d = make_deployment(
+        DeploymentEnv::Production,
+        DeploymentStatus::Success,
+        Some(3600.0),
+    );
     let id = d.id;
     store.insert_deployment(d);
     assert!(store.get_deployment(id).is_some());
@@ -139,9 +147,21 @@ fn store_list_deployments_sorted_desc() {
 #[test]
 fn store_recent_deployments_env_filter() {
     let store = DevlakeStore::new();
-    store.insert_deployment(make_deployment(DeploymentEnv::Production, DeploymentStatus::Success, None));
-    store.insert_deployment(make_deployment(DeploymentEnv::Staging, DeploymentStatus::Success, None));
-    store.insert_deployment(make_deployment(DeploymentEnv::Production, DeploymentStatus::Success, None));
+    store.insert_deployment(make_deployment(
+        DeploymentEnv::Production,
+        DeploymentStatus::Success,
+        None,
+    ));
+    store.insert_deployment(make_deployment(
+        DeploymentEnv::Staging,
+        DeploymentStatus::Success,
+        None,
+    ));
+    store.insert_deployment(make_deployment(
+        DeploymentEnv::Production,
+        DeploymentStatus::Success,
+        None,
+    ));
 
     let prod = store.recent_deployments(Some(&DeploymentEnv::Production), 10);
     assert_eq!(prod.len(), 2);
@@ -370,7 +390,11 @@ fn store_compute_dora_report_with_data() {
     let now = Utc::now();
     // Insert 5 successful + 1 failed deployment in the last 5 days
     for i in 0..5i64 {
-        let mut d = make_deployment(DeploymentEnv::Production, DeploymentStatus::Success, Some(3600.0));
+        let mut d = make_deployment(
+            DeploymentEnv::Production,
+            DeploymentStatus::Success,
+            Some(3600.0),
+        );
         d.deployed_at = now - Duration::days(i);
         store.insert_deployment(d);
     }
@@ -382,5 +406,5 @@ fn store_compute_dora_report_with_data() {
     // 6 deployments over 30 days = 0.2/day
     assert!((report.deployment_frequency_per_day - 0.2).abs() < 0.001);
     // 1 failure out of 6 = 16.67%
-    assert!((report.change_failure_rate_pct - (1.0/6.0 * 100.0)).abs() < 0.1);
+    assert!((report.change_failure_rate_pct - (1.0 / 6.0 * 100.0)).abs() < 0.1);
 }

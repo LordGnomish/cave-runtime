@@ -87,9 +87,7 @@ pub fn admit_entry(
         ));
     }
     if entry.selectors.is_empty() {
-        return Err(IdentityError::PolicyViolation(
-            "selectors required".into(),
-        ));
+        return Err(IdentityError::PolicyViolation("selectors required".into()));
     }
     Ok(entry)
 }

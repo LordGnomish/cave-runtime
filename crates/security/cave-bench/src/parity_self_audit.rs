@@ -17,7 +17,9 @@ pub const FLOOR_HONEST_RATIO: f64 = 0.50;
 pub const TODAY: &str = "2026-05-24";
 
 pub fn manifest_path() -> PathBuf {
-    [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"].iter().collect()
+    [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]
+        .iter()
+        .collect()
 }
 
 pub fn manifest_text() -> String {
@@ -32,7 +34,9 @@ pub fn extract_scalar(text: &str, key: &str) -> Option<String> {
         if l.starts_with('#') {
             continue;
         }
-        let Some(after) = l.strip_prefix(key) else { continue };
+        let Some(after) = l.strip_prefix(key) else {
+            continue;
+        };
         let next = after.chars().next();
         if !matches!(next, Some(c) if c == ' ' || c == '\t' || c == '=') {
             continue;
@@ -58,16 +62,24 @@ pub fn count_tables(text: &str, header: &str) -> usize {
 
 pub fn gate_1_upstream_pinned(text: &str) -> Result<(), String> {
     if !text.contains(KUBE_BENCH_VERSION) {
-        return Err(format!("manifest must mention kube-bench {KUBE_BENCH_VERSION}"));
+        return Err(format!(
+            "manifest must mention kube-bench {KUBE_BENCH_VERSION}"
+        ));
     }
     if !text.contains(KUBE_BENCH_SHA) {
-        return Err(format!("manifest must pin kube-bench source_sha {KUBE_BENCH_SHA}"));
+        return Err(format!(
+            "manifest must pin kube-bench source_sha {KUBE_BENCH_SHA}"
+        ));
     }
     if !text.contains(KUBESCAPE_VERSION) {
-        return Err(format!("manifest must mention kubescape {KUBESCAPE_VERSION}"));
+        return Err(format!(
+            "manifest must mention kubescape {KUBESCAPE_VERSION}"
+        ));
     }
     if !text.contains(KUBESCAPE_SHA) {
-        return Err(format!("manifest must pin kubescape source_sha {KUBESCAPE_SHA}"));
+        return Err(format!(
+            "manifest must pin kubescape source_sha {KUBESCAPE_SHA}"
+        ));
     }
     Ok(())
 }
@@ -105,7 +117,9 @@ pub fn gate_2_mapped_files_exist(text: &str) -> Result<(), String> {
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(format!("mapped entries reference missing files: {missing:?}"))
+        Err(format!(
+            "mapped entries reference missing files: {missing:?}"
+        ))
     }
 }
 
@@ -122,7 +136,10 @@ pub fn gate_3_partial_has_gap_reason(text: &str) -> Result<(), String> {
 pub fn gate_4_skipped_has_scope_cut(text: &str) -> Result<(), String> {
     let entries = collect_entries(text, "skipped");
     for (i, body) in entries.iter().enumerate() {
-        if !body.contains("scope_cut_target") && !body.contains("scope_cut_category") && !body.contains("target") {
+        if !body.contains("scope_cut_target")
+            && !body.contains("scope_cut_category")
+            && !body.contains("target")
+        {
             return Err(format!("skipped #{i} lacks scope_cut_target / target"));
         }
         if !body.contains("reason") {
@@ -188,7 +205,11 @@ pub fn gate_7_spdx_coverage(root: &PathBuf) -> Result<usize, String> {
     if missing.is_empty() {
         Ok(total)
     } else {
-        Err(format!("{}/{} .rs files missing AGPL SPDX header: {missing:?}", missing.len(), total))
+        Err(format!(
+            "{}/{} .rs files missing AGPL SPDX header: {missing:?}",
+            missing.len(),
+            total
+        ))
     }
 }
 
@@ -198,10 +219,15 @@ pub fn gate_8_no_stub_macros(src: &PathBuf) -> Result<(), String> {
         if !p.extension().map(|e| e == "rs").unwrap_or(false) {
             return;
         }
-        if p.file_name().map(|n| n == "parity_self_audit.rs").unwrap_or(false) {
+        if p.file_name()
+            .map(|n| n == "parity_self_audit.rs")
+            .unwrap_or(false)
+        {
             return;
         }
-        let Ok(text) = fs::read_to_string(p) else { return };
+        let Ok(text) = fs::read_to_string(p) else {
+            return;
+        };
         for (lineno, line) in text.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") {
@@ -253,11 +279,16 @@ fn collect_entries(text: &str, header: &str) -> Vec<String> {
 }
 
 fn walk(dir: &PathBuf, cb: &mut dyn FnMut(&PathBuf)) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {
-            if p.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(false) {
+            if p.file_name()
+                .map(|n| n.to_string_lossy().starts_with('.'))
+                .unwrap_or(false)
+            {
                 continue;
             }
             if p.file_name().map(|n| n == "target").unwrap_or(false) {
@@ -302,7 +333,10 @@ reason = "kernel only"
     #[test]
     fn test_extract_scalar() {
         let s = sample();
-        assert_eq!(extract_scalar(&s, "version").as_deref(), Some(KUBE_BENCH_VERSION));
+        assert_eq!(
+            extract_scalar(&s, "version").as_deref(),
+            Some(KUBE_BENCH_VERSION)
+        );
     }
 
     #[test]

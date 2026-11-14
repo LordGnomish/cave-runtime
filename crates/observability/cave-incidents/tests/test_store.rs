@@ -6,8 +6,8 @@
 use cave_incidents::engine;
 use cave_incidents::models::{
     AddResponderRequest, CreateIncidentRequest, CreatePostMortemRequest, EscalationPolicy,
-    EscalationStep, EscalationTarget, IncidentSeverity, IncidentStatus, OnCallSchedule,
-    OnCallUser, PostMortemStatus, Responder, ResponderRole, RotationType, ScheduleLayer,
+    EscalationStep, EscalationTarget, IncidentSeverity, IncidentStatus, OnCallSchedule, OnCallUser,
+    PostMortemStatus, Responder, ResponderRole, RotationType, ScheduleLayer,
 };
 use cave_incidents::store::IncidentStore;
 use chrono::Utc;
@@ -93,9 +93,18 @@ fn test_store_update_nonexistent_returns_false() {
 #[test]
 fn test_store_list_all() {
     let store = IncidentStore::new();
-    store.create(engine::create_incident(make_request("I1", IncidentSeverity::P1)));
-    store.create(engine::create_incident(make_request("I2", IncidentSeverity::P2)));
-    store.create(engine::create_incident(make_request("I3", IncidentSeverity::P3)));
+    store.create(engine::create_incident(make_request(
+        "I1",
+        IncidentSeverity::P1,
+    )));
+    store.create(engine::create_incident(make_request(
+        "I2",
+        IncidentSeverity::P2,
+    )));
+    store.create(engine::create_incident(make_request(
+        "I3",
+        IncidentSeverity::P3,
+    )));
     let list = store.list();
     assert_eq!(list.len(), 3);
 }
@@ -119,9 +128,18 @@ fn test_store_list_open_only() {
 #[test]
 fn test_store_list_by_severity() {
     let store = IncidentStore::new();
-    store.create(engine::create_incident(make_request("P1-a", IncidentSeverity::P1)));
-    store.create(engine::create_incident(make_request("P1-b", IncidentSeverity::P1)));
-    store.create(engine::create_incident(make_request("P3-a", IncidentSeverity::P3)));
+    store.create(engine::create_incident(make_request(
+        "P1-a",
+        IncidentSeverity::P1,
+    )));
+    store.create(engine::create_incident(make_request(
+        "P1-b",
+        IncidentSeverity::P1,
+    )));
+    store.create(engine::create_incident(make_request(
+        "P3-a",
+        IncidentSeverity::P3,
+    )));
 
     let p1 = store.list_by_severity(&IncidentSeverity::P1);
     assert_eq!(p1.len(), 2);
@@ -194,7 +212,9 @@ fn test_store_postmortem_crud() {
     let pm_id = pm.id;
 
     store.create_postmortem(pm.clone());
-    let fetched = store.get_postmortem(pm_id).expect("postmortem should exist");
+    let fetched = store
+        .get_postmortem(pm_id)
+        .expect("postmortem should exist");
     assert_eq!(fetched.title, "Root cause analysis");
     assert_eq!(fetched.action_items.len(), 1);
 

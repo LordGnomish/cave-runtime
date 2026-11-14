@@ -9,7 +9,8 @@
 //!   internal/resources/datastore/datastore_setup.go — createDB/createUser/grant flow
 
 use cave_kamaji::connection::{
-    Connection, DatastoreError, Driver, FakeConnection, kine_table_ddl, mysql, postgres, run_migrate,
+    Connection, DatastoreError, Driver, FakeConnection, kine_table_ddl, mysql, postgres,
+    run_migrate,
 };
 
 // ── Driver enum (datastore_types.go) ────────────────────────────────────────
@@ -24,7 +25,12 @@ fn driver_wire_values_match_upstream() {
 
 #[test]
 fn driver_round_trips_from_str() {
-    for d in [Driver::Etcd, Driver::MySql, Driver::PostgreSql, Driver::Nats] {
+    for d in [
+        Driver::Etcd,
+        Driver::MySql,
+        Driver::PostgreSql,
+        Driver::Nats,
+    ] {
         assert_eq!(Driver::from_wire(d.as_str()), Some(d));
     }
     assert_eq!(Driver::from_wire("bogus"), None);
@@ -54,7 +60,10 @@ fn only_nats_lacks_multitenancy() {
 fn postgres_ddl_matches_upstream_statements() {
     assert_eq!(postgres::create_db("t_a"), "CREATE DATABASE t_a");
     // CREATE ROLE %s LOGIN PASSWORD ?  — password bound as a parameter upstream.
-    assert_eq!(postgres::create_user("t_a"), "CREATE ROLE t_a LOGIN PASSWORD ?");
+    assert_eq!(
+        postgres::create_user("t_a"),
+        "CREATE ROLE t_a LOGIN PASSWORD ?"
+    );
     assert_eq!(
         postgres::grant_privileges("t_a", "t_a"),
         "GRANT ALL PRIVILEGES ON DATABASE t_a TO t_a"

@@ -27,8 +27,8 @@ pub mod sync_runner;
 pub mod topology;
 
 pub use conntrack::{
-    apply_conntrack_sysctls, flush_stale_cluster_ips, flush_stale_node_ports, CapturedConntrack,
-    ConntrackBackend,
+    CapturedConntrack, ConntrackBackend, apply_conntrack_sysctls, flush_stale_cluster_ips,
+    flush_stale_node_ports,
 };
 pub use endpoints::{EndpointInfo, EndpointSliceMap};
 pub use error::{KubeProxyError, KubeProxyResult};
@@ -43,6 +43,6 @@ pub use service::{
     TrafficPolicy,
 };
 pub use sync_runner::{BoundedFrequencyRunner, ProxySyncRunner};
-pub use topology::{can_use_topology, categorize_endpoints, EndpointCategories};
+pub use topology::{EndpointCategories, can_use_topology, categorize_endpoints};
 
 pub const MODULE_NAME: &str = "kube-proxy";

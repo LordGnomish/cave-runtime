@@ -11,8 +11,8 @@
 //!
 //! Pure decision logic only — no network.
 
-use cave_keda::scaler::ScalerTrait;
 use cave_keda::dynatrace_scaler::{DynatraceResponse, DynatraceScaler, DynatraceSeries};
+use cave_keda::scaler::ScalerTrait;
 
 // ─── validateDynatraceResponse ──────────────────────────────────────────────
 
@@ -29,15 +29,16 @@ fn validate_response_no_series_errors() {
         result: vec![DynatraceSeries { data: vec![] }],
     };
     let err = resp.validate().unwrap_err();
-    assert!(err.contains("does not contain any metric series"), "got: {err}");
+    assert!(
+        err.contains("does not contain any metric series"),
+        "got: {err}"
+    );
 }
 
 #[test]
 fn validate_response_no_values_errors() {
     let resp = DynatraceResponse {
-        result: vec![DynatraceSeries {
-            data: vec![vec![]],
-        }],
+        result: vec![DynatraceSeries { data: vec![vec![]] }],
     };
     let err = resp.validate().unwrap_err();
     assert!(err.contains("does not contain any values"), "got: {err}");
@@ -80,8 +81,14 @@ fn build_query_url_trims_trailing_slash_and_appends_api_path() {
         "builtin:host.cpu.usage",
         "now-2h",
     );
-    assert!(url.starts_with("https://abc.live.dynatrace.com/api/v2/metrics/query?"), "got: {url}");
-    assert!(url.contains("metricSelector=builtin%3Ahost.cpu.usage"), "got: {url}");
+    assert!(
+        url.starts_with("https://abc.live.dynatrace.com/api/v2/metrics/query?"),
+        "got: {url}"
+    );
+    assert!(
+        url.contains("metricSelector=builtin%3Ahost.cpu.usage"),
+        "got: {url}"
+    );
     assert!(url.contains("from=now-2h"), "got: {url}");
 }
 

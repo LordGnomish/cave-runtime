@@ -71,8 +71,7 @@ impl FulcioClient {
 
     /// Build the CSR body Fulcio expects from a keypair + OIDC token.
     pub fn build_csr(&self, kp: &Keypair, token: &IdToken) -> Result<CsrRequest> {
-        let public_key_pem =
-            crate::keypair::encode_public_pem(kp.algorithm, kp.public_key_bytes());
+        let public_key_pem = crate::keypair::encode_public_pem(kp.algorithm, kp.public_key_bytes());
         let payload = token.identity().as_bytes();
         let proof = kp.sign(payload)?;
         let proof_b64 = base64::engine::general_purpose::STANDARD.encode(proof);
@@ -110,16 +109,11 @@ impl FulcioClient {
             "not_after": token.exp,
         });
         let cert_pem = wrap_pem("CERTIFICATE", &serde_json::to_vec(&cert_body).unwrap());
-        let chain_pem = vec![wrap_pem(
-            "CERTIFICATE",
-            b"cave-fulcio-mock-root",
-        )];
+        let chain_pem = vec![wrap_pem("CERTIFICATE", b"cave-fulcio-mock-root")];
         Ok(SigningCertificate {
             cert_pem,
             chain_pem,
-            sct_b64: Some(
-                base64::engine::general_purpose::STANDARD.encode(b"mock-sct"),
-            ),
+            sct_b64: Some(base64::engine::general_purpose::STANDARD.encode(b"mock-sct")),
         })
     }
 
@@ -162,7 +156,12 @@ impl SigningCertificate {
             .to_string();
         let chain_pem = chain_node["certificates"]
             .as_array()
-            .map(|a| a.iter().skip(1).filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .map(|a| {
+                a.iter()
+                    .skip(1)
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default();
         let sct_b64 = j["signedCertificateDetachedSct"]["signedCertificateTimestamp"]
             .as_str()
@@ -220,7 +219,9 @@ mod tests {
         let tok = fixture_token();
         let fc = FulcioClient::default();
         let csr = fc.build_csr(&kp, &tok).unwrap();
-        let err = fc.verify_csr(&csr, "bob@example.com").expect_err("must reject");
+        let err = fc
+            .verify_csr(&csr, "bob@example.com")
+            .expect_err("must reject");
         assert!(matches!(err, SignError::Fulcio(_)));
     }
 

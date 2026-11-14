@@ -3,8 +3,8 @@
 //! Tests for DevLake data models — written BEFORE implementation (TDD).
 
 use cave_devlake::models::{
-    Commit, DeploymentEnv, DeploymentStatus, DoraRating, Incident, Issue, IssueStatus,
-    IssueType, Pipeline, PipelineStatus, PrState, PullRequest, Sprint, SprintState,
+    Commit, DeploymentEnv, DeploymentStatus, DoraRating, Incident, Issue, IssueStatus, IssueType,
+    Pipeline, PipelineStatus, PrState, PullRequest, Sprint, SprintState,
 };
 use chrono::Utc;
 use uuid::Uuid;

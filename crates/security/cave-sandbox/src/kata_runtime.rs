@@ -106,15 +106,35 @@ impl KataSandbox {
 /// kata-runtime CLI command surface — `cmd/kata-runtime/*.go`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum KataCommand {
-    Create { id: String, bundle: String },
-    Start { id: String },
-    Exec { id: String, argv: Vec<String> },
-    Kill { id: String, signal: i32 },
-    Delete { id: String, force: bool },
-    State { id: String },
+    Create {
+        id: String,
+        bundle: String,
+    },
+    Start {
+        id: String,
+    },
+    Exec {
+        id: String,
+        argv: Vec<String>,
+    },
+    Kill {
+        id: String,
+        signal: i32,
+    },
+    Delete {
+        id: String,
+        force: bool,
+    },
+    State {
+        id: String,
+    },
     List,
-    Pause { id: String },
-    Resume { id: String },
+    Pause {
+        id: String,
+    },
+    Resume {
+        id: String,
+    },
     /// `kata-runtime check` — host-readiness checks.
     Check,
     /// `kata-runtime env` — runtime env JSON dump.
@@ -125,7 +145,12 @@ impl KataCommand {
     pub fn to_argv(&self) -> Vec<String> {
         match self {
             KataCommand::Create { id, bundle } => {
-                vec!["create".into(), "--bundle".into(), bundle.clone(), id.clone()]
+                vec![
+                    "create".into(),
+                    "--bundle".into(),
+                    bundle.clone(),
+                    id.clone(),
+                ]
             }
             KataCommand::Start { id } => vec!["start".into(), id.clone()],
             KataCommand::Exec { id, argv } => {
@@ -190,7 +215,10 @@ mod tests {
 
     #[test]
     fn create_argv() {
-        let c = KataCommand::Create { id: "c".into(), bundle: "/b".into() };
+        let c = KataCommand::Create {
+            id: "c".into(),
+            bundle: "/b".into(),
+        };
         assert_eq!(c.to_argv(), vec!["create", "--bundle", "/b", "c"]);
     }
 
@@ -202,13 +230,19 @@ mod tests {
 
     #[test]
     fn delete_force() {
-        let c = KataCommand::Delete { id: "c".into(), force: true };
+        let c = KataCommand::Delete {
+            id: "c".into(),
+            force: true,
+        };
         assert_eq!(c.to_argv(), vec!["delete", "--force", "c"]);
     }
 
     #[test]
     fn exec_argv() {
-        let c = KataCommand::Exec { id: "c".into(), argv: vec!["sh".into()] };
+        let c = KataCommand::Exec {
+            id: "c".into(),
+            argv: vec!["sh".into()],
+        };
         assert_eq!(c.to_argv(), vec!["exec", "c", "sh"]);
     }
 }

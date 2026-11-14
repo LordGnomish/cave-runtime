@@ -39,8 +39,7 @@ use cave_identity::policy::{self, Caller, PolicyConfig};
 /// `URL_SAFE_NO_PAD` engine `jwt_svid` uses internally. Local so the test
 /// pulls in no new external crate.
 fn b64url_no_pad(input: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::new();
     for chunk in input.chunks(3) {
         let b0 = chunk[0] as u32;

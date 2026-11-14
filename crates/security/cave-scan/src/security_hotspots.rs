@@ -170,7 +170,8 @@ mod tests {
     #[test]
     fn double_review_rejected() {
         let mut h = hot();
-        h.mark_reviewed(HotspotResolution::Safe, None, None).unwrap();
+        h.mark_reviewed(HotspotResolution::Safe, None, None)
+            .unwrap();
         let err = h
             .mark_reviewed(HotspotResolution::Fixed, None, None)
             .unwrap_err();
@@ -180,7 +181,8 @@ mod tests {
     #[test]
     fn reopen_clears_resolution() {
         let mut h = hot();
-        h.mark_reviewed(HotspotResolution::Fixed, None, None).unwrap();
+        h.mark_reviewed(HotspotResolution::Fixed, None, None)
+            .unwrap();
         h.reopen().unwrap();
         assert_eq!(h.status, HotspotStatus::ToReview);
         assert!(h.resolution.is_none());
@@ -219,7 +221,8 @@ mod tests {
     #[test]
     fn reviewed_pct_mixed() {
         let mut a = hot();
-        a.mark_reviewed(HotspotResolution::Safe, None, None).unwrap();
+        a.mark_reviewed(HotspotResolution::Safe, None, None)
+            .unwrap();
         let b = hot();
         let pct = reviewed_pct(&[a, b]);
         assert_eq!(pct, 50.0);

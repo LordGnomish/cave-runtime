@@ -70,9 +70,11 @@ impl CsrBuilder {
 
         // Cite: RFC 5280 §4.2.1.6 — Subject Alternative Names.
         for dns in &params.dns_names {
-            cert_params
-                .subject_alt_names
-                .push(SanType::DnsName(dns.clone().try_into().map_err(|_| rcgen::Error::CouldNotParseCertificate)?));
+            cert_params.subject_alt_names.push(SanType::DnsName(
+                dns.clone()
+                    .try_into()
+                    .map_err(|_| rcgen::Error::CouldNotParseCertificate)?,
+            ));
         }
 
         let csr = cert_params.serialize_request(&key_pair)?;

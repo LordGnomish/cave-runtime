@@ -157,10 +157,7 @@ fn try_deny_from_denied_errors_and_preserves_message() {
     // Second try_deny is rejected; original message is preserved.
     let result = cr.try_deny(DenialReason::Other, "again");
     assert!(result.is_err());
-    assert_eq!(
-        result.unwrap_err(),
-        "CertificateRequest is already denied"
-    );
+    assert_eq!(result.unwrap_err(), "CertificateRequest is already denied");
     assert_eq!(cr.state, CertificateRequestState::Denied);
     assert_eq!(cr.failure_message, first_msg);
 }

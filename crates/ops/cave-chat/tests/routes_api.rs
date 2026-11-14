@@ -7,7 +7,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use cave_chat::{AppState, router};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -17,7 +17,9 @@ async fn make_app() -> axum::Router {
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
@@ -45,7 +47,9 @@ async fn test_create_channel() {
         .method("POST")
         .uri("/api/chat/channels")
         .header("content-type", "application/json")
-        .body(Body::from(json!({"name": "general", "channel_type": "public"}).to_string()))
+        .body(Body::from(
+            json!({"name": "general", "channel_type": "public"}).to_string(),
+        ))
         .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
@@ -77,7 +81,9 @@ async fn test_create_then_list_channel() {
         .method("POST")
         .uri("/api/chat/channels")
         .header("content-type", "application/json")
-        .body(Body::from(json!({"name": "ops", "channel_type": "private"}).to_string()))
+        .body(Body::from(
+            json!({"name": "ops", "channel_type": "private"}).to_string(),
+        ))
         .unwrap();
     let create_resp = app.clone().oneshot(create_req).await.unwrap();
     assert_eq!(create_resp.status(), StatusCode::CREATED);
@@ -104,7 +110,9 @@ async fn test_post_and_get_messages() {
         .method("POST")
         .uri("/api/chat/channels")
         .header("content-type", "application/json")
-        .body(Body::from(json!({"name": "dev", "channel_type": "public"}).to_string()))
+        .body(Body::from(
+            json!({"name": "dev", "channel_type": "public"}).to_string(),
+        ))
         .unwrap();
     let ch_resp = app.clone().oneshot(ch_req).await.unwrap();
     let ch_body = body_json(ch_resp).await;
@@ -115,7 +123,9 @@ async fn test_post_and_get_messages() {
         .method("POST")
         .uri(format!("/api/chat/channels/{}/messages", channel_id))
         .header("content-type", "application/json")
-        .body(Body::from(json!({"author_id": "alice", "content": "hello there"}).to_string()))
+        .body(Body::from(
+            json!({"author_id": "alice", "content": "hello there"}).to_string(),
+        ))
         .unwrap();
     let msg_resp = app.clone().oneshot(msg_req).await.unwrap();
     assert_eq!(msg_resp.status(), StatusCode::CREATED);
@@ -145,7 +155,9 @@ async fn test_search_messages() {
         .method("POST")
         .uri("/api/chat/channels")
         .header("content-type", "application/json")
-        .body(Body::from(json!({"name": "search-test", "channel_type": "public"}).to_string()))
+        .body(Body::from(
+            json!({"name": "search-test", "channel_type": "public"}).to_string(),
+        ))
         .unwrap();
     let ch_body = body_json(app.clone().oneshot(ch_req).await.unwrap()).await;
     let cid = ch_body["id"].as_str().unwrap().to_string();
@@ -156,7 +168,9 @@ async fn test_search_messages() {
             .method("POST")
             .uri(format!("/api/chat/channels/{}/messages", cid))
             .header("content-type", "application/json")
-            .body(Body::from(json!({"author_id": "bot", "content": content}).to_string()))
+            .body(Body::from(
+                json!({"author_id": "bot", "content": content}).to_string(),
+            ))
             .unwrap();
         app.clone().oneshot(req).await.unwrap();
     }
@@ -168,7 +182,12 @@ async fn test_search_messages() {
         .unwrap();
     let results = body_json(app.oneshot(search_req).await.unwrap()).await;
     assert_eq!(results.as_array().unwrap().len(), 1);
-    assert!(results[0]["content"].as_str().unwrap().contains("deployment"));
+    assert!(
+        results[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("deployment")
+    );
 }
 
 // ── Presence ─────────────────────────────────────────────────────────────────

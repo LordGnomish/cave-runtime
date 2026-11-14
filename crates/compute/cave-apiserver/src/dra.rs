@@ -397,7 +397,9 @@ mod tests {
     #[test]
     fn claim_create_requires_existing_class() {
         let r = r();
-        let err = r.create_claim(claim("default", "c1", "no-such")).unwrap_err();
+        let err = r
+            .create_claim(claim("default", "c1", "no-such"))
+            .unwrap_err();
         assert_eq!(err, DraError::ClassNotFound("no-such".into()));
     }
 

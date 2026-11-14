@@ -40,8 +40,7 @@ pub struct ValidityRange {
 
 impl TrustedRoot {
     pub fn from_json(s: &str) -> Result<Self> {
-        serde_json::from_str(s)
-            .map_err(|e| SignError::TrustedRoot(format!("decode: {}", e)))
+        serde_json::from_str(s).map_err(|e| SignError::TrustedRoot(format!("decode: {}", e)))
     }
 
     pub fn to_json(&self) -> Result<String> {

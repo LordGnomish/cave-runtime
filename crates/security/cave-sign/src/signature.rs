@@ -10,9 +10,11 @@
 use crate::error::{Result, SignError};
 use crate::models::KeyAlgorithm;
 use base64::Engine;
-use ed25519_dalek::{Signer as DalekSigner, SigningKey as Ed25519SigningKey,
-    VerifyingKey as Ed25519VerifyingKey, SECRET_KEY_LENGTH as ED25519_SK_LEN,
-    Signature as Ed25519Signature, Verifier as DalekVerifier};
+use ed25519_dalek::{
+    SECRET_KEY_LENGTH as ED25519_SK_LEN, Signature as Ed25519Signature, Signer as DalekSigner,
+    SigningKey as Ed25519SigningKey, Verifier as DalekVerifier,
+    VerifyingKey as Ed25519VerifyingKey,
+};
 #[allow(unused_imports)]
 use p256::ecdsa::signature::{Signer as _, Verifier as _};
 use p256::ecdsa::{
@@ -47,7 +49,10 @@ impl std::fmt::Debug for Keypair {
         f.debug_struct("Keypair")
             .field("algorithm", &self.algorithm)
             .field("sk", &"<redacted>")
-            .field("pk_b64", &base64::engine::general_purpose::STANDARD.encode(&self.pk))
+            .field(
+                "pk_b64",
+                &base64::engine::general_purpose::STANDARD.encode(&self.pk),
+            )
             .finish()
     }
 }
@@ -219,7 +224,13 @@ mod tests {
         let seed = [9u8; 32];
         let kp = Keypair::from_seed(KeyAlgorithm::EcdsaP256, &seed).unwrap();
         let sig = kp.sign(b"hello cave").unwrap();
-        verify(KeyAlgorithm::EcdsaP256, kp.public_key_bytes(), b"hello cave", &sig).unwrap();
+        verify(
+            KeyAlgorithm::EcdsaP256,
+            kp.public_key_bytes(),
+            b"hello cave",
+            &sig,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -227,8 +238,13 @@ mod tests {
         let seed = [7u8; 32];
         let kp = Keypair::from_seed(KeyAlgorithm::EcdsaP256, &seed).unwrap();
         let sig = kp.sign(b"hello").unwrap();
-        let err = verify(KeyAlgorithm::EcdsaP256, kp.public_key_bytes(), b"helLO", &sig)
-            .expect_err("tamper must be detected");
+        let err = verify(
+            KeyAlgorithm::EcdsaP256,
+            kp.public_key_bytes(),
+            b"helLO",
+            &sig,
+        )
+        .expect_err("tamper must be detected");
         assert!(matches!(err, SignError::Verify(_)));
     }
 
@@ -238,7 +254,13 @@ mod tests {
         let kp = Keypair::from_seed(KeyAlgorithm::Ed25519, &seed).unwrap();
         let sig = kp.sign(b"hello cave").unwrap();
         assert_eq!(sig.len(), 64);
-        verify(KeyAlgorithm::Ed25519, kp.public_key_bytes(), b"hello cave", &sig).unwrap();
+        verify(
+            KeyAlgorithm::Ed25519,
+            kp.public_key_bytes(),
+            b"hello cave",
+            &sig,
+        )
+        .unwrap();
     }
 
     #[test]

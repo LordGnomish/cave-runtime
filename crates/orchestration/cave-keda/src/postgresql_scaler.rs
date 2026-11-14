@@ -47,9 +47,18 @@ impl PostgreSqlScaler {
         let mut params = Vec::new();
         params.push(format!("host={}", escape_connection_parameter(&self.host)));
         params.push(format!("port={}", escape_connection_parameter(&self.port)));
-        params.push(format!("user={}", escape_connection_parameter(&self.user_name)));
-        params.push(format!("dbname={}", escape_connection_parameter(&self.db_name)));
-        params.push(format!("sslmode={}", escape_connection_parameter(&self.ssl_mode)));
+        params.push(format!(
+            "user={}",
+            escape_connection_parameter(&self.user_name)
+        ));
+        params.push(format!(
+            "dbname={}",
+            escape_connection_parameter(&self.db_name)
+        ));
+        params.push(format!(
+            "sslmode={}",
+            escape_connection_parameter(&self.ssl_mode)
+        ));
         params.push(format!(
             "password={}",
             escape_connection_parameter(&self.password)
@@ -135,15 +144,9 @@ mod tests {
 
     #[test]
     fn escape_quotes_and_wraps_values_with_spaces() {
-        assert_eq!(
-            escape_connection_parameter("my db"),
-            "'my db'"
-        );
+        assert_eq!(escape_connection_parameter("my db"), "'my db'");
         // single quote inside a spaced value gets backslash-escaped
-        assert_eq!(
-            escape_connection_parameter("a 'b'"),
-            "'a \\'b\\''"
-        );
+        assert_eq!(escape_connection_parameter("a 'b'"), "'a \\'b\\''");
     }
 
     #[test]

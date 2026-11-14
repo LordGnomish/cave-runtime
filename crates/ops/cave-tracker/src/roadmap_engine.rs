@@ -4,8 +4,8 @@
 //!
 //! Adapted from the orphan `roadmap.rs` to work with the current models.
 
-use crate::models::{Issue, IssueType, Priority, Sprint, SprintState};
 use crate::TrackerStore;
+use crate::models::{Issue, IssueType, Priority, Sprint, SprintState};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::collections::HashSet;
@@ -232,15 +232,12 @@ pub fn risk_report(store: &TrackerStore, project_id: Uuid) -> RiskReport {
     let blocked: Vec<Uuid> = open_issues
         .iter()
         .filter(|i| {
-            store
-                .issue_links
-                .values()
-                .any(|link| {
-                    use crate::models::LinkType;
-                    link.to_issue_id == i.id
-                        && link.link_type == LinkType::IsBlockedBy
-                        && open_ids.contains(&link.from_issue_id)
-                })
+            store.issue_links.values().any(|link| {
+                use crate::models::LinkType;
+                link.to_issue_id == i.id
+                    && link.link_type == LinkType::IsBlockedBy
+                    && open_ids.contains(&link.from_issue_id)
+            })
         })
         .map(|i| i.id)
         .collect();

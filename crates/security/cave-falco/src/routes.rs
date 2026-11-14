@@ -11,7 +11,10 @@
 
 use crate::observability;
 use crate::rule_loader;
-use axum::{routing::{get, post}, Json, Router};
+use axum::{
+    Json, Router,
+    routing::{get, post},
+};
 
 pub fn router() -> Router {
     Router::new()
@@ -81,7 +84,8 @@ mod tests {
 
     #[tokio::test]
     async fn parse_rules_accepts_falco_style_yaml() {
-        let body = "- rule: { name: r, desc: d, condition: 1=1, priority: WARNING, output: hi }".to_string();
+        let body = "- rule: { name: r, desc: d, condition: 1=1, priority: WARNING, output: hi }"
+            .to_string();
         let Json(v) = parse_rules(body).await;
         assert_eq!(v["ok"], true);
         assert_eq!(v["rules"], 1);

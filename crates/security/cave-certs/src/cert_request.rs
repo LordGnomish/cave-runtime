@@ -152,9 +152,7 @@ impl CertificateRequest {
             CertificateRequestState::Approved => {
                 Err("cannot deny an already-approved CertificateRequest; revoke instead".into())
             }
-            CertificateRequestState::Denied => {
-                Err("CertificateRequest is already denied".into())
-            }
+            CertificateRequestState::Denied => Err("CertificateRequest is already denied".into()),
         }
     }
 
@@ -178,7 +176,9 @@ mod tests {
         CertificateRequestSpec {
             tenant_id: "t1".into(),
             issuer_ref: IssuerRef::issuer("le-prod"),
-            csr_pem: "-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n".into(),
+            csr_pem:
+                "-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n"
+                    .into(),
             is_ca: false,
             duration_seconds: Some(90 * 86_400),
             usages: vec!["server auth".into()],

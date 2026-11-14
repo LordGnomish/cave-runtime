@@ -24,12 +24,18 @@ pub struct Tenant {
 impl Tenant {
     /// Create a new `Tenant` from a `TenantId` with no display name.
     pub fn new(id: TenantId) -> Self {
-        Tenant { id, display_name: None }
+        Tenant {
+            id,
+            display_name: None,
+        }
     }
 
     /// Create a `Tenant` with a display name.
     pub fn with_display_name(id: TenantId, display_name: impl Into<String>) -> Self {
-        Tenant { id, display_name: Some(display_name.into()) }
+        Tenant {
+            id,
+            display_name: Some(display_name.into()),
+        }
     }
 }
 
@@ -44,7 +50,9 @@ pub struct TenantRegistry {
 impl TenantRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        TenantRegistry { tenants: HashMap::new() }
+        TenantRegistry {
+            tenants: HashMap::new(),
+        }
     }
 
     /// Register a tenant, replacing any existing entry with the same ID.

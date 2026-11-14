@@ -123,9 +123,7 @@ fn rol32(word: u32, shift: u32) -> u32 {
 /// `jhash_3words` — Bob Jenkins lookup3 final mix over three words.
 /// Faithful port of `bpf/lib/jhash.h`.
 pub fn jhash_3words(a: u32, b: u32, c: u32, initval: u32) -> u32 {
-    let iv = initval
-        .wrapping_add(JHASH_INITVAL)
-        .wrapping_add(3 << 2);
+    let iv = initval.wrapping_add(JHASH_INITVAL).wrapping_add(3 << 2);
     let (mut a, mut b, mut c) = (a.wrapping_add(iv), b.wrapping_add(iv), c.wrapping_add(iv));
     // __jhash_final(a, b, c)
     c ^= b;
@@ -182,7 +180,12 @@ impl LbMaps {
     }
 
     fn frontend_key(addr: u32, dport: u16, proto: u8) -> LbKey {
-        LbKey { address: addr, dport, backend_slot: 0, proto }
+        LbKey {
+            address: addr,
+            dport,
+            backend_slot: 0,
+            proto,
+        }
     }
 
     /// Populate a service: frontend entry, per-slot backend mapping,
@@ -201,17 +204,37 @@ impl LbMaps {
         self.services
             .update(
                 Self::frontend_key(addr, dport, proto),
-                LbServiceMaster { backend_count: count, rev_nat_index, algorithm },
+                LbServiceMaster {
+                    backend_count: count,
+                    rev_nat_index,
+                    algorithm,
+                },
                 UpdateFlag::Any,
             )
             .expect("frontend insert");
         for (slot, (backend_id, backend)) in backends.iter().enumerate() {
-            let key = LbKey { address: addr, dport, backend_slot: (slot as u16) + 1, proto };
-            self.slots.update(key, *backend_id, UpdateFlag::Any).expect("slot insert");
-            self.backends.update(*backend_id, *backend, UpdateFlag::Any).expect("backend insert");
+            let key = LbKey {
+                address: addr,
+                dport,
+                backend_slot: (slot as u16) + 1,
+                proto,
+            };
+            self.slots
+                .update(key, *backend_id, UpdateFlag::Any)
+                .expect("slot insert");
+            self.backends
+                .update(*backend_id, *backend, UpdateFlag::Any)
+                .expect("backend insert");
         }
         self.rev_nat
-            .update(rev_nat_index, RevNatEntry { address: addr, port: dport }, UpdateFlag::Any)
+            .update(
+                rev_nat_index,
+                RevNatEntry {
+                    address: addr,
+                    port: dport,
+                },
+                UpdateFlag::Any,
+            )
             .expect("rev_nat insert");
         if algorithm == LbAlgo::Maglev {
             // Build a LUT: backend_ids round-robined across all slots.
@@ -228,13 +251,30 @@ impl LbMaps {
     }
 
     /// `lb4_lookup_service` — the frontend (slot 0) entry.
-    pub fn lb4_lookup_service(&mut self, addr: u32, dport: u16, proto: u8) -> Option<LbServiceMaster> {
-        self.services.lookup(&Self::frontend_key(addr, dport, proto))
+    pub fn lb4_lookup_service(
+        &mut self,
+        addr: u32,
+        dport: u16,
+        proto: u8,
+    ) -> Option<LbServiceMaster> {
+        self.services
+            .lookup(&Self::frontend_key(addr, dport, proto))
     }
 
     /// `lb4_lookup_backend_slot` -> backend_id at `slot` (1-based).
-    pub fn lb4_lookup_backend_slot(&mut self, addr: u32, dport: u16, proto: u8, slot: u16) -> Option<u32> {
-        self.slots.lookup(&LbKey { address: addr, dport, backend_slot: slot, proto })
+    pub fn lb4_lookup_backend_slot(
+        &mut self,
+        addr: u32,
+        dport: u16,
+        proto: u8,
+        slot: u16,
+    ) -> Option<u32> {
+        self.slots.lookup(&LbKey {
+            address: addr,
+            dport,
+            backend_slot: slot,
+            proto,
+        })
     }
 
     /// `lb4_lookup_backend` -> backend addr/port for an id.
@@ -242,7 +282,14 @@ impl LbMaps {
         self.backends.lookup(&backend_id)
     }
 
-    fn xlate(&mut self, addr: u32, dport: u16, proto: u8, slot: u16, rev_nat_index: u16) -> Option<LbXlate> {
+    fn xlate(
+        &mut self,
+        addr: u32,
+        dport: u16,
+        proto: u8,
+        slot: u16,
+        rev_nat_index: u16,
+    ) -> Option<LbXlate> {
         let backend_id = self.lb4_lookup_backend_slot(addr, dport, proto, slot)?;
         let backend = self.lb4_lookup_backend(backend_id)?;
         Some(LbXlate {
@@ -289,7 +336,10 @@ impl LbMaps {
     /// reverse-NAT index identifies which service to restore.
     pub fn lb4_rev_nat(&mut self, rev_nat_index: u16, _reply: &LbTuple) -> Option<RevNatResult> {
         let nat = self.rev_nat.lookup(&rev_nat_index)?;
-        Some(RevNatResult { new_saddr: nat.address, new_sport: nat.port })
+        Some(RevNatResult {
+            new_saddr: nat.address,
+            new_sport: nat.port,
+        })
     }
 }
 
@@ -314,7 +364,13 @@ mod tests {
 
     #[test]
     fn maglev_index_in_range_and_daddr_independent() {
-        let a = LbTuple { saddr: 0x0A000009, daddr: 1, sport: 33333, dport: 80, nexthdr: L4Proto::Tcp.proto_num() };
+        let a = LbTuple {
+            saddr: 0x0A000009,
+            daddr: 1,
+            sport: 33333,
+            dport: 80,
+            nexthdr: L4Proto::Tcp.proto_num(),
+        };
         let b = LbTuple { daddr: 999, ..a };
         assert_eq!(maglev_index(&a), maglev_index(&b));
         assert!(maglev_index(&a) < LB_MAGLEV_LUT_SIZE);
@@ -329,9 +385,21 @@ mod tests {
             L4Proto::Tcp.proto_num(),
             5,
             LbAlgo::Random,
-            &[(1, LbBackend { address: 0x0A010001, port: 8080 })],
+            &[(
+                1,
+                LbBackend {
+                    address: 0x0A010001,
+                    port: 8080,
+                },
+            )],
         );
-        let t = LbTuple { saddr: 0x0A000001, daddr: 0xAC140001, sport: 5000, dport: 80, nexthdr: L4Proto::Tcp.proto_num() };
+        let t = LbTuple {
+            saddr: 0x0A000001,
+            daddr: 0xAC140001,
+            sport: 5000,
+            dport: 80,
+            nexthdr: L4Proto::Tcp.proto_num(),
+        };
         let x = maps.lb4_local_random(&t, 0).unwrap();
         assert_eq!(x.backend_id, 1);
         assert_eq!(x.new_dport, 8080);

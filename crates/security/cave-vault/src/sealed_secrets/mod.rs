@@ -82,9 +82,7 @@ pub struct TemplateMeta {
 }
 
 /// Scope is encoded in annotations on the SealedSecret manifest.
-pub fn scope_from_annotations(
-    annotations: &std::collections::BTreeMap<String, String>,
-) -> Scope {
+pub fn scope_from_annotations(annotations: &std::collections::BTreeMap<String, String>) -> Scope {
     if annotations
         .get("sealedsecrets.bitnami.com/cluster-wide")
         .map(|v| v == "true")

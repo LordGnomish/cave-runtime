@@ -28,102 +28,230 @@ pub struct NsaControl {
 /// All NSA controls returned with their unified Check meta.
 pub fn nsa_controls() -> Vec<NsaControl> {
     vec![
-        ctrl("C-0001", "Forbidden Container Registries", Severity::High,
-             "Containers should only be pulled from approved/trusted registries.",
-             "registry_allowlist"),
-        ctrl("C-0002", "Exec into container", Severity::Medium,
-             "Attaching to running containers via `kubectl exec` provides ad-hoc shell access.",
-             "exec_allowed"),
-        ctrl("C-0004", "Resource limits on every container", Severity::Medium,
-             "Containers must declare CPU and memory limits.",
-             "resource_limits"),
-        ctrl("C-0005", "API server insecure port", Severity::Critical,
-             "API server --insecure-port must be 0.",
-             "insecure_port_zero"),
-        ctrl("C-0007", "Roles with delete capabilities", Severity::Medium,
-             "RBAC roles granting deletion of critical resources must be reviewed.",
-             "rbac_delete_capable"),
-        ctrl("C-0009", "Resource policies (LimitRange / ResourceQuota)", Severity::Medium,
-             "Each namespace must have a LimitRange and ResourceQuota.",
-             "namespace_limit_range"),
-        ctrl("C-0012", "Applications credentials in configuration files", Severity::High,
-             "Hardcoded credentials inside ConfigMaps/Manifests are forbidden.",
-             "hardcoded_creds"),
-        ctrl("C-0013", "Non-root containers", Severity::High,
-             "Containers must run as non-root user (runAsNonRoot=true).",
-             "run_as_non_root"),
-        ctrl("C-0014", "Access Kubernetes dashboard", Severity::High,
-             "Kubernetes Dashboard pod must not be exposed externally.",
-             "dashboard_exposed"),
-        ctrl("C-0015", "List Kubernetes secrets", Severity::High,
-             "RBAC permissions to LIST secrets cluster-wide must be restricted.",
-             "rbac_secret_list"),
-        ctrl("C-0016", "Allow privilege escalation", Severity::High,
-             "securityContext.allowPrivilegeEscalation must be false.",
-             "no_priv_esc"),
-        ctrl("C-0017", "Immutable container filesystem", Severity::Medium,
-             "readOnlyRootFilesystem must be true.",
-             "read_only_root_fs"),
-        ctrl("C-0018", "Configured readiness probe", Severity::Low,
-             "Every pod must declare a readinessProbe.",
-             "readiness_probe"),
-        ctrl("C-0020", "Mount service principal", Severity::Critical,
-             "Mounting cloud-provider service-principal credentials into a pod is forbidden.",
-             "service_principal_mount"),
-        ctrl("C-0026", "Kubernetes CronJob", Severity::Medium,
-             "CronJobs are reviewed for least privilege and read-only filesystems.",
-             "cronjob_review"),
-        ctrl("C-0030", "Ingress and Egress blocked", Severity::High,
-             "Default-deny NetworkPolicies are present in every namespace.",
-             "network_policy_default_deny"),
-        ctrl("C-0034", "Automatic mapping of service account", Severity::Medium,
-             "Pods must set automountServiceAccountToken=false unless explicitly required.",
-             "automount_sa_token_false"),
-        ctrl("C-0035", "Cluster-admin binding", Severity::Critical,
-             "ClusterRoleBindings to cluster-admin must be limited.",
-             "cluster_admin_binding"),
-        ctrl("C-0036", "Validating admission webhook (or OPA gatekeeper)", Severity::Medium,
-             "A validating admission webhook must be installed.",
-             "admission_webhook_present"),
-        ctrl("C-0038", "Host PID/IPC privileges", Severity::Critical,
-             "Pods must not enable hostPID, hostIPC, or hostNetwork.",
-             "host_namespace_false"),
-        ctrl("C-0041", "HostNetwork access", Severity::Critical,
-             "hostNetwork: true is forbidden.",
-             "host_network_false"),
-        ctrl("C-0044", "Container hostPort", Severity::Medium,
-             "Containers must not request hostPort.",
-             "no_host_port"),
-        ctrl("C-0045", "Writable hostPath mount", Severity::Critical,
-             "hostPath mounts must be read-only.",
-             "host_path_readonly"),
-        ctrl("C-0046", "Insecure capabilities", Severity::High,
-             "Containers must drop ALL capabilities and add only required ones.",
-             "capabilities_drop_all"),
-        ctrl("C-0048", "HostPath mount", Severity::High,
-             "hostPath mounts are restricted to approved paths only.",
-             "no_host_path"),
-        ctrl("C-0050", "Resources CPU limit", Severity::Medium,
-             "Containers must declare CPU limit.",
-             "cpu_limit"),
-        ctrl("C-0055", "Linux hardening (seccomp)", Severity::Medium,
-             "Containers must use seccompProfile {RuntimeDefault or Localhost}.",
-             "seccomp_profile"),
-        ctrl("C-0057", "Privileged container", Severity::Critical,
-             "Containers must not be privileged.",
-             "no_privileged"),
-        ctrl("C-0066", "Secret/etcd encryption enabled", Severity::Critical,
-             "API server --encryption-provider-config must be set.",
-             "etcd_encryption"),
-        ctrl("C-0073", "Naked pods", Severity::Low,
-             "Pods must be owned by a controller (Deployment, StatefulSet, DaemonSet).",
-             "owned_pod"),
-        ctrl("C-0078", "Image vulnerabilities (critical)", Severity::Critical,
-             "Container images must have no critical CVEs (cave-trivy scan).",
-             "no_critical_cve"),
-        ctrl("C-0086", "CoreDNS poisoning", Severity::High,
-             "CoreDNS deployment integrity (signed manifests + RBAC).",
-             "coredns_integrity"),
+        ctrl(
+            "C-0001",
+            "Forbidden Container Registries",
+            Severity::High,
+            "Containers should only be pulled from approved/trusted registries.",
+            "registry_allowlist",
+        ),
+        ctrl(
+            "C-0002",
+            "Exec into container",
+            Severity::Medium,
+            "Attaching to running containers via `kubectl exec` provides ad-hoc shell access.",
+            "exec_allowed",
+        ),
+        ctrl(
+            "C-0004",
+            "Resource limits on every container",
+            Severity::Medium,
+            "Containers must declare CPU and memory limits.",
+            "resource_limits",
+        ),
+        ctrl(
+            "C-0005",
+            "API server insecure port",
+            Severity::Critical,
+            "API server --insecure-port must be 0.",
+            "insecure_port_zero",
+        ),
+        ctrl(
+            "C-0007",
+            "Roles with delete capabilities",
+            Severity::Medium,
+            "RBAC roles granting deletion of critical resources must be reviewed.",
+            "rbac_delete_capable",
+        ),
+        ctrl(
+            "C-0009",
+            "Resource policies (LimitRange / ResourceQuota)",
+            Severity::Medium,
+            "Each namespace must have a LimitRange and ResourceQuota.",
+            "namespace_limit_range",
+        ),
+        ctrl(
+            "C-0012",
+            "Applications credentials in configuration files",
+            Severity::High,
+            "Hardcoded credentials inside ConfigMaps/Manifests are forbidden.",
+            "hardcoded_creds",
+        ),
+        ctrl(
+            "C-0013",
+            "Non-root containers",
+            Severity::High,
+            "Containers must run as non-root user (runAsNonRoot=true).",
+            "run_as_non_root",
+        ),
+        ctrl(
+            "C-0014",
+            "Access Kubernetes dashboard",
+            Severity::High,
+            "Kubernetes Dashboard pod must not be exposed externally.",
+            "dashboard_exposed",
+        ),
+        ctrl(
+            "C-0015",
+            "List Kubernetes secrets",
+            Severity::High,
+            "RBAC permissions to LIST secrets cluster-wide must be restricted.",
+            "rbac_secret_list",
+        ),
+        ctrl(
+            "C-0016",
+            "Allow privilege escalation",
+            Severity::High,
+            "securityContext.allowPrivilegeEscalation must be false.",
+            "no_priv_esc",
+        ),
+        ctrl(
+            "C-0017",
+            "Immutable container filesystem",
+            Severity::Medium,
+            "readOnlyRootFilesystem must be true.",
+            "read_only_root_fs",
+        ),
+        ctrl(
+            "C-0018",
+            "Configured readiness probe",
+            Severity::Low,
+            "Every pod must declare a readinessProbe.",
+            "readiness_probe",
+        ),
+        ctrl(
+            "C-0020",
+            "Mount service principal",
+            Severity::Critical,
+            "Mounting cloud-provider service-principal credentials into a pod is forbidden.",
+            "service_principal_mount",
+        ),
+        ctrl(
+            "C-0026",
+            "Kubernetes CronJob",
+            Severity::Medium,
+            "CronJobs are reviewed for least privilege and read-only filesystems.",
+            "cronjob_review",
+        ),
+        ctrl(
+            "C-0030",
+            "Ingress and Egress blocked",
+            Severity::High,
+            "Default-deny NetworkPolicies are present in every namespace.",
+            "network_policy_default_deny",
+        ),
+        ctrl(
+            "C-0034",
+            "Automatic mapping of service account",
+            Severity::Medium,
+            "Pods must set automountServiceAccountToken=false unless explicitly required.",
+            "automount_sa_token_false",
+        ),
+        ctrl(
+            "C-0035",
+            "Cluster-admin binding",
+            Severity::Critical,
+            "ClusterRoleBindings to cluster-admin must be limited.",
+            "cluster_admin_binding",
+        ),
+        ctrl(
+            "C-0036",
+            "Validating admission webhook (or OPA gatekeeper)",
+            Severity::Medium,
+            "A validating admission webhook must be installed.",
+            "admission_webhook_present",
+        ),
+        ctrl(
+            "C-0038",
+            "Host PID/IPC privileges",
+            Severity::Critical,
+            "Pods must not enable hostPID, hostIPC, or hostNetwork.",
+            "host_namespace_false",
+        ),
+        ctrl(
+            "C-0041",
+            "HostNetwork access",
+            Severity::Critical,
+            "hostNetwork: true is forbidden.",
+            "host_network_false",
+        ),
+        ctrl(
+            "C-0044",
+            "Container hostPort",
+            Severity::Medium,
+            "Containers must not request hostPort.",
+            "no_host_port",
+        ),
+        ctrl(
+            "C-0045",
+            "Writable hostPath mount",
+            Severity::Critical,
+            "hostPath mounts must be read-only.",
+            "host_path_readonly",
+        ),
+        ctrl(
+            "C-0046",
+            "Insecure capabilities",
+            Severity::High,
+            "Containers must drop ALL capabilities and add only required ones.",
+            "capabilities_drop_all",
+        ),
+        ctrl(
+            "C-0048",
+            "HostPath mount",
+            Severity::High,
+            "hostPath mounts are restricted to approved paths only.",
+            "no_host_path",
+        ),
+        ctrl(
+            "C-0050",
+            "Resources CPU limit",
+            Severity::Medium,
+            "Containers must declare CPU limit.",
+            "cpu_limit",
+        ),
+        ctrl(
+            "C-0055",
+            "Linux hardening (seccomp)",
+            Severity::Medium,
+            "Containers must use seccompProfile {RuntimeDefault or Localhost}.",
+            "seccomp_profile",
+        ),
+        ctrl(
+            "C-0057",
+            "Privileged container",
+            Severity::Critical,
+            "Containers must not be privileged.",
+            "no_privileged",
+        ),
+        ctrl(
+            "C-0066",
+            "Secret/etcd encryption enabled",
+            Severity::Critical,
+            "API server --encryption-provider-config must be set.",
+            "etcd_encryption",
+        ),
+        ctrl(
+            "C-0073",
+            "Naked pods",
+            Severity::Low,
+            "Pods must be owned by a controller (Deployment, StatefulSet, DaemonSet).",
+            "owned_pod",
+        ),
+        ctrl(
+            "C-0078",
+            "Image vulnerabilities (critical)",
+            Severity::Critical,
+            "Container images must have no critical CVEs (cave-trivy scan).",
+            "no_critical_cve",
+        ),
+        ctrl(
+            "C-0086",
+            "CoreDNS poisoning",
+            Severity::High,
+            "CoreDNS deployment integrity (signed manifests + RBAC).",
+            "coredns_integrity",
+        ),
     ]
 }
 
@@ -131,10 +259,17 @@ fn ctrl(id: &str, title: &str, sev: Severity, desc: &str, predicate: &str) -> Ns
     let mut c = Check::new(id, Framework::NsaHardening, NodeType::Policies, title);
     c.severity = sev;
     c.description = desc.into();
-    c.level = if sev == Severity::Critical || sev == Severity::High { CisLevel::L1 } else { CisLevel::L2 };
+    c.level = if sev == Severity::Critical || sev == Severity::High {
+        CisLevel::L1
+    } else {
+        CisLevel::L2
+    };
     c.tags = vec!["nsa".into()];
     c.remediation = format!("Apply NSA hardening guidance for: {title}.");
-    NsaControl { check: c, predicate: predicate.into() }
+    NsaControl {
+        check: c,
+        predicate: predicate.into(),
+    }
 }
 
 /// Per-control facts captured from manifest static analysis.
@@ -210,12 +345,21 @@ pub fn evaluate_control(c: &NsaControl, facts: &NsaManifestFacts, host: &str) ->
         "service_principal_mount" => !facts.service_principal_mounted,
         "cronjob_review" => facts.cronjob_safe,
         "exec_allowed" => !facts.exec_allowed,
-        _ => return Finding::warn(&c.check, host, format!("Predicate '{}' is review-only", c.predicate)),
+        _ => {
+            return Finding::warn(
+                &c.check,
+                host,
+                format!("Predicate '{}' is review-only", c.predicate),
+            );
+        }
     };
     if predicate_pass {
         Finding::pass(&c.check, host, format!("{}: control satisfied", c.check.id))
     } else {
-        let msg = format!("{}: '{}' predicate failed — {}", c.check.id, c.predicate, c.check.title);
+        let msg = format!(
+            "{}: '{}' predicate failed — {}",
+            c.check.id, c.predicate, c.check.title
+        );
         let mut f = Finding::fail(&c.check, host, msg);
         f.verdict = Verdict::Fail;
         f
@@ -249,7 +393,13 @@ mod tests {
 
     #[test]
     fn test_evaluate_privileged_fail() {
-        let c = ctrl("C-0057", "Privileged", Severity::Critical, "", "no_privileged");
+        let c = ctrl(
+            "C-0057",
+            "Privileged",
+            Severity::Critical,
+            "",
+            "no_privileged",
+        );
         let mut facts = NsaManifestFacts::default();
         facts.privileged = true;
         let f = evaluate_control(&c, &facts, "h");
@@ -266,7 +416,13 @@ mod tests {
 
     #[test]
     fn test_evaluate_host_namespace() {
-        let c = ctrl("C-0038", "HostNS", Severity::Critical, "", "host_namespace_false");
+        let c = ctrl(
+            "C-0038",
+            "HostNS",
+            Severity::Critical,
+            "",
+            "host_namespace_false",
+        );
         let mut facts = NsaManifestFacts::default();
         facts.host_pid = true;
         let f = evaluate_control(&c, &facts, "h");

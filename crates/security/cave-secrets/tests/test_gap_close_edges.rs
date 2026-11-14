@@ -62,11 +62,7 @@ fn password_assignment_short_value_does_not_match() {
     let dets = builtin_detectors();
     let content = r#"password = "short""#; // 5 chars between quotes
     let findings = scan(content, "x.toml", &dets);
-    assert!(
-        findings
-            .iter()
-            .all(|f| f.detector != "password-assignment")
-    );
+    assert!(findings.iter().all(|f| f.detector != "password-assignment"));
 }
 
 #[test]
@@ -94,8 +90,7 @@ fn private_key_plain_no_label_matches() {
 #[test]
 fn scan_assigns_increasing_line_numbers() {
     let dets = builtin_detectors();
-    let content =
-        "junk\nAKIAIOSFODNN7EXAMPLE\nmore_junk\nAKIAIOSFODNN7OTHERKEY\n";
+    let content = "junk\nAKIAIOSFODNN7EXAMPLE\nmore_junk\nAKIAIOSFODNN7OTHERKEY\n";
     let findings: Vec<&Finding> = scan(content, "f.env", &dets)
         .into_iter()
         .filter(|f| f.detector == "aws-access-key")
@@ -115,8 +110,7 @@ fn scan_same_line_multiple_detectors_each_produces_finding() {
     // A line carrying both an AWS key AND a github token must produce
     // one finding per matching detector — not collapse to a single hit.
     let dets = builtin_detectors();
-    let content =
-        "AKIAIOSFODNN7EXAMPLE ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234";
+    let content = "AKIAIOSFODNN7EXAMPLE ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234";
     let findings = scan(content, "x.env", &dets);
     assert!(findings.iter().any(|f| f.detector == "aws-access-key"));
     assert!(findings.iter().any(|f| f.detector == "github-token"));
@@ -218,11 +212,7 @@ fn entropy_low_value_with_hint_does_not_fire() {
 #[test]
 fn private_key_severity_is_critical() {
     let dets = builtin_detectors();
-    let findings = scan(
-        "-----BEGIN RSA PRIVATE KEY-----",
-        "id_rsa",
-        &dets,
-    );
+    let findings = scan("-----BEGIN RSA PRIVATE KEY-----", "id_rsa", &dets);
     let pk = findings
         .iter()
         .find(|f| f.detector == "private-key")
@@ -233,7 +223,8 @@ fn private_key_severity_is_critical() {
 #[test]
 fn azure_connection_string_severity_is_critical() {
     let dets = builtin_detectors();
-    let content = "AZ=DefaultEndpointsProtocol=https;AccountName=mystore;AccountKey=YWJjZGVmZ2hpamtsbW5vcA==";
+    let content =
+        "AZ=DefaultEndpointsProtocol=https;AccountName=mystore;AccountKey=YWJjZGVmZ2hpamtsbW5vcA==";
     let findings = scan(content, "az.env", &dets);
     let az = findings
         .iter()
@@ -247,8 +238,7 @@ fn all_findings_unverified_after_scan() {
     // The scan() function does not perform verification — `verified` must
     // always be false at this stage. Verification is a separate pipeline step.
     let dets = builtin_detectors();
-    let content =
-        "AKIAIOSFODNN7EXAMPLE\nghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\n-----BEGIN RSA PRIVATE KEY-----";
+    let content = "AKIAIOSFODNN7EXAMPLE\nghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\n-----BEGIN RSA PRIVATE KEY-----";
     let findings = scan(content, "mixed.txt", &dets);
     assert!(!findings.is_empty());
     assert!(findings.iter().all(|f| !f.verified));

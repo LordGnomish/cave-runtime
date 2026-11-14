@@ -60,10 +60,7 @@ pub struct CrCondition {
 /// Cite: cert-manager `ValidateCertificateRequestApprovalCondition`
 /// (certificaterequest.go:123-171). Ensures only a single `Approved` or
 /// `Denied` condition may exist and that it is set to `True`.
-pub fn validate_cr_approval_condition(
-    cr_conds: &[CrCondition],
-    fld: &str,
-) -> Vec<ValidationError> {
+pub fn validate_cr_approval_condition(cr_conds: &[CrCondition], fld: &str) -> Vec<ValidationError> {
     let mut el = Vec::new();
 
     let approved: Vec<&CrCondition> = cr_conds

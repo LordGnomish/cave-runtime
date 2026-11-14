@@ -2,15 +2,15 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for trusted cluster federation model.
 
-use cave_pam::trusted_cluster::{
-    TrustStore, TrustedCluster, TrustDirection, TrustState,
-};
+use cave_pam::trusted_cluster::{TrustDirection, TrustState, TrustStore, TrustedCluster};
 use uuid::Uuid;
 
 fn make_cluster(name: &str, direction: TrustDirection) -> TrustedCluster {
     TrustedCluster {
         name: name.to_string(),
-        root_ca_pem: format!("-----BEGIN CERTIFICATE-----\nFAKE-CA-{name}\n-----END CERTIFICATE-----"),
+        root_ca_pem: format!(
+            "-----BEGIN CERTIFICATE-----\nFAKE-CA-{name}\n-----END CERTIFICATE-----"
+        ),
         direction,
         roles_to_map: vec!["admin".to_string()],
         metadata: std::collections::HashMap::new(),
@@ -30,7 +30,9 @@ fn test_register_cluster() {
 #[test]
 fn test_activate_cluster() {
     let store = TrustStore::new("cluster-a");
-    let id = store.register(make_cluster("cluster-b", TrustDirection::Outbound)).unwrap();
+    let id = store
+        .register(make_cluster("cluster-b", TrustDirection::Outbound))
+        .unwrap();
     store.activate(&id).expect("should activate");
     let c = store.get(&id).unwrap();
     assert_eq!(c.state, TrustState::Active);
@@ -39,7 +41,9 @@ fn test_activate_cluster() {
 #[test]
 fn test_deactivate_cluster() {
     let store = TrustStore::new("cluster-a");
-    let id = store.register(make_cluster("cluster-c", TrustDirection::Inbound)).unwrap();
+    let id = store
+        .register(make_cluster("cluster-c", TrustDirection::Inbound))
+        .unwrap();
     store.activate(&id).unwrap();
     store.deactivate(&id).expect("should deactivate");
     let c = store.get(&id).unwrap();
@@ -49,7 +53,9 @@ fn test_deactivate_cluster() {
 #[test]
 fn test_remove_cluster() {
     let store = TrustStore::new("cluster-a");
-    let id = store.register(make_cluster("cluster-d", TrustDirection::Bidirectional)).unwrap();
+    let id = store
+        .register(make_cluster("cluster-d", TrustDirection::Bidirectional))
+        .unwrap();
     store.remove(&id).expect("should remove");
     assert!(store.get(&id).is_none());
 }
@@ -57,8 +63,12 @@ fn test_remove_cluster() {
 #[test]
 fn test_list_active_clusters() {
     let store = TrustStore::new("cluster-a");
-    let id1 = store.register(make_cluster("c1", TrustDirection::Outbound)).unwrap();
-    let _id2 = store.register(make_cluster("c2", TrustDirection::Inbound)).unwrap();
+    let id1 = store
+        .register(make_cluster("c1", TrustDirection::Outbound))
+        .unwrap();
+    let _id2 = store
+        .register(make_cluster("c2", TrustDirection::Inbound))
+        .unwrap();
     store.activate(&id1).unwrap();
 
     let active = store.list_active();

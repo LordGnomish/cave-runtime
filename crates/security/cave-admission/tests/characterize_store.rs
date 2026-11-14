@@ -3,8 +3,8 @@
 //! Characterization tests for cave_admission::store (AdmissionStore).
 
 use cave_admission::models::{
-    AdmissionOperation, AdmissionPolicy, EnforcementAction, PolicyEvalRule, RuleOperator,
-    ViolationLog, AdmissionRequest, GroupVersionResource, UserInfo,
+    AdmissionOperation, AdmissionPolicy, AdmissionRequest, EnforcementAction, GroupVersionResource,
+    PolicyEvalRule, RuleOperator, UserInfo, ViolationLog,
 };
 use cave_admission::store::AdmissionStore;
 use chrono::Utc;

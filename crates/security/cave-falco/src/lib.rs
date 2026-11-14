@@ -21,6 +21,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cli;
+pub mod engine;
 pub mod error;
 pub mod event;
 pub mod k8s_audit;
@@ -28,13 +30,11 @@ pub mod observability;
 pub mod output;
 pub mod parity_self_audit;
 pub mod plugin_sdk;
+pub mod routes;
 pub mod rule;
 pub mod rule_loader;
-pub mod engine;
-pub mod cli;
-pub mod routes;
 
-pub use error::{FalcoError, Result};
-pub use event::{FalcoEvent, EventClass, Priority};
-pub use rule::{Rule, RuleAction, MacroDef, ListDef, OutputField};
 pub use engine::{Engine, EngineMatch};
+pub use error::{FalcoError, Result};
+pub use event::{EventClass, FalcoEvent, Priority};
+pub use rule::{ListDef, MacroDef, OutputField, Rule, RuleAction};

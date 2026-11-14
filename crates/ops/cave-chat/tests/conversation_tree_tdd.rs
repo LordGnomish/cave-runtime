@@ -12,8 +12,8 @@
 //! uses to reconstruct a conversation subtree from a flat message list.
 
 use cave_chat::conversation_tree::{
-    get_all_messages_up_to_parent, get_messages_up_to_target_level, split_at_target_level,
-    ConvoNode, NO_PARENT,
+    ConvoNode, NO_PARENT, get_all_messages_up_to_parent, get_messages_up_to_target_level,
+    split_at_target_level,
 };
 
 /// Build the same fixture tree the upstream fork.spec.js uses:
@@ -76,7 +76,11 @@ fn messages_up_to_target_level_returns_levels_down_to_target() {
     // root level + child level (child1, child2). grandchildren are deeper -> excluded.
     assert_eq!(
         got,
-        vec!["child1".to_string(), "child2".to_string(), "root".to_string()]
+        vec![
+            "child1".to_string(),
+            "child2".to_string(),
+            "root".to_string()
+        ]
     );
 }
 
@@ -113,6 +117,9 @@ fn split_at_target_level_reparents_target_level_to_root() {
         }
     }
     // descendants keep their parent
-    let gc1 = result.iter().find(|n| n.message_id == "grandchild1").unwrap();
+    let gc1 = result
+        .iter()
+        .find(|n| n.message_id == "grandchild1")
+        .unwrap();
     assert_eq!(gc1.parent_message_id, "child1");
 }

@@ -125,8 +125,7 @@ pub fn evaluate(
     }
 
     let speed_ok = throughput_uplift >= cfg.selection.speed_uplift_floor;
-    let quality_ok = quality_delta
-        >= cfg.selection.eval_uplift_floor.max(0.0);
+    let quality_ok = quality_delta >= cfg.selection.eval_uplift_floor.max(0.0);
 
     if speed_ok {
         reasons.push(format!(
@@ -176,10 +175,15 @@ pub fn baseline_verdict(model_id: &str) -> Verdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bench::{cave_prompts, BenchSnapshot, EvalResult};
+    use crate::bench::{BenchSnapshot, EvalResult, cave_prompts};
     use crate::registry::{Candidate, SourceKind};
 
-    fn snap(model: &str, quality: f32, bytes_per_prompt: usize, ms_per_prompt: u64) -> BenchSnapshot {
+    fn snap(
+        model: &str,
+        quality: f32,
+        bytes_per_prompt: usize,
+        ms_per_prompt: u64,
+    ) -> BenchSnapshot {
         BenchSnapshot {
             model_id: model.to_string(),
             results: cave_prompts()
@@ -215,7 +219,12 @@ mod tests {
     fn rejected_when_license_not_in_allowlist() {
         let cfg = TrackerConfig::default_config();
         let c = cand("foo:7b", "Proprietary", 8.0, 9.0);
-        let v = evaluate(&cfg, &c, &snap(&c.model_id, 0.9, 600, 1000), &snap("base", 0.5, 400, 1000));
+        let v = evaluate(
+            &cfg,
+            &c,
+            &snap(&c.model_id, 0.9, 600, 1000),
+            &snap("base", 0.5, 400, 1000),
+        );
         assert_eq!(v.status, SelectionStatus::Rejected);
         assert!(v.reasons.iter().any(|r| r.contains("license")));
     }
@@ -224,7 +233,12 @@ mod tests {
     fn rejected_when_vram_exceeds_guard() {
         let cfg = TrackerConfig::default_config();
         let c = cand("huge:200b", "Apache-2.0", 200.0, 220.0);
-        let v = evaluate(&cfg, &c, &snap(&c.model_id, 0.9, 600, 1000), &snap("base", 0.5, 400, 1000));
+        let v = evaluate(
+            &cfg,
+            &c,
+            &snap(&c.model_id, 0.9, 600, 1000),
+            &snap("base", 0.5, 400, 1000),
+        );
         assert_eq!(v.status, SelectionStatus::Rejected);
         assert!(v.reasons.iter().any(|r| r.contains("VRAM")));
     }

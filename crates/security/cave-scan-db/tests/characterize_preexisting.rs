@@ -6,7 +6,9 @@
 // they are honest characterisation that the code does what it claims.
 
 use cave_scan_db::matcher::{PackageRef, version_cmp, version_satisfies};
-use cave_scan_db::sources::{FeedPackage, FeedRecord, alpine, debian, ghsa, nvd, redhat, almalinux};
+use cave_scan_db::sources::{
+    FeedPackage, FeedRecord, almalinux, alpine, debian, ghsa, nvd, redhat,
+};
 use cave_scan_db::{
     Advisory, IacRule, IacRuleDb, LangAdvisoryDb, OsAdvisoryDb, Severity, SledStore, VulnDb,
     Vulnerability,
@@ -204,14 +206,12 @@ fn characterize_feed_record_into_vuln_and_advisories() {
         description: "desc".into(),
         severity: "critical".into(),
         references: vec!["https://example.com".into()],
-        packages: vec![
-            FeedPackage {
-                ecosystem: "debian:12".into(),
-                name: "bash".into(),
-                fixed_version: "5.2.15".into(),
-                affected_version: "<5.2.15".into(),
-            },
-        ],
+        packages: vec![FeedPackage {
+            ecosystem: "debian:12".into(),
+            name: "bash".into(),
+            fixed_version: "5.2.15".into(),
+            affected_version: "<5.2.15".into(),
+        }],
     };
     let (v, adv) = r.into_vuln_and_advisories();
     assert_eq!(v.id, "CVE-CHAR-9999");
@@ -225,9 +225,14 @@ fn characterize_feed_record_into_vuln_and_advisories() {
 
 #[test]
 fn characterize_nvd_score_to_severity_buckets() {
-    use cave_scan_db::sources::nvd::score_to_severity;
     use cave_scan_db::CvssV3;
-    let mk = |s: f32| score_to_severity(&CvssV3 { vector: String::new(), score: s });
+    use cave_scan_db::sources::nvd::score_to_severity;
+    let mk = |s: f32| {
+        score_to_severity(&CvssV3 {
+            vector: String::new(),
+            score: s,
+        })
+    };
     assert_eq!(mk(9.8), Severity::Critical);
     assert_eq!(mk(7.5), Severity::High);
     assert_eq!(mk(5.0), Severity::Medium);

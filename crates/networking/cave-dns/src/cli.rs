@@ -16,9 +16,15 @@ pub enum DnsCommand {
     /// `cavectl dns query <name> [type]`
     Query { name: String, qtype: String },
     /// `cavectl dns zone {list|show|reload} [zone]`
-    Zone { action: ZoneAction, zone: Option<String> },
+    Zone {
+        action: ZoneAction,
+        zone: Option<String>,
+    },
     /// `cavectl dns plugin {list|describe} [name]`
-    Plugin { action: PluginAction, name: Option<String> },
+    Plugin {
+        action: PluginAction,
+        name: Option<String>,
+    },
     /// `cavectl dns cache {stats|flush}`
     Cache { action: CacheAction },
     /// `cavectl dns reload`
@@ -229,13 +235,23 @@ mod tests {
     #[test]
     fn parse_cache_stats() {
         let cmd = parse(&["cache", "stats"]).unwrap();
-        assert_eq!(cmd, DnsCommand::Cache { action: CacheAction::Stats });
+        assert_eq!(
+            cmd,
+            DnsCommand::Cache {
+                action: CacheAction::Stats
+            }
+        );
     }
 
     #[test]
     fn parse_cache_flush() {
         let cmd = parse(&["cache", "flush"]).unwrap();
-        assert_eq!(cmd, DnsCommand::Cache { action: CacheAction::Flush });
+        assert_eq!(
+            cmd,
+            DnsCommand::Cache {
+                action: CacheAction::Flush
+            }
+        );
     }
 
     #[test]

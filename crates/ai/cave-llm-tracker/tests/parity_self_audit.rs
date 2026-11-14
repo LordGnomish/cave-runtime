@@ -94,7 +94,11 @@ fn gate_3_fill_ratio_is_measured_and_at_least_floor() {
          Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 #[test]
@@ -220,8 +224,14 @@ fn gate_9_default_config_enforces_phase_0_and_wires_all_four_sources() {
     let s = &cfg.sources;
     assert!(s.huggingface, "HuggingFace source must default on");
     assert!(s.ollama_library, "Ollama library source must default on");
-    assert!(s.lmsys_leaderboard, "LMSys leaderboard source must default on");
-    assert!(s.github_backend_releases, "GitHub backend source must default on");
+    assert!(
+        s.lmsys_leaderboard,
+        "LMSys leaderboard source must default on"
+    );
+    assert!(
+        s.github_backend_releases,
+        "GitHub backend source must default on"
+    );
 
     let seed = cave_llm_tracker::seed_catalog();
     assert!(
@@ -231,7 +241,11 @@ fn gate_9_default_config_enforces_phase_0_and_wires_all_four_sources() {
     );
 
     let prompts = cave_llm_tracker::cave_prompts();
-    assert_eq!(prompts.len(), 5, "cave-specific bench is fixed at 5 prompts");
+    assert_eq!(
+        prompts.len(),
+        5,
+        "cave-specific bench is fixed at 5 prompts"
+    );
 }
 
 fn walk(dir: &PathBuf, cb: &mut dyn FnMut(&PathBuf)) {

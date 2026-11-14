@@ -34,7 +34,11 @@ impl CustodyEntry {
         }
     }
 
-    pub fn following(prev: &CustodyEntry, actor: impl Into<String>, action: impl Into<String>) -> Self {
+    pub fn following(
+        prev: &CustodyEntry,
+        actor: impl Into<String>,
+        action: impl Into<String>,
+    ) -> Self {
         Self {
             actor: actor.into(),
             action: action.into(),
@@ -181,12 +185,7 @@ mod tests {
 
     #[test]
     fn test_build_evidence_item_seeds_chain() {
-        let it = build_evidence_item(
-            EvidenceType::NetworkCapture,
-            "pcap-1",
-            b"x",
-            "bob",
-        );
+        let it = build_evidence_item(EvidenceType::NetworkCapture, "pcap-1", b"x", "bob");
         assert_eq!(it.chain_of_custody, vec!["bob:collect".to_string()]);
     }
 

@@ -25,12 +25,14 @@ use cave_metrics::alertmgr::silence::SilenceStore;
 use cave_metrics::discovery_cloud::Target as CloudTarget;
 use cave_metrics::error::MetricsError;
 use cave_metrics::ingestion::otlp;
-use cave_metrics::ingestion::{exposition, graphite, openmetrics, statsd};
-use cave_metrics::ingestion::remote_read::{decode_read_request, encode_read_response, execute_read};
+use cave_metrics::ingestion::remote_read::{
+    decode_read_request, encode_read_response, execute_read,
+};
 use cave_metrics::ingestion::remote_write::{
     LabelMatcher as ProtoMatcher, MatchType, ProtoLabel, ProtoSample, ProtoTimeSeries, Query,
     ReadRequest, WriteRequest, decode_write_request, encode_write_request,
 };
+use cave_metrics::ingestion::{exposition, graphite, openmetrics, statsd};
 use cave_metrics::model::TimeSeries;
 use cave_metrics::multitenant::{
     DEFAULT_TENANT, TENANT_LABEL, X_SCOPE_ORG_ID, enforce_tenant_filter, federation_relabel,
@@ -40,9 +42,7 @@ use cave_metrics::remote_read_backend::{
     LabelMatcher as RrLabelMatcher, MatcherKind, MemoryReadBackend, ReadQuery, RemoteReadBackend,
     Sample as RrSample,
 };
-use cave_metrics::rules::{
-    AlertRule, AlertState, FiringAlert, RecordingRule, RuleGroup,
-};
+use cave_metrics::rules::{AlertRule, AlertState, FiringAlert, RecordingRule, RuleGroup};
 use cave_metrics::scrape::ScrapeManager;
 use cave_metrics::scrape::discovery::{resolve_all, resolve_file_sd, resolve_static};
 use cave_metrics::scrape::target::{
@@ -167,10 +167,22 @@ fn time_series_push_collects_samples() {
 
 #[test]
 fn metric_type_from_str_known_and_unknown() {
-    assert_eq!(MetricType::from_str("counter").unwrap(), MetricType::Counter);
-    assert_eq!(MetricType::from_str("HISTOGRAM").unwrap(), MetricType::Histogram);
-    assert_eq!(MetricType::from_str("stateset").unwrap(), MetricType::StateSet);
-    assert_eq!(MetricType::from_str("garbage").unwrap(), MetricType::Untyped);
+    assert_eq!(
+        MetricType::from_str("counter").unwrap(),
+        MetricType::Counter
+    );
+    assert_eq!(
+        MetricType::from_str("HISTOGRAM").unwrap(),
+        MetricType::Histogram
+    );
+    assert_eq!(
+        MetricType::from_str("stateset").unwrap(),
+        MetricType::StateSet
+    );
+    assert_eq!(
+        MetricType::from_str("garbage").unwrap(),
+        MetricType::Untyped
+    );
     // Default is Untyped
     let mt: MetricType = Default::default();
     assert_eq!(mt, MetricType::Untyped);
@@ -876,10 +888,7 @@ fn cloud_target_with_label_chain() {
 #[test]
 fn template_printf_int_via_var() {
     let ctx = TemplateContext::new().set_var("n", "12");
-    assert_eq!(
-        render_template("{{ printf \"%d\" $n }}", &ctx),
-        "12"
-    );
+    assert_eq!(render_template("{{ printf \"%d\" $n }}", &ctx), "12");
 }
 
 #[test]
@@ -893,10 +902,7 @@ fn template_printf_no_format_returns_empty_string() {
 #[test]
 fn template_unknown_label_renders_empty() {
     let ctx = TemplateContext::new();
-    assert_eq!(
-        render_template("{{ .Labels.missing }}", &ctx),
-        ""
-    );
+    assert_eq!(render_template("{{ .Labels.missing }}", &ctx), "");
 }
 
 #[test]
@@ -957,8 +963,8 @@ fn alert_rule_with_labels_merges_into_alert_labels() {
     let db = Arc::new(Tsdb::default());
     db.append(lbl(&[("__name__", "errs")]), sample(1000, 1.0));
     let engine = Engine::new(Arc::clone(&db));
-    let mut rule = AlertRule::new("ErrAlert", "errs", 0)
-        .with_labels(lbl(&[("severity", "critical")]));
+    let mut rule =
+        AlertRule::new("ErrAlert", "errs", 0).with_labels(lbl(&[("severity", "critical")]));
     let alerts = rule.evaluate(&engine, 1000).unwrap();
     assert_eq!(alerts.len(), 1);
     assert_eq!(alerts[0].labels.get("severity"), Some("critical"));
@@ -969,8 +975,7 @@ fn alert_rule_annotations_pass_through_unchanged() {
     let db = Arc::new(Tsdb::default());
     db.append(lbl(&[("__name__", "x")]), sample(1000, 1.0));
     let engine = Engine::new(Arc::clone(&db));
-    let mut rule = AlertRule::new("A", "x", 0)
-        .with_annotations(lbl(&[("summary", "boom")]));
+    let mut rule = AlertRule::new("A", "x", 0).with_annotations(lbl(&[("summary", "boom")]));
     let alerts = rule.evaluate(&engine, 1000).unwrap();
     assert_eq!(alerts[0].annotations.get("summary"), Some("boom"));
 }
@@ -1316,7 +1321,9 @@ fn promql_parse_inf_and_nan_literals() {
 fn promql_parse_string_literal_returns_string_result() {
     let db = Arc::new(Tsdb::default());
     let engine = Engine::new(Arc::clone(&db));
-    let r = engine.eval_instant(&parse(r#""hello""#).unwrap(), 0).unwrap();
+    let r = engine
+        .eval_instant(&parse(r#""hello""#).unwrap(), 0)
+        .unwrap();
     if let QueryResult::String(s) = r {
         assert_eq!(s, "hello");
     } else {
@@ -1474,19 +1481,13 @@ fn fn_idelta_simple() {
 
 #[test]
 fn fn_histogram_quantile_negative_q_neg_inf() {
-    let q = cave_metrics::promql::functions::histogram_quantile(
-        -0.1,
-        vec![(0.5, 1.0), (1.0, 2.0)],
-    );
+    let q = cave_metrics::promql::functions::histogram_quantile(-0.1, vec![(0.5, 1.0), (1.0, 2.0)]);
     assert!(q.is_infinite() && q.is_sign_negative());
 }
 
 #[test]
 fn fn_histogram_quantile_q_over_one_inf() {
-    let q = cave_metrics::promql::functions::histogram_quantile(
-        1.5,
-        vec![(0.5, 1.0), (1.0, 2.0)],
-    );
+    let q = cave_metrics::promql::functions::histogram_quantile(1.5, vec![(0.5, 1.0), (1.0, 2.0)]);
     assert!(q.is_infinite() && q.is_sign_positive());
 }
 

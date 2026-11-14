@@ -367,6 +367,7 @@ fn g8_no_stub_macros_in_src() {
 #[test]
 fn g9_surface_intact() {
     use cave_crossplane::{
+        CrossplaneState, MODULE_NAME,
         composition::{
             legacy::LegacyComposer,
             patch_transform::PatchTransformEngine,
@@ -376,10 +377,12 @@ fn g9_surface_intact() {
         conditions::{Condition, ConditionStatus, ConditionType, propagate_composed_to_xr},
         function::{
             FunctionStore,
-            grpc_codec::{RunFunctionRequest, RunFunctionResponse, encode_request, decode_response},
             auto_ready::auto_ready_eval,
-            kcl::evaluate_kcl,
             go_template::render_go_template,
+            grpc_codec::{
+                RunFunctionRequest, RunFunctionResponse, decode_response, encode_request,
+            },
+            kcl::evaluate_kcl,
             patch_transform::run_patch_transform_fn,
         },
         models::{
@@ -391,7 +394,8 @@ fn g9_surface_intact() {
             revision::{ProviderRevisionStore, RevisionState},
             runtime::DeploymentRuntimeConfig,
         },
-        providers_builtin::{kubernetes::KubernetesProvider, helm::HelmProvider},
+        providers_builtin::{helm::HelmProvider, kubernetes::KubernetesProvider},
+        router,
         xpkg::{
             dependency::{DependencyGraph, ResolveError},
             install::install_package,
@@ -400,22 +404,20 @@ fn g9_surface_intact() {
         },
         xr::{bind::bind_claim_to_xr, lifecycle::XrPhase, status::aggregate_ready},
         xrd::{
-            conversion::convert_v1_to_v2,
-            defaulting::apply_defaults,
-            schema_validate::validate_spec,
-            spec::XrdSpec,
+            conversion::convert_v1_to_v2, defaulting::apply_defaults,
+            schema_validate::validate_spec, spec::XrdSpec,
         },
-        CrossplaneState, MODULE_NAME, router,
     };
-    use std::sync::Arc;
     use serde_json::json;
+    use std::sync::Arc;
 
     assert_eq!(MODULE_NAME, "crossplane");
     let state = Arc::new(CrossplaneState::default());
     let _r = router(state.clone());
 
     // pipeline + step roundtrip
-    let step = Step::new("compose", "function-patch-and-transform").with_input(json!({"resources":[]}));
+    let step =
+        Step::new("compose", "function-patch-and-transform").with_input(json!({"resources":[]}));
     assert_eq!(step.step, "compose");
     let _creds: Option<StepCredentials> = None;
     let exec = PipelineExecutor::new();
@@ -447,11 +449,17 @@ fn g9_surface_intact() {
     apply_defaults(&schema_json, &mut spec_v);
     assert_eq!(spec_v["size"], json!(10));
     assert!(validate_spec(&schema_json, &spec_v).is_ok());
-    let _v2 = convert_v1_to_v2(&json!({"apiVersion":"apiextensions.crossplane.io/v1","kind":"CompositeResourceDefinition"}));
+    let _v2 = convert_v1_to_v2(
+        &json!({"apiVersion":"apiextensions.crossplane.io/v1","kind":"CompositeResourceDefinition"}),
+    );
 
     // XR lifecycle + status
     let phase = XrPhase::Creating;
-    assert!(!aggregate_ready(&[json!({"status":{"conditions":[{"type":"Ready","status":"True"}]}})]).is_empty() || phase == XrPhase::Creating);
+    assert!(
+        !aggregate_ready(&[json!({"status":{"conditions":[{"type":"Ready","status":"True"}]}})])
+            .is_empty()
+            || phase == XrPhase::Creating
+    );
 
     // bind
     let claim = json!({"metadata":{"namespace":"ns","name":"c1"}});
@@ -469,11 +477,17 @@ fn g9_surface_intact() {
 
     // function store
     let fs = FunctionStore::new();
-    fs.install("function-auto-ready", "v0.1.0", "xpkg.upbound.io/x/function-auto-ready:v0.1.0").unwrap();
+    fs.install(
+        "function-auto-ready",
+        "v0.1.0",
+        "xpkg.upbound.io/x/function-auto-ready:v0.1.0",
+    )
+    .unwrap();
     assert_eq!(fs.list().len(), 1);
 
     // built-in functions
-    let ar = auto_ready_eval(&[json!({"status":{"conditions":[{"type":"Ready","status":"True"}]}})]);
+    let ar =
+        auto_ready_eval(&[json!({"status":{"conditions":[{"type":"Ready","status":"True"}]}})]);
     assert!(ar);
     let _k = evaluate_kcl("x = 1", &json!({})).unwrap();
     let gt = render_go_template("hello {{ .name }}", &json!({"name":"crossplane"})).unwrap();
@@ -482,7 +496,8 @@ fn g9_surface_intact() {
     assert!(ptfn.is_object() || ptfn.is_null());
 
     // xpkg
-    let bundle = pull_offline("/nonexistent/xpkg").unwrap_or_else(|_| PackageBundle::empty("test-pkg"));
+    let bundle =
+        pull_offline("/nonexistent/xpkg").unwrap_or_else(|_| PackageBundle::empty("test-pkg"));
     assert!(bundle.name.contains("test-pkg") || !bundle.name.is_empty());
     let plan = install_package(&bundle, &state);
     assert!(plan.is_ok());
@@ -505,7 +520,9 @@ fn g9_surface_intact() {
     let c = Condition::new(ConditionType::Ready, ConditionStatus::True);
     assert_eq!(c.condition_type, ConditionType::Ready);
     let xr2 = json!({"status":{"conditions":[]}});
-    let composed = vec![json!({"status":{"conditions":[{"type":"Ready","status":"True"},{"type":"Synced","status":"True"}]}})];
+    let composed = vec![
+        json!({"status":{"conditions":[{"type":"Ready","status":"True"},{"type":"Synced","status":"True"}]}}),
+    ];
     let updated = propagate_composed_to_xr(&xr2, &composed);
     assert!(updated["status"]["conditions"].is_array());
 

@@ -86,7 +86,11 @@ fn gate_3_fill_ratio_is_measured_and_at_least_floor() {
          Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 #[test]
@@ -264,7 +268,14 @@ fn gate_9_all_six_mvp_providers_dispatch_from_registry() {
         },
     ];
     let reg = ProviderRegistry::from_config(configs);
-    for want in ["openai", "anthropic", "ollama", "llamacpp", "mlx", "mistral"] {
+    for want in [
+        "openai",
+        "anthropic",
+        "ollama",
+        "llamacpp",
+        "mlx",
+        "mistral",
+    ] {
         assert!(
             reg.get(want).is_some(),
             "provider `{}` must dispatch from from_config",
@@ -276,12 +287,26 @@ fn gate_9_all_six_mvp_providers_dispatch_from_registry() {
         .into_iter()
         .map(|c| c.provider)
         .collect();
-    for want in ["openai", "anthropic", "ollama", "llamacpp", "mlx", "mistral"] {
+    for want in [
+        "openai",
+        "anthropic",
+        "ollama",
+        "llamacpp",
+        "mlx",
+        "mistral",
+    ] {
         assert!(cats.contains(want), "capability seed missing {}", want);
     }
     // hermes bridge classifies all six.
     use cave_llm_gateway::classify_hermes_provider;
-    for want in ["openai", "anthropic", "ollama", "llamacpp", "mlx", "mistral"] {
+    for want in [
+        "openai",
+        "anthropic",
+        "ollama",
+        "llamacpp",
+        "mlx",
+        "mistral",
+    ] {
         assert!(
             classify_hermes_provider(want).is_some(),
             "hermes bridge can't classify {}",

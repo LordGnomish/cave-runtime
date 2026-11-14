@@ -421,9 +421,15 @@ mod tests {
 
     #[test]
     fn imageref_parses_digest_pin() {
-        let img =
-            ImageRef::parse("api", "ghcr.io/cave/runtime@sha256:deadbeefdeadbeefdeadbeef").unwrap();
-        assert_eq!(img.digest.as_deref(), Some("sha256:deadbeefdeadbeefdeadbeef"));
+        let img = ImageRef::parse(
+            "api",
+            "ghcr.io/cave/runtime@sha256:deadbeefdeadbeefdeadbeef",
+        )
+        .unwrap();
+        assert_eq!(
+            img.digest.as_deref(),
+            Some("sha256:deadbeefdeadbeefdeadbeef")
+        );
         assert_eq!(img.tag, "latest");
     }
 
@@ -437,7 +443,12 @@ mod tests {
         let sel = TagSelector::Semver {
             constraint: "^1.4".into(),
         };
-        let cands = [cand("1.3.9", None, None), cand("1.4.7", None, None), cand("1.5.0", None, None), cand("2.0.0", None, None)];
+        let cands = [
+            cand("1.3.9", None, None),
+            cand("1.4.7", None, None),
+            cand("1.5.0", None, None),
+            cand("2.0.0", None, None),
+        ];
         let picked = sel.select("1.4.0", &cands).unwrap();
         assert_eq!(picked.tag, "1.5.0");
     }
@@ -545,11 +556,7 @@ mod tests {
     fn plan_skips_alias_without_annotation() {
         let app = fixture_app("guestbook", HashMap::new());
         let mut updater = ImageUpdater::new();
-        updater.set_policy(
-            "api",
-            TagSelector::Latest,
-            UpdateStrategy::AnnotationWrite,
-        );
+        updater.set_policy("api", TagSelector::Latest, UpdateStrategy::AnnotationWrite);
         let obs: BTreeMap<String, Vec<TagCandidate>> = BTreeMap::new();
         assert!(updater.plan(&app, &obs).is_empty());
     }
@@ -565,7 +572,10 @@ mod tests {
         });
         let regs: Vec<&RegistryEndpoint> = up.registries().collect();
         assert_eq!(regs.len(), 1);
-        assert_eq!(regs[0].credential_ref.as_deref(), Some("kv/cave/ghcr-token"));
+        assert_eq!(
+            regs[0].credential_ref.as_deref(),
+            Some("kv/cave/ghcr-token")
+        );
     }
 
     #[test]

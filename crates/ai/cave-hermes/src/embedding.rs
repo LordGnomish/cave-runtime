@@ -106,9 +106,14 @@ impl Embedder for TfIdfEmbedder {
             let mut h = Sha256::new();
             h.update(tok.as_bytes());
             let digest = h.finalize();
-            let bucket =
-                (u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]]) as usize) % self.dim;
-            let sign = if (digest[4] & 1) == 0 { 1.0f32 } else { -1.0f32 };
+            let bucket = (u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]])
+                as usize)
+                % self.dim;
+            let sign = if (digest[4] & 1) == 0 {
+                1.0f32
+            } else {
+                -1.0f32
+            };
             v[bucket] += sign * weight;
         }
         let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();

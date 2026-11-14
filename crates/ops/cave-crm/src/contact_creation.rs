@@ -182,26 +182,83 @@ pub fn compute_changed_additional_emails(diff: &PersonDiff) -> ChangedEmails {
 /// `*` prevailing rule and need no enumeration here.
 const PSL_RULES: &[&str] = &[
     // United Kingdom
-    "co.uk", "org.uk", "gov.uk", "ac.uk", "me.uk", "net.uk", "sch.uk", "ltd.uk",
-    "plc.uk", "nhs.uk", "police.uk", "mod.uk",
+    "co.uk",
+    "org.uk",
+    "gov.uk",
+    "ac.uk",
+    "me.uk",
+    "net.uk",
+    "sch.uk",
+    "ltd.uk",
+    "plc.uk",
+    "nhs.uk",
+    "police.uk",
+    "mod.uk",
     // Australia
-    "com.au", "net.au", "org.au", "edu.au", "gov.au", "id.au", "asn.au",
+    "com.au",
+    "net.au",
+    "org.au",
+    "edu.au",
+    "gov.au",
+    "id.au",
+    "asn.au",
     // Japan
-    "co.jp", "ne.jp", "or.jp", "go.jp", "ac.jp", "ad.jp", "ed.jp", "gr.jp", "lg.jp",
+    "co.jp",
+    "ne.jp",
+    "or.jp",
+    "go.jp",
+    "ac.jp",
+    "ad.jp",
+    "ed.jp",
+    "gr.jp",
+    "lg.jp",
     // New Zealand
-    "co.nz", "net.nz", "org.nz", "govt.nz", "ac.nz", "geek.nz", "school.nz",
+    "co.nz",
+    "net.nz",
+    "org.nz",
+    "govt.nz",
+    "ac.nz",
+    "geek.nz",
+    "school.nz",
     // South Africa
-    "co.za", "org.za", "net.za", "gov.za", "web.za",
+    "co.za",
+    "org.za",
+    "net.za",
+    "gov.za",
+    "web.za",
     // Brazil
-    "com.br", "net.br", "org.br", "gov.br", "edu.br",
+    "com.br",
+    "net.br",
+    "org.br",
+    "gov.br",
+    "edu.br",
     // India
-    "co.in", "net.in", "org.in", "gen.in", "firm.in", "ind.in", "gov.in", "ac.in", "edu.in",
+    "co.in",
+    "net.in",
+    "org.in",
+    "gen.in",
+    "firm.in",
+    "ind.in",
+    "gov.in",
+    "ac.in",
+    "edu.in",
     // China
-    "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "ac.cn",
+    "com.cn",
+    "net.cn",
+    "org.cn",
+    "gov.cn",
+    "edu.cn",
+    "ac.cn",
     // South Korea
-    "co.kr", "ne.kr", "or.kr", "re.kr", "go.kr", "ac.kr",
+    "co.kr",
+    "ne.kr",
+    "or.kr",
+    "re.kr",
+    "go.kr",
+    "ac.kr",
     // Wildcard rules (exercise the `*` mechanism — real IANA entries)
-    "*.ck", "*.kawasaki.jp",
+    "*.ck",
+    "*.kawasaki.jp",
 ];
 
 /// Exception rules (IANA `!` entries). The public suffix of a matching
@@ -215,9 +272,10 @@ fn rule_suffix_matches(rule_labels: &[&str], labels: &[&str]) -> bool {
         return false;
     }
     let offset = labels.len() - rule_labels.len();
-    rule_labels.iter().enumerate().all(|(i, r)| {
-        *r == "*" || r.eq_ignore_ascii_case(labels[offset + i])
-    })
+    rule_labels
+        .iter()
+        .enumerate()
+        .all(|(i, r)| *r == "*" || r.eq_ignore_ascii_case(labels[offset + i]))
 }
 
 /// Number of labels in the public suffix of `labels`, per the PSL algorithm:
@@ -264,7 +322,10 @@ fn psl_parse(input: &str) -> Option<ParsedDomain> {
         if label.starts_with('-') || label.ends_with('-') {
             return None;
         }
-        if !label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        if !label
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
             return None;
         }
     }
@@ -273,10 +334,16 @@ fn psl_parse(input: &str) -> Option<ParsedDomain> {
     if n > suffix_len {
         let sld = labels[n - suffix_len - 1].to_string();
         let domain = labels[n - suffix_len - 1..].join(".");
-        Some(ParsedDomain { sld: Some(sld), domain: Some(domain) })
+        Some(ParsedDomain {
+            sld: Some(sld),
+            domain: Some(domain),
+        })
     } else {
         // Input is itself a public suffix → no registrable domain.
-        Some(ParsedDomain { sld: None, domain: None })
+        Some(ParsedDomain {
+            sld: None,
+            domain: None,
+        })
     }
 }
 
@@ -324,7 +391,11 @@ mod tests {
             ("user@not-a-valid-domain", ""),
         ];
         for (input, expected) in cases {
-            assert_eq!(get_domain_name_from_handle(input), expected, "input={input:?}");
+            assert_eq!(
+                get_domain_name_from_handle(input),
+                expected,
+                "input={input:?}"
+            );
         }
     }
 
@@ -340,26 +411,40 @@ mod tests {
             ("not-a-valid-domain", ""),
         ];
         for (input, expected) in cases {
-            assert_eq!(get_company_name_from_domain_name(input), expected, "input={input:?}");
+            assert_eq!(
+                get_company_name_from_domain_name(input),
+                expected,
+                "input={input:?}"
+            );
         }
     }
 
     // ── extractDomainFromLink — regex ^(https?://)?(www\.)? then split('/')[0]
     #[test]
     fn extract_domain_from_link_strips_scheme_www_and_path() {
-        assert_eq!(extract_domain_from_link("https://www.twenty.com/pricing"), "twenty.com");
+        assert_eq!(
+            extract_domain_from_link("https://www.twenty.com/pricing"),
+            "twenty.com"
+        );
         assert_eq!(extract_domain_from_link("http://twenty.com"), "twenty.com");
         assert_eq!(extract_domain_from_link("twenty.com"), "twenty.com");
-        assert_eq!(extract_domain_from_link("https://app.twenty.dev/foo/bar"), "app.twenty.dev");
+        assert_eq!(
+            extract_domain_from_link("https://app.twenty.dev/foo/bar"),
+            "app.twenty.dev"
+        );
         // www. and scheme matched case-insensitively; rest of host preserved.
-        assert_eq!(extract_domain_from_link("HTTPS://WWW.Example.COM/x"), "Example.COM");
+        assert_eq!(
+            extract_domain_from_link("HTTPS://WWW.Example.COM/x"),
+            "Example.COM"
+        );
         assert_eq!(extract_domain_from_link("www.twenty.com"), "twenty.com");
     }
 
     // ── getFirstNameAndLastNameFromHandleAndDisplayName ──────────────────
     #[test]
     fn first_last_from_display_name_wins() {
-        let n = get_first_name_and_last_name_from_handle_and_display_name("john.doe@x.com", "John Doe");
+        let n =
+            get_first_name_and_last_name_from_handle_and_display_name("john.doe@x.com", "John Doe");
         assert_eq!(n.first_name, "John");
         assert_eq!(n.last_name, "Doe");
     }
@@ -390,7 +475,10 @@ mod tests {
     fn has_primary_email_changed_vectors() {
         // (before_primary, after_primary, before_present, after_present, emails_present, expected)
         let none_diff = PersonDiff { emails: None };
-        assert!(!has_primary_email_changed(&none_diff), "emails diff undefined");
+        assert!(
+            !has_primary_email_changed(&none_diff),
+            "emails diff undefined"
+        );
 
         let mk = |before: Option<EmailsValue>, after: Option<EmailsValue>| PersonDiff {
             emails: Some(EmailsFieldDiff { before, after }),
@@ -403,8 +491,14 @@ mod tests {
         )));
         // unchanged primary, different additional
         assert!(!has_primary_email_changed(&mk(
-            Some(ev(Some("same@example.com"), Some(vec!["additional@example.com"]))),
-            Some(ev(Some("same@example.com"), Some(vec!["different@example.com"]))),
+            Some(ev(
+                Some("same@example.com"),
+                Some(vec!["additional@example.com"])
+            )),
+            Some(ev(
+                Some("same@example.com"),
+                Some(vec!["different@example.com"])
+            )),
         )));
         // null -> value
         assert!(has_primary_email_changed(&mk(
@@ -464,25 +558,43 @@ mod tests {
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 
         let r = compute_changed_additional_emails(&mk(
-            Some(ev(Some("primary@example.com"), Some(vec!["old1@example.com", "common@example.com"]))),
-            Some(ev(Some("primary@example.com"), Some(vec!["new1@example.com", "common@example.com"]))),
+            Some(ev(
+                Some("primary@example.com"),
+                Some(vec!["old1@example.com", "common@example.com"]),
+            )),
+            Some(ev(
+                Some("primary@example.com"),
+                Some(vec!["new1@example.com", "common@example.com"]),
+            )),
         ));
         assert_eq!(r.added_additional_emails, s(&["new1@example.com"]));
         assert_eq!(r.removed_additional_emails, s(&["old1@example.com"]));
 
         let r = compute_changed_additional_emails(&mk(
             Some(ev(Some("p@e.com"), Some(vec![]))),
-            Some(ev(Some("p@e.com"), Some(vec!["new1@example.com", "new2@example.com"]))),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec!["new1@example.com", "new2@example.com"]),
+            )),
         ));
-        assert_eq!(r.added_additional_emails, s(&["new1@example.com", "new2@example.com"]));
+        assert_eq!(
+            r.added_additional_emails,
+            s(&["new1@example.com", "new2@example.com"])
+        );
         assert!(r.removed_additional_emails.is_empty());
 
         let r = compute_changed_additional_emails(&mk(
-            Some(ev(Some("p@e.com"), Some(vec!["old1@example.com", "old2@example.com"]))),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec!["old1@example.com", "old2@example.com"]),
+            )),
             Some(ev(Some("p@e.com"), Some(vec![]))),
         ));
         assert!(r.added_additional_emails.is_empty());
-        assert_eq!(r.removed_additional_emails, s(&["old1@example.com", "old2@example.com"]));
+        assert_eq!(
+            r.removed_additional_emails,
+            s(&["old1@example.com", "old2@example.com"])
+        );
 
         // both empty
         let r = compute_changed_additional_emails(&mk(
@@ -493,8 +605,14 @@ mod tests {
 
         // same emails
         let r = compute_changed_additional_emails(&mk(
-            Some(ev(Some("p@e.com"), Some(vec!["email1@example.com", "email2@example.com"]))),
-            Some(ev(Some("p@e.com"), Some(vec!["email1@example.com", "email2@example.com"]))),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec!["email1@example.com", "email2@example.com"]),
+            )),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec!["email1@example.com", "email2@example.com"]),
+            )),
         ));
         assert!(r.added_additional_emails.is_empty() && r.removed_additional_emails.is_empty());
 
@@ -525,11 +643,33 @@ mod tests {
 
         // complex multi add/remove, order preserved
         let r = compute_changed_additional_emails(&mk(
-            Some(ev(Some("p@e.com"), Some(vec!["keep1@example.com", "remove1@example.com", "keep2@example.com", "remove2@example.com"]))),
-            Some(ev(Some("p@e.com"), Some(vec!["keep1@example.com", "add1@example.com", "keep2@example.com", "add2@example.com"]))),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec![
+                    "keep1@example.com",
+                    "remove1@example.com",
+                    "keep2@example.com",
+                    "remove2@example.com",
+                ]),
+            )),
+            Some(ev(
+                Some("p@e.com"),
+                Some(vec![
+                    "keep1@example.com",
+                    "add1@example.com",
+                    "keep2@example.com",
+                    "add2@example.com",
+                ]),
+            )),
         ));
-        assert_eq!(r.added_additional_emails, s(&["add1@example.com", "add2@example.com"]));
-        assert_eq!(r.removed_additional_emails, s(&["remove1@example.com", "remove2@example.com"]));
+        assert_eq!(
+            r.added_additional_emails,
+            s(&["add1@example.com", "add2@example.com"])
+        );
+        assert_eq!(
+            r.removed_additional_emails,
+            s(&["remove1@example.com", "remove2@example.com"])
+        );
 
         // case-insensitive
         let r = compute_changed_additional_emails(&mk(

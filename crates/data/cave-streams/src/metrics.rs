@@ -41,7 +41,9 @@ pub fn render_prometheus(state: &StreamsState) -> String {
 
     out.push_str("# HELP cave_streams_kafka_consumer_groups Number of Kafka consumer groups.\n");
     out.push_str("# TYPE cave_streams_kafka_consumer_groups gauge\n");
-    out.push_str(&format!("cave_streams_kafka_consumer_groups {kafka_groups}\n"));
+    out.push_str(&format!(
+        "cave_streams_kafka_consumer_groups {kafka_groups}\n"
+    ));
 
     out.push_str("# HELP cave_streams_pulsar_tenants Number of Pulsar tenants.\n");
     out.push_str("# TYPE cave_streams_pulsar_tenants gauge\n");
@@ -83,10 +85,7 @@ mod tests {
     fn preview_counters_increment() {
         let before = PULSAR_TXN_PREVIEW_TOTAL.load(Ordering::Relaxed);
         inc_txn_preview();
-        assert_eq!(
-            PULSAR_TXN_PREVIEW_TOTAL.load(Ordering::Relaxed),
-            before + 1
-        );
+        assert_eq!(PULSAR_TXN_PREVIEW_TOTAL.load(Ordering::Relaxed), before + 1);
         let sb = SHARE_GROUP_PREVIEW_TOTAL.load(Ordering::Relaxed);
         inc_share_preview();
         assert_eq!(SHARE_GROUP_PREVIEW_TOTAL.load(Ordering::Relaxed), sb + 1);

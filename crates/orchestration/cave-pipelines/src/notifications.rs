@@ -101,11 +101,16 @@ pub async fn send_notification(
             for (k, v) in headers {
                 req = req.header(k.as_str(), v.as_str());
             }
-            req.send().await.map_err(|e| NotificationError::Http(e.to_string()))?;
+            req.send()
+                .await
+                .map_err(|e| NotificationError::Http(e.to_string()))?;
             Ok(())
         }
 
-        NotificationConfig::Slack { webhook_url, channel } => {
+        NotificationConfig::Slack {
+            webhook_url,
+            channel,
+        } => {
             info!(channel = ?channel, "sending Slack notification");
             let emoji = match event.status {
                 RunPhase::Succeeded => ":white_check_mark:",
@@ -122,7 +127,11 @@ pub async fn send_notification(
             let text = format!(
                 "{emoji} Pipeline *{}* {verb}{}",
                 event.pipeline_name,
-                event.message.as_deref().map(|m| format!(": {m}")).unwrap_or_default(),
+                event
+                    .message
+                    .as_deref()
+                    .map(|m| format!(": {m}"))
+                    .unwrap_or_default(),
             );
             let mut payload = serde_json::json!({ "text": text });
             if let Some(ch) = channel {
@@ -137,7 +146,12 @@ pub async fn send_notification(
             Ok(())
         }
 
-        NotificationConfig::Email { smtp_host, to, from, .. } => {
+        NotificationConfig::Email {
+            smtp_host,
+            to,
+            from,
+            ..
+        } => {
             // Full SMTP integration omitted (would use lettre or similar).
             // Log intent and succeed.
             info!(smtp_host = %smtp_host, to = ?to, from = %from, "email notification (SMTP not wired)");
@@ -180,7 +194,10 @@ mod tests {
             RunPhase::Cancelled,
             RunPhase::Skipped,
         ] {
-            assert!(NotifyOn::Always.matches(&status), "Always should match {status:?}");
+            assert!(
+                NotifyOn::Always.matches(&status),
+                "Always should match {status:?}"
+            );
         }
     }
 

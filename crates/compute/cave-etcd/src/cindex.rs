@@ -153,10 +153,7 @@ mod tests {
     #[test]
     fn set_refuses_regression() {
         let c = ConsistentIndex::new();
-        c.set(ConsistentEntry {
-            index: 10,
-            term: 2,
-        });
+        c.set(ConsistentEntry { index: 10, term: 2 });
         let r = c.set(ConsistentEntry { index: 5, term: 3 });
         // Stays at 10/2; the regressing attempt is rejected.
         assert_eq!(r.index, 10);
@@ -186,10 +183,7 @@ mod tests {
     #[test]
     fn restore_does_not_flush() {
         let c = ConsistentIndex::new();
-        c.restore(ConsistentEntry {
-            index: 42,
-            term: 7,
-        });
+        c.restore(ConsistentEntry { index: 42, term: 7 });
         assert_eq!(c.load(), ConsistentEntry { index: 42, term: 7 });
     }
 

@@ -136,7 +136,10 @@ pub fn alert_rules_yaml() -> String {
         out.push_str(&format!("      - alert: {}\n", r.name));
         out.push_str(&format!("        expr: {}\n", r.expr));
         out.push_str(&format!("        for: {}\n", r.r#for));
-        out.push_str(&format!("        labels:\n          severity: {}\n", r.severity));
+        out.push_str(&format!(
+            "        labels:\n          severity: {}\n",
+            r.severity
+        ));
         out.push_str(&format!(
             "        annotations:\n          description: \"{}\"\n",
             r.description
@@ -190,7 +193,11 @@ mod tests {
         .into_iter()
         .collect();
         for p in dashboard_panels() {
-            assert!(known.contains(p.metric.as_str()), "unknown metric: {}", p.metric);
+            assert!(
+                known.contains(p.metric.as_str()),
+                "unknown metric: {}",
+                p.metric
+            );
         }
     }
 

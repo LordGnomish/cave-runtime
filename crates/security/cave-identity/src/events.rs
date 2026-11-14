@@ -77,7 +77,10 @@ struct EventBufInner {
 impl EntryEventBuffer {
     pub fn new(capacity: usize) -> Arc<Self> {
         Arc::new(Self {
-            inner: Mutex::new(EventBufInner { next_rev: 1, events: VecDeque::with_capacity(capacity) }),
+            inner: Mutex::new(EventBufInner {
+                next_rev: 1,
+                events: VecDeque::with_capacity(capacity),
+            }),
             capacity,
         })
     }
@@ -142,15 +145,26 @@ impl EntryEventBuffer {
     /// itself if no events).
     pub fn poll_since(&self, since: u64) -> (Vec<EntryEvent>, u64) {
         let g = self.inner.lock().unwrap();
-        let mut out: Vec<EntryEvent> = g.events.iter().filter(|e| e.revision > since).cloned().collect();
+        let mut out: Vec<EntryEvent> = g
+            .events
+            .iter()
+            .filter(|e| e.revision > since)
+            .cloned()
+            .collect();
         out.sort_by_key(|e| e.revision);
         let cursor = out.last().map(|e| e.revision).unwrap_or(since);
         (out, cursor)
     }
 
-    pub fn len(&self) -> usize { self.inner.lock().unwrap().events.len() }
-    pub fn is_empty(&self) -> bool { self.inner.lock().unwrap().events.is_empty() }
-    pub fn next_revision(&self) -> u64 { self.inner.lock().unwrap().next_rev }
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().events.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.inner.lock().unwrap().events.is_empty()
+    }
+    pub fn next_revision(&self) -> u64 {
+        self.inner.lock().unwrap().next_rev
+    }
 }
 
 /// Agent fingerprint rebind record. Emitted when an agent renews its
@@ -175,12 +189,14 @@ impl AgentRebind {
         let entry_td = trust_domain_of(&self.entry_spiffe_id);
         if old_td != new_td {
             return Err(IdentityError::Internal(format!(
-                "rebind across trust-domains rejected: old='{}' new='{}'", old_td, new_td
+                "rebind across trust-domains rejected: old='{}' new='{}'",
+                old_td, new_td
             )));
         }
         if entry_td != new_td {
             return Err(IdentityError::Internal(format!(
-                "rebind would orphan entry across trust-domain: entry='{}' parent='{}'", entry_td, new_td
+                "rebind would orphan entry across trust-domain: entry='{}' parent='{}'",
+                entry_td, new_td
             )));
         }
         if self.trust_domain != new_td {
@@ -331,7 +347,10 @@ mod tests {
 
     #[test]
     fn trust_domain_extractor_returns_authority() {
-        assert_eq!(trust_domain_of("spiffe://example.org/path/here"), "example.org");
+        assert_eq!(
+            trust_domain_of("spiffe://example.org/path/here"),
+            "example.org"
+        );
         assert_eq!(trust_domain_of("not-a-spiffe-id"), "");
     }
 

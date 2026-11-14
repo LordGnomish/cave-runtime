@@ -74,7 +74,11 @@ pub fn storage_version<'a>(versions: &'a [Value]) -> Option<&'a Value> {
     versions
         .iter()
         .find(|v| v.get("referenceable").and_then(|x| x.as_bool()) == Some(true))
-        .or_else(|| versions.iter().find(|v| v.get("served").and_then(|x| x.as_bool()) == Some(true)))
+        .or_else(|| {
+            versions
+                .iter()
+                .find(|v| v.get("served").and_then(|x| x.as_bool()) == Some(true))
+        })
 }
 
 #[cfg(test)]
@@ -86,17 +90,17 @@ mod tests {
     fn v1_to_v2_sets_apiversion() {
         let v1 = json!({"apiVersion":"apiextensions.crossplane.io/v1","spec":{}});
         let v2 = convert_v1_to_v2(&v1);
-        assert_eq!(
-            v2["apiVersion"],
-            json!("apiextensions.crossplane.io/v2")
-        );
+        assert_eq!(v2["apiVersion"], json!("apiextensions.crossplane.io/v2"));
     }
 
     #[test]
     fn v1_to_v2_inserts_default_delete_policy() {
         let v1 = json!({"apiVersion":"apiextensions.crossplane.io/v1","spec":{}});
         let v2 = convert_v1_to_v2(&v1);
-        assert_eq!(v2["spec"]["defaultCompositeDeletePolicy"], json!("Background"));
+        assert_eq!(
+            v2["spec"]["defaultCompositeDeletePolicy"],
+            json!("Background")
+        );
     }
 
     #[test]
@@ -130,10 +134,7 @@ mod tests {
             json!({"name":"v1","referenceable":true,"served":true}),
             json!({"name":"v2","referenceable":false,"served":true}),
         ];
-        assert_eq!(
-            storage_version(&vs).unwrap()["name"],
-            json!("v1")
-        );
+        assert_eq!(storage_version(&vs).unwrap()["name"], json!("v1"));
     }
 
     #[test]
@@ -149,6 +150,9 @@ mod tests {
     fn preserves_already_set_policy() {
         let v1 = json!({"apiVersion":"x/v1","spec":{"defaultCompositeDeletePolicy":"Foreground"}});
         let v2 = convert_v1_to_v2(&v1);
-        assert_eq!(v2["spec"]["defaultCompositeDeletePolicy"], json!("Foreground"));
+        assert_eq!(
+            v2["spec"]["defaultCompositeDeletePolicy"],
+            json!("Foreground")
+        );
     }
 }

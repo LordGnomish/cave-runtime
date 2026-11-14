@@ -120,7 +120,10 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
 /// live Kafka/Pulsar gauges plus the streaming-ray-2 preview counters.
 async fn metrics(State((s, _)): State<AppState>) -> impl IntoResponse {
     (
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
         crate::metrics::render_prometheus(&s),
     )
 }

@@ -57,8 +57,8 @@ fn gate_2_source_sha_pinned() {
 #[test]
 fn gate_3_honest_ratio_declared() {
     let m = read_manifest();
-    let ratio = extract_float(&m, "honest_ratio")
-        .expect("manifest must declare honest_ratio in [parity]");
+    let ratio =
+        extract_float(&m, "honest_ratio").expect("manifest must declare honest_ratio in [parity]");
     assert!(
         ratio > 0.0 && ratio <= 1.0,
         "honest_ratio = {} is out of range (0, 1]",
@@ -101,8 +101,7 @@ fn gate_5_no_stub_macros_in_src() {
 #[test]
 fn gate_6_fill_ratio_at_least_one() {
     let m = read_manifest();
-    let ratio =
-        extract_float(&m, "fill_ratio").expect("manifest must declare fill_ratio = 1.0");
+    let ratio = extract_float(&m, "fill_ratio").expect("manifest must declare fill_ratio = 1.0");
     assert!(
         ratio >= 0.90,
         "fill_ratio = {} (need >= 0.90 for gate 6)",

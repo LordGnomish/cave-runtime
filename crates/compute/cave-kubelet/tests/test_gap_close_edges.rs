@@ -5,9 +5,7 @@
 
 use cave_kubelet::agent::{assign_pod, node_status, remove_pod, start_pod, stop_pod, KubeletState};
 use cave_kubelet::models::{ContainerState, NodeStatusReport, PodPhase};
-use cave_kubelet::node_lease::{
-    ConditionStatus, LeaseError, NodeConditionTracker, NodeLease,
-};
+use cave_kubelet::node_lease::{ConditionStatus, LeaseError, NodeConditionTracker, NodeLease};
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
@@ -18,7 +16,10 @@ fn assign_pod_creates_with_pending_phase() {
     assert_eq!(pod.status, PodPhase::Pending);
     assert!(pod.started_at.is_none());
     assert_eq!(pod.containers.len(), 1);
-    assert!(matches!(pod.containers[0].state, ContainerState::Waiting { .. }));
+    assert!(matches!(
+        pod.containers[0].state,
+        ContainerState::Waiting { .. }
+    ));
 }
 
 #[test]
@@ -66,7 +67,10 @@ fn remove_pod_returns_removed_or_none() {
     let p = assign_pod(&s, "p", "ns", vec![]);
     let removed = remove_pod(&s, &p.uid).unwrap();
     assert_eq!(removed.name, "p");
-    assert!(remove_pod(&s, &p.uid).is_none(), "double-remove yields None");
+    assert!(
+        remove_pod(&s, &p.uid).is_none(),
+        "double-remove yields None"
+    );
 }
 
 #[test]
@@ -101,11 +105,26 @@ fn node_status_healthy_template_defaults_capacity() {
 
 #[test]
 fn pod_phase_serializes_as_string_variants() {
-    assert_eq!(serde_json::to_string(&PodPhase::Pending).unwrap(), "\"Pending\"");
-    assert_eq!(serde_json::to_string(&PodPhase::Running).unwrap(), "\"Running\"");
-    assert_eq!(serde_json::to_string(&PodPhase::Succeeded).unwrap(), "\"Succeeded\"");
-    assert_eq!(serde_json::to_string(&PodPhase::Failed).unwrap(), "\"Failed\"");
-    assert_eq!(serde_json::to_string(&PodPhase::Unknown).unwrap(), "\"Unknown\"");
+    assert_eq!(
+        serde_json::to_string(&PodPhase::Pending).unwrap(),
+        "\"Pending\""
+    );
+    assert_eq!(
+        serde_json::to_string(&PodPhase::Running).unwrap(),
+        "\"Running\""
+    );
+    assert_eq!(
+        serde_json::to_string(&PodPhase::Succeeded).unwrap(),
+        "\"Succeeded\""
+    );
+    assert_eq!(
+        serde_json::to_string(&PodPhase::Failed).unwrap(),
+        "\"Failed\""
+    );
+    assert_eq!(
+        serde_json::to_string(&PodPhase::Unknown).unwrap(),
+        "\"Unknown\""
+    );
 }
 
 #[test]
@@ -113,8 +132,16 @@ fn container_state_variants_distinguish_via_equality() {
     let now = Utc::now();
     let w = ContainerState::Waiting { reason: "x".into() };
     let r = ContainerState::Running { started_at: now };
-    let t_a = ContainerState::Terminated { exit_code: 1, reason: "OOM".into(), finished_at: now };
-    let t_b = ContainerState::Terminated { exit_code: 137, reason: "OOM".into(), finished_at: now };
+    let t_a = ContainerState::Terminated {
+        exit_code: 1,
+        reason: "OOM".into(),
+        finished_at: now,
+    };
+    let t_b = ContainerState::Terminated {
+        exit_code: 137,
+        reason: "OOM".into(),
+        finished_at: now,
+    };
     assert_ne!(w, r);
     assert_ne!(r, t_a);
     assert_ne!(t_a, t_b, "different exit_code → not equal");
@@ -171,7 +198,10 @@ fn lease_renew_after_expiry_errors() {
 fn lease_is_valid_at_exact_expiry_boundary() {
     let now = Utc::now();
     let l = NodeLease::new("a", "t", 10, now);
-    assert!(l.is_valid(now + Duration::seconds(10)), "boundary inclusive");
+    assert!(
+        l.is_valid(now + Duration::seconds(10)),
+        "boundary inclusive"
+    );
     assert!(!l.is_valid(now + Duration::seconds(11)));
 }
 
@@ -193,7 +223,13 @@ fn condition_set_same_status_returns_false() {
     let mut t = NodeConditionTracker::default();
     let now = Utc::now();
     t.set("Ready", ConditionStatus::True, "Ok", "", now);
-    let again = t.set("Ready", ConditionStatus::True, "still", "", now + Duration::seconds(1));
+    let again = t.set(
+        "Ready",
+        ConditionStatus::True,
+        "still",
+        "",
+        now + Duration::seconds(1),
+    );
     assert!(!again, "no transition when status unchanged");
 }
 
@@ -215,7 +251,13 @@ fn condition_lost_heartbeat_lists_stale_conditions() {
     let mut t = NodeConditionTracker::default();
     let t0 = Utc::now();
     t.set("Ready", ConditionStatus::True, "", "", t0);
-    t.set("DiskPressure", ConditionStatus::False, "", "", t0 + Duration::seconds(60));
+    t.set(
+        "DiskPressure",
+        ConditionStatus::False,
+        "",
+        "",
+        t0 + Duration::seconds(60),
+    );
     let threshold = t0 + Duration::seconds(30);
     let stale = t.lost_heartbeat_since(threshold);
     assert_eq!(stale, vec!["Ready".to_string()]);

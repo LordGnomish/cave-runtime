@@ -10,16 +10,21 @@
 //!   * end-to-end document CRUD through the pluggable StorageBackend, and SQL
 //!     emission through the SqlBackend executor boundary.
 
-use cave_docdb::backend::{ExecOutcome, MemoryBackend, RecordingExecutor, SqlBackend, StorageBackend};
+use cave_docdb::backend::{
+    ExecOutcome, MemoryBackend, RecordingExecutor, SqlBackend, StorageBackend,
+};
 use cave_docdb::bson::{self, Document};
 use cave_docdb::gridfs::GridFs;
 use cave_docdb::oplog::{OpLog, OpType};
 use cave_docdb::sql;
-use cave_docdb::wire::{self, LegacyOp, OpMsg, OP_INSERT};
-use serde_json::{json, Value};
+use cave_docdb::wire::{self, LegacyOp, OP_INSERT, OpMsg};
+use serde_json::{Value, json};
 
 fn doc(pairs: &[(&str, Value)]) -> Document {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
 }
 
 /// A modern OP_MSG `insert` command survives an encode→decode roundtrip with
@@ -98,7 +103,13 @@ fn gridfs_chunked_upload_download_roundtrip() {
     fs.chunk_size = Some(4); // force several chunks
     let payload: Vec<u8> = (0u8..=200).collect();
 
-    let file = fs.upload("blob.bin", &payload, Some("application/octet-stream".into())).unwrap();
+    let file = fs
+        .upload(
+            "blob.bin",
+            &payload,
+            Some("application/octet-stream".into()),
+        )
+        .unwrap();
     assert_eq!(file.length, payload.len() as u64);
     assert_eq!(file.chunk_size, 4);
 
@@ -114,16 +125,22 @@ fn gridfs_chunked_upload_download_roundtrip() {
 async fn memory_backend_full_crud() {
     let be = MemoryBackend::new();
     for i in 0..5 {
-        be.insert("c", json!({"_id": i.to_string(), "v": i})).await.unwrap();
+        be.insert("c", json!({"_id": i.to_string(), "v": i}))
+            .await
+            .unwrap();
     }
     assert_eq!(be.count("c", &json!({})).await.unwrap(), 5);
 
     let big = be.find("c", &json!({"v": {"$gte": 3}})).await.unwrap();
     assert_eq!(big.len(), 2);
 
-    be.update("c", &json!({"v": {"$gte": 3}}), &json!({"$set": {"tag": "hi"}}))
-        .await
-        .unwrap();
+    be.update(
+        "c",
+        &json!({"v": {"$gte": 3}}),
+        &json!({"$set": {"tag": "hi"}}),
+    )
+    .await
+    .unwrap();
     let tagged = be.find("c", &json!({"tag": "hi"})).await.unwrap();
     assert_eq!(tagged.len(), 2);
 
@@ -158,13 +175,33 @@ async fn oplog_replication_end_to_end() {
     let primary = MemoryBackend::new();
     let log = OpLog::new();
 
-    primary.insert("c", json!({"_id": "1", "n": 1})).await.unwrap();
-    log.append(OpType::Insert, "test.c", json!({"_id": "1", "n": 1}), None, 1);
-    primary.update("c", &json!({"_id": "1"}), &json!({"$set": {"n": 42}})).await.unwrap();
-    log.append(OpType::Update, "test.c", json!({"$set": {"n": 42}}), Some(json!({"_id": "1"})), 2);
+    primary
+        .insert("c", json!({"_id": "1", "n": 1}))
+        .await
+        .unwrap();
+    log.append(
+        OpType::Insert,
+        "test.c",
+        json!({"_id": "1", "n": 1}),
+        None,
+        1,
+    );
+    primary
+        .update("c", &json!({"_id": "1"}), &json!({"$set": {"n": 42}}))
+        .await
+        .unwrap();
+    log.append(
+        OpType::Update,
+        "test.c",
+        json!({"$set": {"n": 42}}),
+        Some(json!({"_id": "1"})),
+        2,
+    );
 
     let secondary = MemoryBackend::new();
-    let n = cave_docdb::oplog::replicate(&secondary, &log.tail(None)).await.unwrap();
+    let n = cave_docdb::oplog::replicate(&secondary, &log.tail(None))
+        .await
+        .unwrap();
     assert_eq!(n, 2);
     let docs = secondary.find("c", &json!({})).await.unwrap();
     assert_eq!(docs.len(), 1);

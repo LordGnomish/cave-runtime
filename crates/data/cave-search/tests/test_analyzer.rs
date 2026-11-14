@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for the text analyzer: tokenize, stop-word filter, stemmer, normalize.
 
-use cave_search::analyzer::{normalize_token, tokenize, filter_stop_words, stem};
+use cave_search::analyzer::{filter_stop_words, normalize_token, stem, tokenize};
 use cave_search::tenant::TenantId;
 use std::str::FromStr;
 
@@ -32,9 +32,21 @@ fn tokenize_splits_on_whitespace() {
 #[test]
 fn tokenize_splits_on_punctuation() {
     let tokens = tokenize("Hello, world! This is a test.", &tenant());
-    assert!(tokens.contains(&"hello".to_string()), "expected 'hello' in {:?}", tokens);
-    assert!(tokens.contains(&"world".to_string()), "expected 'world' in {:?}", tokens);
-    assert!(tokens.contains(&"test".to_string()), "expected 'test' in {:?}", tokens);
+    assert!(
+        tokens.contains(&"hello".to_string()),
+        "expected 'hello' in {:?}",
+        tokens
+    );
+    assert!(
+        tokens.contains(&"world".to_string()),
+        "expected 'world' in {:?}",
+        tokens
+    );
+    assert!(
+        tokens.contains(&"test".to_string()),
+        "expected 'test' in {:?}",
+        tokens
+    );
 }
 
 #[test]
@@ -79,7 +91,11 @@ fn filter_stop_words_preserves_non_stop_words() {
 fn stem_removes_ing_suffix() {
     let s = stem("running");
     assert!(!s.is_empty(), "stem must return non-empty for 'running'");
-    assert!(!s.ends_with("ing"), "stem('running') should not end with 'ing'; got '{}'", s);
+    assert!(
+        !s.ends_with("ing"),
+        "stem('running') should not end with 'ing'; got '{}'",
+        s
+    );
 }
 
 #[test]

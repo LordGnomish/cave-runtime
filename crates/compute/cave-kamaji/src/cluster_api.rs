@@ -91,7 +91,10 @@ pub fn parse_control_plane_endpoint(s: &str) -> ControlPlaneEndpoint {
 }
 
 /// Build a CAPI-shaped status block for one Kamaji TenantControlPlane.
-pub fn build_capi_status(tcp: &TenantControlPlane, infra: Option<InfrastructureRef>) -> CapiTenantStatus {
+pub fn build_capi_status(
+    tcp: &TenantControlPlane,
+    infra: Option<InfrastructureRef>,
+) -> CapiTenantStatus {
     let ep = tcp
         .status
         .api_server_endpoint
@@ -197,7 +200,10 @@ mod tests {
         assert_eq!(s.ready_replicas, 3);
         assert_eq!(s.replicas, 3);
         assert_eq!(s.unavailable_replicas, 0);
-        assert_eq!(s.bootstrap.data_secret_name.as_deref(), Some("demo-kubeconfig"));
+        assert_eq!(
+            s.bootstrap.data_secret_name.as_deref(),
+            Some("demo-kubeconfig")
+        );
         assert!(is_capi_ready(&s));
     }
 
@@ -219,8 +225,14 @@ mod tests {
         let s = build_capi_status(&tcp, None);
         assert!(!s.bootstrap.ready);
         assert!(s.bootstrap.initialized);
-        assert_eq!(s.bootstrap.failure_reason.as_deref(), Some("ControlPlaneFailed"));
-        assert_eq!(s.bootstrap.failure_message.as_deref(), Some("etcd unhealthy"));
+        assert_eq!(
+            s.bootstrap.failure_reason.as_deref(),
+            Some("ControlPlaneFailed")
+        );
+        assert_eq!(
+            s.bootstrap.failure_message.as_deref(),
+            Some("etcd unhealthy")
+        );
         assert!(!is_capi_ready(&s));
     }
 

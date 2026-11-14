@@ -38,7 +38,11 @@ pub struct ChartDependency {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     /// `import-values` — Helm 3 child→parent value pass-through.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", rename = "import-values")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        rename = "import-values"
+    )]
     pub import_values: Vec<String>,
 }
 
@@ -79,12 +83,16 @@ pub fn parse_chart_lock(body: &str) -> Result<ChartLock> {
 /// every declared dep must appear in the lock and its concrete version
 /// must satisfy the declared range.
 pub fn validate_lock(deps: &[ChartDependency], lock: &ChartLock) -> Result<()> {
-    let lock_by_name: BTreeMap<&str, &ChartLockEntry> =
-        lock.dependencies.iter().map(|e| (e.name.as_str(), e)).collect();
+    let lock_by_name: BTreeMap<&str, &ChartLockEntry> = lock
+        .dependencies
+        .iter()
+        .map(|e| (e.name.as_str(), e))
+        .collect();
     for d in deps {
         let Some(entry) = lock_by_name.get(d.name.as_str()) else {
             return Err(DeployError::Internal(format!(
-                "Chart.lock missing dependency '{}' declared in Chart.yaml", d.name
+                "Chart.lock missing dependency '{}' declared in Chart.yaml",
+                d.name
             )));
         };
         if !version_satisfies(&entry.version, &d.version) {
@@ -150,7 +158,8 @@ pub fn topo_resolve_order(adjacency: &BTreeMap<String, Vec<String>>) -> Result<V
     if out.len() != all_nodes.len() {
         return Err(DeployError::Internal(format!(
             "Chart.yaml dependencies form a cycle: emitted {} of {} nodes",
-            out.len(), all_nodes.len()
+            out.len(),
+            all_nodes.len()
         )));
     }
     Ok(out)
@@ -161,7 +170,9 @@ pub fn topo_resolve_order(adjacency: &BTreeMap<String, Vec<String>>) -> Result<V
 pub fn group_by_repository(deps: &[ChartDependency]) -> BTreeMap<String, Vec<String>> {
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for d in deps {
-        out.entry(d.repository.clone()).or_default().push(d.name.clone());
+        out.entry(d.repository.clone())
+            .or_default()
+            .push(d.name.clone());
     }
     out
 }
@@ -213,18 +224,25 @@ fn parse_triple(s: &str) -> Option<Triple> {
 }
 
 pub fn version_satisfies(version: &str, range: &str) -> bool {
-    let Some(v) = parse_triple(version) else { return false };
+    let Some(v) = parse_triple(version) else {
+        return false;
+    };
     let range = range.trim();
-    if range.is_empty() { return true; }
-    range.split(',').map(str::trim).filter(|s| !s.is_empty()).all(|clause| {
-        single_clause_match(v, clause)
-    })
+    if range.is_empty() {
+        return true;
+    }
+    range
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .all(|clause| single_clause_match(v, clause))
 }
 
 fn single_clause_match(v: Triple, clause: &str) -> bool {
     let clause = clause.trim();
     // Wildcard `x` / `*` forms — depth-aware (1.x = major-only, 1.2.x = major+minor).
-    if let Some(stripped) = clause.strip_suffix(".x")
+    if let Some(stripped) = clause
+        .strip_suffix(".x")
         .or_else(|| clause.strip_suffix(".*"))
     {
         let dots = stripped.chars().filter(|c| *c == '.').count();
@@ -236,13 +254,19 @@ fn single_clause_match(v: Triple, clause: &str) -> bool {
             };
         }
     }
-    if clause == "*" || clause == "x" { return true; }
+    if clause == "*" || clause == "x" {
+        return true;
+    }
     if let Some(rest) = clause.strip_prefix('^') {
-        let Some(t) = parse_triple(rest) else { return false };
+        let Some(t) = parse_triple(rest) else {
+            return false;
+        };
         return v >= t && v.0 == t.0;
     }
     if let Some(rest) = clause.strip_prefix('~') {
-        let Some(t) = parse_triple(rest) else { return false };
+        let Some(t) = parse_triple(rest) else {
+            return false;
+        };
         return v >= t && v.0 == t.0 && v.1 == t.1;
     }
     if let Some(rest) = clause.strip_prefix(">=") {
@@ -308,7 +332,11 @@ dependencies:
     #[test]
     fn parse_chart_lock_round_trip() {
         let l = ChartLock {
-            dependencies: vec![ChartLockEntry { name: "postgres".into(), version: "15.4.2".into(), repository: "https://r".into() }],
+            dependencies: vec![ChartLockEntry {
+                name: "postgres".into(),
+                version: "15.4.2".into(),
+                repository: "https://r".into(),
+            }],
             digest: "sha256:abc".into(),
             generated: "2026-05-24T00:00:00Z".into(),
         };
@@ -320,7 +348,11 @@ dependencies:
     #[test]
     fn validate_lock_missing_dep_errors() {
         let deps = vec![dep("postgres", "^15", "https://r")];
-        let lock = ChartLock { dependencies: vec![], digest: "x".into(), generated: "".into() };
+        let lock = ChartLock {
+            dependencies: vec![],
+            digest: "x".into(),
+            generated: "".into(),
+        };
         assert!(validate_lock(&deps, &lock).is_err());
     }
 
@@ -328,8 +360,13 @@ dependencies:
     fn validate_lock_version_out_of_range_errors() {
         let deps = vec![dep("postgres", "^15.0.0", "https://r")];
         let lock = ChartLock {
-            dependencies: vec![ChartLockEntry { name: "postgres".into(), version: "16.0.0".into(), repository: "https://r".into() }],
-            digest: "x".into(), generated: "".into(),
+            dependencies: vec![ChartLockEntry {
+                name: "postgres".into(),
+                version: "16.0.0".into(),
+                repository: "https://r".into(),
+            }],
+            digest: "x".into(),
+            generated: "".into(),
         };
         assert!(validate_lock(&deps, &lock).is_err());
     }
@@ -338,8 +375,13 @@ dependencies:
     fn validate_lock_repo_mismatch_errors() {
         let deps = vec![dep("postgres", "^15", "https://r")];
         let lock = ChartLock {
-            dependencies: vec![ChartLockEntry { name: "postgres".into(), version: "15.1.0".into(), repository: "https://other".into() }],
-            digest: "x".into(), generated: "".into(),
+            dependencies: vec![ChartLockEntry {
+                name: "postgres".into(),
+                version: "15.1.0".into(),
+                repository: "https://other".into(),
+            }],
+            digest: "x".into(),
+            generated: "".into(),
         };
         assert!(validate_lock(&deps, &lock).is_err());
     }
@@ -348,8 +390,13 @@ dependencies:
     fn validate_lock_happy_path() {
         let deps = vec![dep("postgres", "^15", "https://r")];
         let lock = ChartLock {
-            dependencies: vec![ChartLockEntry { name: "postgres".into(), version: "15.4.2".into(), repository: "https://r".into() }],
-            digest: "x".into(), generated: "".into(),
+            dependencies: vec![ChartLockEntry {
+                name: "postgres".into(),
+                version: "15.4.2".into(),
+                repository: "https://r".into(),
+            }],
+            digest: "x".into(),
+            generated: "".into(),
         };
         validate_lock(&deps, &lock).unwrap();
     }
@@ -389,9 +436,12 @@ dependencies:
 
     #[test]
     fn select_active_filters_by_condition_and_tag() {
-        let mut d_off = dep("off", "1", "r"); d_off.condition = Some("feat.off".into());
-        let mut d_tag = dep("tagged", "1", "r"); d_tag.tags = vec!["heavy".into()];
-        let mut d_other = dep("other", "1", "r"); d_other.tags = vec!["light".into()];
+        let mut d_off = dep("off", "1", "r");
+        d_off.condition = Some("feat.off".into());
+        let mut d_tag = dep("tagged", "1", "r");
+        d_tag.tags = vec!["heavy".into()];
+        let mut d_other = dep("other", "1", "r");
+        d_other.tags = vec!["light".into()];
         let always = dep("always", "1", "r");
         let deps = vec![d_off, d_tag, d_other, always];
         let mut cond = BTreeMap::new();
@@ -405,8 +455,10 @@ dependencies:
 
     #[test]
     fn select_active_star_includes_all_tagged() {
-        let mut d1 = dep("a", "1", "r"); d1.tags = vec!["x".into()];
-        let mut d2 = dep("b", "1", "r"); d2.tags = vec!["y".into()];
+        let mut d1 = dep("a", "1", "r");
+        d1.tags = vec!["x".into()];
+        let mut d2 = dep("b", "1", "r");
+        d2.tags = vec!["y".into()];
         let deps = vec![d1, d2];
         let mut tags = BTreeSet::new();
         tags.insert("*".into());

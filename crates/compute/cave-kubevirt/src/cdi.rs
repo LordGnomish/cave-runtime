@@ -134,13 +134,9 @@ pub enum ReconcileAction {
     /// Create the underlying PVC if not yet present.
     CreatePvc,
     /// Schedule the worker pod (importer / cloner / upload-receiver).
-    SchedulePod {
-        kind: SourceKind,
-    },
+    SchedulePod { kind: SourceKind },
     /// Advance to the next phase.
-    AdvancePhase {
-        next: DataVolumePhase,
-    },
+    AdvancePhase { next: DataVolumePhase },
     /// Reject this DataVolume with an unknown-source error.
     RejectUnknownSource,
 }
@@ -218,10 +214,7 @@ mod tests {
     fn classify_known_kinds() {
         assert_eq!(SourceKind::from_str("http"), Some(SourceKind::Http));
         assert_eq!(SourceKind::from_str("HTTPS"), Some(SourceKind::Http));
-        assert_eq!(
-            SourceKind::from_str("Registry"),
-            Some(SourceKind::Registry)
-        );
+        assert_eq!(SourceKind::from_str("Registry"), Some(SourceKind::Registry));
         assert_eq!(SourceKind::from_str("pvc"), Some(SourceKind::Pvc));
         assert_eq!(SourceKind::from_str("upload"), Some(SourceKind::Upload));
         assert_eq!(SourceKind::from_str("blank"), Some(SourceKind::Blank));
@@ -246,10 +239,7 @@ mod tests {
             SourceKind::Upload.initial_phase(),
             DataVolumePhase::UploadScheduled
         );
-        assert_eq!(
-            SourceKind::Blank.initial_phase(),
-            DataVolumePhase::PvcBound
-        );
+        assert_eq!(SourceKind::Blank.initial_phase(), DataVolumePhase::PvcBound);
     }
 
     #[test]

@@ -179,8 +179,7 @@ mod tests {
         let file = g.upload("data.bin", b"abcdefghijk", None).unwrap();
         assert_eq!(file.length, 11);
         // 11 / 4 = 3 chunks (4 + 4 + 3)
-        let chunks: Vec<&GridFsChunk> =
-            g.chunks.iter().filter(|c| c.files_id == file.id).collect();
+        let chunks: Vec<&GridFsChunk> = g.chunks.iter().filter(|c| c.files_id == file.id).collect();
         assert_eq!(chunks.len(), 3);
         assert_eq!(chunks[2].data, b"ijk");
     }
@@ -227,8 +226,7 @@ mod tests {
         let mut g = GridFs::new();
         let file = g.upload("empty", b"", None).unwrap();
         assert_eq!(file.length, 0);
-        let chunks: Vec<&GridFsChunk> =
-            g.chunks.iter().filter(|c| c.files_id == file.id).collect();
+        let chunks: Vec<&GridFsChunk> = g.chunks.iter().filter(|c| c.files_id == file.id).collect();
         assert!(chunks.is_empty());
     }
 

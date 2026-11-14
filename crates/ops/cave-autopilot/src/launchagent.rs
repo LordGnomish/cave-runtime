@@ -37,7 +37,9 @@ impl PlistSpec {
     /// The default `PATH` for the daemon: Homebrew + cargo + system dirs.
     pub fn default_tool_path() -> String {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/gnomish".into());
-        format!("/opt/homebrew/bin:/opt/homebrew/sbin:{home}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+        format!(
+            "/opt/homebrew/bin:/opt/homebrew/sbin:{home}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        )
     }
 
     /// Derive a spec from a config + the installed binary + config-file paths.
@@ -117,12 +119,20 @@ pub fn plist_path(label: &str) -> PathBuf {
 
 /// Arguments for `launchctl load -w <plist>`.
 pub fn load_args(plist: &Path) -> Vec<String> {
-    vec!["load".into(), "-w".into(), plist.to_string_lossy().into_owned()]
+    vec![
+        "load".into(),
+        "-w".into(),
+        plist.to_string_lossy().into_owned(),
+    ]
 }
 
 /// Arguments for `launchctl unload -w <plist>`.
 pub fn unload_args(plist: &Path) -> Vec<String> {
-    vec!["unload".into(), "-w".into(), plist.to_string_lossy().into_owned()]
+    vec![
+        "unload".into(),
+        "-w".into(),
+        plist.to_string_lossy().into_owned(),
+    ]
 }
 
 /// Write the plist to `~/Library/LaunchAgents/` and load it via launchctl.
@@ -252,7 +262,10 @@ mod tests {
     #[test]
     fn plist_path_under_launchagents() {
         let p = plist_path("com.gnomish.cave-home-autopilot");
-        assert!(p.to_string_lossy().contains("Library/LaunchAgents/com.gnomish.cave-home-autopilot.plist"));
+        assert!(
+            p.to_string_lossy()
+                .contains("Library/LaunchAgents/com.gnomish.cave-home-autopilot.plist")
+        );
     }
 
     #[test]

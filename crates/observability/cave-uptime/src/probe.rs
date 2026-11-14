@@ -239,9 +239,13 @@ pub async fn execute_tcp_probe(
     };
 
     match tokio::time::timeout(timeout, tokio::net::TcpStream::connect(addrs[0])).await {
-        Ok(Ok(_stream)) => {
-            build_probe_result(probe_id, true, start.elapsed().as_millis() as u64, None, None)
-        }
+        Ok(Ok(_stream)) => build_probe_result(
+            probe_id,
+            true,
+            start.elapsed().as_millis() as u64,
+            None,
+            None,
+        ),
         Ok(Err(e)) => build_probe_result(
             probe_id,
             false,
@@ -270,9 +274,8 @@ pub async fn execute_dns_probe(probe_id: Uuid, hostname: &str, timeout_ms: u32) 
     let hostname_owned = hostname.to_string();
     let timeout = Duration::from_millis(timeout_ms as u64);
 
-    let resolve_future = tokio::task::spawn_blocking(move || {
-        format!("{hostname_owned}:0").to_socket_addrs()
-    });
+    let resolve_future =
+        tokio::task::spawn_blocking(move || format!("{hostname_owned}:0").to_socket_addrs());
 
     match tokio::time::timeout(timeout, resolve_future).await {
         Ok(Ok(Ok(mut addrs))) => {

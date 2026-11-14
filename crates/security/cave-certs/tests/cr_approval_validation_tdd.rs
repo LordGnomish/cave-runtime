@@ -15,8 +15,8 @@
 //! (cave-admission); these rules are in-crate runtime logic.
 
 use cave_certs::cr_approval_validation::{
-    validate_cr_approval_condition, validate_update_cr_approval_condition, CrCondition,
-    CrConditionStatus, CrConditionType,
+    CrCondition, CrConditionStatus, CrConditionType, validate_cr_approval_condition,
+    validate_update_cr_approval_condition,
 };
 
 fn approved_true() -> CrCondition {
@@ -54,9 +54,10 @@ fn multiple_approved_conditions_forbidden() {
     // Cite: certificaterequest.go:153-155.
     let errs =
         validate_cr_approval_condition(&[approved_true(), approved_true()], "status.conditions");
-    assert!(errs
-        .iter()
-        .any(|e| e.message.contains("multiple") && e.message.contains("Approved")));
+    assert!(
+        errs.iter()
+            .any(|e| e.message.contains("multiple") && e.message.contains("Approved"))
+    );
 }
 
 #[test]
@@ -65,7 +66,10 @@ fn approved_condition_false_status_rejected() {
     let mut c = approved_true();
     c.status = CrConditionStatus::False;
     let errs = validate_cr_approval_condition(&[c], "status.conditions");
-    assert!(errs.iter().any(|e| e.message.contains("only be set to True")));
+    assert!(
+        errs.iter()
+            .any(|e| e.message.contains("only be set to True"))
+    );
 }
 
 #[test]
@@ -73,19 +77,18 @@ fn denied_condition_unknown_status_rejected() {
     let mut c = denied_true();
     c.status = CrConditionStatus::Unknown;
     let errs = validate_cr_approval_condition(&[c], "status.conditions");
-    assert!(errs.iter().any(|e| e.message.contains("only be set to True")));
+    assert!(
+        errs.iter()
+            .any(|e| e.message.contains("only be set to True"))
+    );
 }
 
 #[test]
 fn approved_and_denied_cannot_coexist() {
     // Cite: certificaterequest.go:166-168.
-    let errs = validate_cr_approval_condition(
-        &[approved_true(), denied_true()],
-        "status.conditions",
-    );
-    assert!(errs
-        .iter()
-        .any(|e| e.message.contains("cannot coexist")));
+    let errs =
+        validate_cr_approval_condition(&[approved_true(), denied_true()], "status.conditions");
+    assert!(errs.iter().any(|e| e.message.contains("cannot coexist")));
 }
 
 #[test]
@@ -96,9 +99,10 @@ fn update_approved_condition_cannot_be_modified_once_set() {
     modified.reason = "ChangedReason".into();
     let new = vec![modified];
     let errs = validate_update_cr_approval_condition(&old, &new, "status.conditions");
-    assert!(errs
-        .iter()
-        .any(|e| e.message.contains("'Approved' condition may not be modified")));
+    assert!(errs.iter().any(|e| {
+        e.message
+            .contains("'Approved' condition may not be modified")
+    }));
 }
 
 #[test]
@@ -109,9 +113,10 @@ fn update_denied_condition_cannot_be_modified_once_set() {
     modified.message = "different".into();
     let new = vec![modified];
     let errs = validate_update_cr_approval_condition(&old, &new, "status.conditions");
-    assert!(errs
-        .iter()
-        .any(|e| e.message.contains("'Denied' condition may not be modified")));
+    assert!(
+        errs.iter()
+            .any(|e| e.message.contains("'Denied' condition may not be modified"))
+    );
 }
 
 #[test]

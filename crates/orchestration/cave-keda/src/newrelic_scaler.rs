@@ -75,10 +75,7 @@ impl NewRelicScaler {
     /// if s.metadata.noDataError { return 0, fmt.Errorf("query return no results %s", ...) }
     /// return 0, nil
     /// ```
-    pub fn extract_metric(
-        results: &[Vec<NrdbValue>],
-        no_data_error: bool,
-    ) -> Result<f64, String> {
+    pub fn extract_metric(results: &[Vec<NrdbValue>], no_data_error: bool) -> Result<f64, String> {
         if results.is_empty() {
             if no_data_error {
                 return Err("query return no results".to_string());

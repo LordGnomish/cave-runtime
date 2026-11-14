@@ -122,9 +122,7 @@ pub fn parse_nuspec(xml: &str) -> Result<NuGetPackage, NuGetError> {
         })
         .unwrap_or_default();
     let tags = first_tag(xml, "tags")
-        .map(|s| {
-            s.split_whitespace().map(String::from).collect::<Vec<_>>()
-        })
+        .map(|s| s.split_whitespace().map(String::from).collect::<Vec<_>>())
         .unwrap_or_default();
     let require_license_acceptance = first_tag(xml, "requireLicenseAcceptance")
         .map(|s| s.eq_ignore_ascii_case("true"))
@@ -233,8 +231,8 @@ mod tests {
 
     #[test]
     fn parse_path_nuspec() {
-        let p = parse_path("/v3-flatcontainer/Newtonsoft.Json/13.0.1/Newtonsoft.Json.nuspec")
-            .unwrap();
+        let p =
+            parse_path("/v3-flatcontainer/Newtonsoft.Json/13.0.1/Newtonsoft.Json.nuspec").unwrap();
         assert_eq!(
             p,
             NuGetPath::Nuspec {
@@ -308,7 +306,10 @@ mod tests {
         assert!(p.require_license_acceptance);
         assert_eq!(p.dependencies.len(), 2);
         assert_eq!(p.dependencies[0].id, "Newtonsoft.Json");
-        assert_eq!(p.dependencies[1].target_framework.as_deref(), Some("netstandard2.0"));
+        assert_eq!(
+            p.dependencies[1].target_framework.as_deref(),
+            Some("netstandard2.0")
+        );
     }
 
     #[test]

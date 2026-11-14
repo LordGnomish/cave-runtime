@@ -88,8 +88,7 @@ impl BenchSummary {
         } else {
             outcomes.iter().map(|o| o.quality).sum::<f32>() / outcomes.len() as f32
         };
-        let passed = agg >= Self::QUALITY_PASS_THRESHOLD
-            && outcomes.iter().all(|o| !o.timed_out);
+        let passed = agg >= Self::QUALITY_PASS_THRESHOLD && outcomes.iter().all(|o| !o.timed_out);
         Self {
             target,
             outcomes,
@@ -122,8 +121,7 @@ mod tests {
 
     #[test]
     fn bench_target_builder_threads_consumer() {
-        let t = BenchTarget::new("http://x:8080", "ollama/llama3.1")
-            .with_consumer("ci-bot");
+        let t = BenchTarget::new("http://x:8080", "ollama/llama3.1").with_consumer("ci-bot");
         assert_eq!(t.gateway_url, "http://x:8080");
         assert_eq!(t.model_id, "ollama/llama3.1");
         assert_eq!(t.consumer, Some("ci-bot".to_string()));

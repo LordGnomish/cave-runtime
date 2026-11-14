@@ -164,9 +164,9 @@ pub fn merge_recent(activities: &[TimelineActivity], window: Duration) -> Vec<Ti
 
     let mut kept: Vec<TimelineActivity> = Vec::new();
     for act in sorted {
-        let dup = kept.iter().any(|k| {
-            k.mergeable_with(&act) && (k.happens_at - act.happens_at).abs() <= window
-        });
+        let dup = kept
+            .iter()
+            .any(|k| k.mergeable_with(&act) && (k.happens_at - act.happens_at).abs() <= window);
         if !dup {
             kept.push(act);
         }
@@ -203,8 +203,20 @@ mod tests {
         task.created_at = Utc::now() - Duration::minutes(5);
 
         let targets = vec![
-            target(ws, note.id, ActivityKind::Note, ActivityTargetKind::Person, person),
-            target(ws, task.id, ActivityKind::Task, ActivityTargetKind::Person, person),
+            target(
+                ws,
+                note.id,
+                ActivityKind::Note,
+                ActivityTargetKind::Person,
+                person,
+            ),
+            target(
+                ws,
+                task.id,
+                ActivityKind::Task,
+                ActivityTargetKind::Person,
+                person,
+            ),
         ];
 
         let feed = timeline_for_target(
@@ -278,10 +290,20 @@ mod tests {
         let member = Uuid::new_v4();
         let now = Utc::now();
 
-        let mut a = TimelineActivity::new(ws, "opportunity.updated", ActivityTargetKind::Opportunity, opp);
+        let mut a = TimelineActivity::new(
+            ws,
+            "opportunity.updated",
+            ActivityTargetKind::Opportunity,
+            opp,
+        );
         a.workspace_member_id = Some(member);
         a.happens_at = now - Duration::minutes(2);
-        let mut b = TimelineActivity::new(ws, "opportunity.updated", ActivityTargetKind::Opportunity, opp);
+        let mut b = TimelineActivity::new(
+            ws,
+            "opportunity.updated",
+            ActivityTargetKind::Opportunity,
+            opp,
+        );
         b.workspace_member_id = Some(member);
         b.happens_at = now;
         // Different event, same record → not merged.

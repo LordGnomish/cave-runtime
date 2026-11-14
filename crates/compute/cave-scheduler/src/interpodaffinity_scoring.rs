@@ -71,7 +71,10 @@ impl PreScoreState {
     ) -> Self {
         let mut state = PreScoreState::default();
         let mut keys: Vec<String> = Vec::new();
-        for w in preferred_affinity.iter().chain(preferred_anti_affinity.iter()) {
+        for w in preferred_affinity
+            .iter()
+            .chain(preferred_anti_affinity.iter())
+        {
             if !keys.iter().any(|k| k == &w.term.topology_key) {
                 keys.push(w.term.topology_key.clone());
             }
@@ -297,9 +300,7 @@ mod tests {
     use crate::framework::{
         ClusterSnapshot, Pod, PodAffinityTerm, VolumeKind, WeightedPodAffinityTerm,
     };
-    use crate::models::{
-        Node as ModelNode, NodeStatus, ResourceCapacity,
-    };
+    use crate::models::{Node as ModelNode, NodeStatus, ResourceCapacity};
     use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
@@ -362,10 +363,11 @@ mod tests {
             (c.clone(), vec![]),
         ]);
 
-        let plug = InterPodAffinityScoring::new().with_preferred_affinity(WeightedPodAffinityTerm {
-            weight: 10,
-            term: term("topology.kubernetes.io/zone"),
-        });
+        let plug =
+            InterPodAffinityScoring::new().with_preferred_affinity(WeightedPodAffinityTerm {
+                weight: 10,
+                term: term("topology.kubernetes.io/zone"),
+            });
 
         let pre = PreScoreState::compute(
             &p,
@@ -377,10 +379,7 @@ mod tests {
         // us-east-1a has two matching existing pods → 2×10 = 20.
         let v_a = pre
             .topology_pair_to_score
-            .get(&(
-                "topology.kubernetes.io/zone".into(),
-                "us-east-1a".into(),
-            ))
+            .get(&("topology.kubernetes.io/zone".into(), "us-east-1a".into()))
             .copied()
             .unwrap_or(0);
         assert_eq!(v_a, 20);
