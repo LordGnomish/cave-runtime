@@ -13,7 +13,7 @@
 //! Persistence (Snapshot/loadSnapshot/Maintenance) and gossip broadcast stay
 //! scope-cut; only the in-memory algorithm is ported.
 
-use cave_alerts::nflog::{NflogError, NflogReceiver, NotificationLog, MeshEntry};
+use cave_alerts::nflog::{MeshEntry, NflogError, NflogReceiver, NotificationLog};
 use chrono::{Duration, Utc};
 
 fn recv(group: &str, integration: &str, idx: u32) -> NflogReceiver {
@@ -35,10 +35,7 @@ fn test_receiver_key_format() {
 fn test_state_key_format() {
     // stateKey: "%s:%s" of group_key and receiver_key
     let r = recv("team-X", "slack", 0);
-    assert_eq!(
-        NotificationLog::state_key("gk1", &r),
-        "gk1:team-X/slack/0"
-    );
+    assert_eq!(NotificationLog::state_key("gk1", &r), "gk1:team-X/slack/0");
 }
 
 #[test]
@@ -72,8 +69,15 @@ fn test_log_overwrites_only_with_newer_timestamp() {
     // First entry at `now`.
     log.log_at(&r, "gk1", vec![1], vec![], None, now).unwrap();
     // An older-timestamped write must NOT overwrite (clock-drift guard).
-    log.log_at(&r, "gk1", vec![9, 9], vec![], None, now - Duration::minutes(5))
-        .unwrap();
+    log.log_at(
+        &r,
+        "gk1",
+        vec![9, 9],
+        vec![],
+        None,
+        now - Duration::minutes(5),
+    )
+    .unwrap();
 
     let e = log.query(&r, "gk1").unwrap();
     assert_eq!(e.firing_alerts, vec![1], "older write must be ignored");

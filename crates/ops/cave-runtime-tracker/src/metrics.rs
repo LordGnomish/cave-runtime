@@ -73,7 +73,10 @@ pub fn render_prometheus(report: &DailyReport, measurements: &[Measurement]) -> 
         "phase0_no_auto_bump",
         "1 while the tracker is report-only (no automatic version bumps).",
         "gauge",
-        &format!("{NS}_phase0_no_auto_bump {}", report.phase_0_no_auto_bump as u8),
+        &format!(
+            "{NS}_phase0_no_auto_bump {}",
+            report.phase_0_no_auto_bump as u8
+        ),
     );
 
     // ── per-subsystem drift gauge (0=in_sync,1=behind,2=unknown) ──────
@@ -204,8 +207,14 @@ mod tests {
         let m = Measurement {
             upstream_repo: "cilium/cilium".to_string(),
             cave_module: "cave-net".to_string(),
-            upstream: Some(LocStats { code: 400_000, ..Default::default() }),
-            cave: Some(LocStats { code: 12_000, ..Default::default() }),
+            upstream: Some(LocStats {
+                code: 400_000,
+                ..Default::default()
+            }),
+            cave: Some(LocStats {
+                code: 12_000,
+                ..Default::default()
+            }),
             ratio: Some(0.03),
         };
         let out = render_prometheus(&r, &[m]);
@@ -224,8 +233,14 @@ mod tests {
         let mk = |module: &str| Measurement {
             upstream_repo: "kubernetes/kubernetes".to_string(),
             cave_module: module.to_string(),
-            upstream: Some(LocStats { code: 5_000_000, ..Default::default() }),
-            cave: Some(LocStats { code: 10_000, ..Default::default() }),
+            upstream: Some(LocStats {
+                code: 5_000_000,
+                ..Default::default()
+            }),
+            cave: Some(LocStats {
+                code: 10_000,
+                ..Default::default()
+            }),
             ratio: Some(0.002),
         };
         let out = render_prometheus(&r, &[mk("cave-apiserver"), mk("cave-scheduler")]);

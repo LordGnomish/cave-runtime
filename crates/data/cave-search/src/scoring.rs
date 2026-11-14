@@ -27,7 +27,9 @@ pub struct BM25Params {
 }
 
 impl Default for BM25Params {
-    fn default() -> Self { BM25Params { k1: 1.2, b: 0.75 } }
+    fn default() -> Self {
+        BM25Params { k1: 1.2, b: 0.75 }
+    }
 }
 
 /// A document with its relevance score for a query.
@@ -45,7 +47,14 @@ pub fn bm25_score(
     doc_freq: u32,
     num_docs: u32,
 ) -> f64 {
-    bm25_score_with_params(term_freq, doc_len, avg_doc_len, doc_freq, num_docs, &BM25Params::default())
+    bm25_score_with_params(
+        term_freq,
+        doc_len,
+        avg_doc_len,
+        doc_freq,
+        num_docs,
+        &BM25Params::default(),
+    )
 }
 
 /// Compute BM25 score with explicit tuning parameters.
@@ -57,7 +66,9 @@ pub fn bm25_score_with_params(
     num_docs: u32,
     params: &BM25Params,
 ) -> f64 {
-    if term_freq == 0 { return 0.0; }
+    if term_freq == 0 {
+        return 0.0;
+    }
 
     let tf = term_freq as f64;
     let dl = doc_len as f64;
@@ -69,8 +80,8 @@ pub fn bm25_score_with_params(
     let idf = ((n - df + 0.5) / (df + 0.5) + 1.0).ln();
 
     // Length-normalized TF.
-    let tf_norm = tf * (params.k1 + 1.0)
-        / (tf + params.k1 * (1.0 - params.b + params.b * dl / avgdl));
+    let tf_norm =
+        tf * (params.k1 + 1.0) / (tf + params.k1 * (1.0 - params.b + params.b * dl / avgdl));
 
     idf * tf_norm
 }
@@ -90,7 +101,8 @@ pub fn search_bm25(index: &Index, query_term: &str, params: &BM25Params) -> Vec<
     pl.iter()
         .map(|(doc_id, tf)| {
             let doc_len = index.doc_len(doc_id);
-            let score = bm25_score_with_params(tf, doc_len, avg_doc_len, doc_freq, num_docs, params);
+            let score =
+                bm25_score_with_params(tf, doc_len, avg_doc_len, doc_freq, num_docs, params);
             ScoredDoc { doc_id, score }
         })
         .collect()
@@ -110,7 +122,12 @@ pub fn rank_results(mut docs: Vec<ScoredDoc>, k: usize) -> Vec<ScoredDoc> {
 }
 
 /// Multi-term BM25 search: tokenize `query`, accumulate per-doc scores, return ranked results.
-pub fn search_multi_term(index: &Index, query: &str, params: &BM25Params, top_k: usize) -> Vec<ScoredDoc> {
+pub fn search_multi_term(
+    index: &Index,
+    query: &str,
+    params: &BM25Params,
+    top_k: usize,
+) -> Vec<ScoredDoc> {
     use std::collections::HashMap;
 
     let terms = tokenize(query, index.tenant());

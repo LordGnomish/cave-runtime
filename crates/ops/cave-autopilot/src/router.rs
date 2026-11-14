@@ -86,7 +86,9 @@ pub fn parse_router_decision(raw: &str, completion: f64) -> Result<RouterDecisio
     let r: RawDecision = serde_json::from_str(&json)
         .map_err(|e| AutopilotError::Llm(format!("router decision parse: {e}")))?;
     if r.surface.trim().is_empty() {
-        return Err(AutopilotError::Llm("router decision has empty surface".into()));
+        return Err(AutopilotError::Llm(
+            "router decision has empty surface".into(),
+        ));
     }
     let context_tokens = r
         .context_tokens
@@ -175,10 +177,9 @@ mod tests {
     fn parse_rejects_non_json() {
         assert!(parse_router_decision("the model rambled with no json", 0.5).is_err());
         // Empty surface is not a usable decision.
-        assert!(parse_router_decision(
-            r#"{"surface":"","needs_human":false,"rationale":"r"}"#,
-            0.5
-        )
-        .is_err());
+        assert!(
+            parse_router_decision(r#"{"surface":"","needs_human":false,"rationale":"r"}"#, 0.5)
+                .is_err()
+        );
     }
 }

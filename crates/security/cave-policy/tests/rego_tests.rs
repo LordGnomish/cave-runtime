@@ -293,9 +293,7 @@ fn test_eval_ad_hoc_query() {
     // arithmetic is exposed via the call form (`plus`, `minus`, `mul`, …).
     // Use unification to verify the ad-hoc query path round-trips bindings
     // without panicking.
-    let results = engine
-        .query_str("x = 2", serde_json::json!({}))
-        .unwrap();
+    let results = engine.query_str("x = 2", serde_json::json!({})).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].get("x"), Some(&serde_json::json!(2)));
 }
@@ -442,10 +440,7 @@ fn test_builtin_aggregates() {
         call("max", vec![nums.clone()]),
         Value::Json(serde_json::json!(3))
     );
-    assert_eq!(
-        call("min", vec![nums]),
-        Value::Json(serde_json::json!(1))
-    );
+    assert_eq!(call("min", vec![nums]), Value::Json(serde_json::json!(1)));
 }
 
 #[test]

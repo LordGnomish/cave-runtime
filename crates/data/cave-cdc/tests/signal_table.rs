@@ -32,7 +32,10 @@ fn signal_table_rejects_duplicate_id() {
     };
     tbl.push(sig.clone()).unwrap();
     let err = tbl.push(sig).unwrap_err();
-    assert!(err.to_string().contains("dup"), "error should mention the duplicate id");
+    assert!(
+        err.to_string().contains("dup"),
+        "error should mention the duplicate id"
+    );
 }
 
 #[test]

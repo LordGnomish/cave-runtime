@@ -72,8 +72,14 @@ fn fresh_setup_creates_db_user_and_grant_in_order() {
 
     let log = conn.statement_log();
     // exact upstream ordering: createDB -> createUser -> grant
-    let db = log.iter().position(|s| s.starts_with("CREATE DATABASE")).unwrap();
-    let user = log.iter().position(|s| s.starts_with("CREATE ROLE")).unwrap();
+    let db = log
+        .iter()
+        .position(|s| s.starts_with("CREATE DATABASE"))
+        .unwrap();
+    let user = log
+        .iter()
+        .position(|s| s.starts_with("CREATE ROLE"))
+        .unwrap();
     let grant = log.iter().position(|s| s.starts_with("GRANT")).unwrap();
     assert!(db < user && user < grant, "db<user<grant: {log:?}");
 }
@@ -102,9 +108,18 @@ fn teardown_revokes_then_drops_db_then_drops_user() {
     assert!(!conn.user_exists("tenants_alpha").unwrap());
     let log = conn.statement_log();
     let revoke = log.iter().rposition(|s| s.starts_with("REVOKE")).unwrap();
-    let dropdb = log.iter().rposition(|s| s.starts_with("DROP DATABASE")).unwrap();
-    let dropuser = log.iter().rposition(|s| s.starts_with("DROP ROLE")).unwrap();
-    assert!(revoke < dropdb && dropdb < dropuser, "revoke<dropdb<dropuser: {log:?}");
+    let dropdb = log
+        .iter()
+        .rposition(|s| s.starts_with("DROP DATABASE"))
+        .unwrap();
+    let dropuser = log
+        .iter()
+        .rposition(|s| s.starts_with("DROP ROLE"))
+        .unwrap();
+    assert!(
+        revoke < dropdb && dropdb < dropuser,
+        "revoke<dropdb<dropuser: {log:?}"
+    );
 }
 
 // ── ShouldStatusBeUpdated (datastore_setup.go) ──────────────────────────────
@@ -119,12 +134,22 @@ fn status_update_triggers_on_driver_or_checksum_or_user_or_schema_drift() {
         user: res.user.clone(),
         schema: res.schema.clone(),
     };
-    assert!(!should_status_be_updated(&converged, &res, "PostgreSQL", "abc"));
+    assert!(!should_status_be_updated(
+        &converged,
+        &res,
+        "PostgreSQL",
+        "abc"
+    ));
 
     // driver drift
     assert!(should_status_be_updated(&converged, &res, "MySQL", "abc"));
     // config checksum drift
-    assert!(should_status_be_updated(&converged, &res, "PostgreSQL", "xyz"));
+    assert!(should_status_be_updated(
+        &converged,
+        &res,
+        "PostgreSQL",
+        "xyz"
+    ));
     // user drift
     let mut s = converged.clone();
     s.user = "other".into();

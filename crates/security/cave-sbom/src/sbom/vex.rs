@@ -64,18 +64,20 @@ pub enum VexJustification {
 
 impl VexJustification {
     pub fn parse(s: &str) -> Option<Self> {
-        Some(match s.trim().to_ascii_lowercase().replace('-', "_").as_str() {
-            "code_not_present" => Self::CodeNotPresent,
-            "code_not_reachable" => Self::CodeNotReachable,
-            "requires_configuration" => Self::RequiresConfiguration,
-            "requires_dependency" => Self::RequiresDependency,
-            "requires_environment" => Self::RequiresEnvironment,
-            "protected_by_compiler" => Self::ProtectedByCompiler,
-            "protected_at_runtime" => Self::ProtectedAtRuntime,
-            "protected_at_perimeter" => Self::ProtectedAtPerimeter,
-            "protected_by_mitigating_control" => Self::ProtectedByMitigatingControl,
-            _ => return None,
-        })
+        Some(
+            match s.trim().to_ascii_lowercase().replace('-', "_").as_str() {
+                "code_not_present" => Self::CodeNotPresent,
+                "code_not_reachable" => Self::CodeNotReachable,
+                "requires_configuration" => Self::RequiresConfiguration,
+                "requires_dependency" => Self::RequiresDependency,
+                "requires_environment" => Self::RequiresEnvironment,
+                "protected_by_compiler" => Self::ProtectedByCompiler,
+                "protected_at_runtime" => Self::ProtectedAtRuntime,
+                "protected_at_perimeter" => Self::ProtectedAtPerimeter,
+                "protected_by_mitigating_control" => Self::ProtectedByMitigatingControl,
+                _ => return None,
+            },
+        )
     }
 }
 
@@ -130,7 +132,10 @@ fn parse_statement(v: &Value) -> VexStatement {
         .get("source")
         .and_then(|s| s.get("name").and_then(Value::as_str))
         .map(String::from);
-    let description = v.get("description").and_then(Value::as_str).map(String::from);
+    let description = v
+        .get("description")
+        .and_then(Value::as_str)
+        .map(String::from);
     let analysis = v.get("analysis").map(parse_analysis);
     let affects = v
         .get("affects")
@@ -235,7 +240,10 @@ mod tests {
 
     #[test]
     fn analysis_state_projection_for_each_vex_state() {
-        assert_eq!(VexState::Resolved.to_analysis_state(), AnalysisState::Resolved);
+        assert_eq!(
+            VexState::Resolved.to_analysis_state(),
+            AnalysisState::Resolved
+        );
         assert_eq!(
             VexState::ResolvedWithPedigree.to_analysis_state(),
             AnalysisState::Resolved
@@ -252,14 +260,20 @@ mod tests {
             VexState::NotAffected.to_analysis_state(),
             AnalysisState::NotAffected
         );
-        assert_eq!(VexState::InTriage.to_analysis_state(), AnalysisState::InTriage);
+        assert_eq!(
+            VexState::InTriage.to_analysis_state(),
+            AnalysisState::InTriage
+        );
     }
 
     #[test]
     fn parse_dash_and_underscore_states() {
         assert_eq!(VexState::parse("not-affected"), Some(VexState::NotAffected));
         assert_eq!(VexState::parse("not_affected"), Some(VexState::NotAffected));
-        assert_eq!(VexState::parse("FALSE-POSITIVE"), Some(VexState::FalsePositive));
+        assert_eq!(
+            VexState::parse("FALSE-POSITIVE"),
+            Some(VexState::FalsePositive)
+        );
     }
 
     #[test]
@@ -280,7 +294,10 @@ mod tests {
 
     #[test]
     fn invalid_json_errors() {
-        assert!(matches!(import_vex("not json").unwrap_err(), VexImportError::Json(_)));
+        assert!(matches!(
+            import_vex("not json").unwrap_err(),
+            VexImportError::Json(_)
+        ));
     }
 
     #[test]

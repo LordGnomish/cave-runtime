@@ -148,7 +148,10 @@ mod tests {
         let to = |p| serde_json::to_value(&p).unwrap();
         assert_eq!(to(ConnectedAccountProvider::Google), "google");
         assert_eq!(to(ConnectedAccountProvider::Microsoft), "microsoft");
-        assert_eq!(to(ConnectedAccountProvider::ImapSmtpCaldav), "imap_smtp_caldav");
+        assert_eq!(
+            to(ConnectedAccountProvider::ImapSmtpCaldav),
+            "imap_smtp_caldav"
+        );
         assert_eq!(to(ConnectedAccountProvider::Oidc), "oidc");
         assert_eq!(to(ConnectedAccountProvider::Saml), "saml");
         assert_eq!(to(ConnectedAccountProvider::EmailGroup), "email_group");

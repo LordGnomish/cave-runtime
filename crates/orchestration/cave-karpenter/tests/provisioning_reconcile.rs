@@ -69,10 +69,7 @@ fn schedule_provisions_a_claim_for_a_pending_pod() {
 #[test]
 fn binpacking_packs_two_pods_onto_one_node() {
     let pools = vec![open_pool("default")];
-    let pods = vec![
-        pending("a", 400, 256, &[]),
-        pending("b", 400, 256, &[]),
-    ];
+    let pods = vec![pending("a", 400, 256, &[]), pending("b", 400, 256, &[])];
     let instances = vec![inst("big", 2000, 4096)];
     let res = schedule(&pools, &pods, &instances);
     assert_eq!(res.claims.len(), 1, "both pods fit one node");
@@ -82,10 +79,7 @@ fn binpacking_packs_two_pods_onto_one_node() {
 #[test]
 fn binpacking_opens_two_nodes_when_one_is_too_small() {
     let pools = vec![open_pool("default")];
-    let pods = vec![
-        pending("a", 800, 512, &[]),
-        pending("b", 800, 512, &[]),
-    ];
+    let pods = vec![pending("a", 800, 512, &[]), pending("b", 800, 512, &[])];
     // Each instance holds only one of the two pods.
     let instances = vec![inst("small", 1000, 1024)];
     let res = schedule(&pools, &pods, &instances);
@@ -136,7 +130,11 @@ fn schedule_honours_pool_taints_in_binpacking() {
 
 #[test]
 fn empty_pending_pods_yields_no_claims() {
-    let res = schedule(&[open_pool("default")], &[], &[inst("m5.large", 2000, 4096)]);
+    let res = schedule(
+        &[open_pool("default")],
+        &[],
+        &[inst("m5.large", 2000, 4096)],
+    );
     assert!(res.claims.is_empty());
     assert!(res.unschedulable.is_empty());
 }
@@ -144,10 +142,7 @@ fn empty_pending_pods_yields_no_claims() {
 #[test]
 fn reconcile_launches_every_claim_through_the_provider() {
     let pools = vec![open_pool("default")];
-    let pods = vec![
-        pending("a", 800, 512, &[]),
-        pending("b", 800, 512, &[]),
-    ];
+    let pods = vec![pending("a", 800, 512, &[]), pending("b", 800, 512, &[])];
     let instances = vec![inst("small", 1000, 1024)];
     let provider = StaticProvider::new();
     let (res, launched) = reconcile(&pools, &pods, &instances, &provider);

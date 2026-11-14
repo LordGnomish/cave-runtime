@@ -209,7 +209,9 @@ mod tests {
     #[test]
     fn test_sigkill_decision_emitted_when_group_matches() {
         let e = Enforcer::default();
-        let dec = e.decide("p1", &kill_group(), &exec_event_for("/bin/bash")).unwrap();
+        let dec = e
+            .decide("p1", &kill_group(), &exec_event_for("/bin/bash"))
+            .unwrap();
         assert_eq!(dec.len(), 1);
         assert_eq!(dec[0].action, ActionKind::Sigkill);
         assert_eq!(dec[0].arg_sig, Some(9));
@@ -220,7 +222,9 @@ mod tests {
     #[test]
     fn test_no_decision_when_group_does_not_match() {
         let e = Enforcer::default();
-        let dec = e.decide("p1", &kill_group(), &exec_event_for("/bin/sh")).unwrap();
+        let dec = e
+            .decide("p1", &kill_group(), &exec_event_for("/bin/sh"))
+            .unwrap();
         assert!(dec.is_empty());
     }
 
@@ -229,7 +233,9 @@ mod tests {
         let mut e = Enforcer::default();
         e.set_monitor_only(true);
         assert!(e.is_monitor_only());
-        let dec = e.decide("p1", &kill_group(), &exec_event_for("/bin/bash")).unwrap();
+        let dec = e
+            .decide("p1", &kill_group(), &exec_event_for("/bin/bash"))
+            .unwrap();
         assert!(dec.is_empty());
     }
 
@@ -249,7 +255,9 @@ mod tests {
             rate_limit: None,
         });
         let e = Enforcer::default();
-        let dec = e.decide("override", &g, &exec_event_for("/bin/cat")).unwrap();
+        let dec = e
+            .decide("override", &g, &exec_event_for("/bin/cat"))
+            .unwrap();
         assert_eq!(dec[0].action, ActionKind::Override);
         assert_eq!(dec[0].arg_error, Some(-1));
     }

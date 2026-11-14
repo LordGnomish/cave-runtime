@@ -98,8 +98,8 @@ impl GroupSilenceState {
             return false;
         }
         match self.silenced_until {
-            None => true,                 // silenced forever
-            Some(until) => now < until,   // silenced for a period
+            None => true,               // silenced forever
+            Some(until) => now < until, // silenced for a period
         }
     }
 }

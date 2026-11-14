@@ -23,7 +23,9 @@ pub fn validate_experiment(experiment: &ChaosExperiment) -> Vec<String> {
         ExperimentType::NetworkCorruption => {
             if let Some(loss) = experiment.parameters.packet_loss_percent {
                 if loss > 100.0 {
-                    errors.push("packet_loss_percent must be 0-100 for NetworkCorruption".to_string());
+                    errors.push(
+                        "packet_loss_percent must be 0-100 for NetworkCorruption".to_string(),
+                    );
                 }
             }
         }

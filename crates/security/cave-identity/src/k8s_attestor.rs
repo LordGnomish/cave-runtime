@@ -60,7 +60,10 @@ pub fn pod_selectors(info: &K8sPodInfo) -> Vec<Selector> {
     out.push(Selector::new("k8s", format!("pod-name:{}", info.pod_name)));
     out.push(Selector::new("k8s", format!("pod-uid:{}", info.pod_uid)));
     out.push(Selector::new("k8s", format!("sa:{}", info.service_account)));
-    out.push(Selector::new("k8s", format!("node-name:{}", info.node_name)));
+    out.push(Selector::new(
+        "k8s",
+        format!("node-name:{}", info.node_name),
+    ));
     out.push(Selector::new(
         "k8s",
         format!("container-name:{}", info.container_name),
@@ -92,11 +95,10 @@ impl WorkloadAttestor for K8sWorkloadAttestor {
         "k8s"
     }
     async fn attest(&self, pid: i32) -> Result<Vec<Selector>> {
-        let info = self
-            .by_pid
-            .get(&pid)
-            .map(|v| v.clone())
-            .ok_or_else(|| IdentityError::AttestationFailed(format!("k8s pid {} unknown", pid)))?;
+        let info =
+            self.by_pid.get(&pid).map(|v| v.clone()).ok_or_else(|| {
+                IdentityError::AttestationFailed(format!("k8s pid {} unknown", pid))
+            })?;
         Ok(pod_selectors(&info))
     }
 }
@@ -129,7 +131,11 @@ impl K8sPsatNodeAttestor {
         }
     }
 
-    pub fn attest_token(&self, token: &str, expected_audience: &str) -> Result<(SpiffeId, Vec<Selector>)> {
+    pub fn attest_token(
+        &self,
+        token: &str,
+        expected_audience: &str,
+    ) -> Result<(SpiffeId, Vec<Selector>)> {
         let claims = self
             .tokens
             .get(token)
@@ -187,9 +193,10 @@ mod tests {
         assert!(s.iter().any(|x| x.value == "ns:prod"));
         assert!(s.iter().any(|x| x.value == "sa:default"));
         assert!(s.iter().any(|x| x.value == "pod-label:app=frontend"));
-        assert!(s
-            .iter()
-            .any(|x| x.value == "pod-annotation:svc.example/owner=team-a"));
+        assert!(
+            s.iter()
+                .any(|x| x.value == "pod-annotation:svc.example/owner=team-a")
+        );
         assert!(s.iter().any(|x| x.value == "container-name:main"));
     }
 
@@ -228,9 +235,7 @@ mod tests {
             id.as_str(),
             "spiffe://example.org/spire/agent/k8s_psat/prod-cluster/no"
         );
-        assert!(selectors
-            .iter()
-            .any(|s| s.value == "cluster:prod-cluster"));
+        assert!(selectors.iter().any(|s| s.value == "cluster:prod-cluster"));
     }
 
     #[test]

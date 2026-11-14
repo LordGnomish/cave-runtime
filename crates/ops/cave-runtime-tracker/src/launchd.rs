@@ -27,7 +27,9 @@ pub struct AgentSpec {
 
 /// XML-escape a text node / element value (`&`, `<`, `>`).
 fn xml(v: &str) -> String {
-    v.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    v.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 impl AgentSpec {
@@ -71,8 +73,12 @@ impl AgentSpec {
 
         if let Some((h, m)) = self.calendar {
             s.push_str("\t<key>StartCalendarInterval</key>\n\t<dict>\n");
-            s.push_str(&format!("\t\t<key>Hour</key>\n\t\t<integer>{h}</integer>\n"));
-            s.push_str(&format!("\t\t<key>Minute</key>\n\t\t<integer>{m}</integer>\n"));
+            s.push_str(&format!(
+                "\t\t<key>Hour</key>\n\t\t<integer>{h}</integer>\n"
+            ));
+            s.push_str(&format!(
+                "\t\t<key>Minute</key>\n\t\t<integer>{m}</integer>\n"
+            ));
             s.push_str("\t</dict>\n");
         }
 
@@ -107,7 +113,9 @@ fn base_env(home: &str) -> Vec<(String, String)> {
         ("HOME".to_string(), home.to_string()),
         (
             "PATH".to_string(),
-            format!("{home}/.cargo/bin:{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"),
+            format!(
+                "{home}/.cargo/bin:{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+            ),
         ),
         ("TZ".to_string(), "Europe/Berlin".to_string()),
     ]
@@ -133,7 +141,11 @@ pub fn daily_report_agent(
     }
     AgentSpec {
         label: "com.gnomish.cave-runtime-tracker".to_string(),
-        program: vec![bin.to_string(), "report".to_string(), "--measure".to_string()],
+        program: vec![
+            bin.to_string(),
+            "report".to_string(),
+            "--measure".to_string(),
+        ],
         working_dir: home.to_string(),
         env,
         calendar: Some((6, 30)),
@@ -174,8 +186,13 @@ mod tests {
 
     #[test]
     fn daily_agent_has_label_schedule_and_argv() {
-        let p = daily_report_agent("/Users/x", "/Users/x/.local/bin/cave-runtime-tracker", "/Users/x/Library/Application Support/cave-runtime", None)
-            .render();
+        let p = daily_report_agent(
+            "/Users/x",
+            "/Users/x/.local/bin/cave-runtime-tracker",
+            "/Users/x/Library/Application Support/cave-runtime",
+            None,
+        )
+        .render();
         assert!(p.starts_with("<?xml version=\"1.0\""));
         assert!(p.contains("<string>com.gnomish.cave-runtime-tracker</string>"));
         assert!(p.contains("<key>Hour</key>\n\t\t<integer>6</integer>"));
@@ -191,7 +208,12 @@ mod tests {
 
     #[test]
     fn metrics_agent_is_keepalive_with_no_calendar() {
-        let p = metrics_serve_agent("/Users/x", "/Users/x/.local/bin/cave-runtime-tracker", "/Users/x/Library/Application Support/cave-runtime", 9103);
+        let p = metrics_serve_agent(
+            "/Users/x",
+            "/Users/x/.local/bin/cave-runtime-tracker",
+            "/Users/x/Library/Application Support/cave-runtime",
+            9103,
+        );
         assert_eq!(p.label, "com.gnomish.cave-runtime-tracker-metrics");
         assert!(p.calendar.is_none());
         assert!(p.keep_alive);

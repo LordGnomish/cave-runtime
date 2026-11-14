@@ -67,12 +67,18 @@ impl DailyReport {
     pub fn render_markdown(&self) -> String {
         let mut s = String::new();
         s.push_str("<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->\n");
-        s.push_str(&format!("# Autopilot Daily — {} ({})\n\n", self.instance, self.date));
+        s.push_str(&format!(
+            "# Autopilot Daily — {} ({})\n\n",
+            self.instance, self.date
+        ));
 
         s.push_str("## Summary\n\n");
         s.push_str(&format!("- **Completed:** {}\n", self.completed.len()));
         s.push_str(&format!("- **Failed:** {}\n", self.failed.len()));
-        s.push_str(&format!("- **Escalated to human:** {}\n", self.escalated_human.len()));
+        s.push_str(&format!(
+            "- **Escalated to human:** {}\n",
+            self.escalated_human.len()
+        ));
         s.push_str(&format!(
             "- **Mean completion:** {:.4} → {:.4} (Δ {:+.4})\n",
             self.mean_completion_start,
@@ -93,7 +99,12 @@ impl DailyReport {
             for t in &self.completed {
                 s.push_str(&format!(
                     "| {} | {:.3} | {:.3} | {:+.3} | {} | {} |\n",
-                    t.subsystem, t.completion_before, t.completion_after, t.delta(), t.tier, t.note
+                    t.subsystem,
+                    t.completion_before,
+                    t.completion_after,
+                    t.delta(),
+                    t.tier,
+                    t.note
                 ));
             }
             s.push('\n');
@@ -104,7 +115,10 @@ impl DailyReport {
             s.push_str("_none_\n\n");
         } else {
             for t in &self.failed {
-                s.push_str(&format!("- `{}` — {} (tier {})\n", t.subsystem, t.note, t.tier));
+                s.push_str(&format!(
+                    "- `{}` — {} (tier {})\n",
+                    t.subsystem, t.note, t.tier
+                ));
             }
             s.push('\n');
         }
@@ -174,7 +188,10 @@ mod tests {
 
     #[test]
     fn file_name_is_dated() {
-        assert_eq!(DailyReport::file_name("2026-06-07"), "autopilot-daily-2026-06-07.md");
+        assert_eq!(
+            DailyReport::file_name("2026-06-07"),
+            "autopilot-daily-2026-06-07.md"
+        );
     }
 
     #[test]
@@ -199,7 +216,10 @@ mod tests {
     fn empty_queue_renders_idle() {
         let mut r = sample();
         r.next_queue.clear();
-        assert!(r.render_markdown().contains("idle — all subsystems at threshold"));
+        assert!(
+            r.render_markdown()
+                .contains("idle — all subsystems at threshold")
+        );
     }
 
     #[test]

@@ -57,7 +57,10 @@ impl ChaosStore {
     }
 
     pub fn add_schedule(&self, schedule: ExperimentSchedule) {
-        self.schedules.write().unwrap().insert(schedule.id, schedule);
+        self.schedules
+            .write()
+            .unwrap()
+            .insert(schedule.id, schedule);
     }
 
     pub fn get_schedule(&self, id: Uuid) -> Option<ExperimentSchedule> {
@@ -87,9 +90,9 @@ impl Default for ChaosStore {
 mod tests {
     use super::*;
     use crate::models::{BlastRadius, ChaosTarget, ExperimentParams, ExperimentType, SafetyGuard};
+    use chrono::Utc;
     use std::collections::HashMap;
     use uuid::Uuid;
-    use chrono::Utc;
 
     fn make_experiment(status: ExperimentStatus) -> ChaosExperiment {
         ChaosExperiment {

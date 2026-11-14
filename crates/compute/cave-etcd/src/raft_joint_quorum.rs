@@ -86,11 +86,7 @@ pub fn majority_committed_index(voters: &[u64], match_idx: &HashMap<u64, u64>) -
 /// When `c_old` is empty the outgoing config is considered vacuously
 /// committed at `u64::MAX`, so the result equals `committed_in(c_new)`.
 /// When both are empty the result is `u64::MAX`.
-pub fn joint_committed_index(
-    c_old: &[u64],
-    c_new: &[u64],
-    match_idx: &HashMap<u64, u64>,
-) -> u64 {
+pub fn joint_committed_index(c_old: &[u64], c_new: &[u64], match_idx: &HashMap<u64, u64>) -> u64 {
     let committed_old = majority_committed_index(c_old, match_idx);
     let committed_new = majority_committed_index(c_new, match_idx);
     committed_old.min(committed_new)

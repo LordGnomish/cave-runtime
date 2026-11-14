@@ -13,7 +13,7 @@
 //! filtering in `WorkflowStore::list`.
 
 use cave_workflows::executor::{
-    aggregate_phase, next_actions, record_success, retry_decision, template_index, NodeAction,
+    NodeAction, aggregate_phase, next_actions, record_success, retry_decision, template_index,
 };
 use cave_workflows::store::WorkflowStore;
 use cave_workflows::workflow_crd::{
@@ -184,7 +184,10 @@ fn retry_decision_always_retries_regardless_of_phase() {
         backoff: None,
     };
     // "Always" retries on any last phase, incrementing the attempt counter.
-    assert_eq!(retry_decision(Some(&s), 0, WorkflowPhase::Succeeded), Some(1));
+    assert_eq!(
+        retry_decision(Some(&s), 0, WorkflowPhase::Succeeded),
+        Some(1)
+    );
     assert_eq!(retry_decision(Some(&s), 1, WorkflowPhase::Failed), Some(2));
     assert_eq!(retry_decision(Some(&s), 2, WorkflowPhase::Error), Some(3));
     // Limit boundary: current_attempts >= limit forbids further retry.
@@ -330,7 +333,10 @@ fn record_success_writes_node_outputs_and_finished_at() {
     assert_eq!(node.phase, WorkflowPhase::Succeeded);
     assert!(node.finished_at.is_some());
     assert!(node.outputs.is_some());
-    assert_eq!(node.outputs.as_ref().unwrap().result.as_deref(), Some("done"));
+    assert_eq!(
+        node.outputs.as_ref().unwrap().result.as_deref(),
+        Some("done")
+    );
 
     // Terminal aggregate → workflow finished_at stamped, phase mirrored.
     assert_eq!(wf.status.phase, WorkflowPhase::Succeeded);
@@ -385,7 +391,10 @@ fn template_index_maps_every_template_by_name() {
     let wf = Workflow::new(
         "wf",
         "argo",
-        spec("first", vec![cont_template("first"), cont_template("second")]),
+        spec(
+            "first",
+            vec![cont_template("first"), cont_template("second")],
+        ),
     );
     let idx = template_index(&wf);
     assert_eq!(idx.len(), 2);
@@ -461,7 +470,10 @@ fn artifact_repository_git_oss_hdfs_raw_roundtrip() {
     assert!(j.contains("\"kind\":\"hdfs\""));
     match serde_json::from_str::<Artifact>(&j).unwrap().repository {
         Some(ArtifactRepository::Hdfs { addresses, path }) => {
-            assert_eq!(addresses, vec!["nn1:8020".to_string(), "nn2:8020".to_string()]);
+            assert_eq!(
+                addresses,
+                vec!["nn1:8020".to_string(), "nn2:8020".to_string()]
+            );
             assert_eq!(path, "/data");
         }
         other => panic!("expected Hdfs, got {other:?}"),

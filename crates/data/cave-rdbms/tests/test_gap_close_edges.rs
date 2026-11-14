@@ -85,7 +85,10 @@ fn sqlvalue_accessors_return_none_for_wrong_type() {
 fn sqlvalue_as_i64_widens_int4() {
     assert_eq!(SqlValue::Int4(42).as_i64(), Some(42i64));
     assert_eq!(SqlValue::Int4(i32::MIN).as_i64(), Some(i32::MIN as i64));
-    assert_eq!(SqlValue::Int8(1_000_000_000_000).as_i64(), Some(1_000_000_000_000));
+    assert_eq!(
+        SqlValue::Int8(1_000_000_000_000).as_i64(),
+        Some(1_000_000_000_000)
+    );
 }
 
 #[test]
@@ -114,24 +117,40 @@ fn coerce_int8_to_int4_in_range_ok() {
 #[test]
 fn coerce_int8_min_max_boundary() {
     assert_eq!(
-        SqlValue::Int8(i32::MIN as i64).coerce_to(&SqlType::Int4).unwrap(),
+        SqlValue::Int8(i32::MIN as i64)
+            .coerce_to(&SqlType::Int4)
+            .unwrap(),
         SqlValue::Int4(i32::MIN)
     );
     assert_eq!(
-        SqlValue::Int8(i32::MAX as i64).coerce_to(&SqlType::Int4).unwrap(),
+        SqlValue::Int8(i32::MAX as i64)
+            .coerce_to(&SqlType::Int4)
+            .unwrap(),
         SqlValue::Int4(i32::MAX)
     );
-    assert!(SqlValue::Int8(i32::MAX as i64 + 1).coerce_to(&SqlType::Int4).is_err());
-    assert!(SqlValue::Int8(i32::MIN as i64 - 1).coerce_to(&SqlType::Int4).is_err());
+    assert!(
+        SqlValue::Int8(i32::MAX as i64 + 1)
+            .coerce_to(&SqlType::Int4)
+            .is_err()
+    );
+    assert!(
+        SqlValue::Int8(i32::MIN as i64 - 1)
+            .coerce_to(&SqlType::Int4)
+            .is_err()
+    );
 }
 
 #[test]
 fn coerce_text_to_int_parses_and_rejects() {
     assert_eq!(
-        SqlValue::Text("42".into()).coerce_to(&SqlType::Int4).unwrap(),
+        SqlValue::Text("42".into())
+            .coerce_to(&SqlType::Int4)
+            .unwrap(),
         SqlValue::Int4(42)
     );
-    let err = SqlValue::Text("abc".into()).coerce_to(&SqlType::Int4).unwrap_err();
+    let err = SqlValue::Text("abc".into())
+        .coerce_to(&SqlType::Int4)
+        .unwrap_err();
     assert!(err.contains("cannot cast"));
 }
 
@@ -139,18 +158,37 @@ fn coerce_text_to_int_parses_and_rejects() {
 fn coerce_text_to_bool_all_truthy_falsy_forms() {
     for truthy in &["t", "T", "true", "TRUE", "y", "YES", "1"] {
         let v = SqlValue::Text((*truthy).into());
-        assert_eq!(v.coerce_to(&SqlType::Bool).unwrap(), SqlValue::Bool(true), "{}", truthy);
+        assert_eq!(
+            v.coerce_to(&SqlType::Bool).unwrap(),
+            SqlValue::Bool(true),
+            "{}",
+            truthy
+        );
     }
     for falsy in &["f", "F", "false", "FALSE", "n", "NO", "0"] {
         let v = SqlValue::Text((*falsy).into());
-        assert_eq!(v.coerce_to(&SqlType::Bool).unwrap(), SqlValue::Bool(false), "{}", falsy);
+        assert_eq!(
+            v.coerce_to(&SqlType::Bool).unwrap(),
+            SqlValue::Bool(false),
+            "{}",
+            falsy
+        );
     }
-    assert!(SqlValue::Text("maybe".into()).coerce_to(&SqlType::Bool).is_err());
+    assert!(
+        SqlValue::Text("maybe".into())
+            .coerce_to(&SqlType::Bool)
+            .is_err()
+    );
 }
 
 #[test]
 fn coerce_null_to_any_type_stays_null() {
-    for ty in &[SqlType::Int4, SqlType::Text, SqlType::Bool, SqlType::Numeric] {
+    for ty in &[
+        SqlType::Int4,
+        SqlType::Text,
+        SqlType::Bool,
+        SqlType::Numeric,
+    ] {
         assert_eq!(SqlValue::Null.coerce_to(ty).unwrap(), SqlValue::Null);
     }
 }
@@ -158,10 +196,15 @@ fn coerce_null_to_any_type_stays_null() {
 #[test]
 fn coerce_identity_returns_clone() {
     assert_eq!(
-        SqlValue::Text("hello".into()).coerce_to(&SqlType::Text).unwrap(),
+        SqlValue::Text("hello".into())
+            .coerce_to(&SqlType::Text)
+            .unwrap(),
         SqlValue::Text("hello".into())
     );
-    assert_eq!(SqlValue::Bool(true).coerce_to(&SqlType::Bool).unwrap(), SqlValue::Bool(true));
+    assert_eq!(
+        SqlValue::Bool(true).coerce_to(&SqlType::Bool).unwrap(),
+        SqlValue::Bool(true)
+    );
 }
 
 #[test]
@@ -169,15 +212,31 @@ fn coerce_incompatible_pair_errors() {
     // Bool → Numeric is not in the coercion table.
     assert!(SqlValue::Bool(true).coerce_to(&SqlType::Numeric).is_err());
     // Date → Int4
-    assert!(SqlValue::Date("2026-01-01".into()).coerce_to(&SqlType::Int4).is_err());
+    assert!(
+        SqlValue::Date("2026-01-01".into())
+            .coerce_to(&SqlType::Int4)
+            .is_err()
+    );
 }
 
 #[test]
 fn coerce_bool_to_int_uses_one_zero() {
-    assert_eq!(SqlValue::Bool(true).coerce_to(&SqlType::Int4).unwrap(), SqlValue::Int4(1));
-    assert_eq!(SqlValue::Bool(false).coerce_to(&SqlType::Int4).unwrap(), SqlValue::Int4(0));
-    assert_eq!(SqlValue::Bool(true).coerce_to(&SqlType::Int8).unwrap(), SqlValue::Int8(1));
-    assert_eq!(SqlValue::Bool(true).coerce_to(&SqlType::Text).unwrap(), SqlValue::Text("true".into()));
+    assert_eq!(
+        SqlValue::Bool(true).coerce_to(&SqlType::Int4).unwrap(),
+        SqlValue::Int4(1)
+    );
+    assert_eq!(
+        SqlValue::Bool(false).coerce_to(&SqlType::Int4).unwrap(),
+        SqlValue::Int4(0)
+    );
+    assert_eq!(
+        SqlValue::Bool(true).coerce_to(&SqlType::Int8).unwrap(),
+        SqlValue::Int8(1)
+    );
+    assert_eq!(
+        SqlValue::Bool(true).coerce_to(&SqlType::Text).unwrap(),
+        SqlValue::Text("true".into())
+    );
 }
 
 #[test]
@@ -206,7 +265,10 @@ fn sqlvalue_to_json_handles_non_finite_as_null() {
 
 #[test]
 fn compare_null_orders_below_every_value() {
-    assert_eq!(SqlValue::Null.compare(&SqlValue::Null), Some(Ordering::Equal));
+    assert_eq!(
+        SqlValue::Null.compare(&SqlValue::Null),
+        Some(Ordering::Equal)
+    );
     assert_eq!(
         SqlValue::Null.compare(&SqlValue::Int4(0)),
         Some(Ordering::Less)
@@ -237,12 +299,20 @@ fn compare_same_type_orders_naturally() {
 fn compare_cross_type_int4_int8_returns_none() {
     // The current implementation rejects cross-type comparison.
     assert!(SqlValue::Int4(1).compare(&SqlValue::Int8(2)).is_none());
-    assert!(SqlValue::Int4(1).compare(&SqlValue::Text("x".into())).is_none());
+    assert!(
+        SqlValue::Int4(1)
+            .compare(&SqlValue::Text("x".into()))
+            .is_none()
+    );
 }
 
 #[test]
 fn compare_numeric_nan_is_unordered() {
-    assert!(SqlValue::Numeric(f64::NAN).compare(&SqlValue::Numeric(1.0)).is_none());
+    assert!(
+        SqlValue::Numeric(f64::NAN)
+            .compare(&SqlValue::Numeric(1.0))
+            .is_none()
+    );
 }
 
 #[test]
@@ -276,8 +346,18 @@ fn schema_starts_empty() {
 #[test]
 fn table_column_index_resolves_or_none() {
     let cols = vec![
-        ColumnDef { name: "id".into(), type_name: "int".into(), not_null: true, primary_key: true },
-        ColumnDef { name: "name".into(), type_name: "text".into(), not_null: false, primary_key: false },
+        ColumnDef {
+            name: "id".into(),
+            type_name: "int".into(),
+            not_null: true,
+            primary_key: true,
+        },
+        ColumnDef {
+            name: "name".into(),
+            type_name: "text".into(),
+            not_null: false,
+            primary_key: false,
+        },
     ];
     let t = Table::new("things", cols);
     assert_eq!(t.column_index("id"), Some(0));
@@ -290,9 +370,15 @@ fn table_row_count_reflects_inserted_rows() {
     let t_empty = Table::new("e", vec![]);
     assert_eq!(t_empty.row_count(), 0);
 
-    let mut t = Table::new("t", vec![ColumnDef {
-        name: "v".into(), type_name: "int".into(), not_null: false, primary_key: false,
-    }]);
+    let mut t = Table::new(
+        "t",
+        vec![ColumnDef {
+            name: "v".into(),
+            type_name: "int".into(),
+            not_null: false,
+            primary_key: false,
+        }],
+    );
     t.rows.push(vec![SqlValue::Int4(1)]);
     t.rows.push(vec![SqlValue::Int4(2)]);
     assert_eq!(t.row_count(), 2);
@@ -371,8 +457,18 @@ fn catalog_empty_db_still_has_three_schemas_but_no_tables() {
 fn catalog_columns_uses_one_based_ordinal_position() {
     let mut db = Database::new("d");
     let cols = vec![
-        ColumnDef { name: "a".into(), type_name: "int".into(), not_null: true, primary_key: false },
-        ColumnDef { name: "b".into(), type_name: "text".into(), not_null: false, primary_key: false },
+        ColumnDef {
+            name: "a".into(),
+            type_name: "int".into(),
+            not_null: true,
+            primary_key: false,
+        },
+        ColumnDef {
+            name: "b".into(),
+            type_name: "text".into(),
+            not_null: false,
+            primary_key: false,
+        },
     ];
     db.schemas
         .get_mut("public")
@@ -391,8 +487,18 @@ fn catalog_columns_uses_one_based_ordinal_position() {
 fn catalog_columns_is_nullable_yes_no() {
     let mut db = Database::new("d");
     let cols = vec![
-        ColumnDef { name: "id".into(), type_name: "int".into(), not_null: true, primary_key: true },
-        ColumnDef { name: "opt".into(), type_name: "text".into(), not_null: false, primary_key: false },
+        ColumnDef {
+            name: "id".into(),
+            type_name: "int".into(),
+            not_null: true,
+            primary_key: true,
+        },
+        ColumnDef {
+            name: "opt".into(),
+            type_name: "text".into(),
+            not_null: false,
+            primary_key: false,
+        },
     ];
     db.schemas
         .get_mut("public")
@@ -649,7 +755,9 @@ fn parser_savepoint_creates_named_statement() {
 
 #[test]
 fn parser_rollback_to_savepoint_recognized() {
-    let ast = Parser::new("ROLLBACK TO SAVEPOINT sp1").parse().expect("rollback to");
+    let ast = Parser::new("ROLLBACK TO SAVEPOINT sp1")
+        .parse()
+        .expect("rollback to");
     match ast.statement {
         Statement::RollbackTo(name) => assert_eq!(name, "sp1"),
         other => panic!("expected RollbackTo, got {:?}", other),
@@ -663,7 +771,10 @@ fn parser_rollback_to_savepoint_recognized() {
 #[tokio::test]
 async fn engine_execute_ddl_create_table_acks() {
     let engine = Engine::new();
-    let out = engine.execute_ddl("CREATE TABLE foo(id int)").await.unwrap();
+    let out = engine
+        .execute_ddl("CREATE TABLE foo(id int)")
+        .await
+        .unwrap();
     assert_eq!(out, "TABLE CREATED");
 }
 
@@ -685,7 +796,13 @@ async fn engine_execute_ddl_unknown_returns_ok() {
 async fn engine_default_users_table_has_two_seed_rows() {
     let engine = Engine::default();
     let db = engine.get_database().await;
-    let users = db.schemas.get("public").unwrap().tables.get("users").unwrap();
+    let users = db
+        .schemas
+        .get("public")
+        .unwrap()
+        .tables
+        .get("users")
+        .unwrap();
     assert_eq!(users.row_count(), 2);
     assert_eq!(users.columns.len(), 3);
     assert_eq!(users.columns[0].name, "id");

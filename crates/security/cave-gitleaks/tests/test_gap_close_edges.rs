@@ -65,7 +65,12 @@ fn redact_handles_unicode_prefix_safely() {
     let r = redact("héllo-secret-extra");
     // First 4 chars: h é l l, then stars (15 - 4 = 11 stars capped by 12).
     assert!(r.starts_with("héll"));
-    assert!(r[r.find('o').unwrap_or(r.len())..].chars().any(|c| c == '*') || r.contains('*'));
+    assert!(
+        r[r.find('o').unwrap_or(r.len())..]
+            .chars()
+            .any(|c| c == '*')
+            || r.contains('*')
+    );
 }
 
 // ── Finding fingerprint state transitions ──────────────────────────────
@@ -124,8 +129,7 @@ fn builtin_rules_all_have_keyword_prefilters_except_private_key_block() {
 
 #[test]
 fn builtin_jwt_rule_matches_three_part_token() {
-    let jwt =
-        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+    let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
     let any = builtin_rules()
         .into_iter()
         .find(|r| r.id == "jwt")
@@ -247,9 +251,8 @@ fn detect_with_decoders_finds_secret_inside_base64_blob() {
         let mut out = String::new();
         let mut i = 0;
         while i + 3 <= input.len() {
-            let n = ((input[i] as u32) << 16)
-                | ((input[i + 1] as u32) << 8)
-                | (input[i + 2] as u32);
+            let n =
+                ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);
             out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
             out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
             out.push(TABLE[((n >> 6) & 0x3f) as usize] as char);

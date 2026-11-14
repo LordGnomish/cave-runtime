@@ -121,7 +121,11 @@ fn test_list_traces_tag_membership() {
     store.upsert_trace(make_trace(None, None, vec!["dev"]));
 
     let prod = store.list_traces(None, None, Some("prod"), 100);
-    assert_eq!(prod.len(), 1, "only the trace whose tags contain 'prod' matches");
+    assert_eq!(
+        prod.len(),
+        1,
+        "only the trace whose tags contain 'prod' matches"
+    );
     assert!(prod[0].tags.iter().any(|t| t == "prod"));
 
     // A tag present on no trace yields nothing.
@@ -161,7 +165,9 @@ fn test_get_active_prompt_max_among_active() {
     store.upsert_prompt_template(make_prompt("sys", 2, true));
     store.upsert_prompt_template(make_prompt("sys", 3, false));
 
-    let active = store.get_active_prompt("sys").expect("active versions exist");
+    let active = store
+        .get_active_prompt("sys")
+        .expect("active versions exist");
     assert_eq!(
         active.version, 2,
         "v2 is the highest ACTIVE version; inactive v3 is excluded"
@@ -183,7 +189,10 @@ fn test_cost_window_by_model_breakdown() {
 
     let window = compute_cost_window(&store, Duration::hours(1));
 
-    assert_eq!(window.generation_count, 3, "all three generations are in-window");
+    assert_eq!(
+        window.generation_count, 3,
+        "all three generations are in-window"
+    );
     assert_eq!(window.by_model.len(), 2, "two distinct models");
     assert!(
         (window.by_model["gpt-4"] - 0.15).abs() < 1e-9,

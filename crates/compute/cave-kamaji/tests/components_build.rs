@@ -75,7 +75,10 @@ fn scheduler_container_shape() {
     assert_eq!(c.name, "kube-scheduler");
     assert_eq!(c.command, vec!["kube-scheduler"]);
     assert_eq!(c.image, "registry.k8s.io/kube-scheduler:v1.31.0");
-    assert_eq!(arg(&c.args, "--kubeconfig"), Some("/etc/kubernetes/scheduler.conf"));
+    assert_eq!(
+        arg(&c.args, "--kubeconfig"),
+        Some("/etc/kubernetes/scheduler.conf")
+    );
     assert_eq!(arg(&c.args, "--bind-address"), Some("0.0.0.0"));
     assert_eq!(arg(&c.args, "--leader-elect"), Some("true"));
     assert_eq!(c.liveness_port, 10259);
@@ -157,8 +160,14 @@ fn apiserver_uses_kine_local_etcd_for_sql_drivers() {
     // KineMySQL/KinePostgreSQL/KineNATS -> --etcd-servers=http://127.0.0.1:2379
     for d in [Driver::MySql, Driver::PostgreSql, Driver::Nats] {
         let c = build_apiserver(&input(d));
-        assert_eq!(arg(&c.args, "--etcd-servers"), Some("http://127.0.0.1:2379"));
-        assert!(arg(&c.args, "--etcd-prefix").is_none(), "kine has no etcd-prefix");
+        assert_eq!(
+            arg(&c.args, "--etcd-servers"),
+            Some("http://127.0.0.1:2379")
+        );
+        assert!(
+            arg(&c.args, "--etcd-prefix").is_none(),
+            "kine has no etcd-prefix"
+        );
     }
 }
 
@@ -185,6 +194,10 @@ fn control_plane_emits_three_named_components() {
     let names: Vec<&str> = cs.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(
         names,
-        vec!["kube-apiserver", "kube-controller-manager", "kube-scheduler"]
+        vec![
+            "kube-apiserver",
+            "kube-controller-manager",
+            "kube-scheduler"
+        ]
     );
 }

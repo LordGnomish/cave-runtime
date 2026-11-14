@@ -108,17 +108,28 @@ pub enum AgentRpc {
     ReadStdout(ReadStreamRequest),
     ReadStderr(ReadStreamRequest),
     WriteStdin(WriteStreamRequest),
-    CloseStdin { container_id: String, exec_id: String },
+    CloseStdin {
+        container_id: String,
+        exec_id: String,
+    },
     CreateSandbox(CreateSandboxRequest),
-    DestroySandbox { sandbox_id: String },
+    DestroySandbox {
+        sandbox_id: String,
+    },
     ListInterfaces,
     UpdateInterface(Interface),
     /// `agent.PauseContainer`.
-    PauseContainer { container_id: String },
+    PauseContainer {
+        container_id: String,
+    },
     /// `agent.ResumeContainer`.
-    ResumeContainer { container_id: String },
+    ResumeContainer {
+        container_id: String,
+    },
     /// `agent.RemoveContainer`.
-    RemoveContainer { container_id: String },
+    RemoveContainer {
+        container_id: String,
+    },
 }
 
 impl AgentRpc {
@@ -152,7 +163,9 @@ mod tests {
     fn method_names_pascalcase() {
         let r = AgentRpc::ListInterfaces;
         assert_eq!(r.method_name(), "ListInterfaces");
-        let r = AgentRpc::DestroySandbox { sandbox_id: "x".into() };
+        let r = AgentRpc::DestroySandbox {
+            sandbox_id: "x".into(),
+        };
         assert_eq!(r.method_name(), "DestroySandbox");
     }
 
@@ -178,7 +191,11 @@ mod tests {
 
     #[test]
     fn signal_serializes() {
-        let s = SignalProcessRequest { container_id: "c".into(), exec_id: "e".into(), signal: 15 };
+        let s = SignalProcessRequest {
+            container_id: "c".into(),
+            exec_id: "e".into(),
+            signal: 15,
+        };
         let j = serde_json::to_value(&s).unwrap();
         assert_eq!(j["signal"], 15);
     }
@@ -220,11 +237,17 @@ mod tests {
 
     #[test]
     fn rpc_pause_resume_remove() {
-        let r = AgentRpc::PauseContainer { container_id: "c".into() };
+        let r = AgentRpc::PauseContainer {
+            container_id: "c".into(),
+        };
         assert_eq!(r.method_name(), "PauseContainer");
-        let r = AgentRpc::ResumeContainer { container_id: "c".into() };
+        let r = AgentRpc::ResumeContainer {
+            container_id: "c".into(),
+        };
         assert_eq!(r.method_name(), "ResumeContainer");
-        let r = AgentRpc::RemoveContainer { container_id: "c".into() };
+        let r = AgentRpc::RemoveContainer {
+            container_id: "c".into(),
+        };
         assert_eq!(r.method_name(), "RemoveContainer");
     }
 }

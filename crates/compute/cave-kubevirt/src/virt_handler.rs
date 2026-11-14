@@ -98,7 +98,11 @@ impl NodeFingerprint {
         let mut labels = BTreeMap::new();
         labels.insert(
             "kubevirt.io/schedulable".into(),
-            if self.kvm_present { "true".into() } else { "false".into() },
+            if self.kvm_present {
+                "true".into()
+            } else {
+                "false".into()
+            },
         );
         if !self.cpu_vendor.is_empty() {
             labels.insert(
@@ -177,7 +181,10 @@ impl LauncherPodState {
         match (self, cmd) {
             (Pending, _) => false,
             (Ready, Sync) => true,
-            (Running, Sync | Shutdown | Pause | Unpause | Freeze | Unfreeze | Migrate | CancelMigration) => true,
+            (
+                Running,
+                Sync | Shutdown | Pause | Unpause | Freeze | Unfreeze | Migrate | CancelMigration,
+            ) => true,
             (Running, Kill) => true,
             (Terminating, Kill) => true,
             _ => false,

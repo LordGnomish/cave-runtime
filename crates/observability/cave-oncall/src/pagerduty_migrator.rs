@@ -292,8 +292,14 @@ mod tests {
         let lookup = |_: &str| Some("alice".to_string());
         let steps = migrate_rule(&rule, &lookup);
         assert_eq!(steps.len(), 2);
-        assert!(matches!(steps[0].step_type, EscalationStepType::Wait { minutes: 15 }));
-        assert!(matches!(steps[1].step_type, EscalationStepType::NotifyUser { .. }));
+        assert!(matches!(
+            steps[0].step_type,
+            EscalationStepType::Wait { minutes: 15 }
+        ));
+        assert!(matches!(
+            steps[1].step_type,
+            EscalationStepType::NotifyUser { .. }
+        ));
     }
 
     #[test]
@@ -309,7 +315,10 @@ mod tests {
         let lookup = |_: &str| Some("alice".to_string());
         let steps = migrate_rule(&rule, &lookup);
         assert_eq!(steps.len(), 1);
-        assert!(matches!(steps[0].step_type, EscalationStepType::NotifyUser { .. }));
+        assert!(matches!(
+            steps[0].step_type,
+            EscalationStepType::NotifyUser { .. }
+        ));
     }
 
     #[test]
@@ -325,7 +334,10 @@ mod tests {
         let lookup = |_: &str| None;
         let steps = migrate_rule(&rule, &lookup);
         assert_eq!(steps.len(), 1);
-        assert!(matches!(steps[0].step_type, EscalationStepType::NotifyOnCall));
+        assert!(matches!(
+            steps[0].step_type,
+            EscalationStepType::NotifyOnCall
+        ));
     }
 
     #[test]

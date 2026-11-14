@@ -12,11 +12,11 @@
 //! The "live chat" smoke is opt-in via `CAVE_LLM_GATEWAY_SMOKE_OLLAMA=1`
 //! (gated so CI never tries to talk to a port that isn't there).
 
-use cave_llm_gateway::capability::{seeded_router, CapabilityRequest, Locality};
+use cave_llm_gateway::capability::{CapabilityRequest, Locality, seeded_router};
+use cave_llm_gateway::openai::{ChatCompletionRequest, ChatMessage};
+use cave_llm_gateway::provider::AnthropicProvider;
 use cave_llm_gateway::provider::{LlmProvider, ProviderConfig, ProviderType};
 use cave_llm_gateway::providers::ollama::OllamaProvider;
-use cave_llm_gateway::provider::AnthropicProvider;
-use cave_llm_gateway::openai::{ChatCompletionRequest, ChatMessage};
 
 #[tokio::test]
 async fn smoke_capability_router_scoring_orders_consistently() {
@@ -92,7 +92,11 @@ async fn smoke_ollama_health_probe_attempt_does_not_panic() {
 /// `/api/tags` so the test works against arbitrary local catalogs.
 #[tokio::test]
 async fn smoke_ollama_chat_live() {
-    if std::env::var("CAVE_LLM_GATEWAY_SMOKE_OLLAMA").ok().as_deref() != Some("1") {
+    if std::env::var("CAVE_LLM_GATEWAY_SMOKE_OLLAMA")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
         eprintln!("skipping live-ollama chat smoke (set CAVE_LLM_GATEWAY_SMOKE_OLLAMA=1)");
         return;
     }
@@ -147,7 +151,10 @@ async fn smoke_ollama_chat_live() {
         seed: None,
         logprobs: None,
     };
-    let resp = p.complete(&req).await.expect("live ollama chat must succeed");
+    let resp = p
+        .complete(&req)
+        .await
+        .expect("live ollama chat must succeed");
     let text = resp
         .choices
         .first()

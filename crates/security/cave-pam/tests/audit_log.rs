@@ -3,8 +3,8 @@
 //! Tests for structured audit log.
 
 use cave_pam::audit_log::{AuditEvent, AuditEventKind, AuditLog, AuditQuery};
-use uuid::Uuid;
 use chrono::{Duration, Utc};
+use uuid::Uuid;
 
 fn emit_event(log: &AuditLog, kind: AuditEventKind, user_id: Uuid) {
     log.emit(AuditEvent {
@@ -35,7 +35,10 @@ fn test_query_by_user() {
     emit_event(&log, AuditEventKind::AccessGranted, u1);
     emit_event(&log, AuditEventKind::SessionStart, u2);
 
-    let events = log.query(AuditQuery { actor_id: Some(u1), ..Default::default() });
+    let events = log.query(AuditQuery {
+        actor_id: Some(u1),
+        ..Default::default()
+    });
     assert_eq!(events.len(), 2);
     for e in &events {
         assert_eq!(e.actor_id, u1);
@@ -64,7 +67,10 @@ fn test_query_with_limit() {
     for _ in 0..10 {
         emit_event(&log, AuditEventKind::CommandRun, uid);
     }
-    let events = log.query(AuditQuery { limit: Some(3), ..Default::default() });
+    let events = log.query(AuditQuery {
+        limit: Some(3),
+        ..Default::default()
+    });
     assert_eq!(events.len(), 3);
 }
 

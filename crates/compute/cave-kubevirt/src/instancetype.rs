@@ -253,9 +253,7 @@ pub fn preference_ref(name: &str) -> PreferenceRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        Domain, RunStrategy, VirtualMachine, VirtualMachineInstanceTemplateSpec,
-    };
+    use crate::models::{Domain, RunStrategy, VirtualMachine, VirtualMachineInstanceTemplateSpec};
 
     fn vm_with_refs(it: Option<&str>, pref: Option<&str>) -> VirtualMachine {
         let mut v = VirtualMachine::default();

@@ -76,10 +76,7 @@ fn md5_hex(data: &[u8]) -> String {
                 32..=47 => (b ^ c ^ d, (3 * i + 5) % 16),
                 _ => (c ^ (b | !d), (7 * i) % 16),
             };
-            let f = f
-                .wrapping_add(a)
-                .wrapping_add(MD5_K[i])
-                .wrapping_add(m[g]);
+            let f = f.wrapping_add(a).wrapping_add(MD5_K[i]).wrapping_add(m[g]);
             a = d;
             d = c;
             c = b;
@@ -191,12 +188,9 @@ impl GroupingEngine {
         let distinction = Self::group_distinction(alert.grouping_id.as_deref(), alert.is_demo);
 
         // 1. Try to return the last open group for (channel, distinction).
-        if let Some(g) = self
-            .groups
-            .iter()
-            .rev()
-            .find(|g| g.open_for_grouping && g.channel == alert.channel && g.distinction == distinction)
-        {
+        if let Some(g) = self.groups.iter().rev().find(|g| {
+            g.open_for_grouping && g.channel == alert.channel && g.distinction == distinction
+        }) {
             return GroupingResult {
                 group_id: g.id,
                 group_created: false,

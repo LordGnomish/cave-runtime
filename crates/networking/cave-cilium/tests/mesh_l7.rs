@@ -74,7 +74,12 @@ fn routes_first_match_wins_by_path_method_header() {
 
     // Same path, no canary header → falls through to the v1 route.
     let r = cfg
-        .route(&HttpRequest::new("GET", "api.example.com", "/api/v1/users", &[]))
+        .route(&HttpRequest::new(
+            "GET",
+            "api.example.com",
+            "/api/v1/users",
+            &[],
+        ))
         .unwrap();
     assert_eq!(r.cluster, "v1");
     assert_eq!(r.prefix_rewrite.as_deref(), Some("/"));
@@ -154,16 +159,25 @@ fn l7_policy_enforces_http_rules_at_proxy() {
     assert_eq!(denied.status, 403);
 
     // Path mismatch → 403.
-    assert!(!pol.enforce(&HttpRequest::new("GET", "svc", "/secret", &[])).allowed);
+    assert!(
+        !pol.enforce(&HttpRequest::new("GET", "svc", "/secret", &[]))
+            .allowed
+    );
 
     // POST /api/submit matches the second rule.
-    assert!(pol.enforce(&HttpRequest::new("POST", "svc", "/api/submit", &[])).allowed);
+    assert!(
+        pol.enforce(&HttpRequest::new("POST", "svc", "/api/submit", &[]))
+            .allowed
+    );
 }
 
 #[test]
 fn empty_l7_policy_allows_all() {
     let pol = L7Policy::new(vec![]);
-    assert!(pol.enforce(&HttpRequest::new("DELETE", "svc", "/anything", &[])).allowed);
+    assert!(
+        pol.enforce(&HttpRequest::new("DELETE", "svc", "/anything", &[]))
+            .allowed
+    );
 }
 
 #[test]
@@ -173,10 +187,14 @@ fn header_rule_requires_presence_and_value() {
         path: None,
         headers: vec!["x-token".into()],
     }]);
-    assert!(pol
-        .enforce(&HttpRequest::new("GET", "svc", "/", &[("x-token", "abc")]))
-        .allowed);
-    assert!(!pol.enforce(&HttpRequest::new("GET", "svc", "/", &[])).allowed);
+    assert!(
+        pol.enforce(&HttpRequest::new("GET", "svc", "/", &[("x-token", "abc")]))
+            .allowed
+    );
+    assert!(
+        !pol.enforce(&HttpRequest::new("GET", "svc", "/", &[]))
+            .allowed
+    );
 }
 
 #[test]

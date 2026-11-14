@@ -62,7 +62,9 @@ impl AgentManager {
         let mut rotated = 0usize;
         for mut kv in self.cache.iter_mut() {
             let cached = kv.value().clone();
-            if let Some(new) = x509_svid::rotate_if_needed(&self.ca, &cached.entry, &cached.current_svid)? {
+            if let Some(new) =
+                x509_svid::rotate_if_needed(&self.ca, &cached.entry, &cached.current_svid)?
+            {
                 kv.current_svid = new;
                 kv.last_rotated_at = Utc::now();
                 rotated += 1;
@@ -78,9 +80,7 @@ impl AgentManager {
             .iter()
             .find(|kv| &kv.value().entry.spiffe_id == spiffe_id)
             .map(|kv| kv.value().clone())
-            .ok_or_else(|| {
-                IdentityError::EntryNotFound(format!("no svid for {}", spiffe_id))
-            })?;
+            .ok_or_else(|| IdentityError::EntryNotFound(format!("no svid for {}", spiffe_id)))?;
         Ok(SdsSecret {
             name: entry.entry.spiffe_id.as_str().to_string(),
             cert_chain_pem: pem_chain(&entry.current_svid),
@@ -207,8 +207,9 @@ mod tests {
     fn sds_fetch_unknown_id() {
         let mgr = AgentManager::new(fresh_ca());
         mgr.bootstrap(&[entry("a")]).unwrap();
-        assert!(mgr
-            .sds_fetch(&SpiffeId::new("spiffe://example.org/missing"))
-            .is_err());
+        assert!(
+            mgr.sds_fetch(&SpiffeId::new("spiffe://example.org/missing"))
+                .is_err()
+        );
     }
 }

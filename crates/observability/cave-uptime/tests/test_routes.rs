@@ -32,7 +32,9 @@ async fn test_list_probes_empty() {
         .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(json.is_array() || json.get("probes").is_some());
 }
@@ -59,7 +61,9 @@ async fn test_create_probe() {
         .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
-    let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(json.get("id").is_some(), "response must have an id");
 }
@@ -98,7 +102,9 @@ async fn test_create_then_get_probe() {
         .unwrap();
     let create_resp = app.oneshot(create_req).await.unwrap();
     assert_eq!(create_resp.status(), StatusCode::CREATED);
-    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let id = created["id"].as_str().expect("id field");
 
@@ -110,7 +116,9 @@ async fn test_create_then_get_probe() {
         .unwrap();
     let get_resp = app2.oneshot(get_req).await.unwrap();
     assert_eq!(get_resp.status(), StatusCode::OK);
-    let get_body = axum::body::to_bytes(get_resp.into_body(), usize::MAX).await.unwrap();
+    let get_body = axum::body::to_bytes(get_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let probe: serde_json::Value = serde_json::from_slice(&get_body).unwrap();
     assert_eq!(probe["name"].as_str(), Some("DB Port"));
 }
@@ -136,7 +144,9 @@ async fn test_delete_probe() {
         .body(Body::from(serde_json::to_vec(&payload).unwrap()))
         .unwrap();
     let create_resp = app.oneshot(create_req).await.unwrap();
-    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let id = created["id"].as_str().expect("id field").to_string();
 

@@ -50,7 +50,9 @@ impl KubernetesProvider {
     }
 
     pub fn get(&self, ns: &str, kind: &str, name: &str) -> Option<ManagedObject> {
-        self.objects.get(&Self::key(ns, kind, name)).map(|o| o.clone())
+        self.objects
+            .get(&Self::key(ns, kind, name))
+            .map(|o| o.clone())
     }
 
     pub fn list_objects(&self, ns: &str) -> Vec<ManagedObject> {

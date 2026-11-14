@@ -113,7 +113,11 @@ impl WorkflowStore {
     /// terminal node. The execution model deliberately matches
     /// upstream's "first-edge" walk used by the visualizer — a more
     /// elaborate edge-condition engine arrives with the JS isolate.
-    pub fn execute(&mut self, run_id: &str, workflow_id: &str) -> Result<WorkflowRunStatus, String> {
+    pub fn execute(
+        &mut self,
+        run_id: &str,
+        workflow_id: &str,
+    ) -> Result<WorkflowRunStatus, String> {
         let workflow = self
             .workflows
             .get(workflow_id)
@@ -123,11 +127,8 @@ impl WorkflowStore {
         }
         let mut trace = Vec::new();
         let mut cursor = workflow.root_step_id.clone();
-        let by_id: HashMap<&str, &WorkflowStep> = workflow
-            .steps
-            .iter()
-            .map(|s| (s.id.as_str(), s))
-            .collect();
+        let by_id: HashMap<&str, &WorkflowStep> =
+            workflow.steps.iter().map(|s| (s.id.as_str(), s)).collect();
         loop {
             let step = by_id
                 .get(cursor.as_str())
@@ -164,10 +165,7 @@ fn validate_dag(w: &Workflow) -> Result<(), String> {
     for s in &w.steps {
         for n in &s.next {
             if !by_id.contains_key(n.as_str()) {
-                return Err(format!(
-                    "step '{}' has dangling next '{}'",
-                    s.id, n
-                ));
+                return Err(format!("step '{}' has dangling next '{}'", s.id, n));
             }
         }
     }
@@ -285,11 +283,7 @@ mod tests {
     #[test]
     fn inactive_workflow_does_not_execute() {
         let mut store = WorkflowStore::default();
-        let mut w = workflow(
-            "wf-1",
-            vec![step("a", WorkflowStepType::Trigger, &[])],
-            "a",
-        );
+        let mut w = workflow("wf-1", vec![step("a", WorkflowStepType::Trigger, &[])], "a");
         w.is_active = false;
         store.put_workflow(w).unwrap();
         let err = store.execute("run-1", "wf-1").unwrap_err();
@@ -306,11 +300,7 @@ mod tests {
                 "a",
             ))
             .unwrap();
-        let mut w2 = workflow(
-            "wf-2",
-            vec![step("a", WorkflowStepType::Trigger, &[])],
-            "a",
-        );
+        let mut w2 = workflow("wf-2", vec![step("a", WorkflowStepType::Trigger, &[])], "a");
         w2.workspace_id = "ws-2".into();
         store.put_workflow(w2).unwrap();
         let in_ws1 = store.list_workflows("ws-1");

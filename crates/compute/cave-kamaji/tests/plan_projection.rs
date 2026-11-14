@@ -3,11 +3,11 @@
 //! Strict-TDD spec for the REST plan projections that surface the new
 //! control-plane / datastore / reconcile ports over the Kamaji HTTP API.
 
+use cave_kamaji::connection::Driver;
 use cave_kamaji::models::{TenantControlPlane, TenantPhase, TenantSpec, TenantStatus};
 use cave_kamaji::routes::{
     component_plan_json, driver_from_data_store, reconcile_plan_json, status_plan_json,
 };
-use cave_kamaji::connection::Driver;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -65,7 +65,10 @@ fn reconcile_plan_exposes_pipeline_and_isolated_datastore() {
     let v = reconcile_plan_json(&tcp("postgres"));
     assert_eq!(v["phase"], "provisioning");
     let pipe = v["pipeline"].as_array().unwrap();
-    assert_eq!(pipe.first().and_then(|s| s.as_str()), Some("datastore-migrate"));
+    assert_eq!(
+        pipe.first().and_then(|s| s.as_str()),
+        Some("datastore-migrate")
+    );
     assert_eq!(pipe.last().and_then(|s| s.as_str()), Some("ingress"));
     // datastore isolation: per-tenant schema/user derived from ns_name
     assert_eq!(v["datastore"]["schema"], "tenants_alpha");

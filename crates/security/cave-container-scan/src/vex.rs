@@ -193,11 +193,7 @@ impl OpenVex {
     pub fn filter(&self, findings: Vec<Finding>) -> FilterOutcome {
         let mut outcome = FilterOutcome::default();
         for finding in findings {
-            let product = finding
-                .location
-                .package
-                .clone()
-                .unwrap_or_default();
+            let product = finding.location.package.clone().unwrap_or_default();
             let vuln_id = finding.cves.first().cloned().unwrap_or_default();
 
             let hit = if vuln_id.is_empty() {

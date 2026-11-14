@@ -135,7 +135,10 @@ impl BuildConfig {
             a.extend(["-f".to_string(), df.clone()]);
         }
         for arg in &self.build_args {
-            a.extend(["--build-arg".to_string(), format!("{}={}", arg.name, arg.value)]);
+            a.extend([
+                "--build-arg".to_string(),
+                format!("{}={}", arg.name, arg.value),
+            ]);
         }
         if let Some(cache) = &self.cache {
             for src in &cache.cache_from {
@@ -152,7 +155,10 @@ impl BuildConfig {
             a.extend(["--dockerfile".to_string(), df.clone()]);
         }
         for arg in &self.build_args {
-            a.extend(["--build-arg".to_string(), format!("{}={}", arg.name, arg.value)]);
+            a.extend([
+                "--build-arg".to_string(),
+                format!("{}={}", arg.name, arg.value),
+            ]);
         }
         if let Some(cache) = &self.cache {
             a.push("--cache=true".to_string());
@@ -174,7 +180,11 @@ impl BuildConfig {
     }
 
     fn s2i_args(&self) -> Vec<String> {
-        vec!["build".to_string(), self.context.clone(), self.image.clone()]
+        vec![
+            "build".to_string(),
+            self.context.clone(),
+            self.image.clone(),
+        ]
     }
 }
 
@@ -197,7 +207,10 @@ mod tests {
     use super::*;
 
     fn param(name: &str, value: &str) -> BuildParam {
-        BuildParam { name: name.to_string(), value: value.to_string() }
+        BuildParam {
+            name: name.to_string(),
+            value: value.to_string(),
+        }
     }
 
     #[test]
@@ -213,7 +226,10 @@ mod tests {
     #[test]
     fn test_build_arg_included_in_docker_args() {
         let mut cfg = BuildConfig::dockerfile("img:v1", ".");
-        cfg.build_args.push(BuildArg { name: "APP_VERSION".to_string(), value: "1.2".to_string() });
+        cfg.build_args.push(BuildArg {
+            name: "APP_VERSION".to_string(),
+            value: "1.2".to_string(),
+        });
         let args = cfg.cli_args();
         assert!(args.contains(&"--build-arg".to_string()));
         assert!(args.contains(&"APP_VERSION=1.2".to_string()));

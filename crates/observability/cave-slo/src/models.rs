@@ -60,11 +60,22 @@ impl SloIndicator {
                 let bad = total.saturating_sub(*good);
                 bad as f64 / *total as f64 * 100.0
             }
-            SloIndicator::Latency { p99_ms, threshold_ms } => {
-                if p99_ms < threshold_ms { 0.0 } else { 100.0 }
+            SloIndicator::Latency {
+                p99_ms,
+                threshold_ms,
+            } => {
+                if p99_ms < threshold_ms {
+                    0.0
+                } else {
+                    100.0
+                }
             }
             SloIndicator::Threshold { value, threshold } => {
-                if value < threshold { 0.0 } else { 100.0 }
+                if value < threshold {
+                    0.0
+                } else {
+                    100.0
+                }
             }
         }
     }

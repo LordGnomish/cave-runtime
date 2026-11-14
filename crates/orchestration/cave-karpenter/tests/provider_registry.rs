@@ -11,8 +11,8 @@
 
 use cave_karpenter::models::NodeClass;
 use cave_karpenter::provider::{
-    AzureNodeClassSpec, Ec2NodeClassSpec, GceNodeClassSpec, HetznerNodeClassSpec,
-    NodeClassKind, ProviderRegistration, ProviderRegistry, StaticProvider, default_registry,
+    AzureNodeClassSpec, Ec2NodeClassSpec, GceNodeClassSpec, HetznerNodeClassSpec, NodeClassKind,
+    ProviderRegistration, ProviderRegistry, StaticProvider, default_registry,
 };
 
 fn node_class(group: &str, kind: &str) -> NodeClass {

@@ -70,7 +70,10 @@ impl IncidentStore {
         let map = self.incidents.read().unwrap();
         map.values()
             .filter(|i| {
-                matches!(i.status, IncidentStatus::Open | IncidentStatus::Acknowledged)
+                matches!(
+                    i.status,
+                    IncidentStatus::Open | IncidentStatus::Acknowledged
+                )
             })
             .cloned()
             .collect()

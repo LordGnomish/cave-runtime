@@ -35,7 +35,11 @@ impl DependencyGraph {
         self.edges.entry(name).or_default();
     }
 
-    pub fn add_edge(&mut self, from: impl Into<String>, to: impl Into<String>) -> Result<(), ResolveError> {
+    pub fn add_edge(
+        &mut self,
+        from: impl Into<String>,
+        to: impl Into<String>,
+    ) -> Result<(), ResolveError> {
         let from = from.into();
         let to = to.into();
         if !self.nodes.contains(&from) {
@@ -54,11 +58,8 @@ impl DependencyGraph {
 
     /// Return the install order: dependencies first.
     pub fn topo_sort(&self) -> Result<Vec<String>, ResolveError> {
-        let mut in_degree: BTreeMap<String, usize> = self
-            .nodes
-            .iter()
-            .map(|n| (n.clone(), 0))
-            .collect();
+        let mut in_degree: BTreeMap<String, usize> =
+            self.nodes.iter().map(|n| (n.clone(), 0)).collect();
         for (from, deps) in &self.edges {
             for to in deps {
                 // Edge from→to means `from` depends on `to`; so `to` must be
@@ -145,12 +146,14 @@ mod tests {
         let order = g.topo_sort().unwrap();
         assert_eq!(
             order.iter().position(|n| n == "c").unwrap()
-                < order.iter().position(|n| n == "b").unwrap()
-        , true);
+                < order.iter().position(|n| n == "b").unwrap(),
+            true
+        );
         assert_eq!(
             order.iter().position(|n| n == "b").unwrap()
-                < order.iter().position(|n| n == "a").unwrap()
-        , true);
+                < order.iter().position(|n| n == "a").unwrap(),
+            true
+        );
     }
 
     #[test]

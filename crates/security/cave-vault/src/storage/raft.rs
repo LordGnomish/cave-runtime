@@ -752,8 +752,22 @@ mod tests {
         f.bump_term(2);
         assert_eq!(f.last_log_term(), 0);
         let entries = vec![
-            LogEntry { index: 1, term: 2, op: LogOp::Put { path: "kv/a".into(), value: b"1".to_vec() } },
-            LogEntry { index: 2, term: 2, op: LogOp::Put { path: "kv/b".into(), value: b"2".to_vec() } },
+            LogEntry {
+                index: 1,
+                term: 2,
+                op: LogOp::Put {
+                    path: "kv/a".into(),
+                    value: b"1".to_vec(),
+                },
+            },
+            LogEntry {
+                index: 2,
+                term: 2,
+                op: LogOp::Put {
+                    path: "kv/b".into(),
+                    value: b"2".to_vec(),
+                },
+            },
         ];
         assert!(f.append_entries(0, 0, entries, 2).unwrap());
         assert_eq!(f.last_log_index(), 2);
@@ -770,7 +784,11 @@ mod tests {
         // Heartbeat advertises a leader_commit ahead of what we've received.
         let f = RaftBackend::new();
         f.bump_term(1);
-        let e = vec![LogEntry { index: 1, term: 1, op: LogOp::Noop }];
+        let e = vec![LogEntry {
+            index: 1,
+            term: 1,
+            op: LogOp::Noop,
+        }];
         assert!(f.append_entries(0, 0, e, 99).unwrap());
         assert_eq!(f.commit_index(), 1, "commit clamped to local last index");
     }

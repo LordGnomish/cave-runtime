@@ -24,7 +24,10 @@ pub enum ExecutorError {
     #[error("Step '{step}' timed out after {seconds}s")]
     Timeout { step: String, seconds: u64 },
     #[error("IO error launching step '{step}': {source}")]
-    Io { step: String, source: std::io::Error },
+    Io {
+        step: String,
+        source: std::io::Error,
+    },
 }
 
 pub type ExecutorResult<T> = Result<T, ExecutorError>;
@@ -51,7 +54,10 @@ pub struct StepExecutor;
 
 /// Build a params lookup map from a slice of Param.
 fn params_map(params: &[Param]) -> HashMap<String, ParamValue> {
-    params.iter().map(|p| (p.name.clone(), p.value.clone())).collect()
+    params
+        .iter()
+        .map(|p| (p.name.clone(), p.value.clone()))
+        .collect()
 }
 
 impl StepExecutor {
@@ -114,17 +120,16 @@ impl StepExecutor {
         cmd.stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 
-        let output =
-            tokio::time::timeout(Duration::from_secs(timeout_secs), cmd.output())
-                .await
-                .map_err(|_| ExecutorError::Timeout {
-                    step: step.name.clone(),
-                    seconds: timeout_secs,
-                })?
-                .map_err(|e| ExecutorError::Io {
-                    step: step.name.clone(),
-                    source: e,
-                })?;
+        let output = tokio::time::timeout(Duration::from_secs(timeout_secs), cmd.output())
+            .await
+            .map_err(|_| ExecutorError::Timeout {
+                step: step.name.clone(),
+                seconds: timeout_secs,
+            })?
+            .map_err(|e| ExecutorError::Io {
+                step: step.name.clone(),
+                source: e,
+            })?;
 
         let exit_code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -139,7 +144,14 @@ impl StepExecutor {
             });
         }
 
-        Ok(StepOutput { step_name: step.name.clone(), stdout, stderr, exit_code, started_at, completed_at })
+        Ok(StepOutput {
+            step_name: step.name.clone(),
+            stdout,
+            stderr,
+            exit_code,
+            started_at,
+            completed_at,
+        })
     }
 }
 
@@ -188,7 +200,9 @@ mod tests {
     #[tokio::test]
     async fn test_step_success_exit_zero() {
         let step = simple_step("echo", vec!["echo", "hello"]);
-        let log = StepExecutor::execute(&step, &[], &HashMap::new()).await.unwrap();
+        let log = StepExecutor::execute(&step, &[], &HashMap::new())
+            .await
+            .unwrap();
         assert_eq!(log.exit_code, 0);
         assert!(log.stdout.contains("hello"));
     }
@@ -197,7 +211,10 @@ mod tests {
     async fn test_step_failure_nonzero_exit() {
         let step = simple_step("fail", vec!["false"]);
         let result = StepExecutor::execute(&step, &[], &HashMap::new()).await;
-        assert!(matches!(result, Err(ExecutorError::StepFailed { exit_code: 1, .. })));
+        assert!(matches!(
+            result,
+            Err(ExecutorError::StepFailed { exit_code: 1, .. })
+        ));
     }
 
     #[tokio::test]
@@ -217,7 +234,9 @@ mod tests {
             resources: None,
             security_context: None,
         };
-        let log = StepExecutor::execute(&step, &[], &HashMap::new()).await.unwrap();
+        let log = StepExecutor::execute(&step, &[], &HashMap::new())
+            .await
+            .unwrap();
         assert!(log.stderr.contains("error_msg"));
     }
 
@@ -238,8 +257,13 @@ mod tests {
             resources: None,
             security_context: None,
         };
-        let params = vec![Param { name: "greeting".to_string(), value: ParamValue::String("world".to_string()) }];
-        let log = StepExecutor::execute(&step, &params, &HashMap::new()).await.unwrap();
+        let params = vec![Param {
+            name: "greeting".to_string(),
+            value: ParamValue::String("world".to_string()),
+        }];
+        let log = StepExecutor::execute(&step, &params, &HashMap::new())
+            .await
+            .unwrap();
         assert!(log.stdout.contains("world"));
     }
 
@@ -248,7 +272,11 @@ mod tests {
         let step = Step {
             name: "env-step".to_string(),
             image: "busybox".to_string(),
-            command: Some(vec!["sh".to_string(), "-c".to_string(), "echo $MY_VAR".to_string()]),
+            command: Some(vec![
+                "sh".to_string(),
+                "-c".to_string(),
+                "echo $MY_VAR".to_string(),
+            ]),
             args: vec![],
             env: vec![EnvVar {
                 name: "MY_VAR".to_string(),
@@ -264,7 +292,9 @@ mod tests {
             resources: None,
             security_context: None,
         };
-        let log = StepExecutor::execute(&step, &[], &HashMap::new()).await.unwrap();
+        let log = StepExecutor::execute(&step, &[], &HashMap::new())
+            .await
+            .unwrap();
         assert!(log.stdout.contains("injected"));
     }
 }

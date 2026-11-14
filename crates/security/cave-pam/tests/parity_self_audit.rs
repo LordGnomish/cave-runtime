@@ -25,8 +25,14 @@ fn read_manifest() -> String {
 #[test]
 fn g1_upstream_version_pinned() {
     let m = read_manifest();
-    assert!(m.contains("version"), "G1: [upstream] version must be present");
-    assert!(m.contains("source_sha"), "G1: [upstream] source_sha must be present");
+    assert!(
+        m.contains("version"),
+        "G1: [upstream] version must be present"
+    );
+    assert!(
+        m.contains("source_sha"),
+        "G1: [upstream] source_sha must be present"
+    );
 }
 
 /// G2: every .rs source file has the SPDX header.
@@ -42,8 +48,7 @@ fn g2_spdx_on_all_rs_files() {
         }
         for entry in walkdir(dir) {
             if entry.extension().and_then(|e| e.to_str()) == Some("rs") {
-                let contents = std::fs::read_to_string(&entry)
-                    .unwrap_or_default();
+                let contents = std::fs::read_to_string(&entry).unwrap_or_default();
                 assert!(
                     contents.starts_with(header),
                     "G2: {} is missing SPDX header",
@@ -162,7 +167,9 @@ fn g8_routes_handler_exists() {
     let contents = std::fs::read_to_string(&routes_path).expect("G8: routes.rs missing");
     // Must have at least one GET/POST handler beyond health.
     assert!(
-        contents.contains("sessions") || contents.contains("requests") || contents.contains("nodes"),
+        contents.contains("sessions")
+            || contents.contains("requests")
+            || contents.contains("nodes"),
         "G8: routes.rs must expose PAM endpoints beyond /health"
     );
 }

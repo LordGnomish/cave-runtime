@@ -282,27 +282,27 @@ mod cycle_1779208173_a2 {
 #[cfg(test)]
 mod cycle_1779441287_a2 {
     use cave_karpenter::MODULE_NAME;
+    use cave_karpenter::Store;
     use cave_karpenter::UPSTREAM_REPO;
     use cave_karpenter::UPSTREAM_VERSION;
-    use cave_karpenter::Store;
     use cave_karpenter::batcher::Batcher;
-    use cave_karpenter::binpack::binpack;
     use cave_karpenter::binpack::BinpackResult;
     use cave_karpenter::binpack::InstanceAssignment;
     use cave_karpenter::binpack::InstanceType;
+    use cave_karpenter::binpack::binpack;
+    use cave_karpenter::disruption::Decision;
+    use cave_karpenter::disruption::DisruptionReason;
     use cave_karpenter::disruption::consolidation_candidates;
     use cave_karpenter::disruption::drift_candidates;
     use cave_karpenter::disruption::expiration_candidates;
-    use cave_karpenter::disruption::Decision;
-    use cave_karpenter::disruption::DisruptionReason;
     use cave_karpenter::disruption::parse_duration;
-    use cave_karpenter::drain::drain_all_no_pdb;
     use cave_karpenter::drain::DrainPlan;
     use cave_karpenter::drain::DrainStatus;
     use cave_karpenter::drain::EvictionDecision;
     use cave_karpenter::drain::PodDescriptor;
     use cave_karpenter::drain::PodDisruptionBudget;
     use cave_karpenter::drain::PodOwnerKind;
+    use cave_karpenter::drain::drain_all_no_pdb;
     use cave_karpenter::models::NodeClaim;
     use cave_karpenter::models::NodePool;
     use cave_karpenter::models::Requirement;

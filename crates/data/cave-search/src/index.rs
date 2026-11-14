@@ -30,7 +30,10 @@ pub struct PostingList {
 impl PostingList {
     /// Create an empty posting list.
     pub fn new() -> Self {
-        PostingList { entries: HashMap::new(), total_tf: 0 }
+        PostingList {
+            entries: HashMap::new(),
+            total_tf: 0,
+        }
     }
 
     /// Record that term appears `term_freq` times in `doc_id`.
@@ -84,7 +87,11 @@ impl PostingList {
         let mut result = PostingList::new();
         for list in lists {
             for (doc_id, tf) in list.iter() {
-                let current = result.entries.get(&doc_id).map(|e| e.term_freq).unwrap_or(0);
+                let current = result
+                    .entries
+                    .get(&doc_id)
+                    .map(|e| e.term_freq)
+                    .unwrap_or(0);
                 result.add_doc(doc_id, current + tf);
             }
         }
@@ -93,7 +100,9 @@ impl PostingList {
 }
 
 impl Default for PostingList {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// In-memory inverted index for a single tenant namespace.
@@ -122,10 +131,14 @@ impl Index {
     }
 
     /// Return the index name.
-    pub fn id(&self) -> &str { &self.name }
+    pub fn id(&self) -> &str {
+        &self.name
+    }
 
     /// Return the tenant that owns this index.
-    pub fn tenant(&self) -> &TenantId { &self.tenant }
+    pub fn tenant(&self) -> &TenantId {
+        &self.tenant
+    }
 
     /// Index `doc_id` with the given `text`. Re-indexing replaces old postings.
     pub fn add_document(&mut self, doc_id: u32, text: &str) {
@@ -172,7 +185,9 @@ impl Index {
 
     /// Return candidate doc IDs for a phrase: intersection of posting lists for all terms.
     pub fn phrase_candidates(&self, terms: &[String]) -> Vec<u32> {
-        if terms.is_empty() { return Vec::new(); }
+        if terms.is_empty() {
+            return Vec::new();
+        }
         let mut iter = terms.iter().map(|t| {
             self.get_doc_ids_for_term(t)
                 .into_iter()
@@ -191,17 +206,22 @@ impl Index {
             Some(t) => t,
             None => return false,
         };
-        if terms.is_empty() || terms.len() > doc_toks.len() { return false; }
+        if terms.is_empty() || terms.len() > doc_toks.len() {
+            return false;
+        }
         let first = terms[0].to_lowercase();
         doc_toks
             .iter()
             .enumerate()
             .filter(|(_, t)| **t == first)
             .any(|(i, _)| {
-                if i + terms.len() > doc_toks.len() { return false; }
-                terms.iter().enumerate().all(|(j, term)| {
-                    doc_toks[i + j].to_lowercase() == term.to_lowercase()
-                })
+                if i + terms.len() > doc_toks.len() {
+                    return false;
+                }
+                terms
+                    .iter()
+                    .enumerate()
+                    .all(|(j, term)| doc_toks[i + j].to_lowercase() == term.to_lowercase())
             })
     }
 
@@ -221,11 +241,15 @@ impl Index {
     }
 
     /// Number of live documents in this index.
-    pub fn doc_count(&self) -> usize { self.doc_lengths.len() }
+    pub fn doc_count(&self) -> usize {
+        self.doc_lengths.len()
+    }
 
     /// Average document length (in tokens). Returns 0.0 if empty.
     pub fn avg_doc_len(&self) -> f64 {
-        if self.doc_lengths.is_empty() { return 0.0; }
+        if self.doc_lengths.is_empty() {
+            return 0.0;
+        }
         let total: u32 = self.doc_lengths.values().sum();
         total as f64 / self.doc_lengths.len() as f64
     }

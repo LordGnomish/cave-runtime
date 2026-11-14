@@ -6,9 +6,7 @@
 
 use std::collections::HashMap;
 
-use cave_runtime_tracker::{
-    poll_all, DailyReport, DriftStatus, ReleaseFetcher, TrackerConfig,
-};
+use cave_runtime_tracker::{DailyReport, DriftStatus, ReleaseFetcher, TrackerConfig, poll_all};
 
 /// Deterministic offline fetcher: returns a fixed "latest" for every
 /// repo it is asked about, so the whole registry resolves.
@@ -31,13 +29,21 @@ async fn full_pipeline_emits_markdown_with_every_subsystem() {
     // carries the fetched tag.
     assert!(summary.unresolved.is_empty(), "all repos should resolve");
     assert_eq!(summary.total(), cfg.upstreams.len());
-    assert!(summary.results.iter().all(|r| r.latest.as_deref() == Some("v9.9.9")));
+    assert!(
+        summary
+            .results
+            .iter()
+            .all(|r| r.latest.as_deref() == Some("v9.9.9"))
+    );
     // The registry now ships curated pins (cont2): pinned rows whose
     // baseline differs from the fetched v9.9.9 are Behind; the remaining
     // unpinned rows are honestly Unknown. Together they cover every row,
     // and the Behind count equals the number of pinned rows.
     let pinned = cfg.upstreams.iter().filter(|u| u.pinned.is_some()).count();
-    assert!(pinned >= 50, "expected curated pins in the default registry");
+    assert!(
+        pinned >= 50,
+        "expected curated pins in the default registry"
+    );
     assert_eq!(summary.count(DriftStatus::Behind), pinned);
     assert_eq!(
         summary.count(DriftStatus::Behind) + summary.count(DriftStatus::Unknown),
@@ -54,9 +60,7 @@ async fn full_pipeline_emits_markdown_with_every_subsystem() {
 
     // Persist and re-read, mimicking the LaunchAgent's `report` run.
     let dir = tempfile::tempdir().unwrap();
-    let (json_path, md_path) = report
-        .write_to_dir(dir.path(), "2026-06-07", true)
-        .unwrap();
+    let (json_path, md_path) = report.write_to_dir(dir.path(), "2026-06-07", true).unwrap();
     assert!(json_path.exists() && md_path.exists());
     let on_disk = std::fs::read_to_string(&md_path).unwrap();
     assert!(on_disk.contains("# cave-runtime-tracker"));

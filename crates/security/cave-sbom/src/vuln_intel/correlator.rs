@@ -93,9 +93,10 @@ pub fn correlate(
         if unique_sources.len() > 1 {
             multi_source += 1;
         }
-        let max_cvss = items.iter().filter_map(|v| v.cvss_v3_base).fold(None, |acc, x| {
-            Some(acc.map(|a: f32| a.max(x)).unwrap_or(x))
-        });
+        let max_cvss = items
+            .iter()
+            .filter_map(|v| v.cvss_v3_base)
+            .fold(None, |acc, x| Some(acc.map(|a: f32| a.max(x)).unwrap_or(x)));
         let severity = items
             .iter()
             .map(|v| v.severity)
@@ -144,14 +145,22 @@ struct UnionFind {
 
 impl UnionFind {
     fn insert(&mut self, x: &str) {
-        self.parent.entry(x.to_string()).or_insert_with(|| x.to_string());
+        self.parent
+            .entry(x.to_string())
+            .or_insert_with(|| x.to_string());
     }
 
     fn find(&mut self, x: &str) -> String {
         let mut cur = x.to_string();
-        self.parent.entry(cur.clone()).or_insert_with(|| cur.clone());
+        self.parent
+            .entry(cur.clone())
+            .or_insert_with(|| cur.clone());
         loop {
-            let p = self.parent.get(&cur).cloned().unwrap_or_else(|| cur.clone());
+            let p = self
+                .parent
+                .get(&cur)
+                .cloned()
+                .unwrap_or_else(|| cur.clone());
             if p == cur {
                 return cur;
             }
@@ -246,10 +255,7 @@ mod tests {
     fn aliases_cluster_cross_source_ids() {
         let a = mk("CVE-2024-1", VulnSource::Nvd, Severity::High, Some(8.0));
         let b = mk("GHSA-x-y-z", VulnSource::Ghsa, Severity::High, Some(7.0));
-        let (out, stats) = correlate(
-            vec![a, b],
-            &[("CVE-2024-1".into(), "GHSA-x-y-z".into())],
-        );
+        let (out, stats) = correlate(vec![a, b], &[("CVE-2024-1".into(), "GHSA-x-y-z".into())]);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].canonical_id, "CVE-2024-1");
         assert!(out[0].aliases.iter().any(|a| a == "GHSA-x-y-z"));

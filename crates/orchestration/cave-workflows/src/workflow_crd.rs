@@ -114,13 +114,34 @@ pub struct Artifact {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "kind")]
 pub enum ArtifactRepository {
-    S3 { bucket: String, key: String },
-    Gcs { bucket: String, key: String },
-    Http { url: String },
-    Git { repo: String, revision: String, depth: Option<u32> },
-    Oss { bucket: String, key: String, endpoint: String },
-    Raw { data: String },
-    Hdfs { addresses: Vec<String>, path: String },
+    S3 {
+        bucket: String,
+        key: String,
+    },
+    Gcs {
+        bucket: String,
+        key: String,
+    },
+    Http {
+        url: String,
+    },
+    Git {
+        repo: String,
+        revision: String,
+        depth: Option<u32>,
+    },
+    Oss {
+        bucket: String,
+        key: String,
+        endpoint: String,
+    },
+    Raw {
+        data: String,
+    },
+    Hdfs {
+        addresses: Vec<String>,
+        path: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -354,7 +375,10 @@ fn detect_cycle_in_dag(tasks: &[DagTask]) -> Result<(), Vec<String>> {
     use std::collections::{HashMap as M, HashSet, VecDeque};
     let names: HashSet<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
     let mut in_deg: M<&str, usize> = tasks.iter().map(|t| (t.name.as_str(), 0)).collect();
-    let mut adj: M<&str, Vec<&str>> = tasks.iter().map(|t| (t.name.as_str(), Vec::new())).collect();
+    let mut adj: M<&str, Vec<&str>> = tasks
+        .iter()
+        .map(|t| (t.name.as_str(), Vec::new()))
+        .collect();
     for t in tasks {
         for d in &t.dependencies {
             if let Some(d) = names.get(d.as_str()) {
@@ -395,7 +419,10 @@ pub fn topo_order(tasks: &[DagTask]) -> Result<Vec<String>, Vec<String>> {
     use std::collections::{HashMap as M, HashSet, VecDeque};
     let names: HashSet<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
     let mut in_deg: M<&str, usize> = tasks.iter().map(|t| (t.name.as_str(), 0)).collect();
-    let mut adj: M<&str, Vec<&str>> = tasks.iter().map(|t| (t.name.as_str(), Vec::new())).collect();
+    let mut adj: M<&str, Vec<&str>> = tasks
+        .iter()
+        .map(|t| (t.name.as_str(), Vec::new()))
+        .collect();
     for t in tasks {
         for d in &t.dependencies {
             if let Some(d) = names.get(d.as_str()) {
@@ -628,7 +655,10 @@ mod tests {
         };
         let j = serde_json::to_string(&a).unwrap();
         let back: Artifact = serde_json::from_str(&j).unwrap();
-        assert!(matches!(back.repository, Some(ArtifactRepository::S3 { .. })));
+        assert!(matches!(
+            back.repository,
+            Some(ArtifactRepository::S3 { .. })
+        ));
     }
 
     #[test]

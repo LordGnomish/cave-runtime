@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Tests for status page model and retry logic.
 
+use cave_uptime::models::{ProbeType, UptimeProbe};
+use cave_uptime::retry::{RetryConfig, RetryResult, execute_with_retry};
 use cave_uptime::status::{
     MonitorStatus, ProbeStatusSummary, StatusPage, StatusPageEntry, build_status_page,
 };
-use cave_uptime::retry::{RetryConfig, RetryResult, execute_with_retry};
-use cave_uptime::models::{ProbeType, UptimeProbe};
 use uuid::Uuid;
 
 // ─── MonitorStatus ────────────────────────────────────────────────────────────
@@ -128,7 +128,10 @@ fn test_retry_config_custom() {
     let delay2 = cfg.delay_for_attempt(1);
     assert!(delay2 > delay1, "delay should increase with attempt");
     let delay_max = cfg.delay_for_attempt(100);
-    assert!(delay_max <= cfg.max_delay_ms, "delay capped at max_delay_ms");
+    assert!(
+        delay_max <= cfg.max_delay_ms,
+        "delay capped at max_delay_ms"
+    );
 }
 
 #[tokio::test]
@@ -138,7 +141,8 @@ async fn test_execute_with_retry_immediate_success() {
     let result = execute_with_retry(&cfg, || {
         call_count += 1;
         async { Ok::<u32, String>(42) }
-    }).await;
+    })
+    .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 42);
     assert_eq!(call_count, 1, "should succeed on first attempt");
@@ -163,7 +167,8 @@ async fn test_execute_with_retry_eventual_success() {
                 Ok::<u32, String>(99)
             }
         }
-    }).await;
+    })
+    .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 99);
     assert_eq!(call_count, 3);
@@ -177,9 +182,10 @@ async fn test_execute_with_retry_all_fail() {
         max_delay_ms: 10,
         backoff_multiplier: 1.0,
     };
-    let result = execute_with_retry(&cfg, || {
-        async { Err::<u32, String>("always fails".to_string()) }
-    }).await;
+    let result = execute_with_retry(&cfg, || async {
+        Err::<u32, String>("always fails".to_string())
+    })
+    .await;
     assert!(result.is_err());
 }
 

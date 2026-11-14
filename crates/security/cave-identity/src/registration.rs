@@ -175,17 +175,17 @@ mod tests {
         );
         e.id = "fixed".to_string();
         s.create(e.clone()).unwrap();
-        assert!(matches!(
-            s.create(e),
-            Err(IdentityError::EntryExists(_))
-        ));
+        assert!(matches!(s.create(e), Err(IdentityError::EntryExists(_))));
     }
 
     #[test]
     fn create_rejects_bad_spiffe_id() {
         let s = InMemoryEntryStore::new();
         let e = entry("not-a-spiffe-id", "spiffe://example.org/agent");
-        assert!(matches!(s.create(e), Err(IdentityError::InvalidSpiffeId(_))));
+        assert!(matches!(
+            s.create(e),
+            Err(IdentityError::InvalidSpiffeId(_))
+        ));
     }
 
     #[test]

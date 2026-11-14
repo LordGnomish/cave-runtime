@@ -7,7 +7,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConditionType {
@@ -253,9 +253,11 @@ mod tests {
     fn propagate_empty_makes_ready_false() {
         let xr = propagate_composed_to_xr(&json!({}), &[]);
         let conds = xr["status"]["conditions"].as_array().unwrap();
-        assert!(conds
-            .iter()
-            .any(|c| c["type"] == "Ready" && c["status"] == "False"));
+        assert!(
+            conds
+                .iter()
+                .any(|c| c["type"] == "Ready" && c["status"] == "False")
+        );
     }
 
     #[test]

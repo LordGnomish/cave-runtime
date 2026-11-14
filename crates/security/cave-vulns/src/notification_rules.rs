@@ -141,7 +141,11 @@ mod tests {
             enabled: true,
         };
         assert!(r.matches(&evt(EventKind::SlaBreached, FindingSeverity::Low, None)));
-        assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None)));
+        assert!(!r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None
+        )));
     }
 
     #[test]
@@ -154,9 +158,17 @@ mod tests {
             channels: vec![Channel::Email],
             enabled: true,
         };
-        assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Medium, None)));
+        assert!(!r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Medium,
+            None
+        )));
         assert!(r.matches(&evt(EventKind::FindingCreated, FindingSeverity::High, None)));
-        assert!(r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None)));
+        assert!(r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None
+        )));
     }
 
     #[test]
@@ -169,8 +181,16 @@ mod tests {
             channels: vec![Channel::Webhook],
             enabled: true,
         };
-        assert!(r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Low, Some("acme-portal"))));
-        assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Low, Some("other"))));
+        assert!(r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Low,
+            Some("acme-portal")
+        )));
+        assert!(!r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Low,
+            Some("other")
+        )));
         assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Low, None)));
     }
 
@@ -184,7 +204,11 @@ mod tests {
             channels: vec![Channel::Slack],
             enabled: false,
         };
-        assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None)));
+        assert!(!r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None
+        )));
     }
 
     #[test]
@@ -206,7 +230,11 @@ mod tests {
             channels: vec![Channel::Slack, Channel::Teams],
             enabled: true,
         });
-        let chs = set.route(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None));
+        let chs = set.route(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None,
+        ));
         assert_eq!(chs.len(), 3);
         assert!(chs.contains(&Channel::Slack));
         assert!(chs.contains(&Channel::Email));
@@ -234,7 +262,11 @@ mod tests {
     #[test]
     fn empty_rule_set_routes_no_channels() {
         let set = NotificationRuleSet::new();
-        let chs = set.route(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None));
+        let chs = set.route(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None,
+        ));
         assert!(chs.is_empty());
     }
 
@@ -248,8 +280,16 @@ mod tests {
             channels: vec![Channel::Webhook],
             enabled: true,
         };
-        assert!(r.matches(&evt(EventKind::SlaBreached, FindingSeverity::Critical, None)));
+        assert!(r.matches(&evt(
+            EventKind::SlaBreached,
+            FindingSeverity::Critical,
+            None
+        )));
         assert!(!r.matches(&evt(EventKind::SlaBreached, FindingSeverity::High, None)));
-        assert!(!r.matches(&evt(EventKind::FindingCreated, FindingSeverity::Critical, None)));
+        assert!(!r.matches(&evt(
+            EventKind::FindingCreated,
+            FindingSeverity::Critical,
+            None
+        )));
     }
 }

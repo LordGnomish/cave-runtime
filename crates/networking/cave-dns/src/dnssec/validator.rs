@@ -149,41 +149,62 @@ mod tests {
     #[test]
     fn rrsig_meta_secure_when_modern_and_in_window() {
         let v = Validator::with_root_anchor(500);
-        assert_eq!(v.validate_rrsig_meta(&ed25519_modern_sig()), ValidationOutcome::Secure);
+        assert_eq!(
+            v.validate_rrsig_meta(&ed25519_modern_sig()),
+            ValidationOutcome::Secure
+        );
     }
 
     #[test]
     fn rrsig_meta_bogus_when_expired() {
         let v = Validator::with_root_anchor(5000);
-        assert_eq!(v.validate_rrsig_meta(&ed25519_modern_sig()), ValidationOutcome::Bogus);
+        assert_eq!(
+            v.validate_rrsig_meta(&ed25519_modern_sig()),
+            ValidationOutcome::Bogus
+        );
     }
 
     #[test]
     fn rrsig_meta_insecure_for_legacy_alg() {
         let v = Validator::with_root_anchor(500);
-        assert_eq!(v.validate_rrsig_meta(&legacy_sig()), ValidationOutcome::Insecure);
+        assert_eq!(
+            v.validate_rrsig_meta(&legacy_sig()),
+            ValidationOutcome::Insecure
+        );
     }
 
     #[test]
     fn rrsig_meta_bogus_for_unknown_alg() {
         let v = Validator::with_root_anchor(500);
-        assert_eq!(v.validate_rrsig_meta(&unknown_alg_sig()), ValidationOutcome::Bogus);
+        assert_eq!(
+            v.validate_rrsig_meta(&unknown_alg_sig()),
+            ValidationOutcome::Bogus
+        );
     }
 
     #[test]
     fn nsec_denial_secure_when_covers_or_no_type() {
         let v = Validator::with_root_anchor(500);
         let n = Nsec::new("a.example.com.", "c.example.com.", vec![1]);
-        assert_eq!(v.validate_nsec_denial(&n, "b.example.com.", 28), ValidationOutcome::Secure);
+        assert_eq!(
+            v.validate_nsec_denial(&n, "b.example.com.", 28),
+            ValidationOutcome::Secure
+        );
         let n2 = Nsec::new("svc.example.com.", "tmp.example.com.", vec![1]);
-        assert_eq!(v.validate_nsec_denial(&n2, "svc.example.com.", 28), ValidationOutcome::Secure);
+        assert_eq!(
+            v.validate_nsec_denial(&n2, "svc.example.com.", 28),
+            ValidationOutcome::Secure
+        );
     }
 
     #[test]
     fn nsec_denial_bogus_when_no_proof() {
         let v = Validator::with_root_anchor(500);
         let n = Nsec::new("a.example.com.", "c.example.com.", vec![1]);
-        assert_eq!(v.validate_nsec_denial(&n, "z.example.com.", 28), ValidationOutcome::Bogus);
+        assert_eq!(
+            v.validate_nsec_denial(&n, "z.example.com.", 28),
+            ValidationOutcome::Bogus
+        );
     }
 
     #[test]
@@ -192,6 +213,9 @@ mod tests {
         let params = Nsec3Params::sha1_default();
         let h = super::super::nsec3::hash_name("svc.example.com.", &params);
         let n3 = Nsec3::new(params, h.clone(), vec![0xFF; 20], vec![1]);
-        assert_eq!(v.validate_nsec3_denial(&n3, "svc.example.com.", 28), ValidationOutcome::Secure);
+        assert_eq!(
+            v.validate_nsec3_denial(&n3, "svc.example.com.", 28),
+            ValidationOutcome::Secure
+        );
     }
 }

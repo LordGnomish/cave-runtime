@@ -19,11 +19,7 @@ use cave_datafusion::logical_expr::{BinaryOp, LogicalExpr};
 // appear twice each too, but DataFusion's CSE never hoists trivial leaf
 // nodes (Column / Literal) — only compound expressions count.
 fn ab() -> LogicalExpr {
-    LogicalExpr::binary(
-        LogicalExpr::col("a"),
-        BinaryOp::Plus,
-        LogicalExpr::col("b"),
-    )
+    LogicalExpr::binary(LogicalExpr::col("a"), BinaryOp::Plus, LogicalExpr::col("b"))
 }
 
 #[test]
@@ -44,20 +40,18 @@ fn detects_repeated_compound_subexpr() {
 
     // A leaf column never qualifies as a CSE candidate even though it
     // appears multiple times.
-    assert!(analysis.common_exprs().iter().all(|e| !matches!(
-        e,
-        LogicalExpr::Column { .. } | LogicalExpr::Literal { .. }
-    )));
+    assert!(
+        analysis
+            .common_exprs()
+            .iter()
+            .all(|e| !matches!(e, LogicalExpr::Column { .. } | LogicalExpr::Literal { .. }))
+    );
 }
 
 #[test]
 fn no_common_when_all_distinct() {
     // SELECT a + b, c - d  — nothing repeats.
-    let e1 = LogicalExpr::binary(
-        LogicalExpr::col("a"),
-        BinaryOp::Plus,
-        LogicalExpr::col("b"),
-    );
+    let e1 = LogicalExpr::binary(LogicalExpr::col("a"), BinaryOp::Plus, LogicalExpr::col("b"));
     let e2 = LogicalExpr::binary(
         LogicalExpr::col("c"),
         BinaryOp::Minus,

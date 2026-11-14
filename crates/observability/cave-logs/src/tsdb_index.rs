@@ -205,10 +205,7 @@ mod tests {
 
         let hits = idx.select(
             &"t1".into(),
-            &[
-                ("app".into(), "api".into()),
-                ("env".into(), "prod".into()),
-            ],
+            &[("app".into(), "api".into()), ("env".into(), "prod".into())],
         );
         assert_eq!(hits.len(), 1);
         assert!(hits.contains(&a.fingerprint()));

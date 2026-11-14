@@ -61,7 +61,7 @@ pub fn capability_name(bit: u64) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::process::{cap, Credentials, Namespaces};
+    use crate::process::{Credentials, Namespaces, cap};
     use chrono::TimeZone;
 
     fn ts() -> DateTime<Utc> {

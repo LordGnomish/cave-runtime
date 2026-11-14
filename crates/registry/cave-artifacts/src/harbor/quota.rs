@@ -60,7 +60,9 @@ pub struct ResourceList {
 
 impl ResourceList {
     pub fn new() -> Self {
-        Self { inner: BTreeMap::new() }
+        Self {
+            inner: BTreeMap::new(),
+        }
     }
 
     /// Builder-style insert (used by callers + tests).
@@ -173,7 +175,9 @@ impl QuotaUsage {
         if exceeded.is_empty() {
             Ok(())
         } else {
-            Err(QuotaError::Exceeded { resources: exceeded })
+            Err(QuotaError::Exceeded {
+                resources: exceeded,
+            })
         }
     }
 

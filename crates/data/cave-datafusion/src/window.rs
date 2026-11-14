@@ -114,9 +114,7 @@ fn lag_or_lead(values: &[Value], offset: usize, lag: bool) -> Vec<Value> {
             let j = i + offset;
             if j < n { Some(j) } else { None }
         };
-        let v = neighbour
-            .map(|k| values[k].clone())
-            .unwrap_or(Value::Null);
+        let v = neighbour.map(|k| values[k].clone()).unwrap_or(Value::Null);
         out.push(v);
     }
     out
@@ -140,7 +138,12 @@ fn ntile(n: usize, buckets: usize) -> Result<Vec<Value>, String> {
         if consumed_in_bucket == bucket_size {
             bucket += 1;
             consumed_in_bucket = 0;
-            bucket_size = base + if buckets_with_extra_used < extra { 1 } else { 0 };
+            bucket_size = base
+                + if buckets_with_extra_used < extra {
+                    1
+                } else {
+                    0
+                };
             if buckets_with_extra_used < extra {
                 buckets_with_extra_used += 1;
             }
@@ -161,8 +164,12 @@ mod tests {
 
     #[test]
     fn row_number_enumerates_sequentially() {
-        let out = evaluate(&WindowFunction::RowNumber, &vals(&[10, 20, 30]), &vals(&[10, 20, 30]))
-            .unwrap();
+        let out = evaluate(
+            &WindowFunction::RowNumber,
+            &vals(&[10, 20, 30]),
+            &vals(&[10, 20, 30]),
+        )
+        .unwrap();
         assert_eq!(out, vec![Value::Int64(1), Value::Int64(2), Value::Int64(3)]);
     }
 

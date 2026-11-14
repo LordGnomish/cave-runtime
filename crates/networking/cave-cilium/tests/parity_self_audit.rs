@@ -116,7 +116,11 @@ fn counts_sum_to_total_and_match_blocks() {
     let skipped = read_u64(&m, "skipped_count");
     let unmapped = read_u64(&m, "unmapped_count");
     let total = read_u64(&m, "total");
-    assert_eq!(mapped + partial + skipped + unmapped, total, "counts sum to total");
+    assert_eq!(
+        mapped + partial + skipped + unmapped,
+        total,
+        "counts sum to total"
+    );
 
     // Scalar counts must match the actual block counts.
     assert_eq!(m.matches("\n[[mapped]]").count() as u64, mapped);

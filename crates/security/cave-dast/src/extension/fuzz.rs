@@ -33,12 +33,18 @@ pub enum PayloadProcessor {
     UrlEncode,
     Base64Encode,
     Md5Hash,
-    Prefix { value: String },
-    Suffix { value: String },
+    Prefix {
+        value: String,
+    },
+    Suffix {
+        value: String,
+    },
     UpperCase,
     LowerCase,
     /// Reject (filter out) payloads not matching the substring.
-    FilterContains { needle: String },
+    FilterContains {
+        needle: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -70,9 +76,7 @@ pub fn generate(generator: &PayloadGenerator) -> Vec<String> {
             out
         }
         PayloadGenerator::AllBytes => (0u8..=255).map(|b| format!("\\x{:02x}", b)).collect(),
-        PayloadGenerator::FileContent { content } => {
-            content.lines().map(String::from).collect()
-        }
+        PayloadGenerator::FileContent { content } => content.lines().map(String::from).collect(),
     }
 }
 
@@ -179,7 +183,8 @@ fn md5_hex(input: &[u8]) -> String {
         msg.push(0);
     }
     msg.extend_from_slice(&bit_len.to_le_bytes());
-    let (mut a0, mut b0, mut c0, mut d0) = (0x67452301u32, 0xefcdab89u32, 0x98badcfeu32, 0x10325476u32);
+    let (mut a0, mut b0, mut c0, mut d0) =
+        (0x67452301u32, 0xefcdab89u32, 0x98badcfeu32, 0x10325476u32);
     for chunk in msg.chunks(64) {
         let mut m = [0u32; 16];
         for i in 0..16 {
@@ -266,9 +271,21 @@ mod tests {
 
     #[test]
     fn prefix_suffix_processors() {
-        let p1 = process("x".into(), &PayloadProcessor::Prefix { value: "pre-".into() }).unwrap();
+        let p1 = process(
+            "x".into(),
+            &PayloadProcessor::Prefix {
+                value: "pre-".into(),
+            },
+        )
+        .unwrap();
         assert_eq!(p1, "pre-x");
-        let p2 = process("y".into(), &PayloadProcessor::Suffix { value: "-end".into() }).unwrap();
+        let p2 = process(
+            "y".into(),
+            &PayloadProcessor::Suffix {
+                value: "-end".into(),
+            },
+        )
+        .unwrap();
         assert_eq!(p2, "y-end");
     }
 
@@ -304,7 +321,9 @@ mod tests {
             },
             processors: vec![
                 PayloadProcessor::Base64Encode,
-                PayloadProcessor::Suffix { value: "==pad".into() },
+                PayloadProcessor::Suffix {
+                    value: "==pad".into(),
+                },
             ],
         };
         let out = run_job(&job);
@@ -317,7 +336,9 @@ mod tests {
             generator: PayloadGenerator::Strings {
                 values: vec!["safe".into(), "evil".into()],
             },
-            processors: vec![PayloadProcessor::FilterContains { needle: "evil".into() }],
+            processors: vec![PayloadProcessor::FilterContains {
+                needle: "evil".into(),
+            }],
         };
         assert_eq!(run_job(&job), vec!["evil"]);
     }

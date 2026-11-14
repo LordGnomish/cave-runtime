@@ -81,7 +81,9 @@ impl ProviderRevisionStore {
         let idx = list
             .iter()
             .position(|r| r.state == RevisionState::Active)
-            .ok_or_else(|| CrossplaneError::Internal(format!("no active revision for {}", package)))?;
+            .ok_or_else(|| {
+                CrossplaneError::Internal(format!("no active revision for {}", package))
+            })?;
         list[idx].state = RevisionState::Inactive;
         Ok(list[idx].clone())
     }

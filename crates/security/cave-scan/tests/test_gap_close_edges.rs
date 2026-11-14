@@ -309,10 +309,7 @@ fn table_summary_counts_by_severity() {
 #[test]
 fn template_substitutes_target_scanner_count() {
     let rep = sample_report();
-    let out = template::render(
-        "tgt={{ target }} sc={{ scanner }} n={{ count }}",
-        &rep,
-    );
+    let out = template::render("tgt={{ target }} sc={{ scanner }} n={{ count }}", &rep);
     assert_eq!(out, "tgt=demo-project sc=cave-scan n=5");
 }
 
@@ -363,7 +360,13 @@ fn target_image_tar_extensions_detected() {
 
 #[test]
 fn target_filesystem_paths_detected() {
-    for s in ["/abs/path", "./rel/path", "../parent", "C:\\Windows", "D:/mnt"] {
+    for s in [
+        "/abs/path",
+        "./rel/path",
+        "../parent",
+        "C:\\Windows",
+        "D:/mnt",
+    ] {
         assert_eq!(
             detect_target(s),
             TargetKind::Filesystem,
@@ -374,18 +377,12 @@ fn target_filesystem_paths_detected() {
 
 #[test]
 fn target_image_reference_when_colon_or_slash_no_path_prefix() {
-    assert_eq!(
-        detect_target("ubuntu:22.04"),
-        TargetKind::ImageReference
-    );
+    assert_eq!(detect_target("ubuntu:22.04"), TargetKind::ImageReference);
     assert_eq!(
         detect_target("ghcr.io/cave-runtime/cave-scan:0.1"),
         TargetKind::ImageReference
     );
-    assert_eq!(
-        detect_target("library/alpine"),
-        TargetKind::ImageReference
-    );
+    assert_eq!(detect_target("library/alpine"), TargetKind::ImageReference);
 }
 
 #[test]
@@ -477,15 +474,15 @@ fn oci_media_type_table_covers_seven_known_types() {
 
 #[test]
 fn layer_compression_gzip_zstd_bzip2_xz_and_none() {
-    assert_eq!(detect_layer_compression(&[0x1f, 0x8b]), LayerCompression::Gzip);
+    assert_eq!(
+        detect_layer_compression(&[0x1f, 0x8b]),
+        LayerCompression::Gzip
+    );
     assert_eq!(
         detect_layer_compression(&[0x28, 0xb5, 0x2f, 0xfd]),
         LayerCompression::Zstd
     );
-    assert_eq!(
-        detect_layer_compression(b"BZh9"),
-        LayerCompression::Bzip2
-    );
+    assert_eq!(detect_layer_compression(b"BZh9"), LayerCompression::Bzip2);
     assert_eq!(
         detect_layer_compression(&[0xfd, b'7', b'z', b'X', b'Z', 0x00]),
         LayerCompression::Xz

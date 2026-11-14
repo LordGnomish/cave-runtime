@@ -6,11 +6,11 @@
 //! on origin/main before this uplift. They are NOT red-first TDD pairs.
 
 use cave_store::engine::{Compare, CompareResult, CompareTarget, MvccEngine, TxnOp, TxnRequest};
+use cave_store::etcd::auth::AuthManager;
+use cave_store::etcd::cluster::ClusterManager;
 use cave_store::s3::store::ObjectStore;
 use cave_store::s3::types::{StorageClass, VersioningState};
 use cave_store::wal::WalWriter;
-use cave_store::etcd::auth::AuthManager;
-use cave_store::etcd::cluster::ClusterManager;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -38,9 +38,18 @@ async fn characterize_mvcc_put_monotonic_revision() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    let r1 = engine.put(b"a".to_vec(), b"1".to_vec(), 0, false).await.unwrap();
-    let r2 = engine.put(b"b".to_vec(), b"2".to_vec(), 0, false).await.unwrap();
-    let r3 = engine.put(b"c".to_vec(), b"3".to_vec(), 0, false).await.unwrap();
+    let r1 = engine
+        .put(b"a".to_vec(), b"1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    let r2 = engine
+        .put(b"b".to_vec(), b"2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    let r3 = engine
+        .put(b"c".to_vec(), b"3".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Each put must bump revision
     assert!(r2.header.revision > r1.header.revision);
@@ -52,11 +61,20 @@ async fn characterize_mvcc_range_all_keys() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"k1".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"k2".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"k1".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"k2".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Range all keys: key=\x00, range_end=\x00 (means all)
-    let r = engine.range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 0, false, false)
+        .await
+        .unwrap();
     assert!(r.kvs.len() >= 2, "should return all keys");
     assert_eq!(r.count, r.kvs.len() as i64);
 }
@@ -66,11 +84,23 @@ async fn characterize_mvcc_version_increments_on_put() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"x".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"x".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
-    engine.put(b"x".to_vec(), b"v3".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"x".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"x".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"x".to_vec(), b"v3".to_vec(), 0, false)
+        .await
+        .unwrap();
 
-    let r = engine.range(b"x".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"x".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 1, "only one live entry for key");
     assert_eq!(r.kvs[0].value, b"v3");
     assert_eq!(r.kvs[0].version, 3, "version must be count of puts");
@@ -81,16 +111,28 @@ async fn characterize_mvcc_historical_read() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    let r1 = engine.put(b"h".to_vec(), b"old".to_vec(), 0, false).await.unwrap();
+    let r1 = engine
+        .put(b"h".to_vec(), b"old".to_vec(), 0, false)
+        .await
+        .unwrap();
     let rev1 = r1.header.revision;
-    engine.put(b"h".to_vec(), b"new".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"h".to_vec(), b"new".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Read at rev1 should return "old"
-    let hist = engine.range(b"h".to_vec(), vec![], rev1, 0, false, false).await.unwrap();
+    let hist = engine
+        .range(b"h".to_vec(), vec![], rev1, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(hist.kvs[0].value, b"old");
 
     // Current should return "new"
-    let curr = engine.range(b"h".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let curr = engine
+        .range(b"h".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(curr.kvs[0].value, b"new");
 }
 
@@ -99,10 +141,19 @@ async fn characterize_mvcc_delete_makes_key_invisible() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"del".to_vec(), b"present".to_vec(), 0, false).await.unwrap();
-    engine.delete_range(b"del".to_vec(), vec![], false).await.unwrap();
+    engine
+        .put(b"del".to_vec(), b"present".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .delete_range(b"del".to_vec(), vec![], false)
+        .await
+        .unwrap();
 
-    let r = engine.range(b"del".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"del".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 0, "deleted key must not be visible");
 }
 
@@ -111,9 +162,15 @@ async fn characterize_mvcc_keys_only_has_empty_values() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"q".to_vec(), b"secret-value".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"q".to_vec(), b"secret-value".to_vec(), 0, false)
+        .await
+        .unwrap();
 
-    let r = engine.range(b"q".to_vec(), vec![], 0, 0, true, false).await.unwrap();
+    let r = engine
+        .range(b"q".to_vec(), vec![], 0, 0, true, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 1);
     assert!(r.kvs[0].value.is_empty(), "keys_only must suppress values");
 }
@@ -123,10 +180,19 @@ async fn characterize_mvcc_count_only_returns_empty_kvs() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"c1".to_vec(), b"v".to_vec(), 0, false).await.unwrap();
-    engine.put(b"c2".to_vec(), b"v".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"c1".to_vec(), b"v".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"c2".to_vec(), b"v".to_vec(), 0, false)
+        .await
+        .unwrap();
 
-    let r = engine.range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 0, false, true).await.unwrap();
+    let r = engine
+        .range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 0, false, true)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 0, "count_only must produce no kv entries");
     assert!(r.count >= 2, "count must reflect number of keys");
 }
@@ -137,10 +203,16 @@ async fn characterize_mvcc_limit_truncates_range() {
     let engine = make_engine(&dir);
 
     for i in 0u8..10 {
-        engine.put(vec![b'a' + i], b"v".to_vec(), 0, false).await.unwrap();
+        engine
+            .put(vec![b'a' + i], b"v".to_vec(), 0, false)
+            .await
+            .unwrap();
     }
 
-    let r = engine.range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 3, false, false).await.unwrap();
+    let r = engine
+        .range(b"\x00".to_vec(), b"\x00".to_vec(), 0, 3, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 3, "limit=3 must return at most 3 entries");
 }
 
@@ -153,7 +225,10 @@ async fn characterize_txn_cas_atomicity() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"bal".to_vec(), b"500".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"bal".to_vec(), b"500".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Success branch: version==1 → set to 600
     let txn = TxnRequest {
@@ -162,14 +237,25 @@ async fn characterize_txn_cas_atomicity() {
             result: CompareResult::Equal,
             target: CompareTarget::Version(1),
         }],
-        success: vec![TxnOp::Put { key: b"bal".to_vec(), value: b"600".to_vec(), lease_id: 0 }],
-        failure: vec![TxnOp::Put { key: b"bal".to_vec(), value: b"FAIL".to_vec(), lease_id: 0 }],
+        success: vec![TxnOp::Put {
+            key: b"bal".to_vec(),
+            value: b"600".to_vec(),
+            lease_id: 0,
+        }],
+        failure: vec![TxnOp::Put {
+            key: b"bal".to_vec(),
+            value: b"FAIL".to_vec(),
+            lease_id: 0,
+        }],
     };
 
     let resp = engine.txn(txn).await.unwrap();
     assert!(resp.succeeded);
 
-    let r = engine.range(b"bal".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"bal".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"600");
 }
 
@@ -178,22 +264,36 @@ async fn characterize_txn_failure_branch_fires_on_mismatch() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"lock".to_vec(), b"0".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"lock".to_vec(), b"0".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     let txn = TxnRequest {
         compare: vec![Compare {
             key: b"lock".to_vec(),
             result: CompareResult::Equal,
-            target: CompareTarget::Version(99),  // deliberate mismatch
+            target: CompareTarget::Version(99), // deliberate mismatch
         }],
-        success: vec![TxnOp::Put { key: b"lock".to_vec(), value: b"SUCCESS".to_vec(), lease_id: 0 }],
-        failure: vec![TxnOp::Put { key: b"lock".to_vec(), value: b"FAILURE".to_vec(), lease_id: 0 }],
+        success: vec![TxnOp::Put {
+            key: b"lock".to_vec(),
+            value: b"SUCCESS".to_vec(),
+            lease_id: 0,
+        }],
+        failure: vec![TxnOp::Put {
+            key: b"lock".to_vec(),
+            value: b"FAILURE".to_vec(),
+            lease_id: 0,
+        }],
     };
 
     let resp = engine.txn(txn).await.unwrap();
     assert!(!resp.succeeded);
 
-    let r = engine.range(b"lock".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"lock".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"FAILURE");
 }
 
@@ -202,7 +302,10 @@ async fn characterize_txn_value_compare() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"flag".to_vec(), b"on".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"flag".to_vec(), b"on".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     let txn = TxnRequest {
         compare: vec![Compare {
@@ -210,7 +313,11 @@ async fn characterize_txn_value_compare() {
             result: CompareResult::Equal,
             target: CompareTarget::Value(b"on".to_vec()),
         }],
-        success: vec![TxnOp::Put { key: b"flag".to_vec(), value: b"off".to_vec(), lease_id: 0 }],
+        success: vec![TxnOp::Put {
+            key: b"flag".to_vec(),
+            value: b"off".to_vec(),
+            lease_id: 0,
+        }],
         failure: vec![],
     };
 
@@ -227,14 +334,22 @@ async fn characterize_compaction_rejects_access_below_compact_rev() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    let r1 = engine.put(b"p".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"p".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
+    let r1 = engine
+        .put(b"p".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"p".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     let compact_rev = r1.header.revision + 1;
     engine.compact(compact_rev).await.unwrap();
 
     // Access below compact_rev must fail
-    let err = engine.range(b"p".to_vec(), vec![], r1.header.revision, 0, false, false).await;
+    let err = engine
+        .range(b"p".to_vec(), vec![], r1.header.revision, 0, false, false)
+        .await;
     assert!(err.is_err(), "access below compact_rev must return error");
 }
 
@@ -243,13 +358,25 @@ async fn characterize_compaction_current_still_accessible() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"q".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"q".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"q".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"q".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     engine.compact(engine.current_revision() - 1).await.unwrap();
 
-    let r = engine.range(b"q".to_vec(), vec![], 0, 0, false, false).await.unwrap();
-    assert_eq!(r.kvs[0].value, b"v2", "current value must survive compaction");
+    let r = engine
+        .range(b"q".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        r.kvs[0].value, b"v2",
+        "current value must survive compaction"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -274,16 +401,25 @@ async fn characterize_lease_revoke_removes_attached_keys() {
     let g = engine.lease_grant(60, 0).await.unwrap();
     let lid = g.id;
 
-    engine.put(b"leased".to_vec(), b"val".to_vec(), lid, false).await.unwrap();
+    engine
+        .put(b"leased".to_vec(), b"val".to_vec(), lid, false)
+        .await
+        .unwrap();
 
     // Verify key exists
-    let r = engine.range(b"leased".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"leased".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 1);
 
     engine.lease_revoke(lid).await.unwrap();
 
     // Key must vanish
-    let r2 = engine.range(b"leased".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r2 = engine
+        .range(b"leased".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r2.kvs.len(), 0, "revoking lease must delete attached keys");
 }
 
@@ -308,10 +444,16 @@ async fn characterize_lease_ttl_with_keys() {
     let g = engine.lease_grant(60, 0).await.unwrap();
     let lid = g.id;
 
-    engine.put(b"attached".to_vec(), b"v".to_vec(), lid, false).await.unwrap();
+    engine
+        .put(b"attached".to_vec(), b"v".to_vec(), lid, false)
+        .await
+        .unwrap();
 
     let ttl = engine.lease_time_to_live(lid, true).await.unwrap();
-    assert!(!ttl.keys.is_empty(), "TTL response with keys=true must include keys");
+    assert!(
+        !ttl.keys.is_empty(),
+        "TTL response with keys=true must include keys"
+    );
     assert!(ttl.keys.contains(&b"attached".to_vec()));
 }
 
@@ -347,10 +489,13 @@ async fn characterize_watch_receives_put_event() {
     let eng2 = engine.clone();
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(5)).await;
-        eng2.put(b"watched".to_vec(), b"event-value".to_vec(), 0, false).await.unwrap();
+        eng2.put(b"watched".to_vec(), b"event-value".to_vec(), 0, false)
+            .await
+            .unwrap();
     });
 
-    let ev = timeout(Duration::from_secs(2), rx.recv()).await
+    let ev = timeout(Duration::from_secs(2), rx.recv())
+        .await
         .expect("timeout waiting for watch event")
         .expect("channel closed");
 
@@ -372,7 +517,10 @@ async fn characterize_watch_cancel_stops_delivery() {
 
     // Double-cancel should return false
     let again = engine.watch_cancel(wid).await;
-    assert!(!again, "cancelling an already-removed watch must return false");
+    assert!(
+        !again,
+        "cancelling an already-removed watch must return false"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -384,9 +532,14 @@ async fn characterize_s3_bucket_create_list() {
     let dir = TempDir::new().unwrap();
     let s = make_store(&dir);
 
-    s.create_bucket("my-bkt", "eu-west-1", "tester").await.unwrap();
+    s.create_bucket("my-bkt", "eu-west-1", "tester")
+        .await
+        .unwrap();
     let list = s.list_buckets().await;
-    assert!(list.iter().any(|b| b.name == "my-bkt"), "bucket must appear in list");
+    assert!(
+        list.iter().any(|b| b.name == "my-bkt"),
+        "bucket must appear in list"
+    );
 }
 
 #[tokio::test]
@@ -405,7 +558,19 @@ async fn characterize_s3_bucket_not_empty_prevents_delete() {
     let s = make_store(&dir);
 
     s.create_bucket("bkt1", "us-east-1", "x").await.unwrap();
-    s.put_object("bkt1", "obj", b"data".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "bkt1",
+        "obj",
+        b"data".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let err = s.delete_bucket("bkt1").await;
     assert!(err.is_err(), "non-empty bucket delete must fail");
@@ -434,8 +599,14 @@ async fn characterize_s3_invalid_bucket_name_short() {
     let dir = TempDir::new().unwrap();
     let s = make_store(&dir);
 
-    assert!(s.create_bucket("ab", "us-east-1", "x").await.is_err(), "2-char name must fail");
-    assert!(s.create_bucket("a", "us-east-1", "x").await.is_err(), "1-char name must fail");
+    assert!(
+        s.create_bucket("ab", "us-east-1", "x").await.is_err(),
+        "2-char name must fail"
+    );
+    assert!(
+        s.create_bucket("a", "us-east-1", "x").await.is_err(),
+        "1-char name must fail"
+    );
 }
 
 #[tokio::test]
@@ -443,7 +614,12 @@ async fn characterize_s3_invalid_bucket_name_uppercase() {
     let dir = TempDir::new().unwrap();
     let s = make_store(&dir);
 
-    assert!(s.create_bucket("BucketName", "us-east-1", "x").await.is_err(), "uppercase name must fail");
+    assert!(
+        s.create_bucket("BucketName", "us-east-1", "x")
+            .await
+            .is_err(),
+        "uppercase name must fail"
+    );
 }
 
 #[tokio::test]
@@ -471,9 +647,24 @@ async fn characterize_s3_put_get_roundtrip() {
     let s = make_store(&dir);
 
     s.create_bucket("test-bkt", "us-east-1", "x").await.unwrap();
-    s.put_object("test-bkt", "hello.txt", b"world".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "test-bkt",
+        "hello.txt",
+        b"world".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
-    let obj = s.get_object("test-bkt", "hello.txt", None, None, None).await.unwrap();
+    let obj = s
+        .get_object("test-bkt", "hello.txt", None, None, None)
+        .await
+        .unwrap();
     assert_eq!(obj.body, b"world");
     assert_eq!(obj.content_type, "text/plain");
 }
@@ -484,7 +675,20 @@ async fn characterize_s3_etag_is_nonempty() {
     let s = make_store(&dir);
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
-    let r = s.put_object("tst", "f", b"abc".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    let r = s
+        .put_object(
+            "tst",
+            "f",
+            b"abc".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     assert!(!r.etag.is_empty(), "etag must be computed for every put");
 }
 
@@ -494,7 +698,19 @@ async fn characterize_s3_head_object_metadata() {
     let s = make_store(&dir);
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
-    s.put_object("tst", "m.bin", b"12345".to_vec(), "application/octet-stream", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "tst",
+        "m.bin",
+        b"12345".to_vec(),
+        "application/octet-stream",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let h = s.head_object("tst", "m.bin", None).await.unwrap();
     assert_eq!(h.size, 5);
@@ -518,10 +734,26 @@ async fn characterize_s3_delete_object_removes_it() {
     let s = make_store(&dir);
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
-    s.put_object("tst", "del.txt", b"gone".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "tst",
+        "del.txt",
+        b"gone".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     s.delete_object("tst", "del.txt", None).await.unwrap();
 
-    assert!(s.get_object("tst", "del.txt", None, None, None).await.is_err());
+    assert!(
+        s.get_object("tst", "del.txt", None, None, None)
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -532,8 +764,22 @@ async fn characterize_s3_copy_object() {
     s.create_bucket("src", "us-east-1", "x").await.unwrap();
     s.create_bucket("dst", "us-east-1", "x").await.unwrap();
 
-    s.put_object("src", "orig", b"original".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
-    s.copy_object("src", "orig", None, "dst", "copy", "COPY", None).await.unwrap();
+    s.put_object(
+        "src",
+        "orig",
+        b"original".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    s.copy_object("src", "orig", None, "dst", "copy", "COPY", None)
+        .await
+        .unwrap();
 
     let got = s.get_object("dst", "copy", None, None, None).await.unwrap();
     assert_eq!(got.body, b"original");
@@ -545,9 +791,24 @@ async fn characterize_s3_range_request() {
     let s = make_store(&dir);
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
-    s.put_object("tst", "bytes", b"0123456789".to_vec(), "application/octet-stream", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "tst",
+        "bytes",
+        b"0123456789".to_vec(),
+        "application/octet-stream",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
-    let obj = s.get_object("tst", "bytes", None, Some((3, 6)), None).await.unwrap();
+    let obj = s
+        .get_object("tst", "bytes", None, Some((3, 6)), None)
+        .await
+        .unwrap();
     assert_eq!(obj.body, b"3456", "range get must return the right slice");
     assert!(obj.content_range.is_some());
 }
@@ -560,14 +821,41 @@ async fn characterize_s3_batch_delete() {
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
     for key in &["x", "y", "z"] {
-        s.put_object("tst", key, b"v".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+        s.put_object(
+            "tst",
+            key,
+            b"v".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
-    let results = s.delete_objects("tst", vec![
-        DeleteObjectEntry { key: "x".to_string(), version_id: None },
-        DeleteObjectEntry { key: "y".to_string(), version_id: None },
-        DeleteObjectEntry { key: "noexist".to_string(), version_id: None },
-    ]).await.unwrap();
+    let results = s
+        .delete_objects(
+            "tst",
+            vec![
+                DeleteObjectEntry {
+                    key: "x".to_string(),
+                    version_id: None,
+                },
+                DeleteObjectEntry {
+                    key: "y".to_string(),
+                    version_id: None,
+                },
+                DeleteObjectEntry {
+                    key: "noexist".to_string(),
+                    version_id: None,
+                },
+            ],
+        )
+        .await
+        .unwrap();
 
     let ok: Vec<_> = results.iter().filter(|r| r.error.is_none()).collect();
     let err: Vec<_> = results.iter().filter(|r| r.error.is_some()).collect();
@@ -595,14 +883,45 @@ async fn characterize_versioning_enabled_generates_version_ids() {
     let s = make_store(&dir);
 
     s.create_bucket("vbkt", "us-east-1", "x").await.unwrap();
-    s.set_versioning("vbkt", VersioningState::Enabled).await.unwrap();
+    s.set_versioning("vbkt", VersioningState::Enabled)
+        .await
+        .unwrap();
 
-    let r1 = s.put_object("vbkt", "v", b"a".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
-    let r2 = s.put_object("vbkt", "v", b"b".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    let r1 = s
+        .put_object(
+            "vbkt",
+            "v",
+            b"a".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let r2 = s
+        .put_object(
+            "vbkt",
+            "v",
+            b"b".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
     assert!(r1.version_id.is_some());
     assert!(r2.version_id.is_some());
-    assert_ne!(r1.version_id, r2.version_id, "each put must get a distinct version ID");
+    assert_ne!(
+        r1.version_id, r2.version_id,
+        "each put must get a distinct version ID"
+    );
 }
 
 #[tokio::test]
@@ -611,13 +930,46 @@ async fn characterize_versioning_old_versions_retrievable() {
     let s = make_store(&dir);
 
     s.create_bucket("vbkt", "us-east-1", "x").await.unwrap();
-    s.set_versioning("vbkt", VersioningState::Enabled).await.unwrap();
+    s.set_versioning("vbkt", VersioningState::Enabled)
+        .await
+        .unwrap();
 
-    let r1 = s.put_object("vbkt", "v", b"first".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
-    s.put_object("vbkt", "v", b"second".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    let r1 = s
+        .put_object(
+            "vbkt",
+            "v",
+            b"first".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    s.put_object(
+        "vbkt",
+        "v",
+        b"second".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
-    let old = s.get_object("vbkt", "v", r1.version_id.as_deref(), None, None).await.unwrap();
-    assert_eq!(old.body, b"first", "old version must be retrievable by version ID");
+    let old = s
+        .get_object("vbkt", "v", r1.version_id.as_deref(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        old.body, b"first",
+        "old version must be retrievable by version ID"
+    );
 }
 
 #[tokio::test]
@@ -626,13 +978,33 @@ async fn characterize_versioning_delete_creates_delete_marker() {
     let s = make_store(&dir);
 
     s.create_bucket("vbkt", "us-east-1", "x").await.unwrap();
-    s.set_versioning("vbkt", VersioningState::Enabled).await.unwrap();
+    s.set_versioning("vbkt", VersioningState::Enabled)
+        .await
+        .unwrap();
 
-    s.put_object("vbkt", "v", b"data".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "vbkt",
+        "v",
+        b"data".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     let del = s.delete_object("vbkt", "v", None).await.unwrap();
 
-    assert!(del.delete_marker, "versioned delete must create a delete marker");
-    assert!(del.version_id.is_some(), "delete marker must have its own version_id");
+    assert!(
+        del.delete_marker,
+        "versioned delete must create a delete marker"
+    );
+    assert!(
+        del.version_id.is_some(),
+        "delete marker must have its own version_id"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -645,7 +1017,10 @@ async fn characterize_multipart_initiate_returns_upload_id() {
     let s = make_store(&dir);
 
     s.create_bucket("mpu", "us-east-1", "x").await.unwrap();
-    let uid = s.create_multipart_upload("mpu", "big.bin", "application/octet-stream", HashMap::new()).await.unwrap();
+    let uid = s
+        .create_multipart_upload("mpu", "big.bin", "application/octet-stream", HashMap::new())
+        .await
+        .unwrap();
     assert!(!uid.is_empty());
 }
 
@@ -655,16 +1030,25 @@ async fn characterize_multipart_full_flow() {
     let s = make_store(&dir);
 
     s.create_bucket("mpu", "us-east-1", "x").await.unwrap();
-    let uid = s.create_multipart_upload("mpu", "big.bin", "application/octet-stream", HashMap::new()).await.unwrap();
+    let uid = s
+        .create_multipart_upload("mpu", "big.bin", "application/octet-stream", HashMap::new())
+        .await
+        .unwrap();
 
     let part1 = vec![b'A'; 5 * 1024 * 1024]; // 5 MB minimum
-    let part2 = vec![b'B'; 1024];             // last part can be smaller
+    let part2 = vec![b'B'; 1024]; // last part can be smaller
 
     let e1 = s.upload_part(&uid, 1, part1.clone()).await.unwrap();
     let e2 = s.upload_part(&uid, 2, part2.clone()).await.unwrap();
 
-    let result = s.complete_multipart_upload(&uid, vec![(1, e1), (2, e2)]).await.unwrap();
-    assert!(result.etag.contains('-'), "multipart ETag must contain hyphen");
+    let result = s
+        .complete_multipart_upload(&uid, vec![(1, e1), (2, e2)])
+        .await
+        .unwrap();
+    assert!(
+        result.etag.contains('-'),
+        "multipart ETag must contain hyphen"
+    );
 
     let head = s.head_object("mpu", "big.bin", None).await.unwrap();
     assert_eq!(head.size as usize, part1.len() + part2.len());
@@ -676,13 +1060,19 @@ async fn characterize_multipart_abort_cleans_up() {
     let s = make_store(&dir);
 
     s.create_bucket("mpu", "us-east-1", "x").await.unwrap();
-    let uid = s.create_multipart_upload("mpu", "tmp.bin", "application/octet-stream", HashMap::new()).await.unwrap();
+    let uid = s
+        .create_multipart_upload("mpu", "tmp.bin", "application/octet-stream", HashMap::new())
+        .await
+        .unwrap();
 
     s.upload_part(&uid, 1, vec![b'Z'; 1024]).await.unwrap();
     s.abort_multipart_upload(&uid).await.unwrap();
 
     // Upload is gone
-    assert!(s.list_parts(&uid).await.is_err(), "aborted upload must not be listable");
+    assert!(
+        s.list_parts(&uid).await.is_err(),
+        "aborted upload must not be listable"
+    );
 }
 
 #[tokio::test]
@@ -691,10 +1081,17 @@ async fn characterize_multipart_list_parts() {
     let s = make_store(&dir);
 
     s.create_bucket("mpu", "us-east-1", "x").await.unwrap();
-    let uid = s.create_multipart_upload("mpu", "f.bin", "application/octet-stream", HashMap::new()).await.unwrap();
+    let uid = s
+        .create_multipart_upload("mpu", "f.bin", "application/octet-stream", HashMap::new())
+        .await
+        .unwrap();
 
-    s.upload_part(&uid, 1, vec![b'A'; 5 * 1024 * 1024]).await.unwrap();
-    s.upload_part(&uid, 2, vec![b'B'; 5 * 1024 * 1024]).await.unwrap();
+    s.upload_part(&uid, 1, vec![b'A'; 5 * 1024 * 1024])
+        .await
+        .unwrap();
+    s.upload_part(&uid, 2, vec![b'B'; 5 * 1024 * 1024])
+        .await
+        .unwrap();
     s.upload_part(&uid, 3, vec![b'C'; 100]).await.unwrap();
 
     let parts = s.list_parts(&uid).await.unwrap();
@@ -716,13 +1113,34 @@ async fn characterize_sse_s3_transparent_encrypt_decrypt() {
     s.create_bucket("enc-bkt", "us-east-1", "x").await.unwrap();
 
     let plaintext = b"sensitive-content";
-    s.put_object("enc-bkt", "sec.txt", plaintext.to_vec(), "text/plain", HashMap::new(), HashMap::new(), Some("AES256"), None, None).await.unwrap();
+    s.put_object(
+        "enc-bkt",
+        "sec.txt",
+        plaintext.to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        Some("AES256"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let head = s.head_object("enc-bkt", "sec.txt", None).await.unwrap();
-    assert!(head.encryption.is_some(), "encrypted object must record encryption metadata");
+    assert!(
+        head.encryption.is_some(),
+        "encrypted object must record encryption metadata"
+    );
 
-    let obj = s.get_object("enc-bkt", "sec.txt", None, None, None).await.unwrap();
-    assert_eq!(obj.body, plaintext, "SSE-S3 must decrypt transparently on get");
+    let obj = s
+        .get_object("enc-bkt", "sec.txt", None, None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        obj.body, plaintext,
+        "SSE-S3 must decrypt transparently on get"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -743,7 +1161,11 @@ async fn characterize_lifecycle_rules_stored_on_bucket() {
         status: "Enabled".to_string(),
         prefix: "logs/".to_string(),
         tags: HashMap::new(),
-        expiration: Some(Expiration { days: Some(30), date: None, expired_object_delete_marker: None }),
+        expiration: Some(Expiration {
+            days: Some(30),
+            date: None,
+            expired_object_delete_marker: None,
+        }),
         transitions: vec![],
         noncurrent_version_expiration: None,
         abort_incomplete_multipart_upload: None,
@@ -767,11 +1189,29 @@ async fn characterize_list_objects_prefix_filter() {
 
     s.create_bucket("lst", "us-east-1", "x").await.unwrap();
     for key in &["images/cat.jpg", "images/dog.jpg", "docs/readme.md"] {
-        s.put_object("lst", key, b"data".to_vec(), "application/octet-stream", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+        s.put_object(
+            "lst",
+            key,
+            b"data".to_vec(),
+            "application/octet-stream",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
-    let r = s.list_objects_v2("lst", "images/", None, 100, None).await.unwrap();
-    assert_eq!(r.key_count, 2, "prefix filter must exclude non-matching keys");
+    let r = s
+        .list_objects_v2("lst", "images/", None, 100, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        r.key_count, 2,
+        "prefix filter must exclude non-matching keys"
+    );
 }
 
 #[tokio::test]
@@ -781,11 +1221,30 @@ async fn characterize_list_objects_delimiter_grouping() {
 
     s.create_bucket("lst", "us-east-1", "x").await.unwrap();
     for key in &["a/1", "a/2", "b/1", "top.txt"] {
-        s.put_object("lst", key, b"data".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+        s.put_object(
+            "lst",
+            key,
+            b"data".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
-    let r = s.list_objects_v2("lst", "", Some("/"), 100, None).await.unwrap();
-    assert_eq!(r.common_prefixes.len(), 2, "delimiter must produce two common prefixes (a/ and b/)");
+    let r = s
+        .list_objects_v2("lst", "", Some("/"), 100, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        r.common_prefixes.len(),
+        2,
+        "delimiter must produce two common prefixes (a/ and b/)"
+    );
     assert_eq!(r.key_count, 1, "only top-level non-prefix key: top.txt");
 }
 
@@ -796,12 +1255,27 @@ async fn characterize_list_objects_pagination() {
 
     s.create_bucket("lst", "us-east-1", "x").await.unwrap();
     for i in 0..5 {
-        s.put_object("lst", &format!("key{}", i), b"v".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+        s.put_object(
+            "lst",
+            &format!("key{}", i),
+            b"v".to_vec(),
+            "text/plain",
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     let first = s.list_objects_v2("lst", "", None, 2, None).await.unwrap();
     assert_eq!(first.key_count, 2);
-    assert!(first.is_truncated, "truncated must be true when there are more keys");
+    assert!(
+        first.is_truncated,
+        "truncated must be true when there are more keys"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -814,12 +1288,26 @@ async fn characterize_object_tagging_roundtrip() {
     let s = make_store(&dir);
 
     s.create_bucket("tst", "us-east-1", "x").await.unwrap();
-    s.put_object("tst", "obj", b"data".to_vec(), "text/plain", HashMap::new(), HashMap::new(), None, None, None).await.unwrap();
+    s.put_object(
+        "tst",
+        "obj",
+        b"data".to_vec(),
+        "text/plain",
+        HashMap::new(),
+        HashMap::new(),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let mut tags = HashMap::new();
     tags.insert("env".to_string(), "staging".to_string());
     tags.insert("owner".to_string(), "alice".to_string());
-    s.put_object_tagging("tst", "obj", None, tags).await.unwrap();
+    s.put_object_tagging("tst", "obj", None, tags)
+        .await
+        .unwrap();
 
     let got = s.get_object_tagging("tst", "obj", None).await.unwrap();
     assert_eq!(got.get("env").map(|s| s.as_str()), Some("staging"));
@@ -834,13 +1322,19 @@ async fn characterize_object_tagging_roundtrip() {
 async fn characterize_auth_user_lifecycle() {
     let auth = AuthManager::default();
 
-    auth.user_add("bob".to_string(), "pass1".to_string()).await.unwrap();
+    auth.user_add("bob".to_string(), "pass1".to_string())
+        .await
+        .unwrap();
     let u = auth.user_get("bob").await.unwrap();
     assert_eq!(u.name, "bob");
     assert!(u.roles.is_empty());
 
     // Duplicate user add must fail
-    assert!(auth.user_add("bob".to_string(), "other".to_string()).await.is_err());
+    assert!(
+        auth.user_add("bob".to_string(), "other".to_string())
+            .await
+            .is_err()
+    );
 
     auth.user_delete("bob").await.unwrap();
     assert!(auth.user_get("bob").await.is_err());
@@ -850,7 +1344,9 @@ async fn characterize_auth_user_lifecycle() {
 async fn characterize_auth_role_grant_revoke() {
     let auth = AuthManager::default();
 
-    auth.user_add("eve".to_string(), "secret".to_string()).await.unwrap();
+    auth.user_add("eve".to_string(), "secret".to_string())
+        .await
+        .unwrap();
     auth.role_add("operator".to_string()).await.unwrap();
 
     auth.user_grant_role("eve", "operator").await.unwrap();
@@ -866,7 +1362,9 @@ async fn characterize_auth_role_grant_revoke() {
 async fn characterize_auth_authenticate_correct_password() {
     let auth = AuthManager::default();
 
-    auth.user_add("carol".to_string(), "rightpass".to_string()).await.unwrap();
+    auth.user_add("carol".to_string(), "rightpass".to_string())
+        .await
+        .unwrap();
     auth.enable().await.unwrap();
 
     let tok = auth.authenticate("carol", "rightpass").await.unwrap();
@@ -899,7 +1397,10 @@ async fn characterize_auth_enable_disable() {
 async fn characterize_cluster_has_self_member() {
     let c = ClusterManager::default();
     let members = c.member_list().await;
-    assert!(!members.is_empty(), "default cluster must have self as member");
+    assert!(
+        !members.is_empty(),
+        "default cluster must have self as member"
+    );
     assert_eq!(members[0].name, "cave-store-0");
 }
 
@@ -907,7 +1408,10 @@ async fn characterize_cluster_has_self_member() {
 async fn characterize_cluster_add_remove_member() {
     let c = ClusterManager::default();
 
-    let m = c.member_add(vec!["http://peer:2380".to_string()], false).await.unwrap();
+    let m = c
+        .member_add(vec!["http://peer:2380".to_string()], false)
+        .await
+        .unwrap();
     assert!(m.id != 0);
 
     let list_before = c.member_list().await;
@@ -923,11 +1427,17 @@ async fn characterize_cluster_add_remove_member() {
 async fn characterize_cluster_promote_learner() {
     let c = ClusterManager::default();
 
-    let m = c.member_add(vec!["http://learner:2380".to_string()], true).await.unwrap();
+    let m = c
+        .member_add(vec!["http://learner:2380".to_string()], true)
+        .await
+        .unwrap();
     assert!(m.is_learner);
 
     let promoted = c.member_promote(m.id).await.unwrap();
-    assert!(!promoted.is_learner, "promoted member must not be a learner");
+    assert!(
+        !promoted.is_learner,
+        "promoted member must not be a learner"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1019,7 +1529,10 @@ async fn characterize_presigned_url_wrong_signature_fails() {
     let sig = url.url.split("X-Cave-Signature=").nth(1).unwrap();
 
     let result = presigned::verify("PUT", "b", "k", "ak", url.expires_at, sig, wrong_secret);
-    assert!(result.is_err(), "wrong secret must produce signature mismatch");
+    assert!(
+        result.is_err(),
+        "wrong secret must produce signature mismatch"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1034,7 +1547,10 @@ async fn characterize_wal_replay_restores_engine_state() {
     {
         let wal = WalWriter::open(dir.path()).unwrap();
         let engine = MvccEngine::new(wal);
-        engine.put(b"persistent".to_vec(), b"data".to_vec(), 0, false).await.unwrap();
+        engine
+            .put(b"persistent".to_vec(), b"data".to_vec(), 0, false)
+            .await
+            .unwrap();
     }
 
     // Replay on a fresh engine
@@ -1045,7 +1561,10 @@ async fn characterize_wal_replay_restores_engine_state() {
     let engine2 = MvccEngine::new(wal2);
     engine2.replay_wal(entries).await;
 
-    let r = engine2.range(b"persistent".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine2
+        .range(b"persistent".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 1, "replayed engine must contain the put entry");
     assert_eq!(r.kvs[0].value, b"data");
 }
@@ -1061,7 +1580,10 @@ async fn characterize_wal_s3_replay_restores_bucket() {
         let data_dir = dir.path().join("objects");
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = ObjectStore::new(data_dir, wal_arc);
-        store.create_bucket("wal-bucket", "us-east-1", "test").await.unwrap();
+        store
+            .create_bucket("wal-bucket", "us-east-1", "test")
+            .await
+            .unwrap();
     }
 
     // Replay
@@ -1072,5 +1594,8 @@ async fn characterize_wal_s3_replay_restores_bucket() {
     store2.replay_wal(&entries).await;
 
     let buckets = store2.list_buckets().await;
-    assert!(buckets.iter().any(|b| b.name == "wal-bucket"), "replayed store must contain the bucket");
+    assert!(
+        buckets.iter().any(|b| b.name == "wal-bucket"),
+        "replayed store must contain the bucket"
+    );
 }

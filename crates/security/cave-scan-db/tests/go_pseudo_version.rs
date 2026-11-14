@@ -10,8 +10,8 @@
 //! These tests MUST FAIL until src/go_pseudo.rs is implemented.
 
 use cave_scan_db::go_pseudo::{is_pseudo_version, normalize_pseudo_version, pseudo_version_cmp};
-use cave_scan_db::{Advisory, OsAdvisoryDb, Severity, SledStore, VulnDb, Vulnerability};
 use cave_scan_db::matcher::match_purl_go;
+use cave_scan_db::{Advisory, OsAdvisoryDb, Severity, SledStore, VulnDb, Vulnerability};
 
 // ── is_pseudo_version ─────────────────────────────────────────────────────────
 
@@ -153,20 +153,37 @@ fn match_purl_go_newer_pseudo_version_patched() {
     // is NOT vulnerable.
     let s = SledStore::temporary().unwrap();
     put_vuln(&s, "GHSA-go-3");
-    put_go_advisory(&s, "GHSA-go-3", "github.com/foo/baz", "v0.0.0-20220601000000-aabbccddeeff");
+    put_go_advisory(
+        &s,
+        "GHSA-go-3",
+        "github.com/foo/baz",
+        "v0.0.0-20220601000000-aabbccddeeff",
+    );
 
     let purl = "pkg:golang/github.com/foo/baz@v0.0.0-20230101000000-112233445566";
     let hits = match_purl_go(&s, purl).unwrap();
-    assert!(hits.is_empty(), "newer pseudo-version than fixed should not match");
+    assert!(
+        hits.is_empty(),
+        "newer pseudo-version than fixed should not match"
+    );
 }
 
 #[test]
 fn match_purl_go_older_pseudo_version_than_fixed_pseudo_vulnerable() {
     let s = SledStore::temporary().unwrap();
     put_vuln(&s, "GHSA-go-4");
-    put_go_advisory(&s, "GHSA-go-4", "github.com/foo/qux", "v0.0.0-20230101000000-aabbccddeeff");
+    put_go_advisory(
+        &s,
+        "GHSA-go-4",
+        "github.com/foo/qux",
+        "v0.0.0-20230101000000-aabbccddeeff",
+    );
 
     let purl = "pkg:golang/github.com/foo/qux@v0.0.0-20210101000000-112233445566";
     let hits = match_purl_go(&s, purl).unwrap();
-    assert_eq!(hits.len(), 1, "older pseudo-version before pseudo fixed should match");
+    assert_eq!(
+        hits.len(),
+        1,
+        "older pseudo-version before pseudo fixed should match"
+    );
 }

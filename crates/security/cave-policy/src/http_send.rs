@@ -119,11 +119,16 @@ pub fn evaluate(req: &HttpSendRequest, allow: &HttpSendAllowlist) -> Result<(), 
         s.insert("GET".into());
         s
     } else {
-        allow.methods.iter().map(|m| m.to_ascii_uppercase()).collect()
+        allow
+            .methods
+            .iter()
+            .map(|m| m.to_ascii_uppercase())
+            .collect()
     };
     if !allowed_methods.contains(&method) {
         return Err(PolicyError::Validation(format!(
-            "http.send method '{method}' not allowed (allowed={:?})", allowed_methods
+            "http.send method '{method}' not allowed (allowed={:?})",
+            allowed_methods
         )));
     }
 
@@ -160,13 +165,16 @@ pub fn evaluate(req: &HttpSendRequest, allow: &HttpSendAllowlist) -> Result<(), 
     if let Some(b) = &req.body {
         if allow.max_request_body_bytes > 0 && (b.len() as u32) > allow.max_request_body_bytes {
             return Err(PolicyError::Validation(format!(
-                "http.send body size {} > max {}", b.len(), allow.max_request_body_bytes
+                "http.send body size {} > max {}",
+                b.len(),
+                allow.max_request_body_bytes
             )));
         }
     }
     if allow.max_timeout_ms > 0 && req.timeout_ms > allow.max_timeout_ms {
         return Err(PolicyError::Validation(format!(
-            "http.send timeout_ms {} > max {}", req.timeout_ms, allow.max_timeout_ms
+            "http.send timeout_ms {} > max {}",
+            req.timeout_ms, allow.max_timeout_ms
         )));
     }
 
@@ -177,11 +185,15 @@ fn parse_host_port(url: &str) -> Result<String, PolicyError> {
     let rest = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
-        .ok_or_else(|| PolicyError::Validation(format!("http.send url must be http[s]: '{url}'")))?;
+        .ok_or_else(|| {
+            PolicyError::Validation(format!("http.send url must be http[s]: '{url}'"))
+        })?;
     // Strip path + query.
     let host_with_port = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     if host_with_port.is_empty() {
-        return Err(PolicyError::Validation(format!("http.send url has empty host: '{url}'")));
+        return Err(PolicyError::Validation(format!(
+            "http.send url has empty host: '{url}'"
+        )));
     }
     if host_with_port.contains(':') {
         Ok(host_with_port.to_string())
@@ -191,8 +203,12 @@ fn parse_host_port(url: &str) -> Result<String, PolicyError> {
     }
 }
 
-fn default_timeout() -> u32 { 5_000 }
-fn default_true() -> bool { true }
+fn default_timeout() -> u32 {
+    5_000
+}
+fn default_true() -> bool {
+    true
+}
 
 #[cfg(test)]
 mod tests {
@@ -232,13 +248,22 @@ mod tests {
 
     #[test]
     fn parse_host_port_inserts_default_port() {
-        assert_eq!(parse_host_port("https://example.org/foo").unwrap(), "example.org:443");
-        assert_eq!(parse_host_port("http://example.org/foo").unwrap(), "example.org:80");
+        assert_eq!(
+            parse_host_port("https://example.org/foo").unwrap(),
+            "example.org:443"
+        );
+        assert_eq!(
+            parse_host_port("http://example.org/foo").unwrap(),
+            "example.org:80"
+        );
     }
 
     #[test]
     fn parse_host_port_keeps_explicit_port() {
-        assert_eq!(parse_host_port("https://api.internal:8443/v1/x").unwrap(), "api.internal:8443");
+        assert_eq!(
+            parse_host_port("https://api.internal:8443/v1/x").unwrap(),
+            "api.internal:8443"
+        );
     }
 
     #[test]
@@ -276,7 +301,8 @@ mod tests {
     #[test]
     fn evaluate_header_always_denied_authorization() {
         let mut r = req("GET", "https://api.internal/v1/data");
-        r.headers.insert("Authorization".into(), "Bearer xxx".into());
+        r.headers
+            .insert("Authorization".into(), "Bearer xxx".into());
         let mut a = allow_basic();
         a.allow_request_headers.insert("Authorization".into());
         // Even when explicitly allowed, Authorization is always denied.
@@ -288,7 +314,10 @@ mod tests {
         for name in ["Cookie", "Set-Cookie", "Host", "Connection"] {
             let mut r = req("GET", "https://api.internal/v1/data");
             r.headers.insert(name.into(), "x".into());
-            assert!(evaluate(&r, &allow_basic()).is_err(), "{name} should be denied");
+            assert!(
+                evaluate(&r, &allow_basic()).is_err(),
+                "{name} should be denied"
+            );
         }
     }
 
@@ -302,7 +331,8 @@ mod tests {
     #[test]
     fn evaluate_header_case_insensitive_match() {
         let mut r = req("POST", "https://api.internal/v1/data");
-        r.headers.insert("content-type".into(), "application/json".into());
+        r.headers
+            .insert("content-type".into(), "application/json".into());
         evaluate(&r, &allow_basic()).unwrap();
     }
 
@@ -354,7 +384,10 @@ mod tests {
             status: "Bad Gateway".into(),
             headers: BTreeMap::new(),
             body: None,
-            error: Some(HttpSendErrorObject { code: "EIO".into(), message: "upstream down".into() }),
+            error: Some(HttpSendErrorObject {
+                code: "EIO".into(),
+                message: "upstream down".into(),
+            }),
         };
         let j = serde_json::to_string(&resp).unwrap();
         let r2: HttpSendResponse = serde_json::from_str(&j).unwrap();

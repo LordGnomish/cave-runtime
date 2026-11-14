@@ -51,10 +51,16 @@ pub struct PluginMarketplace {
 }
 
 impl PluginMarketplace {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn len(&self) -> usize { self.by_id.len() }
-    pub fn is_empty(&self) -> bool { self.by_id.is_empty() }
+    pub fn len(&self) -> usize {
+        self.by_id.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.by_id.is_empty()
+    }
 
     /// Insert a plugin. Returns Err if `runtime != Wasm` (Charter v2
     /// rejects shared-library loaders) or if `wasm_sha256` is not a
@@ -70,19 +76,27 @@ impl PluginMarketplace {
             || !entry.wasm_sha256.chars().all(|c| c.is_ascii_hexdigit())
         {
             return Err(BenchError::Internal(format!(
-                "plugin '{}' wasm_sha256 must be 64-char hex", entry.id
+                "plugin '{}' wasm_sha256 must be 64-char hex",
+                entry.id
             )));
         }
         if self.by_id.contains_key(&entry.id) {
-            return Err(BenchError::Internal(format!("plugin '{}' already enrolled", entry.id)));
+            return Err(BenchError::Internal(format!(
+                "plugin '{}' already enrolled",
+                entry.id
+            )));
         }
         self.by_id.insert(entry.id.clone(), entry);
         Ok(())
     }
 
-    pub fn get(&self, id: &str) -> Option<&PluginEntry> { self.by_id.get(id) }
+    pub fn get(&self, id: &str) -> Option<&PluginEntry> {
+        self.by_id.get(id)
+    }
 
-    pub fn list(&self) -> Vec<&PluginEntry> { self.by_id.values().collect() }
+    pub fn list(&self) -> Vec<&PluginEntry> {
+        self.by_id.values().collect()
+    }
 
     pub fn by_framework(&self, fw: &str) -> Vec<&PluginEntry> {
         self.by_id
@@ -91,7 +105,9 @@ impl PluginMarketplace {
             .collect()
     }
 
-    pub fn remove(&mut self, id: &str) -> Option<PluginEntry> { self.by_id.remove(id) }
+    pub fn remove(&mut self, id: &str) -> Option<PluginEntry> {
+        self.by_id.remove(id)
+    }
 }
 
 #[cfg(test)]
@@ -162,9 +178,12 @@ mod tests {
     #[test]
     fn by_framework_filters_correctly() {
         let mut m = PluginMarketplace::new();
-        let mut p1 = entry("cis-plugin"); p1.frameworks = vec!["cis".into()];
-        let mut p2 = entry("nsa-plugin"); p2.frameworks = vec!["nsa".into()];
-        let mut p3 = entry("dual"); p3.frameworks = vec!["cis".into(), "nsa".into()];
+        let mut p1 = entry("cis-plugin");
+        p1.frameworks = vec!["cis".into()];
+        let mut p2 = entry("nsa-plugin");
+        p2.frameworks = vec!["nsa".into()];
+        let mut p3 = entry("dual");
+        p3.frameworks = vec!["cis".into(), "nsa".into()];
         m.enroll(p1).unwrap();
         m.enroll(p2).unwrap();
         m.enroll(p3).unwrap();

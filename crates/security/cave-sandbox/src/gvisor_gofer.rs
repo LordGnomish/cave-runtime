@@ -75,7 +75,10 @@ pub struct FdTable {
 
 impl FdTable {
     pub fn new() -> Self {
-        FdTable { inner: BTreeMap::new(), next: 3 }
+        FdTable {
+            inner: BTreeMap::new(),
+            next: 3,
+        }
     }
 
     /// Insert a new mount-mapped FD. Returns the allocated FD number.

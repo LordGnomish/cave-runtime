@@ -15,7 +15,7 @@
 
 use cave_container_scan::models::{Finding, FindingCategory, Severity};
 use cave_container_scan::vex::{
-    finding_status, FindingStatus, OpenVex, VexJustification, VexStatement, VexStatus,
+    FindingStatus, OpenVex, VexJustification, VexStatement, VexStatus, finding_status,
 };
 
 fn vuln_finding(cve: &str) -> Finding {
@@ -36,7 +36,10 @@ fn vuln_finding(cve: &str) -> Finding {
 
 #[test]
 fn test_finding_status_mapping() {
-    assert_eq!(finding_status(VexStatus::NotAffected), FindingStatus::NotAffected);
+    assert_eq!(
+        finding_status(VexStatus::NotAffected),
+        FindingStatus::NotAffected
+    );
     assert_eq!(finding_status(VexStatus::Fixed), FindingStatus::Fixed);
     assert_eq!(
         finding_status(VexStatus::UnderInvestigation),
@@ -143,9 +146,10 @@ fn test_not_affected_suppresses_on_not_affected_and_fixed() {
     assert_eq!(fx.status, FindingStatus::Fixed);
 
     // under_investigation does NOT suppress.
-    assert!(vex
-        .not_affected("CVE-UI", "pkg:deb/debian/libfoo@1.0", &[])
-        .is_none());
+    assert!(
+        vex.not_affected("CVE-UI", "pkg:deb/debian/libfoo@1.0", &[])
+            .is_none()
+    );
 }
 
 // ── filter: end-to-end suppression of scanner findings ──────────────────────

@@ -247,7 +247,8 @@ impl CloudVolume for AzureDiskCloudVolume {
         let rec = g.ensure(volume_id);
         // Azure differs from Hetzner: re-attaching to the same node is a
         // no-op success, mirroring upstream's idempotent `AttachDisk`.
-        if rec.state == VolumeState::Attached && rec.attached_to.as_deref() == Some(node_id.as_str())
+        if rec.state == VolumeState::Attached
+            && rec.attached_to.as_deref() == Some(node_id.as_str())
         {
             return Ok(());
         }
@@ -329,7 +330,11 @@ pub struct VolumeReconcileItem {
 }
 
 impl VolumeReconcileItem {
-    pub fn new(volume_id: impl Into<VolumeId>, desired_state: VolumeState, node: impl Into<NodeId>) -> Self {
+    pub fn new(
+        volume_id: impl Into<VolumeId>,
+        desired_state: VolumeState,
+        node: impl Into<NodeId>,
+    ) -> Self {
         Self {
             volume_id: volume_id.into(),
             desired_state,
@@ -357,7 +362,10 @@ pub enum TickOutcome {
     /// Item driven to its desired state and removed from the queue.
     Reached(VolumeId, VolumeState),
     /// Item failed this round; backoff schedule was incremented.
-    Requeued { volume_id: VolumeId, backoff: Duration },
+    Requeued {
+        volume_id: VolumeId,
+        backoff: Duration,
+    },
 }
 
 /// Watch-loop controller. Holds a queue of pending transitions and steps
@@ -419,7 +427,10 @@ impl CloudVolumeController {
                 | (VolumeState::Attaching, Ok(()))
                 | (VolumeState::Detached, Ok(()))
                 | (VolumeState::Detaching, Ok(()))
-                | (VolumeState::Attached, Err(VolumeError::AlreadyAttached { .. }))
+                | (
+                    VolumeState::Attached,
+                    Err(VolumeError::AlreadyAttached { .. })
+                )
         );
 
         if !step_ok {
@@ -528,7 +539,11 @@ mod tests {
             .await
             .unwrap();
         let err = cv.attach(&node("n2"), &vol("v1")).await.unwrap_err();
-        assert!(matches!(err, VolumeError::AttachConflict { .. }), "got {:?}", err);
+        assert!(
+            matches!(err, VolumeError::AttachConflict { .. }),
+            "got {:?}",
+            err
+        );
     }
 
     #[tokio::test]
@@ -578,7 +593,11 @@ mod tests {
         let cv = AzureDiskCloudVolume::new();
         cv.seed(vol("disk-x")).await;
         let err = cv.detach(&node("aks-0"), &vol("disk-x")).await.unwrap_err();
-        assert!(matches!(err, VolumeError::NotAttached { .. }), "got {:?}", err);
+        assert!(
+            matches!(err, VolumeError::NotAttached { .. }),
+            "got {:?}",
+            err
+        );
     }
 
     #[tokio::test]
@@ -596,7 +615,10 @@ mod tests {
         ctrl.enqueue(VolumeReconcileItem::new("v1", VolumeState::Attached, "n1"));
         assert_eq!(ctrl.pending(), 1);
         let out = ctrl.tick(&cv).await;
-        assert_eq!(out, TickOutcome::Reached("v1".into(), VolumeState::Attached));
+        assert_eq!(
+            out,
+            TickOutcome::Reached("v1".into(), VolumeState::Attached)
+        );
         assert_eq!(ctrl.pending(), 0);
     }
 
@@ -636,7 +658,10 @@ mod tests {
         let mut ctrl = CloudVolumeController::new();
         ctrl.enqueue(VolumeReconcileItem::new("v1", VolumeState::Detached, "n1"));
         let out = ctrl.tick(&cv).await;
-        assert_eq!(out, TickOutcome::Reached("v1".into(), VolumeState::Detached));
+        assert_eq!(
+            out,
+            TickOutcome::Reached("v1".into(), VolumeState::Detached)
+        );
         assert!(cv.list_for_node(&node("n1")).await.unwrap().is_empty());
     }
 }

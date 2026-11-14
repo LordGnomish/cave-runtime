@@ -35,7 +35,10 @@ impl LatencyHistogram {
 
     pub fn new() -> Self {
         let mut h = Self::default();
-        h.bucket_counts = Self::standard_buckets().into_iter().map(|b| (b, 0)).collect();
+        h.bucket_counts = Self::standard_buckets()
+            .into_iter()
+            .map(|b| (b, 0))
+            .collect();
         h
     }
 
@@ -128,7 +131,10 @@ impl KubeProxyMetrics {
             self.services_evicted_total
         ));
         if let Some(mean) = self.sync_proxy_rules_latency.mean_secs() {
-            s.push_str(&format!("kubeproxy_sync_proxy_rules_latency_mean {}\n", mean));
+            s.push_str(&format!(
+                "kubeproxy_sync_proxy_rules_latency_mean {}\n",
+                mean
+            ));
         }
         for (mode, n) in &self.sync_count_by_mode {
             s.push_str(&format!(

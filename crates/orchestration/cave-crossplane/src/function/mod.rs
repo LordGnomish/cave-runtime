@@ -41,12 +41,7 @@ impl FunctionStore {
         Self::default()
     }
 
-    pub fn install(
-        &self,
-        name: &str,
-        revision: &str,
-        package: &str,
-    ) -> CrossplaneResult<Function> {
+    pub fn install(&self, name: &str, revision: &str, package: &str) -> CrossplaneResult<Function> {
         if name.is_empty() {
             return Err(CrossplaneError::Internal("function name empty".into()));
         }

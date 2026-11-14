@@ -10,7 +10,7 @@
 //! in-memory argv computation (NOT k8s pod scheduling / volume mounting,
 //! which remains cave-cri's concern).
 
-use cave_pipelines::entrypoint::{order_containers, EntrypointStep, ENTRYPOINT_BINARY};
+use cave_pipelines::entrypoint::{ENTRYPOINT_BINARY, EntrypointStep, order_containers};
 
 fn step(name: &str, command: Vec<&str>, args: Vec<&str>) -> EntrypointStep {
     EntrypointStep {
@@ -58,9 +58,17 @@ fn step_n_waits_on_previous_step_post_file() {
 fn termination_and_metadata_paths_injected() {
     let steps = vec![step("clone", vec!["git"], vec!["clone"])];
     let out = order_containers(&steps, &[]);
-    let t = out[0].args.iter().position(|a| a == "-termination_path").unwrap();
+    let t = out[0]
+        .args
+        .iter()
+        .position(|a| a == "-termination_path")
+        .unwrap();
     assert_eq!(out[0].args[t + 1], "/tekton/termination");
-    let m = out[0].args.iter().position(|a| a == "-step_metadata_dir").unwrap();
+    let m = out[0]
+        .args
+        .iter()
+        .position(|a| a == "-step_metadata_dir")
+        .unwrap();
     assert_eq!(out[0].args[m + 1], "/tekton/run/0/status");
 }
 
@@ -73,7 +81,10 @@ fn original_command_preserved_after_separator() {
     assert_eq!(out[0].args[e + 1], "sh");
     let sep = out[0].args.iter().position(|a| a == "--").unwrap();
     // After `--`: remaining cmd elements ("-c") then the original args.
-    assert_eq!(&out[0].args[sep + 1..], &["-c".to_string(), "echo hi".to_string()]);
+    assert_eq!(
+        &out[0].args[sep + 1..],
+        &["-c".to_string(), "echo hi".to_string()]
+    );
 }
 
 #[test]
@@ -81,7 +92,11 @@ fn step_results_flag_emitted_comma_joined() {
     let mut s = step("emit", vec!["sh"], vec![]);
     s.results = vec!["digest".to_string(), "url".to_string()];
     let out = order_containers(&[s], &[]);
-    let r = out[0].args.iter().position(|a| a == "-step_results").unwrap();
+    let r = out[0]
+        .args
+        .iter()
+        .position(|a| a == "-step_results")
+        .unwrap();
     assert_eq!(out[0].args[r + 1], "digest,url");
 }
 

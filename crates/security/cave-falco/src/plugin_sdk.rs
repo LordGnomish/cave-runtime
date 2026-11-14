@@ -16,10 +16,10 @@ use serde::{Deserialize, Serialize};
 
 /// Plugin capabilities — mirrors `ss_plugin_caps_t`.
 pub mod plugin_caps {
-    pub const SOURCE: u8        = 0b0001;
-    pub const EXTRACTION: u8    = 0b0010;
-    pub const PARSING: u8       = 0b0100;
-    pub const ASYNC_EVENTS: u8  = 0b1000;
+    pub const SOURCE: u8 = 0b0001;
+    pub const EXTRACTION: u8 = 0b0010;
+    pub const PARSING: u8 = 0b0100;
+    pub const ASYNC_EVENTS: u8 = 0b1000;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,11 +38,15 @@ pub trait Plugin: Send + Sync {
 
     /// Source plugins emit events into the engine queue. Default:
     /// nothing to emit.
-    fn next(&self) -> Result<Option<FalcoEvent>> { Ok(None) }
+    fn next(&self) -> Result<Option<FalcoEvent>> {
+        Ok(None)
+    }
 
     /// Extraction plugins implement field lookups beyond the built-in
     /// libsinsp fields. Default: no extra fields.
-    fn extract(&self, _ev: &FalcoEvent, _field: &str) -> Option<String> { None }
+    fn extract(&self, _ev: &FalcoEvent, _field: &str) -> Option<String> {
+        None
+    }
 }
 
 /// In-tree registry (no dlopen).
@@ -52,13 +56,21 @@ pub struct PluginRegistry {
 }
 
 impl PluginRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn register(&mut self, p: Box<dyn Plugin>) { self.plugins.push(p); }
+    pub fn register(&mut self, p: Box<dyn Plugin>) {
+        self.plugins.push(p);
+    }
 
-    pub fn len(&self) -> usize { self.plugins.len() }
+    pub fn len(&self) -> usize {
+        self.plugins.len()
+    }
 
-    pub fn is_empty(&self) -> bool { self.plugins.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.plugins.is_empty()
+    }
 
     pub fn list(&self) -> Vec<PluginInfo> {
         self.plugins.iter().map(|p| p.info()).collect()
@@ -77,7 +89,9 @@ impl PluginRegistry {
 
     /// Apply extraction plugins to fill any missing field on the event.
     pub fn extract_into(&self, ev: &mut FalcoEvent, field: &str) {
-        if ev.fields.contains_key(field) { return; }
+        if ev.fields.contains_key(field) {
+            return;
+        }
         for p in &self.plugins {
             if let Some(v) = p.extract(ev, field) {
                 ev.fields.insert(field.into(), v);

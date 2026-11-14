@@ -124,7 +124,9 @@ fn walk(
 
 fn eval_check(node: &AstNode, check: &AstCheck) -> bool {
     match check {
-        AstCheck::CalleeNamed(name) => matches!(node, AstNode::Call { callee, .. } if callee == name),
+        AstCheck::CalleeNamed(name) => {
+            matches!(node, AstNode::Call { callee, .. } if callee == name)
+        }
         AstCheck::StringContains(needle) => {
             matches!(node, AstNode::StringLit(s) if s.contains(needle.as_str()))
         }
@@ -170,7 +172,10 @@ mod tests {
     #[test]
     fn callee_named_top_level() {
         let tree = vec![call("eval", vec![])];
-        let m = run_rule(&rule("no-eval", AstCheck::CalleeNamed("eval".into())), &tree);
+        let m = run_rule(
+            &rule("no-eval", AstCheck::CalleeNamed("eval".into())),
+            &tree,
+        );
         assert_eq!(m.len(), 1);
     }
 
@@ -181,7 +186,10 @@ mod tests {
             vec![],
             vec![call("eval", vec![AstNode::StringLit("hello".into())])],
         )];
-        let m = run_rule(&rule("no-eval", AstCheck::CalleeNamed("eval".into())), &tree);
+        let m = run_rule(
+            &rule("no-eval", AstCheck::CalleeNamed("eval".into())),
+            &tree,
+        );
         assert_eq!(m.len(), 1);
         assert_eq!(m[0].path, vec!["fn:outer"]);
     }
@@ -193,10 +201,7 @@ mod tests {
             vec![AstNode::StringLit("password=hunter2".into())],
         )];
         let m = run_rule(
-            &rule(
-                "secret",
-                AstCheck::StringContains("password=".into()),
-            ),
+            &rule("secret", AstCheck::StringContains("password=".into())),
             &tree,
         );
         assert_eq!(m.len(), 1);
@@ -271,10 +276,7 @@ mod tests {
 
     #[test]
     fn empty_tree_returns_empty() {
-        let m = run_rule(
-            &rule("any", AstCheck::CalleeNamed("eval".into())),
-            &[],
-        );
+        let m = run_rule(&rule("any", AstCheck::CalleeNamed("eval".into())), &[]);
         assert!(m.is_empty());
     }
 }

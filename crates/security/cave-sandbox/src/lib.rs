@@ -21,8 +21,8 @@ pub mod kata_runtime;
 pub mod kata_shim;
 pub mod lifecycle;
 pub mod models;
-pub mod oci_runtime_spec;
 pub mod observability;
+pub mod oci_runtime_spec;
 pub mod store;
 
 pub use error::SandboxError;

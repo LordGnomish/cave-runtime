@@ -3,7 +3,7 @@
 //! TDD: real sync-status computation, ported from ArgoCD controller/state.go
 //! CompareAppState (desired vs live manifest comparison).
 
-use cave_gitops_config::models::{compare_state, SyncStatus};
+use cave_gitops_config::models::{SyncStatus, compare_state};
 
 /// Desired manifest identical to the live manifest => Synced.
 #[test]

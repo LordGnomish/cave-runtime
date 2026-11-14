@@ -152,7 +152,14 @@ impl NotificationLog {
         resolved_alerts: Vec<u64>,
         expiry: Option<Duration>,
     ) -> Result<(), NflogError> {
-        self.log_at(r, group_key, firing_alerts, resolved_alerts, expiry, Utc::now())
+        self.log_at(
+            r,
+            group_key,
+            firing_alerts,
+            resolved_alerts,
+            expiry,
+            Utc::now(),
+        )
     }
 
     /// `(*Log).Query` — return the most-recent entry for the

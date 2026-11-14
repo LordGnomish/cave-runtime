@@ -52,7 +52,10 @@ fn clamp_port_range_matches_upstream_biased_multiply() {
     // Result always within [start,end].
     for v in [0u16, 1, 1000, 30000, 60000, 65535] {
         let p = clamp_port_range(1024, 65535, v);
-        assert!((1024..=65535).contains(&p), "port {p} out of range for val {v}");
+        assert!(
+            (1024..=65535).contains(&p),
+            "port {p} out of range for val {v}"
+        );
     }
 }
 
@@ -96,10 +99,10 @@ fn reverse_lookup_restores_original_source() {
 
     // Reply packet 5-tuple: remote(1.1.1.1):443 -> node(192.168.1.10):to_port
     let rtuple = NatTuple {
-        saddr: o.daddr,       // remote
-        daddr: t.addr,        // masquerade addr
-        sport: o.dport,       // 443
-        dport: fwd.to_port,   // allocated source port
+        saddr: o.daddr,     // remote
+        daddr: t.addr,      // masquerade addr
+        sport: o.dport,     // 443
+        dport: fwd.to_port, // allocated source port
         nexthdr: o.nexthdr,
         dir: NatDir::In,
     };
@@ -140,7 +143,11 @@ fn exhaustion_returns_no_mapping() {
 
     // Second, distinct flow wants the same masquerade addr; only port
     // 100 exists and its reverse slot is taken -> all retries collide.
-    let o2 = NatTuple { sport: 100, saddr: u32::from_be_bytes([10, 0, 0, 6]), ..otuple(100) };
+    let o2 = NatTuple {
+        sport: 100,
+        saddr: u32::from_be_bytes([10, 0, 0, 6]),
+        ..otuple(100)
+    };
     let err = snat_v4_new_mapping(&mut m, &o2, &t, &helpers).unwrap_err();
     assert_eq!(err, NatError::NoMapping);
 }
@@ -160,7 +167,11 @@ fn collision_retries_to_next_free_port() {
     assert_eq!(e1.to_port, 100);
 
     // Second flow also prefers 100 (collision) -> retry picks 101.
-    let o2 = NatTuple { sport: 100, saddr: u32::from_be_bytes([10, 0, 0, 7]), ..otuple(100) };
+    let o2 = NatTuple {
+        sport: 100,
+        saddr: u32::from_be_bytes([10, 0, 0, 7]),
+        ..otuple(100)
+    };
     let e2 = snat_v4_new_mapping(&mut m, &o2, &t, &helpers).expect("second");
     assert_eq!(e2.to_port, 101);
 }

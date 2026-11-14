@@ -103,14 +103,28 @@ mod tests {
     #[test]
     fn shim_method_count_seventeen() {
         let methods = [
-            ShimMethod::State, ShimMethod::Create, ShimMethod::Start, ShimMethod::Delete,
-            ShimMethod::Pids, ShimMethod::Pause, ShimMethod::Resume, ShimMethod::Checkpoint,
-            ShimMethod::Kill, ShimMethod::Exec, ShimMethod::ResizePty, ShimMethod::CloseIO,
-            ShimMethod::Update, ShimMethod::Wait, ShimMethod::Stats, ShimMethod::Connect,
+            ShimMethod::State,
+            ShimMethod::Create,
+            ShimMethod::Start,
+            ShimMethod::Delete,
+            ShimMethod::Pids,
+            ShimMethod::Pause,
+            ShimMethod::Resume,
+            ShimMethod::Checkpoint,
+            ShimMethod::Kill,
+            ShimMethod::Exec,
+            ShimMethod::ResizePty,
+            ShimMethod::CloseIO,
+            ShimMethod::Update,
+            ShimMethod::Wait,
+            ShimMethod::Stats,
+            ShimMethod::Connect,
             ShimMethod::Shutdown,
         ];
         assert_eq!(methods.len(), 17);
-        for m in methods { assert!(!m.method_name().is_empty()); }
+        for m in methods {
+            assert!(!m.method_name().is_empty());
+        }
     }
 
     #[test]

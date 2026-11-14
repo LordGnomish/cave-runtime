@@ -3,10 +3,8 @@
 //! Edge coverage for cave-cloud-controller-manager — types, provider config,
 //! NodeAddressType precedence, InstanceState classification, ClusterId.
 
-use cave_cloud_controller_manager::node_controller::{
-    InstanceState, NodeAddress, NodeAddressType,
-};
-use cave_cloud_controller_manager::provider::{ClusterId, CloudConfig, InstanceMetadata, ZoneInfo};
+use cave_cloud_controller_manager::node_controller::{InstanceState, NodeAddress, NodeAddressType};
+use cave_cloud_controller_manager::provider::{CloudConfig, ClusterId, InstanceMetadata, ZoneInfo};
 use cave_cloud_controller_manager::types::{
     Cite, CloudError, ProviderName, Reconcile, TenantId, UPSTREAM_VERSION,
 };
@@ -28,7 +26,12 @@ fn cite_k8s_uses_pinned_upstream_version() {
 
 #[test]
 fn cite_ext_carries_provider_repo_and_version() {
-    let c = Cite::ext("hetznercloud/hcloud-cloud-controller-manager", "x.go", "Sym", "v1.30.1");
+    let c = Cite::ext(
+        "hetznercloud/hcloud-cloud-controller-manager",
+        "x.go",
+        "Sym",
+        "v1.30.1",
+    );
     assert_eq!(c.repo, "hetznercloud/hcloud-cloud-controller-manager");
     assert_eq!(c.version, "v1.30.1");
     let url = c.url();
@@ -143,7 +146,11 @@ fn cloud_error_upstream_display() {
 
 #[test]
 fn cloud_error_tenant_denied_display() {
-    let e = CloudError::TenantDenied { tenant: tenant(), kind: "Node", name: "n1".into() };
+    let e = CloudError::TenantDenied {
+        tenant: tenant(),
+        kind: "Node",
+        name: "n1".into(),
+    };
     let s = e.to_string();
     assert!(s.contains("acme"));
     assert!(s.contains("Node"));
@@ -206,7 +213,11 @@ fn instance_state_healthy_only_for_running() {
 fn instance_state_failure_taint_for_shutdown_and_unreachable() {
     assert!(InstanceState::Shutdown.failure_taint().is_some());
     assert!(InstanceState::Unreachable.failure_taint().is_some());
-    for s in [InstanceState::Running, InstanceState::Terminated, InstanceState::NotFound] {
+    for s in [
+        InstanceState::Running,
+        InstanceState::Terminated,
+        InstanceState::NotFound,
+    ] {
         assert!(s.failure_taint().is_none(), "{:?} should not taint", s);
     }
 }

@@ -79,9 +79,15 @@ pub struct ListDef {
     pub items: Vec<String>,
 }
 
-fn default_source() -> String { "syscall".into() }
-fn default_true() -> bool { true }
-fn default_comp() -> Vec<String> { vec!["=".into()] }
+fn default_source() -> String {
+    "syscall".into()
+}
+fn default_true() -> bool {
+    true
+}
+fn default_comp() -> Vec<String> {
+    vec!["=".into()]
+}
 
 #[cfg(test)]
 mod tests {
@@ -125,13 +131,19 @@ mod tests {
 
     #[test]
     fn macro_def_holds_condition_fragment() {
-        let m = MacroDef { name: "container".into(), condition: "container.id != host".into() };
+        let m = MacroDef {
+            name: "container".into(),
+            condition: "container.id != host".into(),
+        };
         assert_eq!(m.condition, "container.id != host");
     }
 
     #[test]
     fn list_def_holds_named_set() {
-        let l = ListDef { name: "shell_binaries".into(), items: vec!["bash".into(), "sh".into()] };
+        let l = ListDef {
+            name: "shell_binaries".into(),
+            items: vec!["bash".into(), "sh".into()],
+        };
         assert_eq!(l.items.len(), 2);
     }
 

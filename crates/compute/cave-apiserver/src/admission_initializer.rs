@@ -136,11 +136,7 @@ impl PluginInitializer {
 /// builtin admission plugins). Returns the satisfied-count.
 pub fn drive<P>(init: &PluginInitializer, plugin: &mut P) -> usize
 where
-    P: WantsAuthorizer
-        + WantsInformers
-        + WantsRestMapper
-        + WantsClient
-        + WantsFeatureGate,
+    P: WantsAuthorizer + WantsInformers + WantsRestMapper + WantsClient + WantsFeatureGate,
 {
     let mut n = 0;
     if let Some(a) = &init.authorizer {

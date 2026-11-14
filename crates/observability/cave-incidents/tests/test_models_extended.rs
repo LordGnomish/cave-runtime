@@ -53,7 +53,10 @@ fn test_postmortem_serde_roundtrip() {
         title: "Post-mortem for DB outage".to_string(),
         summary: "Primary DB lost quorum".to_string(),
         root_cause: "Disk IOPS exhaustion on leader node".to_string(),
-        action_items: vec!["Add IOPS alert".to_string(), "Add disk sizing runbook".to_string()],
+        action_items: vec![
+            "Add IOPS alert".to_string(),
+            "Add disk sizing runbook".to_string(),
+        ],
         status: PostMortemStatus::Draft,
         created_at: Utc::now(),
         published_at: None,

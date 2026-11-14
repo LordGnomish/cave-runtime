@@ -7,9 +7,9 @@
 //! `pkg/issuer/ca/issue.go` (CA issuer),
 //! `pkg/util/pki/csr.go` (CSR generation).
 
-use cave_certs::issuers::{CaIssuer, IssueRequest, IssueResult, SelfSignedIssuer};
-use cave_certs::csr::{CsrBuilder, CsrParams};
 use cave_certs::crds::IssuerRef;
+use cave_certs::csr::{CsrBuilder, CsrParams};
+use cave_certs::issuers::{CaIssuer, IssueRequest, IssueResult, SelfSignedIssuer};
 
 const TENANT: &str = "tenant-issuers-test";
 
@@ -31,7 +31,10 @@ fn selfsigned_issuer_produces_valid_cert_pem() {
     assert!(!result.private_key_pem.is_empty());
     // The PEM blocks must carry the right headers.
     assert!(result.certificate_pem.contains("CERTIFICATE"));
-    assert!(result.private_key_pem.contains("PRIVATE KEY") || result.private_key_pem.contains("EC PRIVATE KEY"));
+    assert!(
+        result.private_key_pem.contains("PRIVATE KEY")
+            || result.private_key_pem.contains("EC PRIVATE KEY")
+    );
 }
 
 /// Cite: cert-manager selfsigned issuer — is_ca=true produces a CA
@@ -68,7 +71,12 @@ fn ca_issuer_signs_leaf_cert_from_stored_ca() {
     let ca_result = ss.issue(&ca_req).unwrap();
 
     // Now use CaIssuer with that CA to sign a leaf cert.
-    let ca_issuer = CaIssuer::from_pem(TENANT, &ca_result.certificate_pem, &ca_result.private_key_pem).unwrap();
+    let ca_issuer = CaIssuer::from_pem(
+        TENANT,
+        &ca_result.certificate_pem,
+        &ca_result.private_key_pem,
+    )
+    .unwrap();
     let leaf_req = IssueRequest {
         tenant_id: TENANT.into(),
         dns_names: vec!["api.example.com".into(), "www.example.com".into()],
@@ -113,7 +121,12 @@ fn ca_issuer_rejects_cross_tenant_sign_request() {
         is_ca: true,
     };
     let ca_result = ss.issue(&ca_req).unwrap();
-    let ca_issuer = CaIssuer::from_pem(TENANT, &ca_result.certificate_pem, &ca_result.private_key_pem).unwrap();
+    let ca_issuer = CaIssuer::from_pem(
+        TENANT,
+        &ca_result.certificate_pem,
+        &ca_result.private_key_pem,
+    )
+    .unwrap();
     let leaf_req = IssueRequest {
         tenant_id: "tenant-other".into(), // wrong tenant
         dns_names: vec!["api.other.com".into()],
