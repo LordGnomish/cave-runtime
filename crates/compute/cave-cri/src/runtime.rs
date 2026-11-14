@@ -262,6 +262,13 @@ pub async fn unpause_container(id: Uuid, store: &ContainerStore) -> CriResult<()
 }
 
 /// Execute a command inside a running container's namespaces.
+///
+/// On Linux the command runs as a child process of the runtime. Between
+/// fork and exec the child joins those namespaces of the container's
+/// process that differ from the runtime's own, then changes to the
+/// requested working directory. Its stdin is empty, stdout and stderr are
+/// captured, and it is killed if the returned future is dropped before the
+/// command has finished.
 pub async fn exec_in_container(
     id: Uuid,
     req: &ExecRequest,
@@ -281,95 +288,88 @@ pub async fn exec_in_container(
 
     #[cfg(target_os = "linux")]
     {
-        if let Some(pid) = container.pid {
-            namespace::enter_namespaces(pid)?;
+        use std::process::Stdio;
+
+        // Everything that allocates or reads /proc happens here, in the
+        // parent: after fork the child may only make system calls.
+        let namespaces = match container.pid {
+            Some(pid) => namespace::open_foreign_namespaces(std::path::Path::new("/proc"), pid),
+            None => Vec::new(),
+        };
+        let joined: Vec<&str> = namespaces.iter().map(|ns| ns.name).collect();
+        let working_dir = req
+            .working_dir
+            .as_deref()
+            .map(std::ffi::CString::new)
+            .transpose()
+            .map_err(|_| CriError::Exec("working_dir must not contain a NUL byte".into()))?;
+
+        // tokio creates the pipes close-on-exec, reads both of them while it
+        // waits for the child, and reports a failed exec as an error.
+        let mut command = tokio::process::Command::new(&req.command[0]);
+        command
+            .args(&req.command[1..])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+        // SAFETY: the closure runs in the forked child before exec, where
+        // only async-signal-safe functions may be called. It makes setns(2)
+        // and chdir(2) system calls on values prepared above and does not
+        // allocate.
+        unsafe {
+            command.pre_exec(move || {
+                // setns(2) is called here and not in the runtime itself: it
+                // moves only the calling thread, and a multi-threaded
+                // process cannot change its mount namespace at all.
+                namespace::join_namespaces(&namespaces)
+                    .map_err(|(_, errno)| std::io::Error::from(errno))?;
+                // After the mount namespace was joined, so that the path is
+                // looked up inside the container. A directory that cannot be
+                // entered is not an error, the command then runs where the
+                // child already is.
+                if let Some(dir) = &working_dir {
+                    let _ = nix::unistd::chdir(dir.as_c_str());
+                }
+                Ok(())
+            });
         }
 
-        // Fork a child to exec the command, capture output via pipes
-        use nix::sys::wait::{waitpid, WaitStatus};
-        use nix::unistd::{close, fork, pipe, read, ForkResult};
-
-        let (stdout_r, stdout_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
-        let (stderr_r, stderr_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
-
-        match unsafe { fork() } {
-            Ok(ForkResult::Parent { child }) => {
-                close(stdout_w).ok();
-                close(stderr_w).ok();
-
-                let mut stdout_buf = Vec::new();
-                let mut buf = [0u8; 4096];
-                loop {
-                    match read(stdout_r, &mut buf) {
-                        Ok(0) | Err(_) => break,
-                        Ok(n) => stdout_buf.extend_from_slice(&buf[..n]),
-                    }
-                }
-
-                let mut stderr_buf = Vec::new();
-                loop {
-                    match read(stderr_r, &mut buf) {
-                        Ok(0) | Err(_) => break,
-                        Ok(n) => stderr_buf.extend_from_slice(&buf[..n]),
-                    }
-                }
-
-                close(stdout_r).ok();
-                close(stderr_r).ok();
-
-                let exit_code = match waitpid(child, None) {
-                    Ok(WaitStatus::Exited(_, code)) => code,
-                    _ => -1,
-                };
-
-                let duration_ms = start.elapsed().as_millis() as u64;
-                return Ok(ExecResult {
-                    exit_code,
-                    stdout: String::from_utf8_lossy(&stdout_buf).into_owned(),
-                    stderr: String::from_utf8_lossy(&stderr_buf).into_owned(),
-                    duration_ms,
-                });
+        let output = command.output().await.map_err(|e| {
+            if joined.is_empty() {
+                CriError::Exec(format!("exec of {:?} failed: {}", req.command[0], e))
+            } else {
+                CriError::Exec(format!(
+                    "exec of {:?} in the {} namespace(s) of the container failed: {}",
+                    req.command[0],
+                    joined.join(", "),
+                    e
+                ))
             }
-            Ok(ForkResult::Child) => {
-                use nix::unistd::dup2;
-                use std::os::unix::io::RawFd;
-                dup2(stdout_w, 1 as RawFd).ok();
-                dup2(stderr_w, 2 as RawFd).ok();
-                close(stdout_r).ok();
-                close(stderr_r).ok();
+        })?;
 
-                // Apply working dir
-                if let Some(ref wd) = req.working_dir {
-                    let _ = std::env::set_current_dir(wd);
-                }
-
-                let c_cmd = std::ffi::CString::new(req.command[0].as_str()).unwrap();
-                let c_args: Vec<std::ffi::CString> = req
-                    .command
-                    .iter()
-                    .map(|a| std::ffi::CString::new(a.as_str()).unwrap())
-                    .collect();
-                let _ = nix::unistd::execvp(&c_cmd, &c_args);
-                std::process::exit(127);
-            }
-            Err(e) => {
-                return Err(CriError::Exec(format!("fork failed: {}", e)));
-            }
-        }
+        let duration_ms = start.elapsed().as_millis() as u64;
+        Ok(ExecResult {
+            // No exit code means the command was killed by a signal.
+            exit_code: output.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            duration_ms,
+        })
     }
 
     #[cfg(not(target_os = "linux"))]
     {
         tracing::warn!(container_id = %id, cmd = ?req.command, "simulated exec (non-Linux)");
-    }
 
-    let duration_ms = start.elapsed().as_millis() as u64;
-    Ok(ExecResult {
-        exit_code: 0,
-        stdout: format!("exec: {}", req.command.join(" ")),
-        stderr: String::new(),
-        duration_ms,
-    })
+        let duration_ms = start.elapsed().as_millis() as u64;
+        Ok(ExecResult {
+            exit_code: 0,
+            stdout: format!("exec: {}", req.command.join(" ")),
+            stderr: String::new(),
+            duration_ms,
+        })
+    }
 }
 
 /// Read container log lines (JSON format like Docker/containerd).
@@ -391,7 +391,9 @@ pub fn get_container_logs(
         use std::io::BufRead;
         if let Ok(file) = std::fs::File::open(&container.log_path) {
             let reader = std::io::BufReader::new(file);
-            for line in reader.lines().flatten() {
+            // Stop at the first read error: `lines()` would hand out the
+            // same error again and again (e.g. EISDIR for a directory).
+            for line in reader.lines().map_while(Result::ok) {
                 // Parse JSON log format: {"time":"...","stream":"stdout","log":"..."}
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                     let timestamp = v["time"]
@@ -539,7 +541,17 @@ pub async fn restore_container(
 
     container.status = ContainerStatus::Running;
     container.started_at = Some(chrono::Utc::now());
-    container.pid = Some(99998);
+    // No process is started here (CRIU is not invoked), so on Linux there is
+    // no pid to record: stop, kill and pause send real signals to
+    // `container.pid`, and a made-up number may belong to another process.
+    #[cfg(target_os = "linux")]
+    {
+        container.pid = None;
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        container.pid = Some(99998);
+    }
     store.update(container);
     tracing::info!(container_id = %id, "container restored from checkpoint");
     Ok(())
@@ -803,10 +815,36 @@ mod tests {
 
     #[test]
     fn test_get_container_logs_running() {
+        // On Linux the entries are read from the container's log file (one
+        // simulated entry elsewhere), so the container gets a log file.
+        let dir = tempfile::tempdir().unwrap();
+        let log_path = dir.path().join("container.log");
+        std::fs::write(
+            &log_path,
+            concat!(
+                r#"{"time":"2026-01-02T03:04:05Z","stream":"stderr","log":"hello\n"}"#,
+                "\n",
+                "not json\n",
+            ),
+        )
+        .unwrap();
         let store = ContainerStore::new();
         let id = make_running(&store);
+        let mut container = store.get(&id).unwrap();
+        container.log_path = log_path;
+        store.update(container);
+
         let logs = get_container_logs(id, None, &store).unwrap();
         assert!(!logs.is_empty());
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(logs.len(), 2);
+            assert_eq!(logs[0].timestamp.to_rfc3339(), "2026-01-02T03:04:05+00:00");
+            assert_eq!(logs[0].stream, "stderr");
+            assert_eq!(logs[0].message, "hello");
+            assert_eq!(logs[1].stream, "stdout");
+            assert_eq!(logs[1].message, "not json");
+        }
     }
 
     #[test]
@@ -819,10 +857,22 @@ mod tests {
 
     #[test]
     fn test_list_processes_running() {
+        // On Linux the process is looked up in /proc/<pid>/status, so the
+        // container gets the pid of a process that exists: this one.
         let store = ContainerStore::new();
         let id = make_running(&store);
+        let mut container = store.get(&id).unwrap();
+        container.pid = Some(std::process::id());
+        store.update(container);
+
         let procs = list_container_processes(id, &store).unwrap();
         assert!(!procs.is_empty());
+        assert_eq!(procs[0].pid, std::process::id());
+        #[cfg(target_os = "linux")]
+        {
+            let comm = std::fs::read_to_string("/proc/self/comm").unwrap();
+            assert_eq!(procs[0].command, comm.trim_end());
+        }
     }
 
     #[test]

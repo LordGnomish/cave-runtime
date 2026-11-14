@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
 const CAVE_CGROUP_PREFIX: &str = "cave";
+const DEFAULT_TENANT: &str = "default";
 
 /// Handle to a container's cgroup. The `tenant_id` segment is part of the
 /// canonical path so every container's cgroup tree is hard-isolated by
@@ -26,7 +27,7 @@ pub struct CgroupHandle {
 
 impl CgroupHandle {
     pub fn new(container_id: &str) -> Self {
-        Self::with_root(container_id, "default", Path::new(CGROUP_ROOT))
+        Self::with_root(container_id, DEFAULT_TENANT, Path::new(CGROUP_ROOT))
     }
 
     /// Tenant-scoped handle rooted at an arbitrary cgroup hierarchy root.
@@ -44,26 +45,74 @@ impl CgroupHandle {
 }
 
 /// Create a cgroup v2 directory and apply resource limits.
-pub fn create_cgroup(container_id: &str, _limits: &ResourceLimits) -> CriResult<CgroupHandle> {
-    let handle = CgroupHandle::new(container_id);
+///
+/// On Linux, a hierarchy this process may not write to (not root and no
+/// delegated subtree, or a read-only cgroup mount) is tolerated when the
+/// container asks for no limits: a warning is logged and the container gets
+/// no cgroup of its own. This is the rule of runc's fs2 manager
+/// (`libcontainer/cgroups/fs2/fs2.go`, `Manager.Apply`). If any limit is
+/// requested the failure is an error, because the limit would not be
+/// enforced.
+pub fn create_cgroup(container_id: &str, limits: &ResourceLimits) -> CriResult<CgroupHandle> {
+    create_cgroup_at(Path::new(CGROUP_ROOT), container_id, limits)
+}
+
+/// `create_cgroup` with the hierarchy root as a parameter: `/sys/fs/cgroup`
+/// in production, a directory of their own choosing in tests.
+fn create_cgroup_at(
+    root: &Path,
+    container_id: &str,
+    limits: &ResourceLimits,
+) -> CriResult<CgroupHandle> {
+    let handle = CgroupHandle::with_root(container_id, DEFAULT_TENANT, root);
 
     #[cfg(target_os = "linux")]
     {
-        std::fs::create_dir_all(&handle.path).map_err(|e| {
-            CriError::Cgroup(format!(
-                "failed to create cgroup {}: {}",
-                handle.path.display(),
-                e
-            ))
-        })?;
-        apply_limits(&handle, limits)?;
+        match std::fs::create_dir_all(&handle.path) {
+            Ok(()) => apply_limits(&handle, limits)?,
+            Err(e) if hierarchy_not_writable(&e) && !requests_any_limit(limits) => {
+                tracing::warn!(
+                    "cannot create cgroup {}: {} — no limits requested, continuing without a cgroup",
+                    handle.path.display(),
+                    e
+                );
+            }
+            Err(e) => {
+                return Err(CriError::Cgroup(format!(
+                    "failed to create cgroup {}: {}",
+                    handle.path.display(),
+                    e
+                )));
+            }
+        }
     }
     #[cfg(not(target_os = "linux"))]
     {
+        let _ = limits;
         tracing::warn!("cgroups not supported on this OS — resource limits not enforced");
     }
 
     Ok(handle)
+}
+
+/// Whether creating a cgroup failed because this process may not write to
+/// the hierarchy: `EACCES` / `EPERM` (not root, subtree not delegated) or
+/// `EROFS` (cgroup filesystem mounted read-only, as inside most containers).
+#[cfg(target_os = "linux")]
+fn hierarchy_not_writable(e: &std::io::Error) -> bool {
+    matches!(
+        e.kind(),
+        std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+    )
+}
+
+/// Whether `apply_limits` would write anything for these limits.
+#[cfg(target_os = "linux")]
+fn requests_any_limit(limits: &ResourceLimits) -> bool {
+    limits.cpu_shares.is_some()
+        || limits.cpu_quota.is_some()
+        || limits.memory_limit.is_some()
+        || limits.pids_limit.is_some()
 }
 
 /// Update resource limits on an existing cgroup.
@@ -72,7 +121,7 @@ pub fn update_cgroup(handle: &CgroupHandle, limits: &ResourceLimits) -> CriResul
 }
 
 /// Remove cgroup directory.
-pub fn remove_cgroup(_handle: &CgroupHandle) -> CriResult<()> {
+pub fn remove_cgroup(handle: &CgroupHandle) -> CriResult<()> {
     #[cfg(target_os = "linux")]
     {
         if handle.path.exists() {
@@ -80,49 +129,60 @@ pub fn remove_cgroup(_handle: &CgroupHandle) -> CriResult<()> {
                 .map_err(|e| CriError::Cgroup(format!("failed to remove cgroup: {}", e)))?;
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = handle;
+    }
     Ok(())
 }
 
 /// Read current resource usage from cgroup.
-pub fn read_stats(_handle: &CgroupHandle) -> CriResult<CgroupStats> {
-    let stats = CgroupStats::default();
-
+pub fn read_stats(handle: &CgroupHandle) -> CriResult<CgroupStats> {
     #[cfg(target_os = "linux")]
-    {
-        stats.cpu_usage_usec =
-            read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0);
-        stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
-        stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
-        stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
-    }
+    let stats = CgroupStats {
+        cpu_usage_usec: read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0),
+        memory_current: read_file_u64(&handle.path.join("memory.current")).unwrap_or(0),
+        memory_peak: read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0),
+        pids_current: read_file_u64(&handle.path.join("pids.current")).unwrap_or(0),
+    };
+    #[cfg(not(target_os = "linux"))]
+    let stats = {
+        let _ = handle;
+        CgroupStats::default()
+    };
 
     Ok(stats)
 }
 
 /// Read extended cgroup v2 stats including io.stat, user/sys usec, and throttle info.
-pub fn read_stats_v2(_handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
-    let stats = crate::models::CgroupStatsV2::default();
-
+pub fn read_stats_v2(handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
     #[cfg(target_os = "linux")]
-    {
+    let stats = {
         let cpu_stat_path = handle.path.join("cpu.stat");
-        stats.cpu_usage_usec = read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0);
-        stats.cpu_user_usec = read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0);
-        stats.cpu_system_usec = read_cpu_stat(&cpu_stat_path, "system_usec").unwrap_or(0);
-        stats.cpu_nr_throttled = read_cpu_stat(&cpu_stat_path, "nr_throttled").unwrap_or(0);
-
-        stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
-        stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
-        stats.memory_swap_current =
-            read_file_u64(&handle.path.join("memory.swap.current")).unwrap_or(0);
-
-        stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
-        stats.pids_max_reached = read_pids_events(&handle.path.join("pids.events")).unwrap_or(0);
-
         let (rbytes, wbytes) = read_io_stat(&handle.path.join("io.stat")).unwrap_or((0, 0));
-        stats.io_read_bytes = rbytes;
-        stats.io_write_bytes = wbytes;
-    }
+        crate::models::CgroupStatsV2 {
+            cpu_usage_usec: read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0),
+            cpu_user_usec: read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0),
+            cpu_system_usec: read_cpu_stat(&cpu_stat_path, "system_usec").unwrap_or(0),
+            cpu_nr_throttled: read_cpu_stat(&cpu_stat_path, "nr_throttled").unwrap_or(0),
+
+            memory_current: read_file_u64(&handle.path.join("memory.current")).unwrap_or(0),
+            memory_peak: read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0),
+            memory_swap_current: read_file_u64(&handle.path.join("memory.swap.current"))
+                .unwrap_or(0),
+
+            pids_current: read_file_u64(&handle.path.join("pids.current")).unwrap_or(0),
+            pids_max_reached: read_pids_events(&handle.path.join("pids.events")).unwrap_or(0),
+
+            io_read_bytes: rbytes,
+            io_write_bytes: wbytes,
+        }
+    };
+    #[cfg(not(target_os = "linux"))]
+    let stats = {
+        let _ = handle;
+        crate::models::CgroupStatsV2::default()
+    };
 
     Ok(stats)
 }
@@ -457,14 +517,20 @@ mod tests {
 
     #[test]
     fn test_create_cgroup_zero_limits() {
+        // On Linux this creates a directory and writes the limit files, so
+        // the hierarchy root is a tempdir instead of the host's
+        // /sys/fs/cgroup, which a test run is not allowed to write to.
+        let root = tempfile::tempdir().unwrap();
         let limits = ResourceLimits {
             cpu_shares: Some(0),
             cpu_quota: Some(0),
             memory_limit: Some(0),
             pids_limit: Some(0),
         };
-        let h = create_cgroup("zero-limits-id", &limits).unwrap();
+        let h = create_cgroup_at(root.path(), "zero-limits-id", &limits).unwrap();
         assert_eq!(h.container_id, "zero-limits-id");
+        #[cfg(target_os = "linux")]
+        assert!(h.path.is_dir());
     }
 
     #[test]
@@ -476,7 +542,12 @@ mod tests {
 
     #[test]
     fn test_update_cgroup_all_limits_set() {
-        let h = CgroupHandle::new("update-all");
+        // Limits can only be written to a cgroup that exists, and on Linux
+        // they really are written: the handle gets a directory in a tempdir
+        // instead of a path under the host's /sys/fs/cgroup.
+        let root = tempfile::tempdir().unwrap();
+        let h = CgroupHandle::with_root("update-all", DEFAULT_TENANT, root.path());
+        std::fs::create_dir_all(&h.path).unwrap();
         let limits = ResourceLimits {
             cpu_shares: Some(1024),
             cpu_quota: Some(50000),
@@ -484,6 +555,14 @@ mod tests {
             pids_limit: Some(100),
         };
         assert!(update_cgroup(&h, &limits).is_ok());
+        #[cfg(target_os = "linux")]
+        {
+            let read = |file: &str| std::fs::read_to_string(h.path.join(file)).unwrap();
+            assert_eq!(read("cpu.weight"), "1024");
+            assert_eq!(read("cpu.max"), "50000 100000");
+            assert_eq!(read("memory.max"), "536870912");
+            assert_eq!(read("pids.max"), "100");
+        }
     }
 
     #[test]
@@ -502,6 +581,139 @@ mod tests {
         assert_eq!(stats.memory_current, 0);
         assert_eq!(stats.memory_peak, 0);
         assert_eq!(stats.pids_current, 0);
+    }
+
+    // ── create_cgroup on Linux, hierarchy root injected ──────────────────────
+    //
+    // `create_cgroup_at` is `create_cgroup` with the hierarchy root as a
+    // parameter. None of these tests needs privileges or touches
+    // /sys/fs/cgroup, and each gives the same result with and without root.
+
+    /// sysfs refuses mkdir(2) for every caller (EPERM for root, EACCES for
+    /// anyone else), which makes it a stand-in for a cgroup hierarchy this
+    /// process may not write to. Fails loudly instead of creating
+    /// directories somewhere else if /sys is not sysfs.
+    #[cfg(target_os = "linux")]
+    fn unwritable_hierarchy() -> &'static Path {
+        use nix::sys::statfs::{statfs, SYSFS_MAGIC};
+        let root = Path::new("/sys/kernel");
+        let fs = statfs(root).expect("statfs(/sys/kernel)");
+        assert_eq!(
+            fs.filesystem_type(),
+            SYSFS_MAGIC,
+            "/sys/kernel must be on sysfs for this test"
+        );
+        root
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_creates_the_cgroup_and_writes_the_limits() {
+        let root = tempfile::tempdir().unwrap();
+        let limits = ResourceLimits {
+            cpu_shares: Some(512),
+            cpu_quota: Some(50_000),
+            memory_limit: Some(256 * 1024 * 1024),
+            pids_limit: Some(128),
+        };
+
+        let h = create_cgroup_at(root.path(), "ctr-create", &limits).unwrap();
+
+        assert_eq!(h.path, root.path().join("cave/default/ctr-create"));
+        assert!(h.path.is_dir());
+        let read = |file: &str| std::fs::read_to_string(h.path.join(file)).unwrap();
+        assert_eq!(read("cpu.weight"), "512");
+        assert_eq!(read("cpu.max"), "50000 100000");
+        assert_eq!(read("memory.max"), "268435456");
+        assert_eq!(read("pids.max"), "128");
+    }
+
+    /// Same rule as runc's fs2 manager (`Manager.Apply`): without permission
+    /// to create the cgroup, a container that asks for no limits still
+    /// starts; it just has no cgroup of its own.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_without_limits_tolerates_an_unwritable_hierarchy() {
+        let root = unwritable_hierarchy();
+
+        let h = create_cgroup_at(root, "ctr-no-limits", &ResourceLimits::default()).unwrap();
+
+        assert_eq!(h.container_id, "ctr-no-limits");
+        assert_eq!(h.path, root.join("cave/default/ctr-no-limits"));
+        assert!(!h.path.exists());
+    }
+
+    /// A limit that cannot be enforced is an error, never a warning.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_with_limits_fails_on_an_unwritable_hierarchy() {
+        let root = unwritable_hierarchy();
+        let limits = ResourceLimits {
+            pids_limit: Some(64),
+            ..Default::default()
+        };
+
+        let err = create_cgroup_at(root, "ctr-limits", &limits).unwrap_err();
+
+        assert!(matches!(err, CriError::Cgroup(_)), "got {err:?}");
+        assert!(!root.join("cave").exists());
+    }
+
+    /// Only a missing permission is tolerated. Here the hierarchy root is a
+    /// regular file, so mkdir fails with ENOTDIR, with or without limits.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn create_cgroup_at_does_not_tolerate_other_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let not_a_dir = dir.path().join("hierarchy");
+        std::fs::write(&not_a_dir, b"").unwrap();
+
+        let err =
+            create_cgroup_at(&not_a_dir, "ctr-enotdir", &ResourceLimits::default()).unwrap_err();
+
+        assert!(matches!(err, CriError::Cgroup(_)), "got {err:?}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn only_missing_permission_counts_as_an_unwritable_hierarchy() {
+        use nix::libc::{EACCES, EBUSY, EINVAL, ENOENT, ENOSPC, ENOTDIR, EPERM, EROFS};
+        let os_error = std::io::Error::from_raw_os_error;
+
+        for errno in [EACCES, EPERM, EROFS] {
+            assert!(hierarchy_not_writable(&os_error(errno)), "errno {errno}");
+        }
+        for errno in [ENOENT, ENOTDIR, ENOSPC, EBUSY, EINVAL] {
+            assert!(!hierarchy_not_writable(&os_error(errno)), "errno {errno}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn every_set_limit_counts_as_requested() {
+        assert!(!requests_any_limit(&ResourceLimits::default()));
+
+        let one_at_a_time = [
+            ResourceLimits {
+                cpu_shares: Some(100),
+                ..Default::default()
+            },
+            ResourceLimits {
+                cpu_quota: Some(50_000),
+                ..Default::default()
+            },
+            ResourceLimits {
+                memory_limit: Some(4096),
+                ..Default::default()
+            },
+            ResourceLimits {
+                pids_limit: Some(0),
+                ..Default::default()
+            },
+        ];
+        for limits in &one_at_a_time {
+            assert!(requests_any_limit(limits), "{limits:?}");
+        }
     }
 
     // ── v2 stats ──────────────────────────────────────────────────────────────
