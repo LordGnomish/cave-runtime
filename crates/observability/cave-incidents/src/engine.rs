@@ -142,13 +142,30 @@ pub fn compute_metrics_from_refs(incidents: &[&Incident]) -> IncidentMetrics {
     let total = incidents.len() as u64;
     let open = incidents
         .iter()
-        .filter(|i| matches!(i.status, IncidentStatus::Open | IncidentStatus::Acknowledged))
+        .filter(|i| {
+            matches!(
+                i.status,
+                IncidentStatus::Open | IncidentStatus::Acknowledged
+            )
+        })
         .count() as u64;
 
-    let p1 = incidents.iter().filter(|i| matches!(i.severity, IncidentSeverity::P1)).count() as u64;
-    let p2 = incidents.iter().filter(|i| matches!(i.severity, IncidentSeverity::P2)).count() as u64;
-    let p3 = incidents.iter().filter(|i| matches!(i.severity, IncidentSeverity::P3)).count() as u64;
-    let p4 = incidents.iter().filter(|i| matches!(i.severity, IncidentSeverity::P4)).count() as u64;
+    let p1 = incidents
+        .iter()
+        .filter(|i| matches!(i.severity, IncidentSeverity::P1))
+        .count() as u64;
+    let p2 = incidents
+        .iter()
+        .filter(|i| matches!(i.severity, IncidentSeverity::P2))
+        .count() as u64;
+    let p3 = incidents
+        .iter()
+        .filter(|i| matches!(i.severity, IncidentSeverity::P3))
+        .count() as u64;
+    let p4 = incidents
+        .iter()
+        .filter(|i| matches!(i.severity, IncidentSeverity::P4))
+        .count() as u64;
 
     // MTTA: mean seconds from created_at to acknowledged_at (resolved/closed only)
     let tta_values: Vec<f64> = incidents
@@ -180,9 +197,7 @@ pub fn compute_metrics_from_refs(incidents: &[&Incident]) -> IncidentMetrics {
         .iter()
         .filter(|i| {
             matches!(i.status, IncidentStatus::Resolved | IncidentStatus::Closed)
-                && i.resolved_at
-                    .map(|t| t > one_week_ago)
-                    .unwrap_or(false)
+                && i.resolved_at.map(|t| t > one_week_ago).unwrap_or(false)
         })
         .count() as u64;
 
@@ -314,7 +329,10 @@ mod tests {
         let mut incident = create_incident(make_request("API Down"));
         let user = Uuid::new_v4();
         let result = close(&mut incident, user);
-        assert!(matches!(result, Err(IncidentError::InvalidTransition { .. })));
+        assert!(matches!(
+            result,
+            Err(IncidentError::InvalidTransition { .. })
+        ));
     }
 
     #[test]

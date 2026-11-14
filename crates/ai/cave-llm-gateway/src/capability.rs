@@ -305,12 +305,21 @@ mod tests {
 
     #[test]
     fn seed_catalogue_covers_all_six_providers() {
-        let providers: std::collections::HashSet<_> = seed_catalogue()
-            .into_iter()
-            .map(|c| c.provider)
-            .collect();
-        for want in ["anthropic", "openai", "mistral", "ollama", "llamacpp", "mlx"] {
-            assert!(providers.contains(want), "missing provider in seed: {}", want);
+        let providers: std::collections::HashSet<_> =
+            seed_catalogue().into_iter().map(|c| c.provider).collect();
+        for want in [
+            "anthropic",
+            "openai",
+            "mistral",
+            "ollama",
+            "llamacpp",
+            "mlx",
+        ] {
+            assert!(
+                providers.contains(want),
+                "missing provider in seed: {}",
+                want
+            );
         }
     }
 

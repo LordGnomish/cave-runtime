@@ -11,7 +11,7 @@
 
 use crate::bundle::CosignBundle;
 use crate::error::Result;
-use crate::models::{Signature, SigKind};
+use crate::models::{SigKind, Signature};
 use crate::rekor::{HashedRekordEntry, RekorClient};
 use crate::signature::{Keypair, sha256_digest_string};
 use base64::Engine;
@@ -82,10 +82,7 @@ pub fn sign_blob_keypair_with_rekor(
 
 /// Verify a blob+bundle. The caller supplies the bundle; we re-derive the
 /// digest from the bytes and check it matches.
-pub fn verify_blob(
-    payload: &[u8],
-    bundle: &CosignBundle,
-) -> Result<()> {
+pub fn verify_blob(payload: &[u8], bundle: &CosignBundle) -> Result<()> {
     use crate::error::SignError;
     let expected = sha256_digest_string(payload);
     if expected != bundle.artifact_digest {

@@ -3,13 +3,11 @@
 //! Edge / failure / boundary coverage for cave-cache — ACL, eviction, config,
 //! glob, Db, ZSet, errors, PubSub registry.
 
-use cave_cache::acl::{
-    AclState, AclUser, ChannelPermissions, CommandPermissions, KeyPermissions,
-};
+use cave_cache::acl::{AclState, AclUser, ChannelPermissions, CommandPermissions, KeyPermissions};
 use cave_cache::config::{Config, EvictionPolicy, LogLevel, NotifyFlags};
 use cave_cache::db::{Db, PubSubRegistry, ScriptStore, glob_match};
 use cave_cache::error::{CacheError, CacheResult};
-use cave_cache::eviction::{estimate_memory, evict_keys, evict_if_needed};
+use cave_cache::eviction::{estimate_memory, evict_if_needed, evict_keys};
 use cave_cache::types::{Entry, Value, ZSet};
 use std::collections::{HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -89,9 +87,8 @@ fn acl_user_with_password_rejects_wrong_password() {
     let mut u = AclUser::default_user();
     u.flags.no_pass = false;
     // SHA-256 of "hunter2"
-    u.passwords.push(
-        "f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7".into(),
-    );
+    u.passwords
+        .push("f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7".into());
     assert!(u.authenticate("hunter2"));
     assert!(!u.authenticate("wrong"));
 }
@@ -221,8 +218,12 @@ fn cache_error_to_resp_error_equals_display() {
 
 #[test]
 fn cache_result_alias_works_for_ok_and_err() {
-    fn ok() -> CacheResult<i32> { Ok(7) }
-    fn bad() -> CacheResult<i32> { Err(CacheError::NotFound) }
+    fn ok() -> CacheResult<i32> {
+        Ok(7)
+    }
+    fn bad() -> CacheResult<i32> {
+        Err(CacheError::NotFound)
+    }
     assert_eq!(ok().unwrap(), 7);
     assert!(matches!(bad(), Err(CacheError::NotFound)));
 }
@@ -279,7 +280,9 @@ fn loglevel_as_str_distinct_per_level() {
         LogLevel::Verbose.as_str(),
         LogLevel::Notice.as_str(),
         LogLevel::Warning.as_str(),
-    ].into_iter().collect();
+    ]
+    .into_iter()
+    .collect();
     assert_eq!(strs.len(), 4);
 }
 
@@ -484,7 +487,10 @@ fn value_type_name_per_variant() {
 fn zset_add_new_returns_true_existing_returns_false() {
     let mut z = ZSet::new();
     assert!(z.add(b"a".to_vec(), 1.0));
-    assert!(!z.add(b"a".to_vec(), 2.0), "duplicate add must return false");
+    assert!(
+        !z.add(b"a".to_vec(), 2.0),
+        "duplicate add must return false"
+    );
     assert_eq!(z.score(b"a"), Some(2.0));
 }
 
@@ -595,7 +601,10 @@ fn evict_volatile_random_only_touches_ttl_keys() {
     // Only 3 candidates with TTL exist; 5 requested → at most 3 evicted.
     assert!(n <= 3);
     for i in 0..3 {
-        assert!(db.exists(format!("nottl_{}", i).as_bytes()), "non-TTL keys must survive");
+        assert!(
+            db.exists(format!("nottl_{}", i).as_bytes()),
+            "non-TTL keys must survive"
+        );
     }
 }
 

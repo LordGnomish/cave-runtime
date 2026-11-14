@@ -125,11 +125,7 @@ impl ProbeScheduler {
 
     /// Returns the next scheduled run time (unix timestamp) for a probe.
     pub fn next_run_at(&self, id: Uuid) -> Option<i64> {
-        self.entries
-            .read()
-            .unwrap()
-            .get(&id)
-            .map(|e| e.next_run_at)
+        self.entries.read().unwrap().get(&id).map(|e| e.next_run_at)
     }
 }
 

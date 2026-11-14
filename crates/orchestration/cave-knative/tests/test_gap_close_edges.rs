@@ -12,11 +12,11 @@
 //! duplicating coverage. No src/ files were modified.
 
 use cave_knative::{
-    Autoscaler, AutoscalerConfig, AutoscalerMetric, AutoscalerMode, Channel, Configuration,
-    Container, EnvVar, EventingSink, EventingSource, Ksvc, ObjectMeta, PodSpec, Revision,
-    RevisionTemplateSpec, Route, Subscription, TrafficTarget, Trigger, ANNOTATION_AUTOSCALER_CLASS,
-    ANNOTATION_CREATOR, ANNOTATION_LAST_MODIFIER, ANNOTATION_MAX_SCALE, ANNOTATION_METRIC,
-    ANNOTATION_MIN_SCALE, ANNOTATION_TARGET, validate_template, validate_traffic,
+    ANNOTATION_AUTOSCALER_CLASS, ANNOTATION_CREATOR, ANNOTATION_LAST_MODIFIER,
+    ANNOTATION_MAX_SCALE, ANNOTATION_METRIC, ANNOTATION_MIN_SCALE, ANNOTATION_TARGET, Autoscaler,
+    AutoscalerConfig, AutoscalerMetric, AutoscalerMode, Channel, Configuration, Container, EnvVar,
+    EventingSink, EventingSource, Ksvc, ObjectMeta, PodSpec, Revision, RevisionTemplateSpec, Route,
+    Subscription, TrafficTarget, Trigger, validate_template, validate_traffic,
 };
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -24,13 +24,19 @@ use std::time::{Duration, Instant};
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 
 fn container(name: &str, image: &str) -> Container {
-    Container { name: name.to_string(), image: image.to_string(), env: vec![] }
+    Container {
+        name: name.to_string(),
+        image: image.to_string(),
+        env: vec![],
+    }
 }
 
 fn template(image: &str) -> RevisionTemplateSpec {
     RevisionTemplateSpec {
         metadata: ObjectMeta::default(),
-        spec: PodSpec { containers: vec![container("app", image)] },
+        spec: PodSpec {
+            containers: vec![container("app", image)],
+        },
     }
 }
 
@@ -60,8 +66,14 @@ fn annotation_constants_match_upstream_keys() {
 #[test]
 fn objectmeta_with_creator_records_both_creator_and_modifier() {
     let m = ObjectMeta::with_creator("tenant-X");
-    assert_eq!(m.annotations.get(ANNOTATION_CREATOR), Some(&"tenant-X".to_string()));
-    assert_eq!(m.annotations.get(ANNOTATION_LAST_MODIFIER), Some(&"tenant-X".to_string()));
+    assert_eq!(
+        m.annotations.get(ANNOTATION_CREATOR),
+        Some(&"tenant-X".to_string())
+    );
+    assert_eq!(
+        m.annotations.get(ANNOTATION_LAST_MODIFIER),
+        Some(&"tenant-X".to_string())
+    );
     // Default fields stay empty.
     assert!(m.name.is_empty());
     assert!(m.namespace.is_empty());
@@ -97,7 +109,10 @@ fn validate_traffic_rejects_target_without_any_ref() {
     // sums to 100 but no revision/configuration/latest_revision set on the second.
     let t = vec![
         rev_target("a", 50),
-        TrafficTarget { percent: Some(50), ..Default::default() },
+        TrafficTarget {
+            percent: Some(50),
+            ..Default::default()
+        },
     ];
     assert!(validate_traffic(&t).is_err());
 }
@@ -154,7 +169,10 @@ fn validate_template_accepts_multi_container_pod() {
     let tpl = RevisionTemplateSpec {
         metadata: ObjectMeta::default(),
         spec: PodSpec {
-            containers: vec![container("main", "img:v1"), container("sidecar", "envoy:1.30")],
+            containers: vec![
+                container("main", "img:v1"),
+                container("sidecar", "envoy:1.30"),
+            ],
         },
     };
     assert!(validate_template(&tpl).is_ok());
@@ -167,7 +185,10 @@ fn configuration_record_created_overwrites_previous() {
     let mut cfg = Configuration::new("t");
     cfg.record_created_revision("rev-1");
     cfg.record_created_revision("rev-2");
-    assert_eq!(cfg.status.latestCreatedRevisionName, Some("rev-2".to_string()));
+    assert_eq!(
+        cfg.status.latestCreatedRevisionName,
+        Some("rev-2".to_string())
+    );
 }
 
 #[test]
@@ -176,8 +197,14 @@ fn configuration_record_ready_does_not_overwrite_created() {
     cfg.record_created_revision("rev-new");
     cfg.record_ready_revision("rev-old");
     // Created and ready can diverge during a rollout.
-    assert_eq!(cfg.status.latestCreatedRevisionName, Some("rev-new".to_string()));
-    assert_eq!(cfg.status.latestReadyRevisionName, Some("rev-old".to_string()));
+    assert_eq!(
+        cfg.status.latestCreatedRevisionName,
+        Some("rev-new".to_string())
+    );
+    assert_eq!(
+        cfg.status.latestReadyRevisionName,
+        Some("rev-old".to_string())
+    );
 }
 
 #[test]
@@ -223,7 +250,9 @@ fn revision_validate_bubbles_template_error_when_image_empty() {
     let mut rev = Revision::new("t");
     rev.spec.template = RevisionTemplateSpec {
         metadata: ObjectMeta::default(),
-        spec: PodSpec { containers: vec![container("c", "")] },
+        spec: PodSpec {
+            containers: vec![container("c", "")],
+        },
     };
     let err = rev.validate().unwrap_err();
     assert!(err.contains("image"));
@@ -329,8 +358,14 @@ fn eventing_source_ce_overrides_persist() {
     let mut s = EventingSource::new("t");
     s.add_ce_override("source", "/devices/1");
     s.add_ce_override("type", "com.example.foo");
-    assert_eq!(s.spec.ce_overrides.get("source"), Some(&"/devices/1".to_string()));
-    assert_eq!(s.spec.ce_overrides.get("type"), Some(&"com.example.foo".to_string()));
+    assert_eq!(
+        s.spec.ce_overrides.get("source"),
+        Some(&"/devices/1".to_string())
+    );
+    assert_eq!(
+        s.spec.ce_overrides.get("type"),
+        Some(&"com.example.foo".to_string())
+    );
     assert_eq!(s.spec.ce_overrides.len(), 2);
 }
 
@@ -339,7 +374,10 @@ fn eventing_source_add_ce_override_overwrites_existing_key() {
     let mut s = EventingSource::new("t");
     s.add_ce_override("type", "com.example.foo");
     s.add_ce_override("type", "com.example.bar");
-    assert_eq!(s.spec.ce_overrides.get("type"), Some(&"com.example.bar".to_string()));
+    assert_eq!(
+        s.spec.ce_overrides.get("type"),
+        Some(&"com.example.bar".to_string())
+    );
     assert_eq!(s.spec.ce_overrides.len(), 1);
 }
 
@@ -348,7 +386,10 @@ fn eventing_sink_resolve_address_mirrors_destination() {
     let mut sink = EventingSink::new("t");
     sink.spec.destination = Some("http://broker.svc/in".to_string());
     sink.resolve_address();
-    assert_eq!(sink.status.address_url, Some("http://broker.svc/in".to_string()));
+    assert_eq!(
+        sink.status.address_url,
+        Some("http://broker.svc/in".to_string())
+    );
 }
 
 #[test]
@@ -387,14 +428,21 @@ fn channel_fanout_preserves_subscription_order_and_duplicates() {
         reply_uri: None,
     });
     let out = c.fanout();
-    assert_eq!(out, vec!["http://u1", "http://u2", "http://u3", "http://u1"]);
+    assert_eq!(
+        out,
+        vec!["http://u1", "http://u2", "http://u3", "http://u1"]
+    );
 }
 
 #[test]
 fn trigger_filter_multi_attribute_requires_all_to_match() {
     let mut trig = Trigger::new("t", "default");
-    trig.filter.attributes.insert("type".to_string(), "com.example.foo".to_string());
-    trig.filter.attributes.insert("source".to_string(), "/devices/1".to_string());
+    trig.filter
+        .attributes
+        .insert("type".to_string(), "com.example.foo".to_string());
+    trig.filter
+        .attributes
+        .insert("source".to_string(), "/devices/1".to_string());
 
     let matching = HashMap::from([
         ("type".to_string(), "com.example.foo".to_string()),
@@ -570,8 +618,14 @@ fn container_env_preserves_optional_value() {
         name: "app".to_string(),
         image: "img".to_string(),
         env: vec![
-            EnvVar { name: "DATABASE_URL".to_string(), value: Some("postgres://x".to_string()) },
-            EnvVar { name: "DEBUG".to_string(), value: None },
+            EnvVar {
+                name: "DATABASE_URL".to_string(),
+                value: Some("postgres://x".to_string()),
+            },
+            EnvVar {
+                name: "DEBUG".to_string(),
+                value: None,
+            },
         ],
     };
     assert_eq!(c.env.len(), 2);

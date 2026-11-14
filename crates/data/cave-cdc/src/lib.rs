@@ -33,9 +33,9 @@ pub use connector::{
 pub use error::{CdcError, CdcResult};
 pub use mongo::{MongoDbConnector, OplogEvent, OplogOp};
 pub use mysql::{BinlogEvent, BinlogEventType, MySqlConnector};
+pub use offset::{OffsetKey, OffsetStore};
 pub use outbox::{OutboxEntry, OutboxEventRouter};
 pub use postgres::{PostgresConnector, ReplicationSlotConfig, WalEvent, WalEventKind};
-pub use offset::{OffsetKey, OffsetStore};
 pub use routing::{RoutingPolicy, TopicRouter};
 pub use schema::{Compatibility, Schema, SchemaFormat, SchemaRegistry};
 pub use schema_history::{HistoryRecord, HistorySource, SchemaHistory};

@@ -128,7 +128,8 @@ fn cross_tenant_resource_access_is_refused() {
     for t in [&mut alpha, &mut beta] {
         let cp = control_plane(t);
         let su = setup(t);
-        mgr.provision(t, &mut conn, cp, su, "https://x:6443").unwrap();
+        mgr.provision(t, &mut conn, cp, su, "https://x:6443")
+            .unwrap();
     }
 
     // A resource stamped for alpha is owned by alpha…
@@ -157,7 +158,8 @@ fn deleting_one_tenant_leaves_the_others_running() {
     for t in [&mut alpha, &mut beta, &mut gamma] {
         let cp = control_plane(t);
         let su = setup(t);
-        mgr.provision(t, &mut conn, cp, su, "https://x:6443").unwrap();
+        mgr.provision(t, &mut conn, cp, su, "https://x:6443")
+            .unwrap();
     }
 
     // Decommission beta only.

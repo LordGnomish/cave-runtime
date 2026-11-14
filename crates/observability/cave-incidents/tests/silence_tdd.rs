@@ -93,7 +93,10 @@ fn test_expired_period_silence_is_no_longer_active() {
     let mut s = GroupSilenceState::default();
     let past = Utc::now() - Duration::hours(1);
     s.silence(Some(past));
-    assert!(!s.is_active_at(Utc::now()), "past silenced_until -> not active");
+    assert!(
+        !s.is_active_at(Utc::now()),
+        "past silenced_until -> not active"
+    );
     // a forever silence is always active until explicitly un-silenced
     let mut f = GroupSilenceState::default();
     f.silence(None);

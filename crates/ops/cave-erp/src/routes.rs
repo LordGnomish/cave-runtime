@@ -67,20 +67,8 @@ async fn get_partner_balance(
     State(store): State<Arc<ErpStore>>,
     Path(partner_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let invoices: Vec<_> = store
-        .invoices
-        .read()
-        .await
-        .values()
-        .cloned()
-        .collect();
-    let payments: Vec<_> = store
-        .payments
-        .read()
-        .await
-        .values()
-        .cloned()
-        .collect();
+    let invoices: Vec<_> = store.invoices.read().await.values().cloned().collect();
+    let payments: Vec<_> = store.payments.read().await.values().cloned().collect();
 
     let balance: PartnerBalance = compute_partner_balance(partner_id, &invoices, &payments);
     Json(balance)

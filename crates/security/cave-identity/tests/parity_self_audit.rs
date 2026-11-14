@@ -36,7 +36,9 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 }
 
 fn walk(dir: &Path, cb: &mut dyn FnMut(&Path)) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -95,7 +97,11 @@ fn gate_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 // ─── G4: parity_ratio_source = "manifest" + last_audit = today ─────────────
@@ -267,11 +273,11 @@ fn gate_9_identity_surface_intact() {
         SpiffeId, TrustDomain,
     };
     use cave_identity::oidc::{self, OidcDiscovery};
-    use cave_identity::policy::{admit_entry, Caller, PolicyConfig};
+    use cave_identity::policy::{Caller, PolicyConfig, admit_entry};
     use cave_identity::registration::{
-        selectors_equal, selectors_match, selectors_superset, InMemoryEntryStore,
+        InMemoryEntryStore, selectors_equal, selectors_match, selectors_superset,
     };
-    use cave_identity::routes::{create_router, IdentityState};
+    use cave_identity::routes::{IdentityState, create_router};
     use cave_identity::server_ca::{RotationParams, ServerCa, SignatureAlgorithm};
     use cave_identity::spiffe_id::{agent_id, is_descendant, parse_spiffe_id};
     use cave_identity::store::{MemStore, SqliteStoreFacade};
@@ -287,7 +293,10 @@ fn gate_9_identity_surface_intact() {
         &SpiffeId::new("spiffe://example.org/team/svc"),
     ));
     let agent = agent_id(&TrustDomain::new("example.org"), "k8s_psat", "n1").unwrap();
-    assert_eq!(agent.as_str(), "spiffe://example.org/spire/agent/k8s_psat/n1");
+    assert_eq!(
+        agent.as_str(),
+        "spiffe://example.org/spire/agent/k8s_psat/n1"
+    );
 
     // 2. Server CA bootstrap + rotation
     let ca = ServerCa::new(TrustDomain::new("example.org"), RotationParams::default());

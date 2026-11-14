@@ -100,7 +100,10 @@ fn new_order_creates_authz_per_identifier_and_stays_pending() {
     assert_eq!(order.authorization_ids.len(), 2);
     assert_eq!(order.status, OrderStatus::Pending);
     // Finalize URL is derived deterministically from the order id.
-    assert_eq!(order.finalize_url, format!("/acme/order/{}/finalize", order_id));
+    assert_eq!(
+        order.finalize_url,
+        format!("/acme/order/{}/finalize", order_id)
+    );
     // Not yet finalized: no certificate URL.
     assert_eq!(order.certificate_url, None);
 }

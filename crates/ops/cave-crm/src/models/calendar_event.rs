@@ -278,7 +278,10 @@ mod tests {
     #[test]
     fn rsvp_normalizes_caldav_partstat() {
         assert_eq!(Rsvp::from_caldav_partstat("ACCEPTED"), Rsvp::Accepted);
-        assert_eq!(Rsvp::from_caldav_partstat("NEEDS-ACTION"), Rsvp::NeedsAction);
+        assert_eq!(
+            Rsvp::from_caldav_partstat("NEEDS-ACTION"),
+            Rsvp::NeedsAction
+        );
         assert_eq!(Rsvp::from_caldav_partstat("DELEGATED"), Rsvp::NeedsAction);
     }
 

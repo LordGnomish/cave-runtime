@@ -7,8 +7,8 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use cave_slo::{State, router};
 use cave_slo::models::{MetricType, SloStatus};
+use cave_slo::{State, router};
 use serde_json::Value;
 use std::sync::Arc;
 use tower::ServiceExt; // for `.oneshot()`
@@ -21,7 +21,9 @@ async fn call(state: Arc<State>, req: Request<Body>) -> (StatusCode, Value) {
     let app = router(state);
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
-    let body_bytes = axum::body::to_bytes(resp.into_body(), 1 << 20).await.unwrap();
+    let body_bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+        .await
+        .unwrap();
     let json: Value = serde_json::from_slice(&body_bytes).unwrap_or(Value::Null);
     (status, json)
 }

@@ -146,8 +146,7 @@ fn default_config_path(instance: &str) -> PathBuf {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -175,11 +174,7 @@ async fn main() -> anyhow::Result<()> {
                 .or_else(|| std::env::current_exe().ok())
                 .map(|p| p.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "cave-autopilot".into());
-            let spec = launchagent::PlistSpec::from_config(
-                &cfg,
-                &bin,
-                &cfg_path.to_string_lossy(),
-            );
+            let spec = launchagent::PlistSpec::from_config(&cfg, &bin, &cfg_path.to_string_lossy());
             let path = launchagent::install(&spec)?;
             println!("installed + loaded LaunchAgent: {}", path.display());
             println!("config: {}", cfg_path.display());
@@ -256,7 +251,11 @@ async fn main() -> anyhow::Result<()> {
             }
             let tiers = if pull {
                 client
-                    .ensure_tiers(&cfg.model_l1_router, &cfg.model_l2_coder, &cfg.model_fallback)
+                    .ensure_tiers(
+                        &cfg.model_l1_router,
+                        &cfg.model_l2_coder,
+                        &cfg.model_fallback,
+                    )
                     .await?
             } else {
                 OllamaClient::resolve_tiers(
@@ -269,12 +268,20 @@ async fn main() -> anyhow::Result<()> {
             println!(
                 "L1 router: {} ({})",
                 tiers.router,
-                if tiers.router_fell_back { "fell back to resident" } else { "named" }
+                if tiers.router_fell_back {
+                    "fell back to resident"
+                } else {
+                    "named"
+                }
             );
             println!(
                 "L2 coder:  {} ({})",
                 tiers.coder,
-                if tiers.coder_fell_back { "fell back to resident" } else { "named" }
+                if tiers.coder_fell_back {
+                    "fell back to resident"
+                } else {
+                    "named"
+                }
             );
         }
         Command::Smoke {
@@ -306,8 +313,8 @@ async fn main() -> anyhow::Result<()> {
                     .coder
                 }
             };
-            let workdir = workdir
-                .unwrap_or_else(|| std::env::temp_dir().join("cave-autopilot-smoke"));
+            let workdir =
+                workdir.unwrap_or_else(|| std::env::temp_dir().join("cave-autopilot-smoke"));
             std::fs::create_dir_all(&workdir)?;
             // Clean any prior crate dir so the run is fresh.
             let _ = std::fs::remove_dir_all(workdir.join(&crate_name));
@@ -318,7 +325,10 @@ async fn main() -> anyhow::Result<()> {
                 task_desc: task,
                 max_retries: retries,
             };
-            println!("smoke: model={model} crate={crate_name} workdir={}", workdir.display());
+            println!(
+                "smoke: model={model} crate={crate_name} workdir={}",
+                workdir.display()
+            );
             let outcome = exec.run(&spec, &workdir).await?;
             println!("model:     {}", outcome.model);
             println!("attempts:  {}", outcome.attempts);

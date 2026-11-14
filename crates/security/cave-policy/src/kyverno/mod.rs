@@ -242,12 +242,7 @@ impl KyvernoEngine {
             // Only apply the exception when the resource is in scope of the
             // exception's match_resources block. Without this check every
             // resource targeted by the rule would inherit the exception.
-            if !matches_resources(
-                &exc.spec.match_resources,
-                resource,
-                res_namespace,
-                "CREATE",
-            ) {
+            if !matches_resources(&exc.spec.match_resources, resource, res_namespace, "CREATE") {
                 continue;
             }
             return true;

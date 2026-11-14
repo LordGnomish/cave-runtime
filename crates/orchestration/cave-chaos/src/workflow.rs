@@ -176,7 +176,10 @@ pub fn execute_workflow(
                             node_id: child_str.clone(),
                             status: WorkflowNodeStatus::Failed,
                             experiment_id: None,
-                            error: Some(format!("child '{}' is not a valid experiment UUID", child_str)),
+                            error: Some(format!(
+                                "child '{}' is not a valid experiment UUID",
+                                child_str
+                            )),
                             started_at: Some(Utc::now()),
                             ended_at: Some(Utc::now()),
                         },
@@ -289,9 +292,7 @@ fn run_experiment_by_id(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        BlastRadius, ChaosTarget, ExperimentParams, ExperimentType, SafetyGuard,
-    };
+    use crate::models::{BlastRadius, ChaosTarget, ExperimentParams, ExperimentType, SafetyGuard};
     use std::collections::HashMap;
 
     fn make_exp(exp_type: ExperimentType, ns: &str) -> ChaosExperiment {

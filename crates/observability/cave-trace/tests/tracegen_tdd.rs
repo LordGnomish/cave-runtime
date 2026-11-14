@@ -36,7 +36,10 @@ fn one_trace_has_root_plus_child_spans() {
     assert_eq!(root.kind, SpanKind::Server);
     assert_eq!(root.service_name, "tracegen");
 
-    let children: Vec<_> = spans.iter().filter(|s| s.parent_span_id.is_some()).collect();
+    let children: Vec<_> = spans
+        .iter()
+        .filter(|s| s.parent_span_id.is_some())
+        .collect();
     assert_eq!(children.len(), 3);
     for c in &children {
         assert_eq!(c.kind, SpanKind::Client);
@@ -86,7 +89,10 @@ fn timing_matches_fake_span_duration() {
     assert_eq!(root.end_time_unix_nano, start + 4 * FAKE_SPAN_DURATION_NS);
 
     // child c starts at start + c*fakeSpanDuration, lasts fakeSpanDuration.
-    let mut children: Vec<_> = spans.iter().filter(|s| s.parent_span_id.is_some()).collect();
+    let mut children: Vec<_> = spans
+        .iter()
+        .filter(|s| s.parent_span_id.is_some())
+        .collect();
     children.sort_by_key(|s| s.start_time_unix_nano);
     for (c, span) in children.iter().enumerate() {
         let child_start = start + (c as u64) * FAKE_SPAN_DURATION_NS;
@@ -117,14 +123,26 @@ fn child_attributes_cycle_by_key_and_value() {
 
     // First child: keys attr_00, attr_01 ; vals val_00, val_01.
     let c0 = &children[0];
-    assert_eq!(c0.tags.get("attr_00"), Some(&TagValue::String("val_00".into())));
-    assert_eq!(c0.tags.get("attr_01"), Some(&TagValue::String("val_01".into())));
+    assert_eq!(
+        c0.tags.get("attr_00"),
+        Some(&TagValue::String("val_00".into()))
+    );
+    assert_eq!(
+        c0.tags.get("attr_01"),
+        Some(&TagValue::String("val_01".into()))
+    );
 
     // Second child continues the counters: key cycles mod 2 -> attr_00, attr_01;
     // value cycles mod 3 -> val_02, val_00.
     let c1 = &children[1];
-    assert_eq!(c1.tags.get("attr_00"), Some(&TagValue::String("val_02".into())));
-    assert_eq!(c1.tags.get("attr_01"), Some(&TagValue::String("val_00".into())));
+    assert_eq!(
+        c1.tags.get("attr_00"),
+        Some(&TagValue::String("val_02".into()))
+    );
+    assert_eq!(
+        c1.tags.get("attr_01"),
+        Some(&TagValue::String("val_00".into()))
+    );
 }
 
 #[test]
@@ -139,7 +157,10 @@ fn debug_and_firehose_flags_add_root_tags() {
     let spans = simulate_one_trace(&mut g, "svc", 0);
     let root = &spans[0];
     assert_eq!(root.tags.get("jaeger.debug"), Some(&TagValue::Bool(true)));
-    assert_eq!(root.tags.get("jaeger.firehose"), Some(&TagValue::Bool(true)));
+    assert_eq!(
+        root.tags.get("jaeger.firehose"),
+        Some(&TagValue::Bool(true))
+    );
 }
 
 #[test]
@@ -160,7 +181,11 @@ fn simulate_traces_respects_worker_and_trace_counts() {
     let mut ids: Vec<u128> = traces.iter().map(|t| t[0].trace_id).collect();
     ids.sort_unstable();
     ids.dedup();
-    assert_eq!(ids.len(), 6, "trace_ids must be unique across generated traces");
+    assert_eq!(
+        ids.len(),
+        6,
+        "trace_ids must be unique across generated traces"
+    );
 }
 
 #[test]
@@ -176,5 +201,8 @@ fn services_suffix_names_when_multiple() {
     };
     let traces = simulate_traces(&cfg);
     let names: Vec<&str> = traces.iter().map(|t| t[0].service_name.as_str()).collect();
-    assert_eq!(names, vec!["tracegen-00", "tracegen-01", "tracegen-00", "tracegen-01"]);
+    assert_eq!(
+        names,
+        vec!["tracegen-00", "tracegen-01", "tracegen-00", "tracegen-01"]
+    );
 }

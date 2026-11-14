@@ -31,7 +31,9 @@ async fn list_cases(extract::State(state): extract::State<Arc<State>>) -> Json<s
     }))
 }
 
-async fn list_policies(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
+async fn list_policies(
+    extract::State(state): extract::State<Arc<State>>,
+) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "policies": state.policies.list(),
         "count": state.policies.count(),

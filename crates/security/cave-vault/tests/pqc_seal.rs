@@ -18,7 +18,12 @@ fn wrap_then_unwrap_recovers_master_key() {
 
     let wrapped: PqcWrappedKey = kp.seal_wrap(&master_key).unwrap();
     // The wrapped form must NOT leak the plaintext master key.
-    assert!(!wrapped.ciphertext.windows(master_key.len()).any(|w| w == &master_key[..]));
+    assert!(
+        !wrapped
+            .ciphertext
+            .windows(master_key.len())
+            .any(|w| w == &master_key[..])
+    );
     // ML-KEM-768 ciphertext is 1088 bytes; AES-GCM nonce is 12 bytes.
     assert_eq!(wrapped.kem_ciphertext.len(), 1088);
     assert_eq!(wrapped.nonce.len(), 12);

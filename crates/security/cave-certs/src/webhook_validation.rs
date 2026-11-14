@@ -323,9 +323,7 @@ pub fn validate_duration(crt: &WebhookCertificateSpec, fld: &str) -> Vec<Validat
         if rb >= duration {
             el.push(ValidationError::new(
                 format!("{fld}.renewBefore"),
-                format!(
-                    "certificate duration {duration}s must be greater than renewBefore {rb}s"
-                ),
+                format!("certificate duration {duration}s must be greater than renewBefore {rb}s"),
             ));
         }
     }

@@ -107,10 +107,7 @@ pub fn plan_reclaim(req: &ReclaimRequest) -> ReclaimPlan {
     }
 
     let reclaimed_bytes = bytes_by_content.values().sum();
-    let reclaimable_content = bytes_by_content
-        .keys()
-        .map(|s| s.to_string())
-        .collect();
+    let reclaimable_content = bytes_by_content.keys().map(|s| s.to_string()).collect();
 
     ReclaimPlan {
         reclaimable_content,

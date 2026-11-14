@@ -93,7 +93,12 @@ pub fn emit_domain_xml(vmi: &VirtualMachineInstance, opts: &EmitOptions) -> Stri
     emit_os(&mut out, opts, &vmi.spec.domain.firmware);
     emit_features(&mut out);
     emit_clock(&mut out, opts.architecture);
-    emit_devices(&mut out, opts.architecture, &vmi.spec.volumes, &vmi.spec.networks);
+    emit_devices(
+        &mut out,
+        opts.architecture,
+        &vmi.spec.volumes,
+        &vmi.spec.networks,
+    );
     let _ = writeln!(out, "</domain>");
     out
 }
@@ -124,7 +129,13 @@ fn emit_memory(out: &mut String, mem: &Option<DomainMemory>) {
 fn emit_cpu(out: &mut String, cpu: &Option<DomainCpu>) {
     let (cores, sockets, threads) = cpu
         .as_ref()
-        .map(|c| (c.cores.unwrap_or(1), c.sockets.unwrap_or(1), c.threads.unwrap_or(1)))
+        .map(|c| {
+            (
+                c.cores.unwrap_or(1),
+                c.sockets.unwrap_or(1),
+                c.threads.unwrap_or(1),
+            )
+        })
         .unwrap_or((1, 1, 1));
     let vcpus = cores as u64 * sockets as u64 * threads as u64;
     let _ = writeln!(out, "  <vcpu placement='static'>{}</vcpu>", vcpus);
@@ -200,11 +211,7 @@ fn emit_clock(out: &mut String, arch: Architecture) {
 
 fn emit_devices(out: &mut String, arch: Architecture, volumes: &[Volume], networks: &[Network]) {
     let _ = writeln!(out, "  <devices>");
-    let _ = writeln!(
-        out,
-        "    <emulator>{}</emulator>",
-        arch.default_emulator()
-    );
+    let _ = writeln!(out, "    <emulator>{}</emulator>", arch.default_emulator());
     for (i, v) in volumes.iter().enumerate() {
         emit_disk(out, i, v);
     }

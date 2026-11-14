@@ -13,9 +13,7 @@ use std::collections::HashMap;
 
 use crate::config::TrackerConfig;
 use crate::error::TrackerResult;
-use crate::registry::{
-    default_backend_repos, seed_catalog, Candidate, LiveFetcher, SourceKind,
-};
+use crate::registry::{Candidate, LiveFetcher, SourceKind, default_backend_repos, seed_catalog};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PollSummary {
@@ -87,7 +85,10 @@ pub async fn poll_all(cfg: &TrackerConfig) -> TrackerResult<PollSummary> {
                 all.extend(c);
             }
             Err(e) => {
-                errors.insert(SourceKind::LmsysLeaderboard.slug().to_string(), e.to_string());
+                errors.insert(
+                    SourceKind::LmsysLeaderboard.slug().to_string(),
+                    e.to_string(),
+                );
             }
         }
     }

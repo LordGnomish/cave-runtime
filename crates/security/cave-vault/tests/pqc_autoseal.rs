@@ -50,7 +50,10 @@ fn recovery_quorum_reconstructs_master_key() {
 fn recovery_with_fewer_than_threshold_does_not_recover() {
     let mut seal = PqcSeal::generate();
     let init = seal.initialize(5, 3).unwrap();
-    let too_few = vec![init.recovery_shares[0].clone(), init.recovery_shares[1].clone()];
+    let too_few = vec![
+        init.recovery_shares[0].clone(),
+        init.recovery_shares[1].clone(),
+    ];
     // Two shares cannot reconstruct a 3-of-5 secret: either an error or a
     // wrong value, but never the real master key.
     match PqcSeal::recover_master_key(&too_few) {
@@ -72,7 +75,11 @@ fn seed_persisted_keypair_still_auto_unseals() {
     let (seed, wrapped_json, master_key) = {
         let mut seal = PqcSeal::generate();
         let init = seal.initialize(3, 2).unwrap();
-        (seal.seed_bytes(), seal.wrapped_key_json().unwrap(), init.master_key)
+        (
+            seal.seed_bytes(),
+            seal.wrapped_key_json().unwrap(),
+            init.master_key,
+        )
     };
     let restored = PqcSeal::from_persisted(&seed, &wrapped_json).unwrap();
     assert_eq!(restored.auto_unseal().unwrap(), master_key);

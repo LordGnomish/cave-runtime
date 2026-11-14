@@ -45,8 +45,7 @@ impl MemStore {
 
     /// Insert/replace a bundle keyed by its trust domain.
     pub fn put_bundle(&self, b: Bundle) -> Result<()> {
-        self.bundles
-            .insert(b.trust_domain.as_str().to_string(), b);
+        self.bundles.insert(b.trust_domain.as_str().to_string(), b);
         Ok(())
     }
 
@@ -109,10 +108,7 @@ impl MemStore {
     }
 
     pub fn list_federations(&self) -> Vec<FederationRelationship> {
-        self.federations
-            .iter()
-            .map(|f| f.value().clone())
-            .collect()
+        self.federations.iter().map(|f| f.value().clone()).collect()
     }
 
     pub fn delete_federation(&self, td: &TrustDomain) -> Result<FederationRelationship> {
@@ -183,10 +179,7 @@ mod tests {
         let s = MemStore::new();
         let b = bundle("example.org");
         s.put_bundle(b.clone()).unwrap();
-        assert_eq!(
-            s.get_bundle(&b.trust_domain).unwrap().sequence_number,
-            1
-        );
+        assert_eq!(s.get_bundle(&b.trust_domain).unwrap().sequence_number, 1);
         assert_eq!(s.list_bundles().len(), 1);
         s.delete_bundle(&b.trust_domain).unwrap();
         assert!(s.get_bundle(&b.trust_domain).is_err());

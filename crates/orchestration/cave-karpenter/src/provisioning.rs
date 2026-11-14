@@ -140,7 +140,11 @@ pub fn create_node_claims<P: CloudProvider>(
     let mut launched = Vec::with_capacity(result.claims.len());
     for sc in &mut result.claims {
         if let Ok(provider_id) = provider.create(&sc.instance.name, &sc.instance.zone) {
-            let mut status = sc.claim.status.clone().unwrap_or_else(NodeClaimStatus::default);
+            let mut status = sc
+                .claim
+                .status
+                .clone()
+                .unwrap_or_else(NodeClaimStatus::default);
             status.node_name = Some(format!("{}-node", sc.claim.name));
             status.provider_id = Some(provider_id.clone());
             sc.claim.status = Some(status);
@@ -180,10 +184,21 @@ mod tests {
     fn claims_get_sequential_names() {
         let pools = vec![open_pool("default")];
         let pods = vec![
-            PendingPod { pod: PodSpec::with_resources("a", 800, 512), node_selector: vec![] },
-            PendingPod { pod: PodSpec::with_resources("b", 800, 512), node_selector: vec![] },
+            PendingPod {
+                pod: PodSpec::with_resources("a", 800, 512),
+                node_selector: vec![],
+            },
+            PendingPod {
+                pod: PodSpec::with_resources("b", 800, 512),
+                node_selector: vec![],
+            },
         ];
-        let instances = vec![InstanceType { name: "small".into(), cpu_millis: 1000, memory_mib: 1024, zone: "z1".into() }];
+        let instances = vec![InstanceType {
+            name: "small".into(),
+            cpu_millis: 1000,
+            memory_mib: 1024,
+            zone: "z1".into(),
+        }];
         let res = schedule(&pools, &pods, &instances);
         assert_eq!(res.claims.len(), 2);
         assert_ne!(res.claims[0].claim.name, res.claims[1].claim.name);

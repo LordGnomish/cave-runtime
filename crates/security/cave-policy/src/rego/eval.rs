@@ -650,11 +650,7 @@ fn eval_rule_by_name(name: &str, bindings: &Bindings, ctx: &EvalCtx) -> Value {
 /// Returns `Some(value)` when the path matches a rule (even if the rule's
 /// value is `Undefined`, so we don't fall back to the static data document),
 /// `None` when no matching module/rule is found.
-fn eval_data_path_as_rule(
-    path: &[String],
-    bindings: &Bindings,
-    ctx: &EvalCtx,
-) -> Option<Value> {
+fn eval_data_path_as_rule(path: &[String], bindings: &Bindings, ctx: &EvalCtx) -> Option<Value> {
     if path.is_empty() {
         return None;
     }

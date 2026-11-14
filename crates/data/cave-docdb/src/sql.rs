@@ -139,7 +139,12 @@ fn translate_filter(filter: &Value, ctx: &mut Ctx) -> String {
 }
 
 /// Combine a `$and`/`$or`/`$nor` array of sub-filters.
-fn combine_logical(value: &Value, joiner: &str, ctx: &mut Ctx, parenthesize: bool) -> Option<String> {
+fn combine_logical(
+    value: &Value,
+    joiner: &str,
+    ctx: &mut Ctx,
+    parenthesize: bool,
+) -> Option<String> {
     let arr = value.as_array()?;
     let parts: Vec<String> = arr
         .iter()
@@ -258,7 +263,11 @@ fn in_clause(field: &str, arg: &Value, ctx: &mut Ctx, negate: bool) -> String {
     let items = arg.as_array().unwrap_or(&empty);
     if items.is_empty() {
         // `$in []` matches nothing; `$nin []` matches everything.
-        return if negate { "TRUE".into() } else { "FALSE".into() };
+        return if negate {
+            "TRUE".into()
+        } else {
+            "FALSE".into()
+        };
     }
     let placeholders: Vec<String> = items
         .iter()
@@ -329,7 +338,10 @@ fn projection_select(projection: Option<&Value>) -> Option<String> {
     for f in fields {
         pairs.push(format!("'{}', {}", esc(f), path_value(f)));
     }
-    Some(format!("jsonb_build_object({}) AS _jsonb", pairs.join(", ")))
+    Some(format!(
+        "jsonb_build_object({}) AS _jsonb",
+        pairs.join(", ")
+    ))
 }
 
 /// Truthiness of a projection flag (`1`, `true` → include).
@@ -358,7 +370,11 @@ pub fn find_to_sql(
         let order: Vec<String> = s
             .iter()
             .map(|(field, dir)| {
-                let d = if dir.as_i64().unwrap_or(1) < 0 { "DESC" } else { "ASC" };
+                let d = if dir.as_i64().unwrap_or(1) < 0 {
+                    "DESC"
+                } else {
+                    "ASC"
+                };
                 format!("{} {}", path_value(field), d)
             })
             .collect();
@@ -396,11 +412,7 @@ pub fn insert_to_sql(table: &str, doc: &Value) -> SqlQuery {
 pub fn update_to_sql(table: &str, filter: &Value, update: &Value) -> SqlQuery {
     let mut ctx = Ctx::default();
     let assignment = build_assignment(update, &mut ctx);
-    let mut sql = format!(
-        "UPDATE {} SET _jsonb = {}",
-        quote_ident(table),
-        assignment
-    );
+    let mut sql = format!("UPDATE {} SET _jsonb = {}", quote_ident(table), assignment);
     sql.push_str(&where_suffix(filter, &mut ctx));
     SqlQuery {
         sql,
@@ -555,7 +567,11 @@ pub fn pipeline_to_sql(table: &str, pipeline: &[Value]) -> Option<SqlQuery> {
         let order: Vec<String> = s
             .iter()
             .map(|(field, dir)| {
-                let d = if dir.as_i64().unwrap_or(1) < 0 { "DESC" } else { "ASC" };
+                let d = if dir.as_i64().unwrap_or(1) < 0 {
+                    "DESC"
+                } else {
+                    "ASC"
+                };
                 format!("{} {}", path_value(field), d)
             })
             .collect();
@@ -614,9 +630,10 @@ fn accumulator_to_sql(spec: &Value) -> Option<String> {
     // numeric field reference "$f" → cast to numeric; literal number → count.
     let numeric_arg = |arg: &Value| -> Option<String> {
         match arg {
-            Value::String(s) if s.starts_with('$') => {
-                Some(format!("({})::numeric", path_text(s.trim_start_matches('$'))))
-            }
+            Value::String(s) if s.starts_with('$') => Some(format!(
+                "({})::numeric",
+                path_text(s.trim_start_matches('$'))
+            )),
             _ => None,
         }
     };
@@ -780,7 +797,14 @@ mod tests {
 
     #[test]
     fn find_basic_with_filter() {
-        let q = find_to_sql("users", &json!({"age": {"$gt": 21}}), None, None, None, None);
+        let q = find_to_sql(
+            "users",
+            &json!({"age": {"$gt": 21}}),
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(
             q.sql,
             "SELECT _jsonb FROM \"users\" WHERE _jsonb -> 'age' > $1::jsonb"
@@ -797,7 +821,14 @@ mod tests {
 
     #[test]
     fn find_sort_skip_limit() {
-        let q = find_to_sql("c", &json!({}), None, Some(&json!({"age": -1})), Some(5), Some(10));
+        let q = find_to_sql(
+            "c",
+            &json!({}),
+            None,
+            Some(&json!({"age": -1})),
+            Some(5),
+            Some(10),
+        );
         assert_eq!(
             q.sql,
             "SELECT _jsonb FROM \"c\" ORDER BY _jsonb -> 'age' DESC LIMIT 10 OFFSET 5"
@@ -815,7 +846,14 @@ mod tests {
 
     #[test]
     fn find_inclusion_projection_drops_id_when_zero() {
-        let q = find_to_sql("c", &json!({}), Some(&json!({"_id": 0, "name": 1})), None, None, None);
+        let q = find_to_sql(
+            "c",
+            &json!({}),
+            Some(&json!({"_id": 0, "name": 1})),
+            None,
+            None,
+            None,
+        );
         assert_eq!(
             q.sql,
             "SELECT jsonb_build_object('name', _jsonb -> 'name') AS _jsonb FROM \"c\""
@@ -890,7 +928,10 @@ mod tests {
 
     #[test]
     fn agg_group_sum() {
-        let q = agg("emp", json!([{"$group": {"_id": "$dept", "total": {"$sum": "$salary"}}}]));
+        let q = agg(
+            "emp",
+            json!([{"$group": {"_id": "$dept", "total": {"$sum": "$salary"}}}]),
+        );
         assert_eq!(
             q.sql,
             "SELECT jsonb_build_object('_id', _jsonb -> 'dept', 'total', to_jsonb(sum((_jsonb ->> 'salary')::numeric))) AS _jsonb FROM \"emp\" GROUP BY _jsonb -> 'dept'"

@@ -15,7 +15,7 @@ use chrono::Utc;
 
 use crate::error::VaultError;
 
-use super::providers::{build_provider, Provider};
+use super::providers::{Provider, build_provider};
 use super::{
     CreationPolicy, DeletionPolicy, ExternalSecret, ExternalSecretStatus, SecretStore,
     StatusCondition,
@@ -105,8 +105,8 @@ pub async fn reconcile_once(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::*;
+    use super::*;
 
     fn fake_store() -> SecretStore {
         SecretStore {

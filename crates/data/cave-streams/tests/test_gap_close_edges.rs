@@ -21,17 +21,13 @@ use cave_streams::broker::{Broker, BrokerConfig, CleanupPolicy as BrokerCleanupP
 use cave_streams::compression::{Codec, compress, decompress};
 use cave_streams::consumer_group::{GroupState, RebalanceProtocol};
 use cave_streams::error::{KafkaErrorCode, StreamsError};
-use cave_streams::idempotent_producer::{
-    PartitionSequence, ProducerIdRegistry, SequenceCheck,
-};
+use cave_streams::idempotent_producer::{PartitionSequence, ProducerIdRegistry, SequenceCheck};
 use cave_streams::partitioned_topic::{
     PartitionRoutingMode, PartitionedTopicRegistry, PersistencePolicy,
 };
 use cave_streams::pulsar_topic::{TopicDomain, TopicName};
 use cave_streams::schema_registry::{CompatibilityLevel, SchemaFormat, SchemaRegistry};
-use cave_streams::tenant::{
-    DEFAULT_NAMESPACE, DEFAULT_TENANT, Namespace, Tenant, TenantRegistry,
-};
+use cave_streams::tenant::{DEFAULT_NAMESPACE, DEFAULT_TENANT, Namespace, Tenant, TenantRegistry};
 
 // =============================================================================
 //  compression
@@ -66,7 +62,13 @@ fn codec_from_name_is_case_insensitive_and_falls_back_to_none() {
 
 #[test]
 fn codec_name_is_self_consistent_with_from_name() {
-    for c in [Codec::None, Codec::Gzip, Codec::Snappy, Codec::Lz4, Codec::Zstd] {
+    for c in [
+        Codec::None,
+        Codec::Gzip,
+        Codec::Snappy,
+        Codec::Lz4,
+        Codec::Zstd,
+    ] {
         assert_eq!(Codec::from_name(c.name()), c);
     }
 }
@@ -74,7 +76,13 @@ fn codec_name_is_self_consistent_with_from_name() {
 #[test]
 fn compression_round_trip_empty_payload_all_codecs() {
     let empty: &[u8] = &[];
-    for c in [Codec::None, Codec::Gzip, Codec::Snappy, Codec::Lz4, Codec::Zstd] {
+    for c in [
+        Codec::None,
+        Codec::Gzip,
+        Codec::Snappy,
+        Codec::Lz4,
+        Codec::Zstd,
+    ] {
         let compressed = compress(c, empty).expect("empty compress");
         let back = decompress(c, &compressed).expect("empty decompress");
         assert_eq!(&back[..], empty, "round trip failed for {:?}", c);
@@ -83,7 +91,13 @@ fn compression_round_trip_empty_payload_all_codecs() {
 
 #[test]
 fn codec_serde_round_trip_round_trips() {
-    for c in [Codec::None, Codec::Gzip, Codec::Snappy, Codec::Lz4, Codec::Zstd] {
+    for c in [
+        Codec::None,
+        Codec::Gzip,
+        Codec::Snappy,
+        Codec::Lz4,
+        Codec::Zstd,
+    ] {
         let s = serde_json::to_string(&c).unwrap();
         let back: Codec = serde_json::from_str(&s).unwrap();
         assert_eq!(back, c);
@@ -237,7 +251,10 @@ fn kafka_error_code_unmapped_variants_return_minus_one() {
         -1
     );
     assert_eq!(
-        StreamsError::AclNotFound { resource: "x".into() }.kafka_error_code(),
+        StreamsError::AclNotFound {
+            resource: "x".into()
+        }
+        .kafka_error_code(),
         -1
     );
 }
@@ -266,7 +283,10 @@ fn rebalance_protocol_serde_uses_kebab_case() {
 
 #[test]
 fn rebalance_protocol_from_str_handles_aliases() {
-    assert_eq!(RebalanceProtocol::from_str("range"), RebalanceProtocol::Range);
+    assert_eq!(
+        RebalanceProtocol::from_str("range"),
+        RebalanceProtocol::Range
+    );
     assert_eq!(
         RebalanceProtocol::from_str("ROUND_ROBIN"),
         RebalanceProtocol::RoundRobin
@@ -465,7 +485,10 @@ fn broker_cleanup_policy_serializes_lowercase() {
 
 #[test]
 fn topic_domain_round_trip_via_strings() {
-    assert_eq!(TopicDomain::parse("persistent").unwrap(), TopicDomain::Persistent);
+    assert_eq!(
+        TopicDomain::parse("persistent").unwrap(),
+        TopicDomain::Persistent
+    );
     assert_eq!(
         TopicDomain::parse("non-persistent").unwrap(),
         TopicDomain::NonPersistent
@@ -539,7 +562,10 @@ fn partitioned_topic_delete_missing_errors() {
 #[test]
 fn persistence_policy_for_topic_matches_domain() {
     let p = TopicName::persistent("acme", "ns", "a").unwrap();
-    assert_eq!(PersistencePolicy::for_topic(&p), PersistencePolicy::Persistent);
+    assert_eq!(
+        PersistencePolicy::for_topic(&p),
+        PersistencePolicy::Persistent
+    );
     let np = TopicName::parse("non-persistent://acme/ns/a").unwrap();
     assert_eq!(
         PersistencePolicy::for_topic(&np),
@@ -601,8 +627,14 @@ fn schema_format_from_str_handles_aliases() {
     assert_eq!(SchemaFormat::from_str("avro"), SchemaFormat::Avro);
     assert_eq!(SchemaFormat::from_str("PROTOBUF"), SchemaFormat::Protobuf);
     assert_eq!(SchemaFormat::from_str("JSON"), SchemaFormat::JsonSchema);
-    assert_eq!(SchemaFormat::from_str("JSON_SCHEMA"), SchemaFormat::JsonSchema);
-    assert_eq!(SchemaFormat::from_str("JSONSCHEMA"), SchemaFormat::JsonSchema);
+    assert_eq!(
+        SchemaFormat::from_str("JSON_SCHEMA"),
+        SchemaFormat::JsonSchema
+    );
+    assert_eq!(
+        SchemaFormat::from_str("JSONSCHEMA"),
+        SchemaFormat::JsonSchema
+    );
     // Unknown → defaults to Avro.
     assert_eq!(SchemaFormat::from_str("BOGUS"), SchemaFormat::Avro);
 }
@@ -617,8 +649,14 @@ fn compatibility_level_parse_supports_dashes_and_underscores() {
         CompatibilityLevel::from_str("FORWARD_TRANSITIVE"),
         CompatibilityLevel::ForwardTransitive
     );
-    assert_eq!(CompatibilityLevel::from_str("none"), CompatibilityLevel::None);
-    assert_eq!(CompatibilityLevel::from_str("full"), CompatibilityLevel::Full);
+    assert_eq!(
+        CompatibilityLevel::from_str("none"),
+        CompatibilityLevel::None
+    );
+    assert_eq!(
+        CompatibilityLevel::from_str("full"),
+        CompatibilityLevel::Full
+    );
     // Unknown → Backward fallback (Confluent's documented default).
     assert_eq!(
         CompatibilityLevel::from_str("???"),
@@ -779,12 +817,19 @@ fn broker_is_send_sync_concurrent_producer_id_alloc() {
             local
         }));
     }
-    let mut all: Vec<i64> = handles.into_iter().flat_map(|h| h.join().unwrap()).collect();
+    let mut all: Vec<i64> = handles
+        .into_iter()
+        .flat_map(|h| h.join().unwrap())
+        .collect();
     all.sort();
     // Every allocated ID must be unique even under contention.
     let len = all.len();
     all.dedup();
-    assert_eq!(all.len(), len, "producer IDs were not unique across threads");
+    assert_eq!(
+        all.len(),
+        len,
+        "producer IDs were not unique across threads"
+    );
 }
 
 #[test]

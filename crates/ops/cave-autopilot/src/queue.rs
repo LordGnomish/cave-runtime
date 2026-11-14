@@ -174,7 +174,10 @@ mod tests {
         q.enqueue_ranked(&[sub("cave-etcd", 0.5), sub("cave-policy", 0.65)]);
         let t = q.start_next().unwrap();
         assert_eq!(t.subsystem, "cave-etcd");
-        assert_eq!(q.get("port-cave-etcd").unwrap().status, TaskStatus::InProgress);
+        assert_eq!(
+            q.get("port-cave-etcd").unwrap().status,
+            TaskStatus::InProgress
+        );
         // Now the next pending is policy.
         assert_eq!(q.peek_next_id().as_deref(), Some("port-cave-policy"));
     }
@@ -189,7 +192,10 @@ mod tests {
         q.record_attempt("port-cave-etcd");
         q.enqueue_ranked(&ranked); // re-read tracker mid-flight
         assert_eq!(q.get("port-cave-etcd").unwrap().attempts, 2);
-        assert_eq!(q.get("port-cave-etcd").unwrap().status, TaskStatus::InProgress);
+        assert_eq!(
+            q.get("port-cave-etcd").unwrap().status,
+            TaskStatus::InProgress
+        );
     }
 
     #[test]

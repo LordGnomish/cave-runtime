@@ -155,7 +155,9 @@ impl AutopilotConfig {
             return Err(AutopilotError::Config("instance must not be empty".into()));
         }
         if self.metrics_port == 0 {
-            return Err(AutopilotError::Config("metrics_port must be non-zero".into()));
+            return Err(AutopilotError::Config(
+                "metrics_port must be non-zero".into(),
+            ));
         }
         Ok(())
     }

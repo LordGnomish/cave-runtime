@@ -16,8 +16,8 @@ use uuid::Uuid;
 /// implement deterministic heuristics so the module compiles and runs without a GPU.
 pub fn parse_intent(description: &str, yaml: Option<&str>) -> Result<InfraIntent, IntentError> {
     let structured = if let Some(yml) = yaml {
-        let val: serde_yaml::Value = serde_yaml::from_str(yml)
-            .map_err(|e| IntentError::ParseError(e.to_string()))?;
+        let val: serde_yaml::Value =
+            serde_yaml::from_str(yml).map_err(|e| IntentError::ParseError(e.to_string()))?;
         Some(val)
     } else {
         None

@@ -100,24 +100,76 @@ pub struct SyscallRule {
 
 impl SyscallRule {
     pub fn allow(name: impl Into<String>) -> Self {
-        SyscallRule { name: name.into(), action: "allow".into() }
+        SyscallRule {
+            name: name.into(),
+            action: "allow".into(),
+        }
     }
     pub fn deny(name: impl Into<String>) -> Self {
-        SyscallRule { name: name.into(), action: "deny".into() }
+        SyscallRule {
+            name: name.into(),
+            action: "deny".into(),
+        }
     }
 }
 
 /// Default Sentry syscall filter — a tiny taste of upstream's `~330` allowed.
 pub fn default_allowlist() -> Vec<SyscallRule> {
     [
-        "read", "write", "openat", "close", "stat", "fstat", "lstat",
-        "mmap", "mprotect", "munmap", "brk", "rt_sigaction", "rt_sigprocmask",
-        "ioctl", "pread64", "pwrite64", "readv", "writev", "access", "pipe",
-        "select", "sched_yield", "mremap", "msync", "mincore", "madvise",
-        "dup", "dup2", "pause", "nanosleep", "getitimer", "alarm", "setitimer",
-        "getpid", "sendfile", "socket", "connect", "accept", "sendto", "recvfrom",
-        "shutdown", "bind", "listen", "getsockname", "getpeername", "setsockopt",
-        "getsockopt", "clone", "fork", "vfork", "execve", "exit", "wait4", "kill",
+        "read",
+        "write",
+        "openat",
+        "close",
+        "stat",
+        "fstat",
+        "lstat",
+        "mmap",
+        "mprotect",
+        "munmap",
+        "brk",
+        "rt_sigaction",
+        "rt_sigprocmask",
+        "ioctl",
+        "pread64",
+        "pwrite64",
+        "readv",
+        "writev",
+        "access",
+        "pipe",
+        "select",
+        "sched_yield",
+        "mremap",
+        "msync",
+        "mincore",
+        "madvise",
+        "dup",
+        "dup2",
+        "pause",
+        "nanosleep",
+        "getitimer",
+        "alarm",
+        "setitimer",
+        "getpid",
+        "sendfile",
+        "socket",
+        "connect",
+        "accept",
+        "sendto",
+        "recvfrom",
+        "shutdown",
+        "bind",
+        "listen",
+        "getsockname",
+        "getpeername",
+        "setsockopt",
+        "getsockopt",
+        "clone",
+        "fork",
+        "vfork",
+        "execve",
+        "exit",
+        "wait4",
+        "kill",
     ]
     .into_iter()
     .map(SyscallRule::allow)
@@ -207,7 +259,10 @@ mod tests {
 
     #[test]
     fn fs_modes_roundtrip() {
-        let c = SentryConfig { fs: SentryFs::Overlay2, ..SentryConfig::default() };
+        let c = SentryConfig {
+            fs: SentryFs::Overlay2,
+            ..SentryConfig::default()
+        };
         let j = serde_json::to_string(&c).unwrap();
         let back: SentryConfig = serde_json::from_str(&j).unwrap();
         assert_eq!(back.fs, SentryFs::Overlay2);

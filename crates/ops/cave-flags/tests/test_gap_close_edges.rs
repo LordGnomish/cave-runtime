@@ -13,8 +13,8 @@
 // Design: failure modes, boundary, state transitions, serde round-trip.
 
 use cave_flags::engine::{
-    evaluate_all, evaluate_constraints, evaluate_flag, normalized_value_100,
-    normalized_value_1000, select_variant,
+    evaluate_all, evaluate_constraints, evaluate_flag, normalized_value_100, normalized_value_1000,
+    select_variant,
 };
 use cave_flags::models::{
     Constraint, ConstraintOperator, EvaluatedVariant, FeatureEnvironment, FeatureFlag,
@@ -217,7 +217,10 @@ fn constraint_in_case_insensitive_matches() {
 fn constraint_not_in_missing_value_is_true() {
     // Per spec: NOT_IN on absent ctx field passes (you are not in the list).
     let c = constraint("missing", ConstraintOperator::NotIn, vec!["x"], None);
-    assert!(evaluate_constraints(std::slice::from_ref(&c), &UnleashContext::default()));
+    assert!(evaluate_constraints(
+        std::slice::from_ref(&c),
+        &UnleashContext::default()
+    ));
 }
 
 #[test]
@@ -638,7 +641,10 @@ fn variant_override_short_circuits_weight() {
     let ev = select_variant(&variants, "f", &ctx, true);
     assert_eq!(ev.name, "B");
     assert!(ev.enabled);
-    assert_eq!(ev.payload.as_ref().map(|p| p.value.as_str()), Some("premium"));
+    assert_eq!(
+        ev.payload.as_ref().map(|p| p.value.as_str()),
+        Some("premium")
+    );
 }
 
 #[test]

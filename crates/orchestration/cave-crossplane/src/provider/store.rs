@@ -241,6 +241,9 @@ mod tests {
         let s = ProviderStore::new();
         s.install(req("p")).unwrap();
         s.mark_healthy("p").unwrap();
-        assert!(matches!(s.get("p").unwrap().status, ProviderStatus::Installed));
+        assert!(matches!(
+            s.get("p").unwrap().status,
+            ProviderStatus::Installed
+        ));
     }
 }

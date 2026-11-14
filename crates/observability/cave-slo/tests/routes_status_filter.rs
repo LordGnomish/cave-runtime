@@ -8,9 +8,9 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use cave_slo::{State, router};
 use cave_slo::models::{MetricType, SloStatus};
 use cave_slo::store::SloStore;
+use cave_slo::{State, router};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -23,7 +23,9 @@ async fn call(state: Arc<State>, req: Request<Body>) -> (StatusCode, Value) {
     let app = router(state);
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
-    let body_bytes = axum::body::to_bytes(resp.into_body(), 1 << 20).await.unwrap();
+    let body_bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+        .await
+        .unwrap();
     let json: Value = serde_json::from_slice(&body_bytes).unwrap_or(Value::Null);
     (status, json)
 }
@@ -37,24 +39,48 @@ fn seed_mixed_state() -> Arc<State> {
     let state = State::new();
     let slos = vec![
         SLO {
-            id: Uuid::new_v4(), name: "ok-slo-1".into(), description: "d".into(),
-            target_percentage: 99.9, window_days: 30, metric_type: MetricType::Availability,
-            created_at: Utc::now(), current_sli: 99.95, status: SloStatus::Ok,
+            id: Uuid::new_v4(),
+            name: "ok-slo-1".into(),
+            description: "d".into(),
+            target_percentage: 99.9,
+            window_days: 30,
+            metric_type: MetricType::Availability,
+            created_at: Utc::now(),
+            current_sli: 99.95,
+            status: SloStatus::Ok,
         },
         SLO {
-            id: Uuid::new_v4(), name: "ok-slo-2".into(), description: "d".into(),
-            target_percentage: 99.0, window_days: 7, metric_type: MetricType::Latency,
-            created_at: Utc::now(), current_sli: 99.2, status: SloStatus::Ok,
+            id: Uuid::new_v4(),
+            name: "ok-slo-2".into(),
+            description: "d".into(),
+            target_percentage: 99.0,
+            window_days: 7,
+            metric_type: MetricType::Latency,
+            created_at: Utc::now(),
+            current_sli: 99.2,
+            status: SloStatus::Ok,
         },
         SLO {
-            id: Uuid::new_v4(), name: "at-risk-slo".into(), description: "d".into(),
-            target_percentage: 99.9, window_days: 30, metric_type: MetricType::ErrorRate,
-            created_at: Utc::now(), current_sli: 98.0, status: SloStatus::AtRisk,
+            id: Uuid::new_v4(),
+            name: "at-risk-slo".into(),
+            description: "d".into(),
+            target_percentage: 99.9,
+            window_days: 30,
+            metric_type: MetricType::ErrorRate,
+            created_at: Utc::now(),
+            current_sli: 98.0,
+            status: SloStatus::AtRisk,
         },
         SLO {
-            id: Uuid::new_v4(), name: "breached-slo".into(), description: "d".into(),
-            target_percentage: 99.9, window_days: 30, metric_type: MetricType::Availability,
-            created_at: Utc::now(), current_sli: 90.0, status: SloStatus::Breached,
+            id: Uuid::new_v4(),
+            name: "breached-slo".into(),
+            description: "d".into(),
+            target_percentage: 99.9,
+            window_days: 30,
+            metric_type: MetricType::Availability,
+            created_at: Utc::now(),
+            current_sli: 90.0,
+            status: SloStatus::Breached,
         },
     ];
     for slo in slos {
@@ -138,5 +164,9 @@ async fn test_list_slos_filter_invalid_status_returns_400() {
         .body(Body::empty())
         .unwrap();
     let (status, _json) = call(state, req).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "invalid status should return 400");
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "invalid status should return 400"
+    );
 }

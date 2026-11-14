@@ -153,7 +153,11 @@ fn intent_parse_nl_infers_database() {
         .iter()
         .map(|r| r.resource_type.as_str())
         .collect();
-    assert!(kinds.iter().any(|&k| k.contains("rds") || k.contains("database")));
+    assert!(
+        kinds
+            .iter()
+            .any(|&k| k.contains("rds") || k.contains("database"))
+    );
 }
 
 #[test]
@@ -331,7 +335,13 @@ fn planner_optimize_plan_removes_nonexistent_deps() {
     optimize_plan(&mut plan);
     // After optimize, bogus dep should be removed
     if let Some(step) = plan.steps.first() {
-        assert!(step.depends_on.is_empty() || step.depends_on.iter().all(|d| plan.steps.iter().any(|s| s.id == *d)));
+        assert!(
+            step.depends_on.is_empty()
+                || step
+                    .depends_on
+                    .iter()
+                    .all(|d| plan.steps.iter().any(|s| s.id == *d))
+        );
     }
 }
 
@@ -441,9 +451,7 @@ async fn test_reject_flow() {
     let req_id = workflow.submit(req).await;
 
     let reviewer = Uuid::new_v4();
-    let rejected = workflow
-        .reject(req_id, reviewer, "Too risky".into())
-        .await;
+    let rejected = workflow.reject(req_id, reviewer, "Too risky".into()).await;
     assert!(rejected.is_ok());
 
     let fetched = workflow.get(req_id).await.unwrap();
@@ -458,11 +466,7 @@ async fn mcp_registry_register_and_execute() {
     registry.register("aws".into(), "http://aws-mcp:8080".into());
 
     let result = registry
-        .execute_tool(
-            "aws",
-            "create_virtual_machine",
-            &HashMap::new(),
-        )
+        .execute_tool("aws", "create_virtual_machine", &HashMap::new())
         .await;
     assert!(result.is_ok());
     let val = result.unwrap();

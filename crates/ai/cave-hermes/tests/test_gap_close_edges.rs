@@ -345,10 +345,7 @@ fn workflow_start_after_complete_returns_checkpoint_missing() {
 
 #[test]
 fn workflow_revision_monotone_under_mixed_ops() {
-    let mut wf = Workflow::new(
-        "wf",
-        vec![Step::new("a"), Step::new("b"), Step::new("c")],
-    );
+    let mut wf = Workflow::new("wf", vec![Step::new("a"), Step::new("b"), Step::new("c")]);
     let r0 = wf.revision;
     wf.start_step().unwrap();
     wf.finish_step(None).unwrap();

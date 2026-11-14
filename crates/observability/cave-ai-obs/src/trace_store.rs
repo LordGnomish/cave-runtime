@@ -34,11 +34,7 @@ impl TraceStore {
         let mut traces = self.traces.write().unwrap();
         if traces.len() >= MAX_RECORDS && !traces.contains_key(&trace.id) {
             // evict oldest by created_at
-            if let Some(oldest_id) = traces
-                .values()
-                .min_by_key(|t| t.created_at)
-                .map(|t| t.id)
-            {
+            if let Some(oldest_id) = traces.values().min_by_key(|t| t.created_at).map(|t| t.id) {
                 traces.remove(&oldest_id);
             }
         }

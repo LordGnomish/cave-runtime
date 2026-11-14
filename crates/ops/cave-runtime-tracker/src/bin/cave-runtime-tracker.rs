@@ -26,9 +26,9 @@ use clap::{Parser, Subcommand};
 use cave_runtime_tracker::config::TrackerConfig;
 use cave_runtime_tracker::error::{TrackerError, TrackerResult};
 use cave_runtime_tracker::launchd::{daily_report_agent, metrics_serve_agent};
-use cave_runtime_tracker::measure::{measure_subset, Measurement, TokeiLoc, DEFAULT_MEASURE_REPOS};
+use cave_runtime_tracker::measure::{DEFAULT_MEASURE_REPOS, Measurement, TokeiLoc, measure_subset};
 use cave_runtime_tracker::metrics::render_prometheus;
-use cave_runtime_tracker::poll::{poll_all, PollSummary};
+use cave_runtime_tracker::poll::{PollSummary, poll_all};
 use cave_runtime_tracker::registry::GithubFetcher;
 use cave_runtime_tracker::report::DailyReport;
 use cave_runtime_tracker::serve;
@@ -122,7 +122,10 @@ async fn main() -> TrackerResult<()> {
             println!("{}", serde_json::to_string_pretty(&summary)?);
             Ok(())
         }
-        Cmd::Report { output_dir, measure } => {
+        Cmd::Report {
+            output_dir,
+            measure,
+        } => {
             let summary = run_poll(&cfg).await;
             let report = DailyReport::assemble(summary);
             let dir = output_dir.unwrap_or_else(|| PathBuf::from(cfg.expanded_output_dir()));

@@ -217,7 +217,14 @@ pub fn window_is_active(window: &SyncWindow, now: DateTime<Utc>) -> bool {
     };
     // Normalize to minute resolution (cron fires on minute boundaries).
     let now_minute = Utc
-        .with_ymd_and_hms(now.year(), now.month(), now.day(), now.hour(), now.minute(), 0)
+        .with_ymd_and_hms(
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute(),
+            0,
+        )
         .single()
         .unwrap_or(now);
     let span_minutes = duration.num_minutes();
@@ -342,10 +349,7 @@ mod tests {
 
     #[test]
     fn parse_duration_compound() {
-        assert_eq!(
-            parse_go_duration("1h30m"),
-            Some(Duration::minutes(90))
-        );
+        assert_eq!(parse_go_duration("1h30m"), Some(Duration::minutes(90)));
         assert_eq!(parse_go_duration("45s"), Some(Duration::seconds(45)));
         assert_eq!(parse_go_duration("bad"), None);
         assert_eq!(parse_go_duration("10"), None);

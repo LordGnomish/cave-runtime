@@ -223,10 +223,10 @@ mod tests {
             annotation_prefix: "alb.ingress.kubernetes.io".into(),
         };
         let patch = render_patch(&p, &WeightSplit::new(40), "s", "c");
-        let fwd = patch["metadata"]["annotations"]
-            ["alb.ingress.kubernetes.io/actions.weighted-routing"]
-            .as_str()
-            .unwrap();
+        let fwd =
+            patch["metadata"]["annotations"]["alb.ingress.kubernetes.io/actions.weighted-routing"]
+                .as_str()
+                .unwrap();
         assert!(fwd.contains("\"Weight\":60"));
         assert!(fwd.contains("\"Weight\":40"));
     }

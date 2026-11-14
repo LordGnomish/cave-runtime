@@ -23,10 +23,7 @@ pub fn create_router(state: Arc<CiliumState>) -> Router {
         .route("/api/cilium/ipam/configure", post(configure_ipam))
         .route("/api/cilium/ipam/nodes", get(list_nodes))
         .route("/api/cilium/ipam/nodes/{node}", post(ensure_node))
-        .route(
-            "/api/cilium/ipam/nodes/{node}/allocate",
-            post(allocate_ip),
-        )
+        .route("/api/cilium/ipam/nodes/{node}/allocate", post(allocate_ip))
         .route("/api/cilium/identities/allocate", post(allocate_identity))
         .route("/api/cilium/hubble/flows", get(list_flows))
         .with_state(state)
@@ -107,7 +104,9 @@ async fn ensure_node(
         .unwrap()
         .ensure_node(&node)
         .map_err(|e| (StatusCode::CONFLICT, e.to_string()))?;
-    Ok(Json(serde_json::json!({ "node": node, "pod_cidr": cidr.to_string() })))
+    Ok(Json(
+        serde_json::json!({ "node": node, "pod_cidr": cidr.to_string() }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -126,7 +125,9 @@ async fn allocate_ip(
         .unwrap()
         .allocate_ip(&node, &req.owner)
         .map_err(|e| (StatusCode::CONFLICT, e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ip": ip.to_string(), "owner": req.owner })))
+    Ok(Json(
+        serde_json::json!({ "ip": ip.to_string(), "owner": req.owner }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -207,7 +208,13 @@ mod tests {
         let st = crate::new_state();
         let mut labels = std::collections::BTreeMap::new();
         labels.insert("app".to_string(), "web".to_string());
-        let Json(a) = allocate_identity(State(st.clone()), Json(LabelReq { labels: labels.clone() })).await;
+        let Json(a) = allocate_identity(
+            State(st.clone()),
+            Json(LabelReq {
+                labels: labels.clone(),
+            }),
+        )
+        .await;
         let Json(b) = allocate_identity(State(st.clone()), Json(LabelReq { labels })).await;
         assert_eq!(a.identity, b.identity);
         assert!(a.identity >= 256);

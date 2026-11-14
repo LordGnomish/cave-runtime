@@ -6,8 +6,8 @@
 //! state transitions a downstream `cave-cri` runtime would apply.
 
 use crate::workflow_crd::{
-    topo_order, Arguments, Artifact, DagTemplate, NodeStatus, Outputs, Parameter, RetryStrategy,
-    StepsTemplate, Template, TemplateBody, Workflow, WorkflowPhase, WorkflowStep, WorkflowStatus,
+    Arguments, Artifact, DagTemplate, NodeStatus, Outputs, Parameter, RetryStrategy, StepsTemplate,
+    Template, TemplateBody, Workflow, WorkflowPhase, WorkflowStatus, WorkflowStep, topo_order,
 };
 use chrono::Utc;
 use std::collections::HashMap;
@@ -83,10 +83,7 @@ pub fn next_actions(wf: &Workflow) -> Vec<NodeAction> {
             if !wf.status.nodes.contains_key(&id) {
                 out.push(NodeAction::Suspend {
                     node_id: id,
-                    duration_seconds: s
-                        .duration
-                        .as_deref()
-                        .and_then(parse_duration_seconds),
+                    duration_seconds: s.duration.as_deref().and_then(parse_duration_seconds),
                 });
             }
         }
@@ -130,7 +127,8 @@ fn schedule_steps(
     out: &mut Vec<NodeAction>,
 ) {
     for (group_idx, group) in steps.steps.iter().enumerate() {
-        let prior_done = group_idx == 0 || group_complete(wf, steps_name, group_idx - 1, &steps.steps[group_idx - 1]);
+        let prior_done = group_idx == 0
+            || group_complete(wf, steps_name, group_idx - 1, &steps.steps[group_idx - 1]);
         if !prior_done {
             return;
         }
@@ -153,7 +151,12 @@ fn schedule_steps(
     }
 }
 
-fn group_complete(wf: &Workflow, steps_name: &str, group_idx: usize, group: &[WorkflowStep]) -> bool {
+fn group_complete(
+    wf: &Workflow,
+    steps_name: &str,
+    group_idx: usize,
+    group: &[WorkflowStep],
+) -> bool {
     group.iter().all(|s| {
         let nid = node_id(steps_name, &format!("g{group_idx}-{}", s.name));
         matches!(
@@ -227,7 +230,11 @@ pub fn retry_decision(
             | ("OnError", WorkflowPhase::Error)
             | ("OnTransientError", WorkflowPhase::Error)
     );
-    if retry { Some(current_attempts + 1) } else { None }
+    if retry {
+        Some(current_attempts + 1)
+    } else {
+        None
+    }
 }
 
 /// Mark a node as `Succeeded` with its outputs and rebuild aggregate phase.
@@ -257,7 +264,10 @@ pub fn record_success(
     );
     let phase = aggregate_phase(wf);
     wf.status.phase = phase;
-    if matches!(phase, WorkflowPhase::Succeeded | WorkflowPhase::Failed | WorkflowPhase::Error) {
+    if matches!(
+        phase,
+        WorkflowPhase::Succeeded | WorkflowPhase::Failed | WorkflowPhase::Error
+    ) {
         wf.status.finished_at.get_or_insert(Utc::now());
     }
     phase
@@ -342,7 +352,10 @@ mod tests {
                         name: "d".into(),
                         inputs: Inputs::default(),
                         outputs: Outputs::default(),
-                        body: TemplateBody::Dag(DagTemplate { tasks, fail_fast: None }),
+                        body: TemplateBody::Dag(DagTemplate {
+                            tasks,
+                            fail_fast: None,
+                        }),
                         retry_strategy: None,
                         timeout: None,
                     },
@@ -568,7 +581,10 @@ mod tests {
         let actions = next_actions(&wf);
         assert!(matches!(
             actions.first(),
-            Some(NodeAction::Suspend { duration_seconds: Some(300), .. })
+            Some(NodeAction::Suspend {
+                duration_seconds: Some(300),
+                ..
+            })
         ));
     }
 

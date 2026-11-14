@@ -123,8 +123,11 @@ mod tests {
 
     #[test]
     fn observed_reference() {
-        let v = evaluate_kcl("name = _observed.spec.name", &json!({"spec":{"name":"db1"}}))
-            .unwrap();
+        let v = evaluate_kcl(
+            "name = _observed.spec.name",
+            &json!({"spec":{"name":"db1"}}),
+        )
+        .unwrap();
         assert_eq!(v["name"], json!("db1"));
     }
 

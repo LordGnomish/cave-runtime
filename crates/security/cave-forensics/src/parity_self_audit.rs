@@ -213,7 +213,10 @@ pub fn gate_8_no_stub_macros(src: &PathBuf) -> Result<(), String> {
         }
         // Skip the audit file itself — it legitimately contains the
         // forbidden macro names as string literals for scanning.
-        if p.file_name().map(|n| n == "parity_self_audit.rs").unwrap_or(false) {
+        if p.file_name()
+            .map(|n| n == "parity_self_audit.rs")
+            .unwrap_or(false)
+        {
             return;
         }
         let Ok(text) = fs::read_to_string(p) else {

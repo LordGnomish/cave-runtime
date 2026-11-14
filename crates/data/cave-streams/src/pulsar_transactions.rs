@@ -343,7 +343,12 @@ impl TransactionMetadataStore {
 
     /// Allocate a fresh `Open` transaction with a monotonic `least_sig_bits`,
     /// registering its timeout deadline.
-    pub fn new_transaction(&mut self, timeout_ms: i64, owner: impl Into<String>, now_ms: i64) -> TxnId {
+    pub fn new_transaction(
+        &mut self,
+        timeout_ms: i64,
+        owner: impl Into<String>,
+        now_ms: i64,
+    ) -> TxnId {
         let least = self.sequence_id_generator;
         self.sequence_id_generator += 1;
         let id = TxnId::new(self.coordinator_id, least);
@@ -371,7 +376,12 @@ impl TransactionMetadataStore {
 
     /// Compare-and-set the status of a stored transaction, updating the
     /// terminal counters (`committed` / `aborted`) on success.
-    pub fn update_status(&mut self, id: &TxnId, new: TxnStatus, expected: TxnStatus) -> TxnResult<()> {
+    pub fn update_status(
+        &mut self,
+        id: &TxnId,
+        new: TxnStatus,
+        expected: TxnStatus,
+    ) -> TxnResult<()> {
         let meta = self
             .txns
             .get_mut(&id.least_sig_bits())
@@ -436,15 +446,19 @@ impl TransactionCoordinator {
 
     /// Drive `Open -> Committing -> Committed`.
     pub fn commit(&mut self, id: &TxnId) -> TxnResult<()> {
-        self.store.update_status(id, TxnStatus::Committing, TxnStatus::Open)?;
-        self.store.update_status(id, TxnStatus::Committed, TxnStatus::Committing)?;
+        self.store
+            .update_status(id, TxnStatus::Committing, TxnStatus::Open)?;
+        self.store
+            .update_status(id, TxnStatus::Committed, TxnStatus::Committing)?;
         Ok(())
     }
 
     /// Drive `Open -> Aborting -> Aborted`.
     pub fn abort(&mut self, id: &TxnId) -> TxnResult<()> {
-        self.store.update_status(id, TxnStatus::Aborting, TxnStatus::Open)?;
-        self.store.update_status(id, TxnStatus::Aborted, TxnStatus::Aborting)?;
+        self.store
+            .update_status(id, TxnStatus::Aborting, TxnStatus::Open)?;
+        self.store
+            .update_status(id, TxnStatus::Aborted, TxnStatus::Aborting)?;
         Ok(())
     }
 
@@ -580,10 +594,17 @@ pub struct TransactionBuffer {
 
 impl TransactionBuffer {
     fn buffer_mut(&mut self, txn_id: &TxnId) -> &mut TxnBuffer {
-        self.buffers.entry(*txn_id).or_insert_with(|| TxnBuffer::new(*txn_id))
+        self.buffers
+            .entry(*txn_id)
+            .or_insert_with(|| TxnBuffer::new(*txn_id))
     }
 
-    pub fn append_entry(&mut self, txn_id: &TxnId, sequence_id: i64, position: EntryPosition) -> TxnResult<()> {
+    pub fn append_entry(
+        &mut self,
+        txn_id: &TxnId,
+        sequence_id: i64,
+        position: EntryPosition,
+    ) -> TxnResult<()> {
         self.buffer_mut(txn_id).append_entry(sequence_id, position)
     }
 
@@ -592,7 +613,8 @@ impl TransactionBuffer {
     }
 
     pub fn commit_txn(&mut self, txn_id: &TxnId, committed_ledger: i64, committed_entry: i64) {
-        self.buffer_mut(txn_id).commit_txn(committed_ledger, committed_entry);
+        self.buffer_mut(txn_id)
+            .commit_txn(committed_ledger, committed_entry);
     }
 
     /// Abort a transaction's buffer and record it in the aborted set.
@@ -602,7 +624,12 @@ impl TransactionBuffer {
         Ok(())
     }
 
-    pub fn read_entries(&self, txn_id: &TxnId, num: usize, start_sequence_id: i64) -> Vec<EntryPosition> {
+    pub fn read_entries(
+        &self,
+        txn_id: &TxnId,
+        num: usize,
+        start_sequence_id: i64,
+    ) -> Vec<EntryPosition> {
         self.buffers
             .get(txn_id)
             .map(|b| b.read_entries(num, start_sequence_id))

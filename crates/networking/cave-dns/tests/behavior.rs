@@ -165,7 +165,12 @@ fn aaaa_and_txt_records_build_with_expected_rdata() {
         other => panic!("expected AAAA rdata, got {other:?}"),
     }
 
-    let txt = txt_record("txt.example.com.", 120, vec!["hello".into(), "world".into()]).unwrap();
+    let txt = txt_record(
+        "txt.example.com.",
+        120,
+        vec!["hello".into(), "world".into()],
+    )
+    .unwrap();
     assert_eq!(txt.record_type(), RecordType::TXT);
     assert_eq!(txt.ttl(), 120);
     assert_eq!(txt.dns_class(), DNSClass::IN);
@@ -272,7 +277,11 @@ fn edns_options_from_message_and_effective_size() {
     let opts2 = EdnsOptions::from_message(&with_opt);
     assert_eq!(opts2.udp_payload_size, 1232);
     assert!(opts2.dnssec_ok);
-    assert_eq!(opts2.effective_udp_size(), 1232, "larger size passes through");
+    assert_eq!(
+        opts2.effective_udp_size(),
+        1232,
+        "larger size passes through"
+    );
 }
 
 // ── LoadbalancePlugin::handle (round-robin via plugin chain) ─────────────────

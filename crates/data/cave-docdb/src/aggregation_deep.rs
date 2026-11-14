@@ -67,10 +67,7 @@ impl Collections {
     }
 
     pub fn get(&self, name: &str) -> &[Document] {
-        self.inner
-            .get(name)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[])
+        self.inner.get(name).map(|v| v.as_slice()).unwrap_or(&[])
     }
 }
 
@@ -85,11 +82,7 @@ pub fn run(input: Vec<Document>, stages: &[DeepStage], catalog: &Collections) ->
     current
 }
 
-fn apply_stage(
-    input: Vec<Document>,
-    stage: &DeepStage,
-    catalog: &Collections,
-) -> Vec<Document> {
+fn apply_stage(input: Vec<Document>, stage: &DeepStage, catalog: &Collections) -> Vec<Document> {
     match stage {
         DeepStage::Lookup(l) => apply_lookup(input, l, catalog),
         DeepStage::Facet(f) => apply_facet(input, f, catalog),
@@ -179,7 +172,10 @@ fn accumulate(acc: &BucketAccumulator, docs: &[Document]) -> Value {
     match acc {
         BucketAccumulator::Count => Value::from(docs.len() as i64),
         BucketAccumulator::Sum(field) => {
-            let s: f64 = docs.iter().filter_map(|d| d.get(field).and_then(value_to_f64)).sum();
+            let s: f64 = docs
+                .iter()
+                .filter_map(|d| d.get(field).and_then(value_to_f64))
+                .sum();
             if (s.fract()).abs() < f64::EPSILON {
                 Value::from(s as i64)
             } else {
@@ -260,7 +256,10 @@ mod tests {
         assert_eq!(orders.len(), 2);
         let nobody = &out[1];
         let empty = nobody.get("orders").unwrap().as_array().unwrap();
-        assert!(empty.is_empty(), "left-outer must emit empty array, not drop the row");
+        assert!(
+            empty.is_empty(),
+            "left-outer must emit empty array, not drop the row"
+        );
     }
 
     #[test]
@@ -373,10 +372,7 @@ mod tests {
             })],
             &cat,
         );
-        assert_eq!(
-            out[0].get("joined").unwrap().as_array().unwrap().len(),
-            0
-        );
+        assert_eq!(out[0].get("joined").unwrap().as_array().unwrap().len(), 0);
     }
 
     #[test]
@@ -392,11 +388,7 @@ mod tests {
 
     #[test]
     fn empty_input_returns_empty() {
-        let out = run(
-            Vec::new(),
-            &[DeepStage::Limit(10)],
-            &Collections::default(),
-        );
+        let out = run(Vec::new(), &[DeepStage::Limit(10)], &Collections::default());
         assert!(out.is_empty());
     }
 }

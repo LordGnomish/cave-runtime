@@ -25,7 +25,10 @@ pub const COMPONENT_LABEL_KEY: &str = "kamaji.clastix.io/component";
 /// per-tenant resource. `kamaji.clastix.io/name` is the ownership boundary.
 pub fn kamaji_labels(tcp_name: &str, resource_name: &str) -> BTreeMap<String, String> {
     let mut m = BTreeMap::new();
-    m.insert(PROJECT_LABEL_KEY.to_string(), PROJECT_LABEL_VALUE.to_string());
+    m.insert(
+        PROJECT_LABEL_KEY.to_string(),
+        PROJECT_LABEL_VALUE.to_string(),
+    );
     m.insert(CONTROL_PLANE_LABEL_KEY.to_string(), tcp_name.to_string());
     m.insert(COMPONENT_LABEL_KEY.to_string(), resource_name.to_string());
     m

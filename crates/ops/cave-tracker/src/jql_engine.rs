@@ -24,10 +24,20 @@ pub enum JqlValue {
 
 #[derive(Debug, Clone)]
 pub enum JqlCondition {
-    Equals { field: String, value: JqlValue },
-    In { field: String, values: Vec<JqlValue> },
-    IsEmpty { field: String },
-    IsNotEmpty { field: String },
+    Equals {
+        field: String,
+        value: JqlValue,
+    },
+    In {
+        field: String,
+        values: Vec<JqlValue>,
+    },
+    IsEmpty {
+        field: String,
+    },
+    IsNotEmpty {
+        field: String,
+    },
     And(Box<JqlCondition>, Box<JqlCondition>),
     Or(Box<JqlCondition>, Box<JqlCondition>),
 }
@@ -51,7 +61,10 @@ impl JqlEngine {
     pub fn parse(query: &str) -> Result<ParsedJql, String> {
         let query = query.trim();
         if query.is_empty() {
-            return Ok(ParsedJql { condition: None, order_by: vec![] });
+            return Ok(ParsedJql {
+                condition: None,
+                order_by: vec![],
+            });
         }
         let (where_part, order_part) = split_order_by(query);
         let order_by = parse_order_by(order_part)?;
@@ -60,7 +73,10 @@ impl JqlEngine {
         } else {
             Some(parse_condition(where_part.trim())?)
         };
-        Ok(ParsedJql { condition, order_by })
+        Ok(ParsedJql {
+            condition,
+            order_by,
+        })
     }
 
     /// Evaluate a parsed JQL against a slice of issues, returning matching clones.
@@ -109,9 +125,13 @@ fn parse_order_by(s: &str) -> Result<Vec<OrderBy>, String> {
     let mut result = Vec::new();
     for part in s.split(',') {
         let part = part.trim();
-        if part.is_empty() { continue; }
+        if part.is_empty() {
+            continue;
+        }
         let tokens: Vec<&str> = part.split_whitespace().collect();
-        if tokens.is_empty() { continue; }
+        if tokens.is_empty() {
+            continue;
+        }
         let field = tokens[0].to_string();
         let ascending = if tokens.len() >= 2 {
             match tokens[1].to_uppercase().as_str() {
@@ -119,7 +139,9 @@ fn parse_order_by(s: &str) -> Result<Vec<OrderBy>, String> {
                 "DESC" => false,
                 other => return Err(format!("Unknown sort direction: {}", other)),
             }
-        } else { true };
+        } else {
+            true
+        };
         result.push(OrderBy { field, ascending });
     }
     Ok(result)
@@ -131,7 +153,9 @@ fn parse_condition(s: &str) -> Result<JqlCondition, String> {
 
 fn parse_or(s: &str) -> Result<JqlCondition, String> {
     let parts = split_top_level(s, " OR ");
-    if parts.len() == 1 { return parse_and(parts[0].trim()); }
+    if parts.len() == 1 {
+        return parse_and(parts[0].trim());
+    }
     let mut iter = parts.into_iter();
     let mut left = parse_and(iter.next().unwrap().trim())?;
     for part in iter {
@@ -143,7 +167,9 @@ fn parse_or(s: &str) -> Result<JqlCondition, String> {
 
 fn parse_and(s: &str) -> Result<JqlCondition, String> {
     let parts = split_top_level(s, " AND ");
-    if parts.len() == 1 { return parse_atom(parts[0].trim()); }
+    if parts.len() == 1 {
+        return parse_atom(parts[0].trim());
+    }
     let mut iter = parts.into_iter();
     let mut left = parse_atom(iter.next().unwrap().trim())?;
     for part in iter {
@@ -165,11 +191,14 @@ fn split_top_level<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
     let mut i = 0;
     while i < s.len() {
         let ch = bytes[i] as char;
-        if ch == '"' || ch == '\'' { in_quote = !in_quote; }
-        else if !in_quote {
-            if ch == '(' { depth += 1; }
-            else if ch == ')' { depth = depth.saturating_sub(1); }
-            else if depth == 0
+        if ch == '"' || ch == '\'' {
+            in_quote = !in_quote;
+        } else if !in_quote {
+            if ch == '(' {
+                depth += 1;
+            } else if ch == ')' {
+                depth = depth.saturating_sub(1);
+            } else if depth == 0
                 && i + sep_len <= s.len()
                 && s_upper[i..i + sep_len] == sep_upper[..]
             {
@@ -194,11 +223,19 @@ fn strip_outer_parens(s: &str) -> &str {
         for ch in inner.chars() {
             match ch {
                 '(' => depth += 1,
-                ')' => { if depth == 0 { ok = false; break; } depth -= 1; }
+                ')' => {
+                    if depth == 0 {
+                        ok = false;
+                        break;
+                    }
+                    depth -= 1;
+                }
                 _ => {}
             }
         }
-        if ok && depth == 0 { return inner.trim(); }
+        if ok && depth == 0 {
+            return inner.trim();
+        }
     }
     s
 }
@@ -225,18 +262,27 @@ fn parse_value_list(s: &str) -> Result<Vec<JqlValue>, String> {
     let s = if s.trim().starts_with('(') && s.trim().ends_with(')') {
         let t = s.trim();
         &t[1..t.len() - 1]
-    } else { s.trim() };
+    } else {
+        s.trim()
+    };
     let mut values = Vec::new();
     let mut current = String::new();
     let mut in_quote = false;
     let mut quote_char = ' ';
     for ch in s.chars() {
         match ch {
-            '"' | '\'' if !in_quote => { in_quote = true; quote_char = ch; }
-            c if in_quote && c == quote_char => { in_quote = false; }
+            '"' | '\'' if !in_quote => {
+                in_quote = true;
+                quote_char = ch;
+            }
+            c if in_quote && c == quote_char => {
+                in_quote = false;
+            }
             ',' if !in_quote => {
                 let v = current.trim().to_string();
-                if !v.is_empty() { values.push(parse_single_value(&v)?); }
+                if !v.is_empty() {
+                    values.push(parse_single_value(&v)?);
+                }
                 current.clear();
                 continue;
             }
@@ -245,13 +291,17 @@ fn parse_value_list(s: &str) -> Result<Vec<JqlValue>, String> {
         current.push(ch);
     }
     let v = current.trim().to_string();
-    if !v.is_empty() { values.push(parse_single_value(&v)?); }
+    if !v.is_empty() {
+        values.push(parse_single_value(&v)?);
+    }
     Ok(values)
 }
 
 fn parse_single_value(s: &str) -> Result<JqlValue, String> {
     let s = s.trim();
-    if s.to_lowercase() == "currentuser()" { return Ok(JqlValue::CurrentUser); }
+    if s.to_lowercase() == "currentuser()" {
+        return Ok(JqlValue::CurrentUser);
+    }
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
         return Ok(JqlValue::Str(s[1..s.len() - 1].to_string()));
     }
@@ -264,11 +314,15 @@ fn parse_atom(s: &str) -> Result<JqlCondition, String> {
 
     // IS NOT EMPTY
     if let Some(rest) = upper.strip_suffix(" IS NOT EMPTY") {
-        return Ok(JqlCondition::IsNotEmpty { field: rest.trim().to_lowercase() });
+        return Ok(JqlCondition::IsNotEmpty {
+            field: rest.trim().to_lowercase(),
+        });
     }
     // IS EMPTY
     if let Some(rest) = upper.strip_suffix(" IS EMPTY") {
-        return Ok(JqlCondition::IsEmpty { field: rest.trim().to_lowercase() });
+        return Ok(JqlCondition::IsEmpty {
+            field: rest.trim().to_lowercase(),
+        });
     }
     // IN (...)
     if let Some(in_pos) = find_in_keyword(s) {
@@ -322,9 +376,26 @@ fn eval_equals(issue: &Issue, field: &str, value: &JqlValue) -> bool {
             let ts = issue.issue_type.to_string().to_lowercase();
             ts == vs.to_lowercase()
         }
-        "label" | "labels" => issue.labels.iter().any(|l| l.to_lowercase() == vs.to_lowercase()),
-        "sprint" | "sprint_id" => issue.sprint_id.map(|id| id.to_string()).as_deref().unwrap_or("") == vs,
-        "epic" | "epic_id" => issue.epic_id.map(|id| id.to_string()).as_deref().unwrap_or("") == vs,
+        "label" | "labels" => issue
+            .labels
+            .iter()
+            .any(|l| l.to_lowercase() == vs.to_lowercase()),
+        "sprint" | "sprint_id" => {
+            issue
+                .sprint_id
+                .map(|id| id.to_string())
+                .as_deref()
+                .unwrap_or("")
+                == vs
+        }
+        "epic" | "epic_id" => {
+            issue
+                .epic_id
+                .map(|id| id.to_string())
+                .as_deref()
+                .unwrap_or("")
+                == vs
+        }
         _ => false,
     }
 }
@@ -425,7 +496,10 @@ mod tests {
 
     #[test]
     fn evaluate_project_filter() {
-        let issues = vec![make("CAVE-1", "CAVE", "To Do"), make("OTHER-1", "OTHER", "To Do")];
+        let issues = vec![
+            make("CAVE-1", "CAVE", "To Do"),
+            make("OTHER-1", "OTHER", "To Do"),
+        ];
         let p = JqlEngine::parse("project = CAVE").unwrap();
         let res = JqlEngine::evaluate(&issues, &p);
         assert_eq!(res.len(), 1);
@@ -433,7 +507,11 @@ mod tests {
 
     #[test]
     fn evaluate_or_condition() {
-        let issues = vec![make("CAVE-1", "CAVE", "To Do"), make("CAVE-2", "CAVE", "Done"), make("CAVE-3", "CAVE", "In Progress")];
+        let issues = vec![
+            make("CAVE-1", "CAVE", "To Do"),
+            make("CAVE-2", "CAVE", "Done"),
+            make("CAVE-3", "CAVE", "In Progress"),
+        ];
         let p = JqlEngine::parse("status = Done OR status = In Progress").unwrap();
         let res = JqlEngine::evaluate(&issues, &p);
         assert_eq!(res.len(), 2);

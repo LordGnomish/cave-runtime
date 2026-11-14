@@ -173,11 +173,13 @@ pub fn reconcile(service: &ServiceSpec, pods: &[PodView]) -> Endpoints {
             continue;
         }
         resolved.sort();
-        let subset = buckets.entry(resolved.clone()).or_insert_with(|| EndpointSubset {
-            addresses: Vec::new(),
-            not_ready_addresses: Vec::new(),
-            ports: resolved.clone(),
-        });
+        let subset = buckets
+            .entry(resolved.clone())
+            .or_insert_with(|| EndpointSubset {
+                addresses: Vec::new(),
+                not_ready_addresses: Vec::new(),
+                ports: resolved.clone(),
+            });
         let addr = EndpointAddress {
             ip: pod.pod_ip.clone(),
             node_name: pod.node_name.clone(),
@@ -215,7 +217,8 @@ fn matches_selector(labels: &BTreeMap<String, String>, sel: &BTreeMap<String, St
         // which has the same rule via syncService early-return).
         return false;
     }
-    sel.iter().all(|(k, v)| labels.get(k).is_some_and(|lv| lv == v))
+    sel.iter()
+        .all(|(k, v)| labels.get(k).is_some_and(|lv| lv == v))
 }
 
 #[cfg(test)]

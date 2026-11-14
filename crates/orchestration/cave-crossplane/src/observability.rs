@@ -6,8 +6,8 @@
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::registry::Registry;
-use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicI64;
 
 #[derive(Debug, Clone, Copy)]
 pub enum PanelKind {

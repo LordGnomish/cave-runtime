@@ -60,7 +60,9 @@ pub fn reconcile_vm(vm: &VirtualMachine, vmi: Option<&VirtualMachineInstance>) -
     match (vmi, want) {
         (None, VmPhase::Starting) => ReconcileAction::CreateVMI,
         (None, VmPhase::Running) => ReconcileAction::CreateVMI,
-        (Some(_), VmPhase::Stopping) | (Some(_), VmPhase::Terminating) => ReconcileAction::DeleteVMI,
+        (Some(_), VmPhase::Stopping) | (Some(_), VmPhase::Terminating) => {
+            ReconcileAction::DeleteVMI
+        }
         (Some(existing), VmPhase::Stopped) => {
             // VMI exists but desired stopped — only delete if currently
             // stopped phase (avoid racing with `Stopping`).
@@ -114,10 +116,7 @@ fn spec_is_empty(spec: &VirtualMachineInstanceSpec) -> bool {
 
 /// Compute the printable VM status — the user-visible `vm.status.printable_status`
 /// field. Mirrors upstream's `getPrintableStatus` switch.
-pub fn printable_status(
-    vm: &VirtualMachine,
-    vmi: Option<&VirtualMachineInstance>,
-) -> &'static str {
+pub fn printable_status(vm: &VirtualMachine, vmi: Option<&VirtualMachineInstance>) -> &'static str {
     let phase = vmi
         .and_then(|v| v.status.as_ref())
         .map(|s| s.phase.as_str())

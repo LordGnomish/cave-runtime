@@ -458,7 +458,10 @@ mod tests {
     }
 
     fn doc(pairs: &[(&str, Value)]) -> Document {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
     }
 
     fn cstr(s: &str) -> Vec<u8> {
@@ -482,7 +485,10 @@ mod tests {
             LegacyOp::Insert(ins) => {
                 assert_eq!(ins.collection, "testdb.users");
                 assert_eq!(ins.documents.len(), 2);
-                assert_eq!(ins.documents[1].get("_id"), Some(&Value::String("2".into())));
+                assert_eq!(
+                    ins.documents[1].get("_id"),
+                    Some(&Value::String("2".into()))
+                );
             }
             other => panic!("expected Insert, got {:?}", other),
         }

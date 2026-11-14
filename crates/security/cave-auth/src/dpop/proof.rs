@@ -109,10 +109,7 @@ impl DpopProof {
             return Err(DpopProofError::BadTyp(header.typ));
         }
         if !SUPPORTED_ALGS.contains(&header.alg.as_str()) {
-            return Err(DpopProofError::UnsupportedAlg(
-                header.alg,
-                SUPPORTED_ALGS,
-            ));
+            return Err(DpopProofError::UnsupportedAlg(header.alg, SUPPORTED_ALGS));
         }
 
         let signing_input = format!("{}.{}", parts[0], parts[1]);

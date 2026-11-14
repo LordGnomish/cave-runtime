@@ -49,8 +49,14 @@ fn offset_store_delete_removes_entry() {
 fn offset_store_rejects_cross_tenant_set() {
     let mut store = OffsetStore::new(TENANT);
     let key = OffsetKey::new("other-tenant", "pg-connector", "public", "orders");
-    let err = store.set_checked(key, serde_json::json!({"lsn": "0/100"})).unwrap_err();
-    assert!(err.to_string().contains("cross-tenant"), "should be cross-tenant error: {}", err);
+    let err = store
+        .set_checked(key, serde_json::json!({"lsn": "0/100"}))
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("cross-tenant"),
+        "should be cross-tenant error: {}",
+        err
+    );
 }
 
 #[test]
@@ -59,7 +65,11 @@ fn offset_key_serializes_to_stable_string() {
     let s = key.to_key_string();
     // Key must embed tenant_id so different tenants never collide.
     assert!(s.contains(TENANT), "key should contain tenant: {}", s);
-    assert!(s.contains("pg-connector"), "key should contain connector: {}", s);
+    assert!(
+        s.contains("pg-connector"),
+        "key should contain connector: {}",
+        s
+    );
 }
 
 #[test]

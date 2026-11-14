@@ -48,7 +48,11 @@ impl Step {
 
     /// Estimate the step's serialized footprint (bytes) — used for telemetry.
     pub fn estimated_size(&self) -> usize {
-        let i = self.input.as_ref().map(|v| v.to_string().len()).unwrap_or(0);
+        let i = self
+            .input
+            .as_ref()
+            .map(|v| v.to_string().len())
+            .unwrap_or(0);
         self.step.len() + self.function_ref.len() + i
     }
 }

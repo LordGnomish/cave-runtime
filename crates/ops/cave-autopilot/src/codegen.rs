@@ -247,7 +247,10 @@ mod tests {
     #[test]
     fn prompts_mention_tdd_and_subsystem() {
         assert!(codegen_system_prompt().contains("TDD"));
-        assert!(build_codegen_prompt("cave-etcd", "crates/cave-etcd", Some("etcd-io/etcd")).contains("cave-etcd"));
+        assert!(
+            build_codegen_prompt("cave-etcd", "crates/cave-etcd", Some("etcd-io/etcd"))
+                .contains("cave-etcd")
+        );
         assert!(build_router_prompt("cave-etcd", 0.5, None).contains("cave-etcd"));
     }
 }

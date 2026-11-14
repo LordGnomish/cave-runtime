@@ -33,7 +33,7 @@ jobs:
     name: cargo-deny check advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -45,10 +45,10 @@ jobs:
     name: cargo-audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # cargo-audit tracks recent rustc releases (0.22.2 needs >= 1.88), so
-      # this job runs on latest stable. The workspace MSRV (1.85) is still
-      # enforced by ci.yml.
+      - uses: actions/checkout@v6
+      # cargo-audit needs a newer rustc than the workspace MSRV (cargo-audit
+      # 0.23.0 needs >= 1.88), so this job runs on latest stable. The
+      # workspace MSRV (1.85) is still enforced by ci.yml.
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -66,7 +66,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@0.28.0
         with:

@@ -126,9 +126,15 @@ impl ProcessTree {
     /// order from immediate parent up to the topmost known.
     pub fn ancestors(&self, exec_id: &str) -> Vec<String> {
         let mut out = Vec::new();
-        let mut cur = self.by_exec_id.get(exec_id).and_then(|p| p.parent_exec_id.clone());
+        let mut cur = self
+            .by_exec_id
+            .get(exec_id)
+            .and_then(|p| p.parent_exec_id.clone());
         while let Some(id) = cur {
-            cur = self.by_exec_id.get(&id).and_then(|p| p.parent_exec_id.clone());
+            cur = self
+                .by_exec_id
+                .get(&id)
+                .and_then(|p| p.parent_exec_id.clone());
             out.push(id);
         }
         out

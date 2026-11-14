@@ -9,7 +9,8 @@
 
 use crate::engine::evaluate_flag;
 use crate::models::{
-    EvaluatedVariant, FeatureFlag, FrontendFeaturesResponse, FrontendToggle, Segment, UnleashContext,
+    EvaluatedVariant, FeatureFlag, FrontendFeaturesResponse, FrontendToggle, Segment,
+    UnleashContext,
 };
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -244,7 +245,10 @@ mod tests {
         let c = ProxyCache::new(Duration::from_secs(60));
         c.refresh(vec![flag("a", true)], vec![]);
         assert_eq!(c.feature_count(), 1);
-        c.refresh(vec![flag("a", true), flag("b", true), flag("c", true)], vec![]);
+        c.refresh(
+            vec![flag("a", true), flag("b", true), flag("c", true)],
+            vec![],
+        );
         assert_eq!(c.feature_count(), 3);
     }
 

@@ -45,20 +45,21 @@ pub fn parse(yaml: &str) -> Result<RulePack> {
     // Falco's YAML wraps each entry inside a `rule:` / `macro:` / `list:`
     // single-key map. Re-parse with a value::Value walker.
     let raw: serde_yaml::Value = serde_yaml::from_str(yaml)?;
-    let arr = raw.as_sequence().ok_or_else(|| FalcoError::RuleParse(
-        "rule pack must be a YAML sequence".into(),
-    ))?;
+    let arr = raw
+        .as_sequence()
+        .ok_or_else(|| FalcoError::RuleParse("rule pack must be a YAML sequence".into()))?;
     let mut pack = RulePack::default();
     for v in arr {
-        let m = v.as_mapping().ok_or_else(|| FalcoError::RuleParse(
-            "rule-pack entry must be a single-key map".into(),
-        ))?;
-        let (k, body) = m.iter().next().ok_or_else(|| FalcoError::RuleParse(
-            "rule-pack entry must have one key".into(),
-        ))?;
-        let key = k.as_str().ok_or_else(|| FalcoError::RuleParse(
-            "rule-pack key must be a string".into(),
-        ))?;
+        let m = v.as_mapping().ok_or_else(|| {
+            FalcoError::RuleParse("rule-pack entry must be a single-key map".into())
+        })?;
+        let (k, body) = m
+            .iter()
+            .next()
+            .ok_or_else(|| FalcoError::RuleParse("rule-pack entry must have one key".into()))?;
+        let key = k
+            .as_str()
+            .ok_or_else(|| FalcoError::RuleParse("rule-pack key must be a string".into()))?;
         match key {
             "rule" => {
                 // Body is a map with `name`, `desc`, `condition`, etc. Inject
@@ -78,7 +79,9 @@ pub fn parse(yaml: &str) -> Result<RulePack> {
                 pack.lists.push(l);
             }
             other => {
-                return Err(FalcoError::RuleParse(format!("unknown entry type '{other}'")));
+                return Err(FalcoError::RuleParse(format!(
+                    "unknown entry type '{other}'"
+                )));
             }
         }
     }

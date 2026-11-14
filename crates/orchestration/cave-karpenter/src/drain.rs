@@ -70,7 +70,10 @@ impl PodDisruptionBudget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DrainStatus {
-    InProgress { remaining: usize, blocked_by_pdb: usize },
+    InProgress {
+        remaining: usize,
+        blocked_by_pdb: usize,
+    },
     Complete,
 }
 
@@ -140,9 +143,11 @@ impl DrainPlan {
         });
         let Some(idx) = idx else {
             // Either no pods, or all remaining are DaemonSets.
-            if let Some(ds_idx) = self.pods.iter().position(|p| {
-                matches!(p.owner_kind, PodOwnerKind::DaemonSet)
-            }) {
+            if let Some(ds_idx) = self
+                .pods
+                .iter()
+                .position(|p| matches!(p.owner_kind, PodOwnerKind::DaemonSet))
+            {
                 let pod = self.pods.remove(ds_idx);
                 return EvictionDecision::Skipped(pod);
             }
@@ -217,11 +222,7 @@ impl DrainPlan {
 
     /// Run the loop until completion or a deadline is hit. Returns the
     /// terminal status. Useful for tests and synchronous callers.
-    pub fn drive_to_completion(
-        &mut self,
-        now: SystemTime,
-        max_steps: usize,
-    ) -> DrainStatus {
+    pub fn drive_to_completion(&mut self, now: SystemTime, max_steps: usize) -> DrainStatus {
         for _ in 0..max_steps {
             match self.step(now) {
                 EvictionDecision::Idle => break,
@@ -250,7 +251,10 @@ mod tests {
         PodDescriptor {
             namespace: ns.into(),
             name: name.into(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             owner_kind: kind,
             grace_deadline: None,
         }
@@ -350,9 +354,7 @@ mod tests {
 
     #[test]
     fn drain_status_complete_when_only_daemonsets_remain() {
-        let pods = vec![
-            pod("kube-system", "cni", &[], PodOwnerKind::DaemonSet),
-        ];
+        let pods = vec![pod("kube-system", "cni", &[], PodOwnerKind::DaemonSet)];
         let mut plan = DrainPlan::new(pods, vec![]);
         let _ = plan.drive_to_completion(SystemTime::now(), 4);
         // The DaemonSet pod is *skipped*, leaving the plan empty.
@@ -404,7 +406,10 @@ mod tests {
     #[test]
     fn step_idle_when_no_pods() {
         let mut plan = DrainPlan::new(vec![], vec![]);
-        assert!(matches!(plan.step(SystemTime::now()), EvictionDecision::Idle));
+        assert!(matches!(
+            plan.step(SystemTime::now()),
+            EvictionDecision::Idle
+        ));
         assert_eq!(plan.status(), DrainStatus::Complete);
     }
 }

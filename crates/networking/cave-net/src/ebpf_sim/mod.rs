@@ -46,5 +46,7 @@ pub use lb_sim::{
     HASH_INIT4_SEED, LB_MAGLEV_LUT_SIZE,
 };
 pub use map::{Map, MapError, MapKind};
-pub use nat_sim::{NatDir, NatEntry, NatError, NatMap, NatTarget, NatTuple, SNAT_COLLISION_RETRIES};
+pub use nat_sim::{
+    NatDir, NatEntry, NatError, NatMap, NatTarget, NatTuple, SNAT_COLLISION_RETRIES,
+};
 pub use program::{Context, Program, Verdict};

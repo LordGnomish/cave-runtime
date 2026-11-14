@@ -28,11 +28,7 @@ fn gate_1_spdx_full_coverage() {
         }
     });
     assert!(total > 0, "no .rs files under src/");
-    assert_eq!(
-        spdx, total,
-        "SPDX missing on {} files",
-        total - spdx
-    );
+    assert_eq!(spdx, total, "SPDX missing on {} files", total - spdx);
 }
 
 #[test]
@@ -76,8 +72,7 @@ fn gate_4_parity_ratio_source_manifest() {
 #[test]
 fn gate_5_fill_ratio_floor_0_95() {
     let m = read_manifest();
-    let ratio = extract_float(&m, "fill_ratio")
-        .expect("manifest must declare fill_ratio");
+    let ratio = extract_float(&m, "fill_ratio").expect("manifest must declare fill_ratio");
     assert!(
         ratio >= 0.95,
         "fill_ratio = {} (need >= 0.95 — Charter v2 deep-port floor)",
@@ -153,8 +148,14 @@ fn gate_8_parity_report_exists() {
     let obs = crate_root().join("observability.toml");
     assert!(obs.exists(), "observability.toml must exist at crate root");
     let obody = fs::read_to_string(&obs).unwrap();
-    assert!(obody.matches("[[panel]]").count() >= 8, "must have >= 8 panels");
-    assert!(obody.matches("[[alert]]").count() >= 5, "must have >= 5 alerts");
+    assert!(
+        obody.matches("[[panel]]").count() >= 8,
+        "must have >= 8 panels"
+    );
+    assert!(
+        obody.matches("[[alert]]").count() >= 5,
+        "must have >= 5 alerts"
+    );
 }
 
 #[test]

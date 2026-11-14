@@ -134,35 +134,63 @@ impl CrmStore {
 
     async fn graphql_objects(&self, ws: Uuid) -> Vec<ObjectData> {
         fn rows<T: serde::Serialize>(items: impl Iterator<Item = T>) -> Vec<serde_json::Value> {
-            items
-                .filter_map(|v| serde_json::to_value(v).ok())
-                .collect()
+            items.filter_map(|v| serde_json::to_value(v).ok()).collect()
         }
         vec![
             ObjectData::new(
                 "person",
                 "people",
-                rows(self.people.read().await.values().filter(|p| p.workspace_id == ws)),
+                rows(
+                    self.people
+                        .read()
+                        .await
+                        .values()
+                        .filter(|p| p.workspace_id == ws),
+                ),
             ),
             ObjectData::new(
                 "company",
                 "companies",
-                rows(self.companies.read().await.values().filter(|c| c.workspace_id == ws)),
+                rows(
+                    self.companies
+                        .read()
+                        .await
+                        .values()
+                        .filter(|c| c.workspace_id == ws),
+                ),
             ),
             ObjectData::new(
                 "opportunity",
                 "opportunities",
-                rows(self.opportunities.read().await.values().filter(|o| o.workspace_id == ws)),
+                rows(
+                    self.opportunities
+                        .read()
+                        .await
+                        .values()
+                        .filter(|o| o.workspace_id == ws),
+                ),
             ),
             ObjectData::new(
                 "note",
                 "notes",
-                rows(self.notes.read().await.values().filter(|n| n.workspace_id == ws)),
+                rows(
+                    self.notes
+                        .read()
+                        .await
+                        .values()
+                        .filter(|n| n.workspace_id == ws),
+                ),
             ),
             ObjectData::new(
                 "task",
                 "tasks",
-                rows(self.tasks.read().await.values().filter(|t| t.workspace_id == ws)),
+                rows(
+                    self.tasks
+                        .read()
+                        .await
+                        .values()
+                        .filter(|t| t.workspace_id == ws),
+                ),
             ),
         ]
     }
@@ -175,14 +203,29 @@ impl CrmStore {
         target_kind: ActivityTargetKind,
         target_id: Uuid,
     ) -> Vec<crate::timeline::TimelineEntry> {
-        let targets: Vec<ActivityTarget> =
-            self.activity_targets.read().await.values().cloned().collect();
+        let targets: Vec<ActivityTarget> = self
+            .activity_targets
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect();
         let notes: Vec<Note> = self.notes.read().await.values().cloned().collect();
         let tasks: Vec<Task> = self.tasks.read().await.values().cloned().collect();
-        let audits: Vec<crate::timeline::TimelineActivity> =
-            self.timeline_activities.read().await.values().cloned().collect();
+        let audits: Vec<crate::timeline::TimelineActivity> = self
+            .timeline_activities
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect();
         crate::timeline::timeline_for_target(
-            target_kind, target_id, &targets, &notes, &tasks, &audits,
+            target_kind,
+            target_id,
+            &targets,
+            &notes,
+            &tasks,
+            &audits,
         )
     }
 
@@ -378,7 +421,10 @@ mod tests {
         s.people.write().await.insert(p2.id, p2);
 
         let out = s
-            .graphql_query(ws1.id, "{ people { edges { node { firstName } } totalCount } }")
+            .graphql_query(
+                ws1.id,
+                "{ people { edges { node { firstName } } totalCount } }",
+            )
             .await;
         // Only ws1's person is visible — tenant isolation holds.
         assert_eq!(out["data"]["people"]["totalCount"], 1);
@@ -388,7 +434,13 @@ mod tests {
         );
 
         let one = s
-            .graphql_query(ws1.id, &format!("{{ person(filter: {{id: \"{}\"}}) {{ firstName }} }}", p1.id))
+            .graphql_query(
+                ws1.id,
+                &format!(
+                    "{{ person(filter: {{id: \"{}\"}}) {{ firstName }} }}",
+                    p1.id
+                ),
+            )
             .await;
         assert_eq!(one["data"]["person"]["firstName"], "Ada");
     }
@@ -412,9 +464,7 @@ mod tests {
         s.notes.write().await.insert(note.id, note);
         s.activity_targets.write().await.insert(nt.id, nt);
 
-        let feed = s
-            .timeline_for_target(ActivityTargetKind::Person, pid)
-            .await;
+        let feed = s.timeline_for_target(ActivityTargetKind::Person, pid).await;
         assert_eq!(feed.len(), 1);
         assert_eq!(feed[0].title, "Intro call");
     }

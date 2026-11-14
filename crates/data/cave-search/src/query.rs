@@ -56,9 +56,10 @@ fn execute_bool(index: &Index, node: &BoolNode) -> Vec<u32> {
 
     let candidates: Vec<u32> = if !node.must.is_empty() {
         // AND: intersect all must results.
-        let mut iter = node.must.iter().map(|q| {
-            q.execute(index).into_iter().collect::<HashSet<u32>>()
-        });
+        let mut iter = node
+            .must
+            .iter()
+            .map(|q| q.execute(index).into_iter().collect::<HashSet<u32>>());
         let first = iter.next().unwrap_or_default();
         iter.fold(first, |acc, set| acc.intersection(&set).copied().collect())
             .into_iter()
@@ -99,17 +100,29 @@ pub struct BooleanQuery;
 impl BooleanQuery {
     /// Create an AND query (all sub-queries must match).
     pub fn and(subs: Vec<Query>) -> Query {
-        Query::Bool(BoolNode { must: subs, should: vec![], must_not: vec![] })
+        Query::Bool(BoolNode {
+            must: subs,
+            should: vec![],
+            must_not: vec![],
+        })
     }
 
     /// Create an OR query (any sub-query must match).
     pub fn or(subs: Vec<Query>) -> Query {
-        Query::Bool(BoolNode { must: vec![], should: subs, must_not: vec![] })
+        Query::Bool(BoolNode {
+            must: vec![],
+            should: subs,
+            must_not: vec![],
+        })
     }
 
     /// Create a NOT query (complement: exclude all docs matching sub-query).
     pub fn not(sub: Query) -> Query {
-        Query::Bool(BoolNode { must: vec![], should: vec![], must_not: vec![sub] })
+        Query::Bool(BoolNode {
+            must: vec![],
+            should: vec![],
+            must_not: vec![sub],
+        })
     }
 }
 

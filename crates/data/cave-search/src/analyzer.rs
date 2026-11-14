@@ -14,13 +14,11 @@ use crate::tenant::TenantId;
 
 /// Common English stop words (Manticore default English stop-word list subset).
 static STOP_WORDS: &[&str] = &[
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
-    "being", "have", "has", "had", "do", "does", "did", "will", "would",
-    "could", "should", "may", "might", "shall", "can", "it", "its", "this",
-    "that", "these", "those", "i", "me", "my", "we", "our", "you", "your",
-    "he", "she", "they", "them", "their", "not", "no", "up", "as", "if",
-    "into", "about", "than", "then", "so", "also",
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
+    "from", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+    "did", "will", "would", "could", "should", "may", "might", "shall", "can", "it", "its", "this",
+    "that", "these", "those", "i", "me", "my", "we", "our", "you", "your", "he", "she", "they",
+    "them", "their", "not", "no", "up", "as", "if", "into", "about", "than", "then", "so", "also",
 ];
 
 /// Normalize a single token: lowercase, strip leading/trailing punctuation.

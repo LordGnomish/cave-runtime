@@ -173,7 +173,11 @@ pub fn compute_payslip(
 /// Compute progressive tax from a bracket table applied to `taxable_income`.
 /// Appends one `PayslipLine::BracketTax` per bracket that applies.
 /// Returns the total bracket tax amount.
-fn compute_bracket_tax(taxable_income: f64, brackets: &[TaxBracket], lines: &mut Vec<PayslipLine>) -> f64 {
+fn compute_bracket_tax(
+    taxable_income: f64,
+    brackets: &[TaxBracket],
+    lines: &mut Vec<PayslipLine>,
+) -> f64 {
     let mut total = 0.0;
     for bracket in brackets {
         let lower = bracket.from;
@@ -196,7 +200,10 @@ fn compute_bracket_tax(taxable_income: f64, brackets: &[TaxBracket], lines: &mut
             description: format!(
                 "Income Tax {:.0}–{} @ {:.1}%",
                 lower,
-                bracket.to.map(|t| format!("{:.0}", t)).unwrap_or_else(|| "∞".to_string()),
+                bracket
+                    .to
+                    .map(|t| format!("{:.0}", t))
+                    .unwrap_or_else(|| "∞".to_string()),
                 bracket.rate_pct,
             ),
             amount: tax,
@@ -218,7 +225,11 @@ mod tests {
 
     #[test]
     fn test_bracket_tax_open_top() {
-        let brackets = vec![TaxBracket { from: 0.0, to: None, rate_pct: 15.0 }];
+        let brackets = vec![TaxBracket {
+            from: 0.0,
+            to: None,
+            rate_pct: 15.0,
+        }];
         let slip = compute_payslip(Uuid::new_v4(), 2000.0, &[], &[], &brackets, "EUR");
         // 2000 * 0.15 = 300
         assert!((slip.total_deductions - 300.0).abs() < 0.01);
@@ -227,9 +238,11 @@ mod tests {
 
     #[test]
     fn test_net_never_negative() {
-        let deductions = vec![
-            Deduction { kind: DeductionKind::IncomeTax, amount: 9999.0, currency: "EUR".to_string() },
-        ];
+        let deductions = vec![Deduction {
+            kind: DeductionKind::IncomeTax,
+            amount: 9999.0,
+            currency: "EUR".to_string(),
+        }];
         let slip = compute_payslip(Uuid::new_v4(), 500.0, &[], &deductions, &[], "EUR");
         assert!(slip.net >= 0.0);
     }

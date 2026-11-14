@@ -9,7 +9,7 @@
 //! are skipped.
 
 use crate::decoders::{decode_gzip, scan_gzip_blob};
-use crate::detector::{scan, Finding, SecretDetector};
+use crate::detector::{Finding, SecretDetector, scan};
 
 const TAR_BLOCK: usize = 512;
 const MAX_ENTRY_BYTES: usize = 16 * 1024 * 1024;

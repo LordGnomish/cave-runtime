@@ -146,7 +146,12 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn new(id: impl Into<String>, framework: Framework, node_type: NodeType, title: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        framework: Framework,
+        node_type: NodeType,
+        title: impl Into<String>,
+    ) -> Self {
         Check {
             id: id.into(),
             framework,
@@ -297,7 +302,14 @@ pub struct ScanSummary {
 }
 
 impl ScanSummary {
-    pub fn compute(scan_id: impl Into<String>, profile_id: impl Into<String>, target: Target, findings: &[Finding], started_at: i64, finished_at: i64) -> Self {
+    pub fn compute(
+        scan_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        target: Target,
+        findings: &[Finding],
+        started_at: i64,
+        finished_at: i64,
+    ) -> Self {
         let mut passed = 0;
         let mut failed = 0;
         let mut warned = 0;
@@ -314,7 +326,11 @@ impl ScanSummary {
             }
         }
         let denom = passed + failed;
-        let score = if denom == 0 { 0.0 } else { passed as f64 / denom as f64 };
+        let score = if denom == 0 {
+            0.0
+        } else {
+            passed as f64 / denom as f64
+        };
         ScanSummary {
             scan_id: scan_id.into(),
             profile_id: profile_id.into(),

@@ -372,9 +372,7 @@ fn parse_sse_line(line: &str) -> Option<OllamaResult<OpenAiChatChunk>> {
 fn build_sse_stream(
     response: reqwest::Response,
 ) -> impl Stream<Item = OllamaResult<OpenAiChatChunk>> + Send {
-    let byte_stream = response
-        .bytes_stream()
-        .map_err(std::io::Error::other);
+    let byte_stream = response.bytes_stream().map_err(std::io::Error::other);
 
     let reader = StreamReader::new(byte_stream);
     let framed = FramedRead::new(reader, LinesCodec::new());

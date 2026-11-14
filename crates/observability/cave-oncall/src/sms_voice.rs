@@ -268,7 +268,10 @@ mod tests {
         let user = mk_user(None);
         let alert = mk_alert("X");
         let d = Dispatcher::new(prov);
-        assert!(matches!(d.dispatch_sms(&user, &alert), DeliveryStatus::Failed(_)));
+        assert!(matches!(
+            d.dispatch_sms(&user, &alert),
+            DeliveryStatus::Failed(_)
+        ));
     }
 
     #[test]

@@ -85,7 +85,12 @@ pub fn install_package(
 /// Validate that a plan can be safely installed (no duplicate names).
 pub fn validate_plan(plan: &InstallPlan) -> CrossplaneResult<()> {
     let mut seen = std::collections::BTreeSet::new();
-    for n in plan.xrds.iter().chain(plan.compositions.iter()).chain(plan.functions.iter()) {
+    for n in plan
+        .xrds
+        .iter()
+        .chain(plan.compositions.iter())
+        .chain(plan.functions.iter())
+    {
         if !seen.insert(n.clone()) {
             return Err(CrossplaneError::Internal(format!(
                 "install plan contains duplicate name: {}",
@@ -157,7 +162,10 @@ mod tests {
 
     #[test]
     fn unknown_kind_ignored() {
-        let p = extract_plan(&b(PackageKind::Configuration, &["kind: Unknown\nname: x\n"]));
+        let p = extract_plan(&b(
+            PackageKind::Configuration,
+            &["kind: Unknown\nname: x\n"],
+        ));
         assert_eq!(p.total(), 0);
     }
 

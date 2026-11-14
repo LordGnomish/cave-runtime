@@ -11,8 +11,7 @@ fn crate_path(rel: &str) -> std::path::PathBuf {
 }
 
 fn read_src(rel: &str) -> String {
-    std::fs::read_to_string(crate_path(rel))
-        .unwrap_or_else(|_| panic!("cannot read {rel}"))
+    std::fs::read_to_string(crate_path(rel)).unwrap_or_else(|_| panic!("cannot read {rel}"))
 }
 
 fn read_manifest() -> String {
@@ -113,7 +112,9 @@ fn g7_upstream_version_set() {
     );
     // The manifest version should include a real version like v3 or v2
     assert!(
-        manifest.contains("version = \"v3") || manifest.contains("version = \"v2") || manifest.contains("source_sha"),
+        manifest.contains("version = \"v3")
+            || manifest.contains("version = \"v2")
+            || manifest.contains("source_sha"),
         "G7 FAIL: upstream version should reflect latest stable"
     );
 }
@@ -156,7 +157,10 @@ fn g3_honest_ratio_in_range() {
                 "G3b FAIL: honest_ratio={val} out of range [0,1]"
             );
             // Honest ratio must reflect real mapping, not inflated
-            assert!(val > 0.0, "G3b FAIL: honest_ratio=0.0 means nothing is mapped");
+            assert!(
+                val > 0.0,
+                "G3b FAIL: honest_ratio=0.0 means nothing is mapped"
+            );
             return;
         }
     }

@@ -72,9 +72,18 @@ pub async fn check_all(registry: &ProviderRegistry) -> HealthReport {
     let mut results: Vec<ProviderHealth> = join_all(probes).await;
     results.sort_by(|a, b| a.provider.cmp(&b.provider));
 
-    let healthy_count = results.iter().filter(|p| p.state == HealthState::Healthy).count();
-    let unhealthy_count = results.iter().filter(|p| p.state == HealthState::Unhealthy).count();
-    let disabled_count = results.iter().filter(|p| p.state == HealthState::Disabled).count();
+    let healthy_count = results
+        .iter()
+        .filter(|p| p.state == HealthState::Healthy)
+        .count();
+    let unhealthy_count = results
+        .iter()
+        .filter(|p| p.state == HealthState::Unhealthy)
+        .count();
+    let disabled_count = results
+        .iter()
+        .filter(|p| p.state == HealthState::Disabled)
+        .count();
 
     HealthReport {
         providers: results,

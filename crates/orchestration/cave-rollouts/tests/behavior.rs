@@ -12,8 +12,8 @@
 //! metric-provider clients are scope-cut and not covered here.
 
 use cave_rollouts::engine::{
-    advance_blue_green, advance_canary, apply_canary_action, evaluate_metric, initial_status,
-    EngineDecision,
+    EngineDecision, advance_blue_green, advance_canary, apply_canary_action, evaluate_metric,
+    initial_status,
 };
 use cave_rollouts::models::{
     AnalysisPhase, AnalysisRun, BlueGreenStrategy, CanaryStep, CanaryStrategy as MCanaryStrategy,
@@ -318,23 +318,11 @@ fn initial_status_blue_green_sets_active_and_preview() {
 #[test]
 fn evaluate_metric_failure_condition_respects_limit() {
     // failure_condition ">= 0.10": two values breach (0.12, 0.15), limit 1 → Failed.
-    let phase = evaluate_metric(
-        "error-rate",
-        &[0.05, 0.12, 0.15],
-        1,
-        None,
-        Some(">= 0.10"),
-    );
+    let phase = evaluate_metric("error-rate", &[0.05, 0.12, 0.15], 1, None, Some(">= 0.10"));
     assert_eq!(phase, AnalysisPhase::Failed);
 
     // Same two breaches but limit raised to 2 → not greater than limit → Successful.
-    let phase = evaluate_metric(
-        "error-rate",
-        &[0.05, 0.12, 0.15],
-        2,
-        None,
-        Some(">= 0.10"),
-    );
+    let phase = evaluate_metric("error-rate", &[0.05, 0.12, 0.15], 2, None, Some(">= 0.10"));
     assert_eq!(phase, AnalysisPhase::Successful);
 }
 

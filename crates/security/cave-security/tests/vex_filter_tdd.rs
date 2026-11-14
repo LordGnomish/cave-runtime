@@ -36,7 +36,10 @@ fn openvex_not_affected_filtered_out() {
             "CVE-2021-44228",
             "pkg:maven/org.apache.logging.log4j/log4j-core",
         ),
-        vuln("CVE-2022-22965", "pkg:maven/org.springframework/spring-core"),
+        vuln(
+            "CVE-2022-22965",
+            "pkg:maven/org.springframework/spring-core",
+        ),
     ];
     let out = doc.filter(&input);
     // not_affected statement removes the matching vuln; the other remains.

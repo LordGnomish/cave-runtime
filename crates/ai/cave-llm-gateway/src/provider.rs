@@ -419,7 +419,9 @@ impl ProviderRegistry {
             let provider: Arc<dyn LlmProvider> = match cfg.provider_type {
                 ProviderType::OpenAi => Arc::new(OpenAiProvider::new(cfg)),
                 ProviderType::Anthropic => Arc::new(AnthropicProvider::new(cfg)),
-                ProviderType::Ollama => Arc::new(crate::providers::ollama::OllamaProvider::new(cfg)),
+                ProviderType::Ollama => {
+                    Arc::new(crate::providers::ollama::OllamaProvider::new(cfg))
+                }
                 ProviderType::LlamaCpp => {
                     Arc::new(crate::providers::llama_cpp::LlamaCppProvider::new(cfg))
                 }

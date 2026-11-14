@@ -8,14 +8,14 @@ use cave_chaos::models::{
     BlastRadius, ChaosExperiment, ChaosTarget, ExperimentParams, ExperimentStatus, ExperimentType,
     SafetyGuard,
 };
-use cave_chaos::workflow::{
-    execute_workflow, WorkflowExecutionResult, WorkflowNode, WorkflowNodeResult,
-    WorkflowNodeStatus, WorkflowNodeType, WorkflowStatus,
-};
 use cave_chaos::workflow::{ChaosWorkflow, WorkflowTemplate};
+use cave_chaos::workflow::{
+    WorkflowExecutionResult, WorkflowNode, WorkflowNodeResult, WorkflowNodeStatus,
+    WorkflowNodeType, WorkflowStatus, execute_workflow,
+};
+use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
 fn make_exp(ns: &str, exp_type: ExperimentType) -> ChaosExperiment {
     ChaosExperiment {
@@ -53,15 +53,13 @@ fn workflow_template_serde_roundtrip() {
         id: Uuid::new_v4(),
         name: "resilience-test".into(),
         description: Some("Network + pod kill chain".into()),
-        nodes: vec![
-            WorkflowNode {
-                id: "step-1".into(),
-                node_type: WorkflowNodeType::Sequential,
-                experiment_id: Some(Uuid::new_v4()),
-                children: vec![],
-                deadline_secs: Some(120),
-            },
-        ],
+        nodes: vec![WorkflowNode {
+            id: "step-1".into(),
+            node_type: WorkflowNodeType::Sequential,
+            experiment_id: Some(Uuid::new_v4()),
+            children: vec![],
+            deadline_secs: Some(120),
+        }],
         created_at: Utc::now(),
         labels: HashMap::new(),
     };

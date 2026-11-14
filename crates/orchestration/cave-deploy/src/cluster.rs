@@ -41,7 +41,11 @@ pub fn kind_to_plural(kind: &str) -> String {
         "LimitRange" => "limitranges",
         other => {
             let lower = other.to_lowercase();
-            return if lower.ends_with('s') { lower } else { format!("{lower}s") };
+            return if lower.ends_with('s') {
+                lower
+            } else {
+                format!("{lower}s")
+            };
         }
     }
     .to_string()

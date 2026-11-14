@@ -8,9 +8,7 @@
 
 use crate::cluster::TRACKING_LABEL;
 use crate::error::DeployError;
-use crate::models::{
-    Application, AutomatedSyncPolicy, HealthStatus, Manifest, SyncStatus,
-};
+use crate::models::{Application, AutomatedSyncPolicy, HealthStatus, Manifest, SyncStatus};
 use chrono::{Duration, Utc};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -117,7 +115,12 @@ fn render_helm(app: &Application) -> Result<Vec<Manifest>, DeployError> {
         .as_ref()
         .and_then(|h| h.chart.clone())
         .unwrap_or_else(|| app.name.clone());
-    let dep = manifest_template("apps/v1", "Deployment", &app.name, &app.spec.destination.namespace);
+    let dep = manifest_template(
+        "apps/v1",
+        "Deployment",
+        &app.name,
+        &app.spec.destination.namespace,
+    );
     let svc = manifest_template("v1", "Service", &chart, &app.spec.destination.namespace);
     Ok(vec![dep, svc])
 }
@@ -181,8 +184,7 @@ pub fn parse_yaml_documents(yaml: &str) -> Result<Vec<Manifest>, DeployError> {
         if value.is_null() {
             continue;
         }
-        let json: serde_json::Value =
-            serde_json::to_value(value).map_err(DeployError::from)?;
+        let json: serde_json::Value = serde_json::to_value(value).map_err(DeployError::from)?;
         if let Some(m) = Manifest::from_value(json) {
             out.push(m);
         }

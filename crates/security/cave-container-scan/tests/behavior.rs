@@ -134,7 +134,8 @@ async fn secret_scan_ignores_low_entropy_base64_line() {
 async fn iac_scan_flags_host_network_as_k8s003() {
     // `hostNetwork: true` substring fires K8S-003 (Severity::High, Confidence::Confirmed).
     let scanner = IacScanner;
-    let content = "kind: Pod\nspec:\n  hostNetwork: true\n  securityContext:\n    runAsNonRoot: true\n";
+    let content =
+        "kind: Pod\nspec:\n  hostNetwork: true\n  securityContext:\n    runAsNonRoot: true\n";
     let req = ScanRequest {
         kind: ScanKind::Iac,
         target: ScanTarget::IacBundle {

@@ -99,8 +99,7 @@ pub fn drain_with_pods(
             Ok(plan.evicted_pods().to_vec())
         }
         crate::drain::DrainStatus::InProgress { .. } => Err(ProviderError::Unavailable(
-            "drain blocked by PodDisruptionBudget — retry after PDB allows eviction"
-                .to_string(),
+            "drain blocked by PodDisruptionBudget — retry after PDB allows eviction".to_string(),
         )),
     }
 }

@@ -346,8 +346,7 @@ mod tests {
     fn jwt_login_enforces_extra_bound_claims() {
         let mut s = JwtStore::default();
         let mut role = base_role();
-        role.bound_claims
-            .insert("groups".into(), json!("eng"));
+        role.bound_claims.insert("groups".into(), json!("eng"));
         s.create_role(role);
 
         let mut claims = base_claims();

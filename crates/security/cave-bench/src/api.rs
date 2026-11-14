@@ -3,7 +3,12 @@
 //! axum HTTP routes — POST /scan, GET /findings, GET /profiles, GET /checks.
 
 use crate::State;
-use axum::{Json, Router, extract, http::StatusCode, response::IntoResponse, routing::{get, post}};
+use axum::{
+    Json, Router, extract,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -57,7 +62,12 @@ async fn post_scan(
     })?;
     let target = crate::models::Target::host_files("/etc/kubernetes", req.host.clone());
     let input = crate::runner::ScanInput::new(req.host.clone());
-    let (findings, summary) = crate::runner::run_profile(&profile, &target, &input, crate::runner::RunMode::Sequential);
+    let (findings, summary) = crate::runner::run_profile(
+        &profile,
+        &target,
+        &input,
+        crate::runner::RunMode::Sequential,
+    );
     let resp = ScanResponse {
         scan_id: summary.scan_id.clone(),
         total: summary.total,
@@ -69,14 +79,18 @@ async fn post_scan(
     Ok(Json(resp))
 }
 
-async fn list_findings(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
+async fn list_findings(
+    extract::State(state): extract::State<Arc<State>>,
+) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "scans": state.findings.list_summaries(),
         "count": state.findings.count(),
     }))
 }
 
-async fn list_failures(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
+async fn list_failures(
+    extract::State(state): extract::State<Arc<State>>,
+) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "failures": state.findings.list_failures(),
     }))
@@ -89,9 +103,18 @@ async fn list_profiles() -> Json<serde_json::Value> {
 }
 
 async fn list_checks() -> Json<serde_json::Value> {
-    let cis_meta: Vec<_> = crate::runner::cis_pairs().into_iter().map(|(c, _)| c).collect();
-    let nsa_meta: Vec<_> = crate::kubescape_nsa::nsa_controls().into_iter().map(|c| c.check).collect();
-    let mitre_meta: Vec<_> = crate::kubescape_mitre::mitre_techniques().into_iter().map(|t| t.check).collect();
+    let cis_meta: Vec<_> = crate::runner::cis_pairs()
+        .into_iter()
+        .map(|(c, _)| c)
+        .collect();
+    let nsa_meta: Vec<_> = crate::kubescape_nsa::nsa_controls()
+        .into_iter()
+        .map(|c| c.check)
+        .collect();
+    let mitre_meta: Vec<_> = crate::kubescape_mitre::mitre_techniques()
+        .into_iter()
+        .map(|t| t.check)
+        .collect();
     Json(serde_json::json!({
         "cis": cis_meta,
         "nsa": nsa_meta,
@@ -99,7 +122,9 @@ async fn list_checks() -> Json<serde_json::Value> {
     }))
 }
 
-async fn list_schedules(extract::State(state): extract::State<Arc<State>>) -> Json<serde_json::Value> {
+async fn list_schedules(
+    extract::State(state): extract::State<Arc<State>>,
+) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "schedules": state.schedules.list(),
         "count": state.schedules.count(),
@@ -116,7 +141,11 @@ async fn alerts() -> Json<serde_json::Value> {
 
 impl IntoResponse for crate::error::BenchError {
     fn into_response(self) -> axum::response::Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": self.to_string()}))).into_response()
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": self.to_string()})),
+        )
+            .into_response()
     }
 }
 
