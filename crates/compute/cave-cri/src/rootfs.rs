@@ -5,7 +5,7 @@
 use crate::error::{CriError, CriResult};
 use crate::models::OciImage;
 use crate::paths;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Assemble a rootfs from OCI image layers.
 ///
@@ -107,12 +107,55 @@ fn overlay_options(lower_dirs: &[PathBuf], upper: &Path, work: &Path) -> String 
 /// Whiteout semantics (OCI spec §7.3.2):
 ///  - `.wh.<name>`        — delete file/dir `<name>` from lower layers
 ///  - `.wh..wh..opq`     — opaque whiteout: ignore all lower-layer contents for this dir
+///
+/// # Containment
+///
+/// A layer is untrusted input: nothing in it may create, change or delete a
+/// path outside `target_dir`. A member that would do so makes the extraction
+/// fail with an error that names the member. It is not skipped: skipping
+/// would produce a root filesystem that silently differs from the image, and
+/// a layer that tries to leave its directory is malformed or hostile either
+/// way, so the image is refused as a whole.
+///
+/// Refused are:
+///  - a member name that is absolute or has a `..` component. Names are not
+///    normalised, so `a/../b` is refused as well. This is the rule
+///    `diff::walking_differ` applies to member names;
+///  - a member whose directory is, after resolving symlinks, not inside
+///    `target_dir` (a symlink that an earlier member pointed elsewhere), or
+///    cannot be resolved at all;
+///  - a hard link whose link name does not resolve to a path inside
+///    `target_dir`;
+///  - a whiteout whose name after `.wh.` is empty, `.` or `..`: it would
+///    remove its own directory or the parent of it.
+///
+/// A symlink member is stored as it is, wherever it points; it is only
+/// never followed out of `target_dir`. A whiteout removes the entry it
+/// names, never what a symlink of that name points to.
+///
+/// Files, directories and links are written by [`tar::Entry::unpack_in`],
+/// which does the symlink and hard link checks; the checks for member names
+/// and for whiteouts, which `tar` knows nothing about, are done here. As in
+/// the `tar` crate, a process that changes `target_dir` while a layer is
+/// being extracted is not defended against.
 pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult<()> {
     let file = std::fs::File::open(archive_path)
         .map_err(|e| CriError::Rootfs(format!("cannot open layer: {}", e)))?;
 
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
+
+    // Every containment check below compares resolved paths with this one.
+    let layer_root = std::fs::create_dir_all(target_dir)
+        .and_then(|()| target_dir.canonicalize())
+        .map_err(|e| {
+            CriError::Rootfs(format!(
+                "cannot resolve layer directory {}: {}",
+                target_dir.display(),
+                e
+            ))
+        })?;
+    let layer_root = layer_root.as_path();
 
     for entry in archive
         .entries()
@@ -125,6 +168,8 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
             .map_err(|e| CriError::Rootfs(format!("entry path error: {}", e)))?
             .to_path_buf();
 
+        check_member_name(&entry_path)?;
+
         let file_name = entry_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -134,38 +179,161 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
             // Opaque whiteout: mark directory so overlay ignores lower layers
             // In a real overlayfs setup the kernel handles this via trusted.overlay.opaque xattr.
             // For our non-overlayfs fallback we mark it with a sentinel file.
-            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
-            std::fs::create_dir_all(&parent).ok();
-            std::fs::write(parent.join(".wh..wh..opq"), b"").ok();
+            if let Some(dir) = whiteout_dir(layer_root, &entry_path, true)? {
+                // `create_new` does not follow a symlink that has the
+                // marker's name. As before, a marker that cannot be written
+                // is not an error.
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(dir.join(".wh..wh..opq"))
+                    .ok();
+            }
             continue;
         }
 
         if let Some(whiteout_name) = file_name.strip_prefix(".wh.") {
             // Whiteout: delete the named file/dir from this layer dir
-            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
-            let target = parent.join(whiteout_name);
-            if target.is_dir() {
-                std::fs::remove_dir_all(&target).ok();
-            } else if target.exists() {
-                std::fs::remove_file(&target).ok();
+            if matches!(whiteout_name, "" | "." | "..") {
+                return Err(rejected(
+                    &entry_path,
+                    "a whiteout has to name one entry of its own directory, not the \
+                     directory itself or its parent, which can be outside the layer directory",
+                ));
+            }
+            if let Some(dir) = whiteout_dir(layer_root, &entry_path, false)? {
+                let target = dir.join(whiteout_name);
+                // Decide on the entry itself, not on what a symlink of that
+                // name points to.
+                match std::fs::symlink_metadata(&target) {
+                    Ok(meta) if meta.is_dir() => {
+                        std::fs::remove_dir_all(&target).ok();
+                    }
+                    Ok(_) => {
+                        std::fs::remove_file(&target).ok();
+                    }
+                    Err(_) => {}
+                }
             }
             continue;
         }
 
-        // Regular file: unpack into target_dir
-        let dest = target_dir.join(&entry_path);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).ok();
+        // Anything else is unpacked below `layer_root`. `unpack_in` creates
+        // missing parent directories and refuses to follow a symlink out of
+        // `layer_root`, for the member as well as for a hard link's target.
+        match entry.unpack_in(layer_root) {
+            Ok(true) => {}
+            // `unpack_in` reports a member it skipped for its name this way.
+            Ok(false) => {
+                return Err(rejected(
+                    &entry_path,
+                    "it would be unpacked outside the layer directory",
+                ));
+            }
+            Err(e) => {
+                return Err(CriError::Rootfs(format!(
+                    "layer extraction failed for {:?}: {}",
+                    entry_path,
+                    error_chain(&e)
+                )));
+            }
         }
-        entry.unpack(&dest).map_err(|e| {
-            CriError::Rootfs(format!(
-                "layer extraction failed for {:?}: {}",
-                entry_path, e
-            ))
-        })?;
     }
 
     Ok(())
+}
+
+/// The error for a layer member that is refused.
+fn rejected(member: &Path, why: impl std::fmt::Display) -> CriError {
+    CriError::Rootfs(format!("layer member {:?} rejected: {}", member, why))
+}
+
+/// `err` followed by its sources. The `tar` crate puts the reason for
+/// refusing a member ("trying to unpack outside of destination path") into
+/// the source of the error it returns.
+fn error_chain(err: &dyn std::error::Error) -> String {
+    let mut text = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
+/// A member name has to be a relative path without `..`: joined to the
+/// layer directory, an absolute name replaces it and `..` climbs out of it.
+fn check_member_name(member: &Path) -> CriResult<()> {
+    for component in member.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(rejected(
+                    member,
+                    "a `..` in a member name leads outside the layer directory",
+                ));
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                return Err(rejected(
+                    member,
+                    "an absolute member name leads outside the layer directory",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The directory a whiteout member acts in, with symlinks resolved: the
+/// directory part of the member name below `layer_root` (a canonical path).
+///
+/// The deepest part of that directory which exists decides where the rest
+/// is, or would be created. It has to resolve to a path inside `layer_root`,
+/// otherwise the member is refused. If part of the directory is missing, it
+/// is created for `create`; without `create`, or if it cannot be created,
+/// the result is `None` and the whiteout has no effect, as before.
+fn whiteout_dir(layer_root: &Path, member: &Path, create: bool) -> CriResult<Option<PathBuf>> {
+    let dir = layer_root.join(member.parent().unwrap_or(Path::new("")));
+
+    // `symlink_metadata`, so that a symlink that points nowhere counts as
+    // existing: nothing may be created through it.
+    let mut existing = dir.as_path();
+    let mut missing = Vec::new();
+    while existing.symlink_metadata().is_err() {
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name);
+                existing = parent;
+            }
+            _ => break,
+        }
+    }
+
+    let mut resolved = existing.canonicalize().map_err(|e| {
+        rejected(
+            member,
+            format!("its directory cannot be resolved inside the layer directory: {e}"),
+        )
+    })?;
+    if !resolved.starts_with(layer_root) {
+        return Err(rejected(
+            member,
+            format!(
+                "its directory resolves to {}, outside the layer directory",
+                resolved.display()
+            ),
+        ));
+    }
+
+    if missing.is_empty() {
+        return Ok(Some(resolved));
+    }
+    if !create {
+        return Ok(None);
+    }
+    resolved.extend(missing.into_iter().rev());
+    Ok(std::fs::create_dir_all(&resolved).ok().map(|()| resolved))
 }
 
 /// Cleanup rootfs and all container data.
