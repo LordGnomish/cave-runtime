@@ -5,7 +5,7 @@
 use crate::error::{CriError, CriResult};
 use crate::models::OciImage;
 use crate::paths;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Assemble a rootfs from OCI image layers.
 ///
@@ -107,12 +107,55 @@ fn overlay_options(lower_dirs: &[PathBuf], upper: &Path, work: &Path) -> String 
 /// Whiteout semantics (OCI spec §7.3.2):
 ///  - `.wh.<name>`        — delete file/dir `<name>` from lower layers
 ///  - `.wh..wh..opq`     — opaque whiteout: ignore all lower-layer contents for this dir
+///
+/// # Containment
+///
+/// A layer is untrusted input: nothing in it may create, change or delete a
+/// path outside `target_dir`. A member that would do so makes the extraction
+/// fail with an error that names the member. It is not skipped: skipping
+/// would produce a root filesystem that silently differs from the image, and
+/// a layer that tries to leave its directory is malformed or hostile either
+/// way, so the image is refused as a whole.
+///
+/// Refused are:
+///  - a member name that is absolute or has a `..` component. Names are not
+///    normalised, so `a/../b` is refused as well. This is the rule
+///    `diff::walking_differ` applies to member names;
+///  - a member whose directory is, after resolving symlinks, not inside
+///    `target_dir` (a symlink that an earlier member pointed elsewhere), or
+///    cannot be resolved at all;
+///  - a hard link whose link name does not resolve to a path inside
+///    `target_dir`;
+///  - a whiteout whose name after `.wh.` is empty, `.` or `..`: it would
+///    remove its own directory or the parent of it.
+///
+/// A symlink member is stored as it is, wherever it points; it is only
+/// never followed out of `target_dir`. A whiteout removes the entry it
+/// names, never what a symlink of that name points to.
+///
+/// Files, directories and links are written by [`tar::Entry::unpack_in`],
+/// which does the symlink and hard link checks; the checks for member names
+/// and for whiteouts, which `tar` knows nothing about, are done here. As in
+/// the `tar` crate, a process that changes `target_dir` while a layer is
+/// being extracted is not defended against.
 pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult<()> {
     let file = std::fs::File::open(archive_path)
         .map_err(|e| CriError::Rootfs(format!("cannot open layer: {}", e)))?;
 
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
+
+    // Every containment check below compares resolved paths with this one.
+    let layer_root = std::fs::create_dir_all(target_dir)
+        .and_then(|()| target_dir.canonicalize())
+        .map_err(|e| {
+            CriError::Rootfs(format!(
+                "cannot resolve layer directory {}: {}",
+                target_dir.display(),
+                e
+            ))
+        })?;
+    let layer_root = layer_root.as_path();
 
     for entry in archive
         .entries()
@@ -125,6 +168,8 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
             .map_err(|e| CriError::Rootfs(format!("entry path error: {}", e)))?
             .to_path_buf();
 
+        check_member_name(&entry_path)?;
+
         let file_name = entry_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -134,38 +179,161 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
             // Opaque whiteout: mark directory so overlay ignores lower layers
             // In a real overlayfs setup the kernel handles this via trusted.overlay.opaque xattr.
             // For our non-overlayfs fallback we mark it with a sentinel file.
-            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
-            std::fs::create_dir_all(&parent).ok();
-            std::fs::write(parent.join(".wh..wh..opq"), b"").ok();
+            if let Some(dir) = whiteout_dir(layer_root, &entry_path, true)? {
+                // `create_new` does not follow a symlink that has the
+                // marker's name. As before, a marker that cannot be written
+                // is not an error.
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(dir.join(".wh..wh..opq"))
+                    .ok();
+            }
             continue;
         }
 
         if let Some(whiteout_name) = file_name.strip_prefix(".wh.") {
             // Whiteout: delete the named file/dir from this layer dir
-            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
-            let target = parent.join(whiteout_name);
-            if target.is_dir() {
-                std::fs::remove_dir_all(&target).ok();
-            } else if target.exists() {
-                std::fs::remove_file(&target).ok();
+            if matches!(whiteout_name, "" | "." | "..") {
+                return Err(rejected(
+                    &entry_path,
+                    "a whiteout has to name one entry of its own directory, not the \
+                     directory itself or its parent, which can be outside the layer directory",
+                ));
+            }
+            if let Some(dir) = whiteout_dir(layer_root, &entry_path, false)? {
+                let target = dir.join(whiteout_name);
+                // Decide on the entry itself, not on what a symlink of that
+                // name points to.
+                match std::fs::symlink_metadata(&target) {
+                    Ok(meta) if meta.is_dir() => {
+                        std::fs::remove_dir_all(&target).ok();
+                    }
+                    Ok(_) => {
+                        std::fs::remove_file(&target).ok();
+                    }
+                    Err(_) => {}
+                }
             }
             continue;
         }
 
-        // Regular file: unpack into target_dir
-        let dest = target_dir.join(&entry_path);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).ok();
+        // Anything else is unpacked below `layer_root`. `unpack_in` creates
+        // missing parent directories and refuses to follow a symlink out of
+        // `layer_root`, for the member as well as for a hard link's target.
+        match entry.unpack_in(layer_root) {
+            Ok(true) => {}
+            // `unpack_in` reports a member it skipped for its name this way.
+            Ok(false) => {
+                return Err(rejected(
+                    &entry_path,
+                    "it would be unpacked outside the layer directory",
+                ));
+            }
+            Err(e) => {
+                return Err(CriError::Rootfs(format!(
+                    "layer extraction failed for {:?}: {}",
+                    entry_path,
+                    error_chain(&e)
+                )));
+            }
         }
-        entry.unpack(&dest).map_err(|e| {
-            CriError::Rootfs(format!(
-                "layer extraction failed for {:?}: {}",
-                entry_path, e
-            ))
-        })?;
     }
 
     Ok(())
+}
+
+/// The error for a layer member that is refused.
+fn rejected(member: &Path, why: impl std::fmt::Display) -> CriError {
+    CriError::Rootfs(format!("layer member {:?} rejected: {}", member, why))
+}
+
+/// `err` followed by its sources. The `tar` crate puts the reason for
+/// refusing a member ("trying to unpack outside of destination path") into
+/// the source of the error it returns.
+fn error_chain(err: &dyn std::error::Error) -> String {
+    let mut text = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
+/// A member name has to be a relative path without `..`: joined to the
+/// layer directory, an absolute name replaces it and `..` climbs out of it.
+fn check_member_name(member: &Path) -> CriResult<()> {
+    for component in member.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(rejected(
+                    member,
+                    "a `..` in a member name leads outside the layer directory",
+                ));
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                return Err(rejected(
+                    member,
+                    "an absolute member name leads outside the layer directory",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The directory a whiteout member acts in, with symlinks resolved: the
+/// directory part of the member name below `layer_root` (a canonical path).
+///
+/// The deepest part of that directory which exists decides where the rest
+/// is, or would be created. It has to resolve to a path inside `layer_root`,
+/// otherwise the member is refused. If part of the directory is missing, it
+/// is created for `create`; without `create`, or if it cannot be created,
+/// the result is `None` and the whiteout has no effect, as before.
+fn whiteout_dir(layer_root: &Path, member: &Path, create: bool) -> CriResult<Option<PathBuf>> {
+    let dir = layer_root.join(member.parent().unwrap_or(Path::new("")));
+
+    // `symlink_metadata`, so that a symlink that points nowhere counts as
+    // existing: nothing may be created through it.
+    let mut existing = dir.as_path();
+    let mut missing = Vec::new();
+    while existing.symlink_metadata().is_err() {
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name);
+                existing = parent;
+            }
+            _ => break,
+        }
+    }
+
+    let mut resolved = existing.canonicalize().map_err(|e| {
+        rejected(
+            member,
+            format!("its directory cannot be resolved inside the layer directory: {e}"),
+        )
+    })?;
+    if !resolved.starts_with(layer_root) {
+        return Err(rejected(
+            member,
+            format!(
+                "its directory resolves to {}, outside the layer directory",
+                resolved.display()
+            ),
+        ));
+    }
+
+    if missing.is_empty() {
+        return Ok(Some(resolved));
+    }
+    if !create {
+        return Ok(None);
+    }
+    resolved.extend(missing.into_iter().rev());
+    Ok(std::fs::create_dir_all(&resolved).ok().map(|()| resolved))
 }
 
 /// Cleanup rootfs and all container data.
@@ -194,6 +362,8 @@ mod tests {
     use super::*;
     use crate::models::{ImageConfig, OciImage, OciLayer};
     use chrono::Utc;
+    use std::collections::BTreeMap;
+    use std::os::unix::fs::MetadataExt;
 
     fn make_empty_image() -> OciImage {
         OciImage {
@@ -380,6 +550,601 @@ mod tests {
         let archive = make_tar_gz(&dir, &[("subdir/.wh.old.txt", b"")]);
         extract_layer(&archive, &target).unwrap();
         assert!(!target.join("subdir").join("old.txt").exists());
+    }
+
+    // ── containment: a layer must stay inside its layer directory ────────────
+    //
+    // These tests run the real `extract_layer` on archives built in memory.
+    // The layer directory is `<tmp>/layer`; next to it `<tmp>/outside` holds
+    // sentinel files and stands for the rest of the host. A layer that tries
+    // to reach outside must be refused with an error that names the member,
+    // and nothing outside the layer directory may be created, changed or
+    // deleted. None of this needs privileges.
+
+    /// The scratch tree of one test.
+    struct Scratch {
+        _tmp: tempfile::TempDir,
+        /// The crafted archive is kept in a directory of its own.
+        archives: tempfile::TempDir,
+        /// `<tmp>`, with symlinks resolved.
+        root: PathBuf,
+        /// `<tmp>/layer`: the directory handed to `extract_layer`.
+        layer: PathBuf,
+        /// `<tmp>/outside`: `sentinel.txt` and `keep/inner.txt`.
+        outside: PathBuf,
+    }
+
+    impl Scratch {
+        fn new() -> Self {
+            let tmp = tempfile::tempdir().unwrap();
+            let root = tmp.path().canonicalize().unwrap();
+            let layer = root.join("layer");
+            let outside = root.join("outside");
+            std::fs::create_dir(&layer).unwrap();
+            std::fs::create_dir_all(outside.join("keep")).unwrap();
+            std::fs::write(outside.join("sentinel.txt"), b"host data").unwrap();
+            std::fs::write(outside.join("keep").join("inner.txt"), b"host data").unwrap();
+            Scratch {
+                _tmp: tmp,
+                archives: tempfile::tempdir().unwrap(),
+                root,
+                layer,
+                outside,
+            }
+        }
+
+        /// Absolute path of an entry of the `outside` directory, as text.
+        fn outside_path(&self, name: &str) -> String {
+            self.outside.join(name).to_str().unwrap().to_string()
+        }
+
+        /// Everything in the scratch tree except the layer directory: path →
+        /// kind, mode, link count and content. Equal snapshots before and
+        /// after an extraction mean that nothing outside the layer directory
+        /// was created, changed or deleted.
+        fn snapshot_outside(&self) -> BTreeMap<PathBuf, String> {
+            fn walk(dir: &Path, skip: &Path, seen: &mut BTreeMap<PathBuf, String>) {
+                for entry in std::fs::read_dir(dir).unwrap() {
+                    let path = entry.unwrap().path();
+                    if path == skip {
+                        continue;
+                    }
+                    let meta = std::fs::symlink_metadata(&path).unwrap();
+                    let state = if meta.file_type().is_symlink() {
+                        format!("symlink to {:?}", std::fs::read_link(&path).unwrap())
+                    } else if meta.is_dir() {
+                        walk(&path, skip, seen);
+                        format!("dir, mode {:o}", meta.mode())
+                    } else {
+                        format!(
+                            "file, mode {:o}, {} link(s), content {:?}",
+                            meta.mode(),
+                            meta.nlink(),
+                            String::from_utf8_lossy(&std::fs::read(&path).unwrap())
+                        )
+                    };
+                    seen.insert(path, state);
+                }
+            }
+            let mut seen = BTreeMap::new();
+            let root_mode = std::fs::symlink_metadata(&self.root).unwrap().mode();
+            seen.insert(self.root.clone(), format!("dir, mode {:o}", root_mode));
+            walk(&self.root, &self.layer, &mut seen);
+            seen
+        }
+    }
+
+    /// One archive member. Its header bytes are filled in directly, because
+    /// `tar::Builder::append_data` and `tar::Header::set_path` refuse some of
+    /// the names these tests have to feed to `extract_layer`.
+    struct RawMember<'a> {
+        name: &'a str,
+        kind: tar::EntryType,
+        link: &'a str,
+        mode: u32,
+        data: &'a [u8],
+    }
+
+    fn file<'a>(name: &'a str, data: &'a [u8]) -> RawMember<'a> {
+        RawMember {
+            name,
+            kind: tar::EntryType::Regular,
+            link: "",
+            mode: 0o644,
+            data,
+        }
+    }
+
+    fn dir(name: &str) -> RawMember<'_> {
+        RawMember {
+            name,
+            kind: tar::EntryType::Directory,
+            link: "",
+            mode: 0o755,
+            data: b"",
+        }
+    }
+
+    fn symlink<'a>(name: &'a str, target: &'a str) -> RawMember<'a> {
+        RawMember {
+            name,
+            kind: tar::EntryType::Symlink,
+            link: target,
+            mode: 0o777,
+            data: b"",
+        }
+    }
+
+    fn hard_link<'a>(name: &'a str, target: &'a str) -> RawMember<'a> {
+        RawMember {
+            name,
+            kind: tar::EntryType::Link,
+            link: target,
+            mode: 0o644,
+            data: b"",
+        }
+    }
+
+    /// Write `members` as a gzipped tar archive, in the order given.
+    fn raw_layer(scratch: &Scratch, members: &[RawMember<'_>]) -> PathBuf {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        let archive_path = scratch.archives.path().join("layer.tar.gz");
+        let gz = GzEncoder::new(
+            std::fs::File::create(&archive_path).unwrap(),
+            Compression::default(),
+        );
+        let mut tar = tar::Builder::new(gz);
+        for member in members {
+            let mut header = tar::Header::new_ustar();
+            {
+                let raw = header.as_old_mut();
+                assert!(
+                    member.name.len() <= raw.name.len() && member.link.len() <= raw.linkname.len(),
+                    "{:?} -> {:?} does not fit a plain tar header",
+                    member.name,
+                    member.link
+                );
+                raw.name[..member.name.len()].copy_from_slice(member.name.as_bytes());
+                raw.linkname[..member.link.len()].copy_from_slice(member.link.as_bytes());
+            }
+            header.set_entry_type(member.kind);
+            header.set_mode(member.mode);
+            header.set_uid(0);
+            header.set_gid(0);
+            header.set_mtime(1_700_000_000);
+            header.set_size(member.data.len() as u64);
+            header.set_cksum();
+            tar.append(&header, member.data).unwrap();
+        }
+        tar.into_inner().unwrap().finish().unwrap();
+        archive_path
+    }
+
+    /// Extract `members` as one layer and assert that the layer is refused
+    /// with an error naming `offender`, and that nothing outside the layer
+    /// directory was created, changed or deleted. Returns the error text.
+    fn assert_layer_rejected(
+        scratch: &Scratch,
+        members: &[RawMember<'_>],
+        offender: &str,
+    ) -> String {
+        let archive = raw_layer(scratch, members);
+        let before = scratch.snapshot_outside();
+        let result = extract_layer(&archive, &scratch.layer);
+        let after = scratch.snapshot_outside();
+        assert_eq!(
+            before, after,
+            "extracting {offender:?} touched paths outside the layer directory \
+             (extract_layer returned {result:?})"
+        );
+        match result {
+            Err(CriError::Rootfs(msg)) => {
+                assert!(
+                    msg.contains(offender),
+                    "the error does not name the member {offender:?}: {msg}"
+                );
+                msg
+            }
+            other => panic!("a layer with {offender:?} must be rejected, got {other:?}"),
+        }
+    }
+
+    /// `assert_layer_rejected` for a member that would land outside the
+    /// layer directory: the error also has to say so.
+    fn assert_escape_rejected(scratch: &Scratch, members: &[RawMember<'_>], offender: &str) {
+        let msg = assert_layer_rejected(scratch, members, offender);
+        assert!(
+            msg.contains("outside"),
+            "the error for {offender:?} does not say that it leads outside: {msg}"
+        );
+    }
+
+    #[test]
+    fn extract_layer_rejects_parent_dir_members() {
+        for name in [
+            "../escaped.txt",
+            "../outside/sentinel.txt",
+            "sub/../../escaped.txt",
+            "./../outside/keep/inner.txt",
+        ] {
+            let scratch = Scratch::new();
+            assert_escape_rejected(&scratch, &[file(name, b"from the layer")], name);
+        }
+    }
+
+    /// A directory member has no content to write, but it has a mode.
+    #[test]
+    fn extract_layer_rejects_parent_dir_directory_member() {
+        let scratch = Scratch::new();
+        let mut member = dir("..");
+        member.mode = 0o700;
+        assert_escape_rejected(&scratch, &[member], "..");
+    }
+
+    /// `..` is rejected as such, also where the name would resolve to a
+    /// path inside the layer directory: member names are not normalised.
+    #[test]
+    fn extract_layer_rejects_parent_dir_component_that_stays_inside() {
+        let scratch = Scratch::new();
+        let name = "etc/../hostname";
+        assert_layer_rejected(&scratch, &[file(name, b"cave\n")], name);
+        assert!(!scratch.layer.join("hostname").exists());
+    }
+
+    #[test]
+    fn extract_layer_rejects_absolute_members() {
+        for target in ["sentinel.txt", "created.txt", "keep/created.txt"] {
+            let scratch = Scratch::new();
+            let name = scratch.outside_path(target);
+            assert_escape_rejected(&scratch, &[file(&name, b"from the layer")], &name);
+        }
+        let scratch = Scratch::new();
+        let name = scratch.outside_path("keep");
+        let mut member = dir(&name);
+        member.mode = 0o700;
+        assert_escape_rejected(&scratch, &[member], &name);
+    }
+
+    /// A symlink member may point anywhere: it is data. What must not happen
+    /// is that a later member is created by following it out of the layer.
+    #[test]
+    fn extract_layer_rejects_write_through_symlink_pointing_outside() {
+        for relative_target in [false, true] {
+            for (through, is_dir) in [
+                ("escape/planted.txt", false),
+                ("escape/sentinel.txt", false),
+                ("escape/sub/deeper/planted.txt", false),
+                ("escape/newdir", true),
+                ("escape/keep", true),
+            ] {
+                let scratch = Scratch::new();
+                let absolute = scratch.outside_path("");
+                let target = if relative_target {
+                    "../outside"
+                } else {
+                    absolute.as_str()
+                };
+                let mut second = if is_dir {
+                    dir(through)
+                } else {
+                    file(through, b"from the layer")
+                };
+                if is_dir {
+                    second.mode = 0o700;
+                }
+                assert_escape_rejected(&scratch, &[symlink("escape", target), second], through);
+            }
+        }
+    }
+
+    #[test]
+    fn extract_layer_rejects_hard_link_to_target_outside() {
+        // Absolute link name.
+        let scratch = Scratch::new();
+        let target = scratch.outside_path("sentinel.txt");
+        assert_escape_rejected(&scratch, &[hard_link("stolen", &target)], "stolen");
+        assert!(std::fs::symlink_metadata(scratch.layer.join("stolen")).is_err());
+
+        // Link name that climbs out of the layer directory.
+        let scratch = Scratch::new();
+        assert_escape_rejected(
+            &scratch,
+            &[hard_link("sub/stolen", "../outside/sentinel.txt")],
+            "sub/stolen",
+        );
+        assert!(std::fs::symlink_metadata(scratch.layer.join("sub/stolen")).is_err());
+
+        // Link name that is a symlink inside the layer, pointing outside.
+        let scratch = Scratch::new();
+        let target = scratch.outside_path("sentinel.txt");
+        assert_escape_rejected(
+            &scratch,
+            &[symlink("peek", &target), hard_link("stolen", "peek")],
+            "stolen",
+        );
+        assert!(std::fs::symlink_metadata(scratch.layer.join("stolen")).is_err());
+    }
+
+    #[test]
+    fn extract_layer_rejects_whiteout_with_escaping_path() {
+        for name in [
+            "../outside/.wh.sentinel.txt",
+            "../outside/.wh.keep",
+            "../.wh.outside",
+            "sub/../../outside/keep/.wh.inner.txt",
+        ] {
+            let scratch = Scratch::new();
+            assert_escape_rejected(&scratch, &[file(name, b"")], name);
+        }
+        for name in [".wh.sentinel.txt", ".wh.keep"] {
+            let scratch = Scratch::new();
+            let name = scratch.outside_path(name);
+            assert_escape_rejected(&scratch, &[file(&name, b"")], &name);
+        }
+    }
+
+    /// The name after `.wh.` has to be one entry of the whiteout's own
+    /// directory. `.wh...` would name the parent of the layer directory.
+    #[test]
+    fn extract_layer_rejects_whiteout_naming_the_parent_directory() {
+        let scratch = Scratch::new();
+        assert_escape_rejected(&scratch, &[file(".wh...", b"")], ".wh...");
+    }
+
+    /// `.wh.` and `.wh..` name the directory the whiteout itself is in.
+    #[test]
+    fn extract_layer_rejects_whiteout_naming_its_own_directory() {
+        for name in [".wh.", ".wh..", "etc/.wh.", "etc/.wh.."] {
+            let scratch = Scratch::new();
+            std::fs::create_dir(scratch.layer.join("etc")).unwrap();
+            std::fs::write(scratch.layer.join("etc/hostname"), b"cave\n").unwrap();
+            let msg = assert_layer_rejected(&scratch, &[file(name, b"")], name);
+            assert!(msg.contains("whiteout"), "unexpected error: {msg}");
+            assert_eq!(
+                std::fs::read(scratch.layer.join("etc/hostname")).unwrap(),
+                b"cave\n",
+                "{name:?} removed the contents of the layer directory"
+            );
+        }
+    }
+
+    #[test]
+    fn extract_layer_rejects_opaque_marker_in_escaping_directory() {
+        for name in [
+            "../.wh..wh..opq",
+            "../outside/.wh..wh..opq",
+            "../outside/keep/.wh..wh..opq",
+            "../created/deeper/.wh..wh..opq",
+        ] {
+            let scratch = Scratch::new();
+            assert_escape_rejected(&scratch, &[file(name, b"")], name);
+        }
+        for name in [".wh..wh..opq", "created/.wh..wh..opq"] {
+            let scratch = Scratch::new();
+            let name = scratch.outside_path(name);
+            assert_escape_rejected(&scratch, &[file(&name, b"")], &name);
+        }
+    }
+
+    #[test]
+    fn extract_layer_rejects_whiteout_reached_through_symlinked_directory() {
+        for relative_target in [false, true] {
+            for through in [
+                "escape/.wh.sentinel.txt",
+                "escape/.wh.keep",
+                "escape/keep/.wh.inner.txt",
+                "escape/.wh..wh..opq",
+                "escape/keep/.wh..wh..opq",
+                "escape/created/.wh..wh..opq",
+            ] {
+                let scratch = Scratch::new();
+                let absolute = scratch.outside_path("");
+                let target = if relative_target {
+                    "../outside"
+                } else {
+                    absolute.as_str()
+                };
+                assert_escape_rejected(
+                    &scratch,
+                    &[symlink("escape", target), file(through, b"")],
+                    through,
+                );
+            }
+        }
+    }
+
+    /// The opaque marker is a new, empty file: an entry that already has
+    /// its name is not written through.
+    #[test]
+    fn extract_layer_opaque_marker_does_not_write_through_an_existing_symlink() {
+        let scratch = Scratch::new();
+        std::os::unix::fs::symlink(
+            scratch.outside.join("sentinel.txt"),
+            scratch.layer.join(".wh..wh..opq"),
+        )
+        .unwrap();
+        let archive = raw_layer(&scratch, &[file(".wh..wh..opq", b"")]);
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, &scratch.layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+    }
+
+    /// A whiteout removes the entry it names. If that entry is a symlink,
+    /// the link goes away and what it points to stays.
+    #[test]
+    fn extract_layer_whiteout_of_a_symlink_removes_the_link_not_its_target() {
+        let scratch = Scratch::new();
+        let outside_dir = scratch.outside_path("keep");
+        let outside_file = scratch.outside_path("sentinel.txt");
+        let archive = raw_layer(
+            &scratch,
+            &[
+                symlink("to-dir", &outside_dir),
+                symlink("to-file", &outside_file),
+                file(".wh.to-dir", b""),
+                file(".wh.to-file", b""),
+            ],
+        );
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, &scratch.layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+        assert!(std::fs::symlink_metadata(scratch.layer.join("to-dir")).is_err());
+        assert!(std::fs::symlink_metadata(scratch.layer.join("to-file")).is_err());
+    }
+
+    /// A regular member whose name is taken by a symlink replaces the link.
+    #[test]
+    fn extract_layer_file_member_replaces_a_symlink_instead_of_writing_through_it() {
+        let scratch = Scratch::new();
+        let outside_file = scratch.outside_path("sentinel.txt");
+        let archive = raw_layer(
+            &scratch,
+            &[
+                symlink("motd", &outside_file),
+                file("motd", b"from the layer"),
+            ],
+        );
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, &scratch.layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+        let motd = scratch.layer.join("motd");
+        assert!(std::fs::symlink_metadata(&motd).unwrap().is_file());
+        assert_eq!(std::fs::read(&motd).unwrap(), b"from the layer");
+    }
+
+    // ── legitimate layers keep extracting ─────────────────────────────────────
+
+    #[test]
+    fn extract_layer_keeps_legitimate_members_working() {
+        let scratch = Scratch::new();
+        let archive = raw_layer(
+            &scratch,
+            &[
+                dir("./"),
+                dir("etc/"),
+                file("etc/hostname", b"cave\n"),
+                // Parent directories that have no member of their own.
+                file("usr/lib/libx.so", b"x"),
+                file("./opt/tool", b"tool"),
+                // Symlinks are stored as they are, wherever they point.
+                symlink("etc/alias", "hostname"),
+                symlink("etc/mtab", "/proc/mounts"),
+                symlink("up", "../outside"),
+                // A member reached through a symlink that stays inside.
+                symlink("lib", "usr/lib"),
+                file("lib/liby.so", b"y"),
+            ],
+        );
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, &scratch.layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+        let layer = &scratch.layer;
+        assert!(layer.join("etc").is_dir());
+        assert_eq!(
+            std::fs::read(layer.join("etc/hostname")).unwrap(),
+            b"cave\n"
+        );
+        assert_eq!(std::fs::read(layer.join("usr/lib/libx.so")).unwrap(), b"x");
+        assert_eq!(std::fs::read(layer.join("opt/tool")).unwrap(), b"tool");
+        assert_eq!(
+            std::fs::read_link(layer.join("etc/alias")).unwrap(),
+            Path::new("hostname")
+        );
+        assert_eq!(std::fs::read(layer.join("etc/alias")).unwrap(), b"cave\n");
+        assert_eq!(
+            std::fs::read_link(layer.join("etc/mtab")).unwrap(),
+            Path::new("/proc/mounts")
+        );
+        assert_eq!(
+            std::fs::read_link(layer.join("up")).unwrap(),
+            Path::new("../outside")
+        );
+        assert_eq!(
+            std::fs::read_link(layer.join("lib")).unwrap(),
+            Path::new("usr/lib")
+        );
+        assert_eq!(std::fs::read(layer.join("usr/lib/liby.so")).unwrap(), b"y");
+    }
+
+    /// The link name of a hard link member is a path in the layer, not a
+    /// path relative to the working directory of the process.
+    #[test]
+    fn extract_layer_hard_link_inside_the_layer() {
+        let scratch = Scratch::new();
+        let archive = raw_layer(
+            &scratch,
+            &[
+                file("bin/busybox", b"applet"),
+                hard_link("bin/sh", "bin/busybox"),
+                hard_link("sbin/init", "./bin/busybox"),
+            ],
+        );
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, &scratch.layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+        let original = std::fs::metadata(scratch.layer.join("bin/busybox")).unwrap();
+        for link in ["bin/sh", "sbin/init"] {
+            let linked = std::fs::metadata(scratch.layer.join(link)).unwrap();
+            assert_eq!(linked.ino(), original.ino(), "{link} is not a hard link");
+        }
+        assert_eq!(original.nlink(), 3);
+    }
+
+    #[test]
+    fn extract_layer_whiteouts_inside_the_layer_still_apply() {
+        let scratch = Scratch::new();
+        let layer = &scratch.layer;
+        std::fs::create_dir_all(layer.join("etc")).unwrap();
+        std::fs::write(layer.join("etc/old.conf"), b"old").unwrap();
+        std::fs::write(layer.join("etc/kept.conf"), b"kept").unwrap();
+        std::fs::create_dir_all(layer.join("var/cache/deep")).unwrap();
+        std::fs::write(layer.join("var/cache/deep/blob"), b"old").unwrap();
+        std::fs::create_dir_all(layer.join("usr/lib")).unwrap();
+        std::fs::write(layer.join("usr/lib/old.so"), b"old").unwrap();
+        let archive = raw_layer(
+            &scratch,
+            &[
+                file("etc/.wh.old.conf", b""),
+                // A whiteout removes a whole directory tree.
+                file("./var/.wh.cache", b""),
+                // Nothing to remove, not even the directory: no effect.
+                file("tmp/.wh.missing", b""),
+                // The directory of an opaque marker is created if needed.
+                file("srv/data/.wh..wh..opq", b""),
+                file("etc/.wh..wh..opq", b""),
+                // A directory reached through a symlink that stays inside.
+                symlink("lib", "usr/lib"),
+                file("lib/.wh.old.so", b""),
+            ],
+        );
+        let before = scratch.snapshot_outside();
+
+        extract_layer(&archive, layer).unwrap();
+
+        assert_eq!(before, scratch.snapshot_outside());
+        assert!(!layer.join("etc/old.conf").exists());
+        assert_eq!(std::fs::read(layer.join("etc/kept.conf")).unwrap(), b"kept");
+        assert!(layer.join("var").is_dir());
+        assert!(!layer.join("var/cache").exists());
+        assert!(!layer.join("tmp").exists());
+        assert_eq!(
+            std::fs::read(layer.join("srv/data/.wh..wh..opq")).unwrap(),
+            b""
+        );
+        assert_eq!(std::fs::read(layer.join("etc/.wh..wh..opq")).unwrap(), b"");
+        assert!(layer.join("usr/lib").is_dir());
+        assert!(!layer.join("usr/lib/old.so").exists());
     }
 
     // ── overlay mount arguments (Linux) ───────────────────────────────────────
