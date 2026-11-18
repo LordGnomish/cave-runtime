@@ -113,11 +113,16 @@ impl Writer {
         if let Some(parent) = tmp_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let file = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&tmp_path)?;
+        let mut options = fs::OpenOptions::new();
+        options.create(true).write(true).truncate(true);
+        // The ingest file is a file of its own. If its name is taken by a
+        // symlink, fail instead of truncating what the link points to.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(nix::libc::O_NOFOLLOW);
+        }
+        let file = options.open(&tmp_path)?;
         let hasher = Hasher::new(expected.algorithm());
         Ok(Self {
             reference,
@@ -245,7 +250,7 @@ mod tests {
     fn commit_with_mismatch_removes_tmp_and_active() {
         let (_d, store) = store();
         let lying = Digest::compute(DigestAlgorithm::Sha256, b"wrong");
-        let tmp_path = store.ingest_path("r3");
+        let tmp_path = store.ingest_path("r3").unwrap();
         let mut w = store.writer("r3".into(), lying).unwrap();
         w.write_all(b"actual bytes").unwrap();
         let err = w.commit().unwrap_err();

@@ -69,11 +69,52 @@ impl FromStr for DigestAlgorithm {
 
 /// An immutable digest. Constructed via [`Digest::parse`] or
 /// [`Digest::compute`]; both validate the inner hex.
+///
+/// Deserializing goes through the same check, so a `Digest` always has a
+/// hex part of the length of its algorithm that consists of `[0-9a-f]`.
+/// [`Digest::fs_path`] relies on that.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "UncheckedDigest")]
 pub struct Digest {
     algorithm: DigestAlgorithm,
     /// Lower-case hex.
     hex: String,
+}
+
+/// The serialized form of a [`Digest`], before its hex part is checked.
+#[derive(Deserialize)]
+#[serde(rename = "Digest")]
+struct UncheckedDigest {
+    algorithm: DigestAlgorithm,
+    hex: String,
+}
+
+impl TryFrom<UncheckedDigest> for Digest {
+    type Error = DigestError;
+    fn try_from(unchecked: UncheckedDigest) -> Result<Self, Self::Error> {
+        check_hex(unchecked.algorithm, &unchecked.hex)?;
+        Ok(Self {
+            algorithm: unchecked.algorithm,
+            hex: unchecked.hex,
+        })
+    }
+}
+
+/// `hex` has to be the lower-case hex form of a digest of `algorithm`.
+fn check_hex(algorithm: DigestAlgorithm, hex: &str) -> Result<(), DigestError> {
+    if hex.len() != algorithm.hex_len() {
+        return Err(DigestError::HexLength {
+            alg: algorithm.as_str(),
+            expected: algorithm.hex_len(),
+            actual: hex.len(),
+        });
+    }
+    for (i, b) in hex.bytes().enumerate() {
+        if !b.is_ascii_hexdigit() || (b.is_ascii_alphabetic() && b.is_ascii_uppercase()) {
+            return Err(DigestError::NonHex(i));
+        }
+    }
+    Ok(())
 }
 
 impl Digest {
@@ -91,18 +132,7 @@ impl Digest {
             .split_once(':')
             .ok_or_else(|| DigestError::MissingSeparator(s.into()))?;
         let algorithm: DigestAlgorithm = alg_s.parse()?;
-        if hex.len() != algorithm.hex_len() {
-            return Err(DigestError::HexLength {
-                alg: algorithm.as_str(),
-                expected: algorithm.hex_len(),
-                actual: hex.len(),
-            });
-        }
-        for (i, b) in hex.bytes().enumerate() {
-            if !b.is_ascii_hexdigit() || (b.is_ascii_alphabetic() && b.is_ascii_uppercase()) {
-                return Err(DigestError::NonHex(i));
-            }
-        }
+        check_hex(algorithm, hex)?;
         Ok(Self {
             algorithm,
             hex: hex.into(),
