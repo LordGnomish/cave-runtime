@@ -453,7 +453,7 @@ async fn kill_container_delivers_the_requested_signal() {
 
 #[tokio::test]
 async fn kill_container_rejects_a_number_that_is_no_signal() {
-    let process = ContainerProcess::spawn("exec sleep 30");
+    let mut process = ContainerProcess::spawn("exec sleep 30");
     let pid = process.pid();
     let store = ContainerStore::new();
     let id = insert_container(&store, ContainerStatus::Running, Some(pid));
@@ -464,7 +464,20 @@ async fn kill_container_rejects_a_number_that_is_no_signal() {
         err.to_string().contains("invalid signal: 4096"),
         "got: {err}"
     );
-    assert!(matches!(process_state(pid), Some('S' | 'R')));
+    // No signal was sent, so the process carries on. A process this young
+    // is not always seen as `S` or `R` at once: while its program is still
+    // being paged in, proc(5) reports `D`. So poll for the state, as the
+    // tests above do, instead of sampling it once. A process that a signal
+    // ended or stopped stays `Z` or `T` and lets the poll time out.
+    eventually("the process is running", || {
+        matches!(process_state(pid), Some('S' | 'R'))
+    })
+    .await;
+    assert_eq!(
+        process.0.try_wait().unwrap(),
+        None,
+        "the process must not have ended"
+    );
 }
 
 #[tokio::test]
