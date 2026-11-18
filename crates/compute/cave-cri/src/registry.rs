@@ -401,10 +401,11 @@ impl RegistryClient {
 
     /// Pull a blob (image layer) by digest and save to cache.
     ///
-    /// The digest of the descriptor is parsed first (see
-    /// [`parse_blob_digest`]): it names the blob in the cache and in the
-    /// request to the registry, so a descriptor whose digest is not well
-    /// formed is refused before either is built.
+    /// The digest of the descriptor is parsed first: it names the blob in
+    /// the cache and in the request to the registry, so a descriptor whose
+    /// digest is not well formed is refused before either is built. A
+    /// well-formed digest is `sha256:` followed by 64, or `sha512:` followed
+    /// by 128, lowercase hex characters.
     ///
     /// The returned file always has the content the digest stands for. A
     /// file that is already in the cache is read and compared with the
