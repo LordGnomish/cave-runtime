@@ -250,7 +250,7 @@ mod tests {
     fn commit_with_mismatch_removes_tmp_and_active() {
         let (_d, store) = store();
         let lying = Digest::compute(DigestAlgorithm::Sha256, b"wrong");
-        let tmp_path = store.ingest_path("r3").unwrap();
+        let tmp_path = store.ingest_path("r3");
         let mut w = store.writer("r3".into(), lying).unwrap();
         w.write_all(b"actual bytes").unwrap();
         let err = w.commit().unwrap_err();

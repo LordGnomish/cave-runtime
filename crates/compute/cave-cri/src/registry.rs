@@ -462,10 +462,12 @@ impl RegistryClient {
 
     /// Compute the expected cache path for a blob digest (used by tests).
     ///
-    /// Fails for a digest that [`RegistryClient::pull_blob`] would refuse.
-    pub fn blob_cache_path(&self, digest: &str) -> CriResult<PathBuf> {
-        let digest = parse_blob_digest(digest)?;
-        Ok(self.cache_dir.join("blobs").join(blob_file_name(&digest)))
+    /// This only builds the name and does not check the digest; a digest is
+    /// checked in [`RegistryClient::pull_blob`], which is where the cache
+    /// is read and written. For a digest that `pull_blob` accepts this is
+    /// the path it returns.
+    pub fn blob_cache_path(&self, digest: &str) -> std::path::PathBuf {
+        self.cache_dir.join("blobs").join(digest.replace(':', "_"))
     }
 
     /// Pull a complete image (manifest + all layers).
@@ -540,7 +542,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let client = make_client(dir.path());
         let digest = sha256_of(b"abcdef");
-        let path = client.blob_cache_path(&digest).unwrap();
+        let path = client.blob_cache_path(&digest);
         assert!(path
             .to_string_lossy()
             .contains(&digest.replace("sha256:", "sha256_")));
@@ -548,16 +550,29 @@ mod tests {
     }
 
     #[test]
-    fn blob_cache_path_refuses_a_digest_that_is_not_well_formed() {
-        let dir = tempfile::tempdir().unwrap();
-        let client = make_client(dir.path());
+    fn parse_blob_digest_refuses_a_digest_that_is_not_well_formed() {
         for digest in ["sha256:abcdef", "../stray.bin", "/etc/hostname", ""] {
-            match client.blob_cache_path(digest) {
+            match parse_blob_digest(digest) {
                 Err(CriError::Registry(msg)) => {
                     assert!(msg.contains("invalid blob digest"), "got: {msg}")
                 }
                 other => panic!("{digest:?} must be refused, got {other:?}"),
             }
+        }
+    }
+
+    /// The name `pull_blob` gives a blob is the one `blob_cache_path`
+    /// computes for its digest.
+    #[test]
+    fn blob_cache_path_is_the_name_pull_blob_uses() {
+        let dir = tempfile::tempdir().unwrap();
+        let client = make_client(dir.path());
+        for algorithm in [DigestAlgorithm::Sha256, DigestAlgorithm::Sha512] {
+            let digest = Digest::compute(algorithm, b"blob");
+            assert_eq!(
+                client.blob_cache_path(&digest.to_string()),
+                dir.path().join("blobs").join(blob_file_name(&digest))
+            );
         }
     }
 
