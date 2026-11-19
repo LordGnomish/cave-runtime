@@ -425,7 +425,15 @@ impl RegistryClient {
             .map_err(|e| CriError::Registry(format!("cache dir creation failed: {}", e)))?;
 
         let blob_path = blob_dir.join(blob_file_name(&digest));
-        match cached_blob_state(&blob_path, &digest) {
+        // Reading and hashing a cached layer takes as long as the layer is
+        // big, so it does not run on the async worker.
+        let cached = {
+            let (path, digest) = (blob_path.clone(), digest.clone());
+            tokio::task::spawn_blocking(move || cached_blob_state(&path, &digest))
+                .await
+                .map_err(|e| CriError::Registry(format!("blob cache check failed: {}", e)))?
+        };
+        match cached {
             CachedBlob::Intact => {
                 tracing::debug!("blob {} already cached", digest);
                 return Ok(blob_path);
@@ -551,7 +559,7 @@ mod tests {
 
     #[test]
     fn parse_blob_digest_refuses_a_digest_that_is_not_well_formed() {
-        for digest in ["sha256:abcdef", "../stray.bin", "/etc/hostname", ""] {
+        for digest in ["sha256:abcdef", "../stray.bin", "/absolute/path", ""] {
             match parse_blob_digest(digest) {
                 Err(CriError::Registry(msg)) => {
                     assert!(msg.contains("invalid blob digest"), "got: {msg}")

@@ -235,32 +235,33 @@ impl LocalStore {
     /// An ingest that could not be started does not stay registered.
     pub fn writer(&self, reference: String, expected: Digest) -> Result<Writer, StoreError> {
         let tmp = self.checked_ingest_path(&reference)?;
-        {
-            let mut active = self.active.write().unwrap();
-            if active.contains_key(&reference) {
-                return Err(StoreError::IngestActive(reference));
-            }
-            active.insert(
-                reference.clone(),
-                IngestState {
-                    expected: expected.clone(),
-                    tmp_path: tmp.clone(),
-                    started_at_unix: now_unix(),
-                },
-            );
+        // The reference is registered once its ingest file is open, and
+        // both happen under the one lock: a second writer for the same
+        // reference is refused before it touches the file, and a writer
+        // that could not be started leaves nothing registered.
+        let mut active = self.active.write().unwrap();
+        if active.contains_key(&reference) {
+            return Err(StoreError::IngestActive(reference));
         }
-        Writer::new(
+        let writer = Writer::new(
             reference.clone(),
-            expected,
-            tmp,
+            expected.clone(),
+            tmp.clone(),
             self.index.clone(),
             self.active.clone(),
             self.root.join("blobs"),
         )
-        .map_err(|e| {
-            self.active.write().unwrap().remove(&reference);
-            StoreError::Io(std::io::Error::other(format!("writer: {e}")))
-        })
+        .map_err(|e| StoreError::Io(std::io::Error::other(format!("writer: {e}"))))?;
+        active.insert(
+            reference,
+            IngestState {
+                expected,
+                tmp_path: tmp,
+                started_at_unix: now_unix(),
+            },
+        );
+        drop(active);
+        Ok(writer)
     }
 
     /// Mark a digest in use by a lease. The leases module owns lease
