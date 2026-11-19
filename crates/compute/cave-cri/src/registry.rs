@@ -4,13 +4,15 @@
 //!
 //! Implements the Docker Registry HTTP API v2 for image pulling.
 
+use crate::content::digest::{Digest, DigestAlgorithm};
+use crate::content::writer::Hasher;
 use crate::error::{CriError, CriResult};
 use crate::models::{ImageConfig, ImageReference, OciDescriptor, OciImage, OciLayer, OciManifest};
 use chrono::{DateTime, Duration, Utc};
 use reqwest::Client;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// Parsed Bearer challenge from a registry's `WWW-Authenticate` response
@@ -190,6 +192,110 @@ impl TokenCache {
     }
 }
 
+/// Parse the digest of a blob as it is found in a manifest.
+///
+/// The grammar is the one of the OCI image specification (descriptor.md,
+/// "Digests"): `algorithm ":" encoded`. Accepted are the registered
+/// algorithms this crate can verify, with the encoded part the
+/// specification requires for them: `sha256` with 64 and `sha512` with 128
+/// lowercase hex characters. Everything else is an error, including
+/// `sha384`, which [`Digest`] knows but the specification does not register.
+///
+/// A digest that passed consists of `[a-z0-9]`, one `:` and nothing else,
+/// which is what makes it usable as a file name and as part of a URL.
+fn parse_blob_digest(digest: &str) -> CriResult<Digest> {
+    let parsed = Digest::parse(digest)
+        .map_err(|e| CriError::Registry(format!("invalid blob digest {:?}: {}", digest, e)))?;
+    match parsed.algorithm() {
+        DigestAlgorithm::Sha256 | DigestAlgorithm::Sha512 => Ok(parsed),
+        other => Err(CriError::Registry(format!(
+            "invalid blob digest {:?}: {} is not a registered algorithm (sha256, sha512)",
+            digest,
+            other.as_str()
+        ))),
+    }
+}
+
+/// The file name of a blob in the cache directory: `<algorithm>_<hex>`.
+fn blob_file_name(digest: &Digest) -> String {
+    format!("{}_{}", digest.algorithm().as_str(), digest.hex())
+}
+
+/// What the cache holds under the name of a blob.
+enum CachedBlob {
+    /// A regular file whose content has the digest.
+    Intact,
+    /// Nothing.
+    Missing,
+    /// Something that must not be returned as the blob, and why.
+    Unusable(String),
+}
+
+/// Look at the cache entry `path` for the blob `digest`.
+fn cached_blob_state(path: &Path, digest: &Digest) -> CachedBlob {
+    // The entry itself, not what a symlink of that name points to.
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_file() => {}
+        Ok(_) => return CachedBlob::Unusable("not a regular file".into()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return CachedBlob::Missing,
+        Err(e) => return CachedBlob::Unusable(format!("cannot be inspected: {}", e)),
+    }
+    match digest_of_file(path, digest.algorithm()) {
+        Ok(actual) if actual == *digest => CachedBlob::Intact,
+        Ok(actual) => CachedBlob::Unusable(format!("its content has the digest {}", actual)),
+        Err(e) => CachedBlob::Unusable(format!("cannot be read: {}", e)),
+    }
+}
+
+/// The digest of the content of the file `path`.
+fn digest_of_file(path: &Path, algorithm: DigestAlgorithm) -> std::io::Result<Digest> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Hasher::new(algorithm);
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        match file.read(&mut buf) {
+            Ok(0) => return Ok(hasher.finalize(algorithm)),
+            Ok(n) => hasher.update(&buf[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// Add the blob `digest` with the content `data` to the cache directory
+/// `blob_dir` and return its path.
+///
+/// `data` is verified against the digest first. It is then written to a new
+/// file next to the cache entry and renamed over it, so the entry either
+/// stays what it was or becomes the complete, verified blob.
+fn store_blob(blob_dir: &Path, digest: &Digest, data: &[u8]) -> CriResult<PathBuf> {
+    let actual = Digest::compute(digest.algorithm(), data);
+    if actual != *digest {
+        return Err(CriError::Registry(format!(
+            "digest mismatch: expected {}, got {}",
+            digest, actual
+        )));
+    }
+
+    let name = blob_file_name(digest);
+    let blob_path = blob_dir.join(&name);
+    // Not a name `blob_file_name` produces, and unique per attempt.
+    let tmp_path = blob_dir.join(format!(".{}.{}.tmp", name, uuid::Uuid::new_v4().simple()));
+
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp_path)
+        .and_then(|mut file| file.write_all(data))
+        .and_then(|()| std::fs::rename(&tmp_path, &blob_path));
+    if let Err(e) = written {
+        std::fs::remove_file(&tmp_path).ok();
+        return Err(CriError::Registry(format!("blob write failed: {}", e)));
+    }
+
+    Ok(blob_path)
+}
+
 /// Registry client for pulling OCI images.
 pub struct RegistryClient {
     client: Client,
@@ -294,24 +400,57 @@ impl RegistryClient {
     }
 
     /// Pull a blob (image layer) by digest and save to cache.
+    ///
+    /// The digest of the descriptor is parsed first: it names the blob in
+    /// the cache and in the request to the registry, so a descriptor whose
+    /// digest is not well formed is refused before either is built. A
+    /// well-formed digest is `sha256:` followed by 64, or `sha512:` followed
+    /// by 128, lowercase hex characters.
+    ///
+    /// The returned file always has the content the digest stands for. A
+    /// file that is already in the cache is read and compared with the
+    /// digest before it is returned. If it does not match, or is not a
+    /// regular file, the blob is downloaded again; the download is verified
+    /// and then moved over the cache entry. If that fails the result is an
+    /// error, not the file that was found.
     pub async fn pull_blob(
         &self,
         image_ref: &ImageReference,
         descriptor: &OciDescriptor,
     ) -> CriResult<PathBuf> {
+        let digest = parse_blob_digest(&descriptor.digest)?;
+
         let blob_dir = self.cache_dir.join("blobs");
         std::fs::create_dir_all(&blob_dir)
             .map_err(|e| CriError::Registry(format!("cache dir creation failed: {}", e)))?;
 
-        let blob_path = blob_dir.join(descriptor.digest.replace(':', "_"));
-        if blob_path.exists() {
-            tracing::debug!("blob {} already cached", descriptor.digest);
-            return Ok(blob_path);
+        let blob_path = blob_dir.join(blob_file_name(&digest));
+        // Reading and hashing a cached layer takes as long as the layer is
+        // big, so it does not run on the async worker.
+        let cached = {
+            let (path, digest) = (blob_path.clone(), digest.clone());
+            tokio::task::spawn_blocking(move || cached_blob_state(&path, &digest))
+                .await
+                .map_err(|e| CriError::Registry(format!("blob cache check failed: {}", e)))?
+        };
+        match cached {
+            CachedBlob::Intact => {
+                tracing::debug!("blob {} already cached", digest);
+                return Ok(blob_path);
+            }
+            CachedBlob::Unusable(why) => {
+                tracing::warn!(
+                    "cached blob {} is not used ({}), fetching it again",
+                    digest,
+                    why
+                );
+            }
+            CachedBlob::Missing => {}
         }
 
         let url = format!(
             "https://{}/v2/{}/blobs/{}",
-            image_ref.registry, image_ref.repository, descriptor.digest
+            image_ref.registry, image_ref.repository, digest
         );
 
         let resp = self
@@ -326,24 +465,15 @@ impl RegistryClient {
             .await
             .map_err(|e| CriError::Registry(format!("blob download failed: {}", e)))?;
 
-        // Verify digest
-        let mut hasher = Sha256::new();
-        hasher.update(&data);
-        let computed = format!("sha256:{}", hex::encode(hasher.finalize()));
-        if computed != descriptor.digest {
-            return Err(CriError::Registry(format!(
-                "digest mismatch: expected {}, got {}",
-                descriptor.digest, computed
-            )));
-        }
-
-        std::fs::write(&blob_path, &data)
-            .map_err(|e| CriError::Registry(format!("blob write failed: {}", e)))?;
-
-        Ok(blob_path)
+        store_blob(&blob_dir, &digest, &data)
     }
 
     /// Compute the expected cache path for a blob digest (used by tests).
+    ///
+    /// This only builds the name and does not check the digest; a digest is
+    /// checked in [`RegistryClient::pull_blob`], which is where the cache
+    /// is read and written. For a digest that `pull_blob` accepts this is
+    /// the path it returns.
     pub fn blob_cache_path(&self, digest: &str) -> std::path::PathBuf {
         self.cache_dir.join("blobs").join(digest.replace(':', "_"))
     }
@@ -400,13 +530,159 @@ mod tests {
         assert_eq!(client.cache_dir, dir.path());
     }
 
+    /// The digest `sha256:<hex>` of `data`.
+    fn sha256_of(data: &[u8]) -> String {
+        Digest::compute(DigestAlgorithm::Sha256, data).to_string()
+    }
+
+    /// The names in `dir`, sorted.
+    fn names_in(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    }
+
     #[test]
     fn test_blob_cache_path_colon_escaped() {
         let dir = tempfile::tempdir().unwrap();
         let client = make_client(dir.path());
-        let path = client.blob_cache_path("sha256:abcdef");
-        assert!(path.to_string_lossy().contains("sha256_abcdef"));
+        let digest = sha256_of(b"abcdef");
+        let path = client.blob_cache_path(&digest);
+        assert!(path
+            .to_string_lossy()
+            .contains(&digest.replace("sha256:", "sha256_")));
         assert!(path.starts_with(&client.cache_dir));
+    }
+
+    #[test]
+    fn parse_blob_digest_refuses_a_digest_that_is_not_well_formed() {
+        for digest in ["sha256:abcdef", "../stray.bin", "/absolute/path", ""] {
+            match parse_blob_digest(digest) {
+                Err(CriError::Registry(msg)) => {
+                    assert!(msg.contains("invalid blob digest"), "got: {msg}")
+                }
+                other => panic!("{digest:?} must be refused, got {other:?}"),
+            }
+        }
+    }
+
+    /// The name `pull_blob` gives a blob is the one `blob_cache_path`
+    /// computes for its digest.
+    #[test]
+    fn blob_cache_path_is_the_name_pull_blob_uses() {
+        let dir = tempfile::tempdir().unwrap();
+        let client = make_client(dir.path());
+        for algorithm in [DigestAlgorithm::Sha256, DigestAlgorithm::Sha512] {
+            let digest = Digest::compute(algorithm, b"blob");
+            assert_eq!(
+                client.blob_cache_path(&digest.to_string()),
+                dir.path().join("blobs").join(blob_file_name(&digest))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_blob_digest_accepts_the_registered_algorithms() {
+        let sha256 = sha256_of(b"blob");
+        assert_eq!(parse_blob_digest(&sha256).unwrap().to_string(), sha256);
+        let sha512 = Digest::compute(DigestAlgorithm::Sha512, b"blob").to_string();
+        assert_eq!(parse_blob_digest(&sha512).unwrap().to_string(), sha512);
+
+        // Known to `Digest`, but not registered by the image specification.
+        let sha384 = Digest::compute(DigestAlgorithm::Sha384, b"blob").to_string();
+        match parse_blob_digest(&sha384) {
+            Err(CriError::Registry(msg)) => {
+                assert!(msg.contains("not a registered algorithm"), "got: {msg}")
+            }
+            other => panic!("sha384 must be refused, got {other:?}"),
+        }
+    }
+
+    /// A download replaces a cache entry whose content is something else,
+    /// and leaves nothing but the blob behind.
+    #[test]
+    fn store_blob_replaces_a_cache_entry_with_other_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let blob = b"layer bytes";
+        let digest = parse_blob_digest(&sha256_of(blob)).unwrap();
+        let entry = dir.path().join(blob_file_name(&digest));
+        std::fs::write(&entry, b"left over from an interrupted write").unwrap();
+        assert!(matches!(
+            cached_blob_state(&entry, &digest),
+            CachedBlob::Unusable(_)
+        ));
+
+        let path = store_blob(dir.path(), &digest, blob).unwrap();
+
+        assert_eq!(path, entry);
+        assert_eq!(std::fs::read(&entry).unwrap(), blob);
+        assert!(matches!(
+            cached_blob_state(&entry, &digest),
+            CachedBlob::Intact
+        ));
+        assert_eq!(names_in(dir.path()), [blob_file_name(&digest)]);
+    }
+
+    /// A symlink in the place of the cache entry is replaced, not written
+    /// through.
+    #[test]
+    fn store_blob_replaces_a_symlink_instead_of_writing_through_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("blobs");
+        std::fs::create_dir(&cache).unwrap();
+        let elsewhere = dir.path().join("elsewhere.bin");
+        std::fs::write(&elsewhere, b"other file").unwrap();
+        let blob = b"layer bytes";
+        let digest = parse_blob_digest(&sha256_of(blob)).unwrap();
+        let entry = cache.join(blob_file_name(&digest));
+        std::os::unix::fs::symlink(&elsewhere, &entry).unwrap();
+
+        store_blob(&cache, &digest, blob).unwrap();
+
+        assert!(std::fs::symlink_metadata(&entry).unwrap().is_file());
+        assert_eq!(std::fs::read(&entry).unwrap(), blob);
+        assert_eq!(std::fs::read(&elsewhere).unwrap(), b"other file");
+    }
+
+    /// Data that does not have the digest is not written anywhere.
+    #[test]
+    fn store_blob_refuses_data_with_another_digest() {
+        let dir = tempfile::tempdir().unwrap();
+        let digest = parse_blob_digest(&sha256_of(b"layer bytes")).unwrap();
+        let entry = dir.path().join(blob_file_name(&digest));
+        std::fs::write(&entry, b"what was there").unwrap();
+
+        match store_blob(dir.path(), &digest, b"something else") {
+            Err(CriError::Registry(msg)) => assert!(msg.contains("digest mismatch"), "{msg}"),
+            other => panic!("expected a digest mismatch, got {other:?}"),
+        }
+
+        assert_eq!(std::fs::read(&entry).unwrap(), b"what was there");
+        assert_eq!(names_in(dir.path()), [blob_file_name(&digest)]);
+    }
+
+    /// If the blob cannot be moved into place, the error is reported and
+    /// the temporary file is removed.
+    #[test]
+    fn store_blob_leaves_no_temporary_file_when_the_rename_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let blob = b"layer bytes";
+        let digest = parse_blob_digest(&sha256_of(blob)).unwrap();
+        // A non-empty directory cannot be replaced by a file.
+        let entry = dir.path().join(blob_file_name(&digest));
+        std::fs::create_dir(&entry).unwrap();
+        std::fs::write(entry.join("keep"), b"x").unwrap();
+
+        match store_blob(dir.path(), &digest, blob) {
+            Err(CriError::Registry(msg)) => assert!(msg.contains("blob write failed"), "{msg}"),
+            other => panic!("expected a write error, got {other:?}"),
+        }
+
+        assert_eq!(names_in(dir.path()), [blob_file_name(&digest)]);
+        assert_eq!(std::fs::read(entry.join("keep")).unwrap(), b"x");
     }
 
     #[tokio::test]
@@ -415,16 +691,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let client = make_client(dir.path());
 
+        // A cached file is only a hit if its content has the digest.
+        let digest = sha256_of(b"fake layer data");
         let descriptor = OciDescriptor {
             media_type: "application/vnd.oci.image.layer.v1.tar+gzip".into(),
-            digest: "sha256:cafebabe".into(),
-            size: 42,
+            digest: digest.clone(),
+            size: 15,
         };
 
         // Create cache dir and file
         let blob_dir = dir.path().join("blobs");
         std::fs::create_dir_all(&blob_dir).unwrap();
-        let blob_file = blob_dir.join("sha256_cafebabe");
+        let blob_file = blob_dir.join(digest.replace("sha256:", "sha256_"));
         std::fs::write(&blob_file, b"fake layer data").unwrap();
 
         let image_ref = ImageReference {

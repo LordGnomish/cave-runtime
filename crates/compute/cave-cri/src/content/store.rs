@@ -142,15 +142,36 @@ impl LocalStore {
         &self.root
     }
 
-    /// Filesystem path for a stored blob.
+    /// Filesystem path for a stored blob: `<root>/blobs/<algorithm>/<hex>`.
+    ///
+    /// The path is below `<root>/blobs` for every `Digest`: its hex part
+    /// is checked whenever one is constructed, deserialized ones included.
     pub fn blob_path(&self, digest: &Digest) -> PathBuf {
         self.root.join("blobs").join(digest.fs_path())
     }
 
-    /// Filesystem path for an in-progress ingest. Operator picks the
-    /// reference; convention is `<algorithm>-<expected-hex-prefix>`.
+    /// Filesystem path for an in-progress ingest:
+    /// `<root>/ingest/<reference>`. Operator picks the reference;
+    /// convention is `<algorithm>-<expected-hex-prefix>`.
+    ///
+    /// This only joins the names and does not check the reference. A
+    /// reference is checked where an ingest is started
+    /// ([`LocalStore::writer`]), which is the only place the store opens
+    /// the file.
     pub fn ingest_path(&self, reference: &str) -> PathBuf {
         self.root.join("ingest").join(reference)
+    }
+
+    /// [`LocalStore::ingest_path`] for a reference that has been checked.
+    ///
+    /// The reference becomes the name of a file in the ingest directory,
+    /// so it has to be a plain file name. One that is empty, is `.` or
+    /// `..`, or contains a path separator (`/` or `\`) or a NUL is refused
+    /// with an [`std::io::ErrorKind::InvalidInput`] error ("invalid ingest
+    /// reference"). No file is looked at for that.
+    fn checked_ingest_path(&self, reference: &str) -> Result<PathBuf, StoreError> {
+        check_ingest_reference(reference)?;
+        Ok(self.ingest_path(reference))
     }
 
     /// Walk `<root>/blobs/<alg>/*` and populate the in-memory index.
@@ -205,31 +226,42 @@ impl LocalStore {
 
     /// Begin a streaming ingest. Returns a writer that the caller
     /// pushes bytes through.
+    ///
+    /// The reference is checked first: it has to be a plain file name
+    /// (not empty, not `.` or `..`, no path separator, no NUL). A reference
+    /// that is refused is not registered and no file is touched.
+    /// The ingest file is a regular file of the store: if the name is
+    /// taken by a symlink, the ingest is refused instead of following it.
+    /// An ingest that could not be started does not stay registered.
     pub fn writer(&self, reference: String, expected: Digest) -> Result<Writer, StoreError> {
-        {
-            let mut active = self.active.write().unwrap();
-            if active.contains_key(&reference) {
-                return Err(StoreError::IngestActive(reference));
-            }
-            active.insert(
-                reference.clone(),
-                IngestState {
-                    expected: expected.clone(),
-                    tmp_path: self.ingest_path(&reference),
-                    started_at_unix: now_unix(),
-                },
-            );
+        let tmp = self.checked_ingest_path(&reference)?;
+        // The reference is registered once its ingest file is open, and
+        // both happen under the one lock: a second writer for the same
+        // reference is refused before it touches the file, and a writer
+        // that could not be started leaves nothing registered.
+        let mut active = self.active.write().unwrap();
+        if active.contains_key(&reference) {
+            return Err(StoreError::IngestActive(reference));
         }
-        let tmp = self.ingest_path(&reference);
-        Writer::new(
-            reference,
-            expected,
-            tmp,
+        let writer = Writer::new(
+            reference.clone(),
+            expected.clone(),
+            tmp.clone(),
             self.index.clone(),
             self.active.clone(),
             self.root.join("blobs"),
         )
-        .map_err(|e| StoreError::Io(std::io::Error::other(format!("writer: {e}"))))
+        .map_err(|e| StoreError::Io(std::io::Error::other(format!("writer: {e}"))))?;
+        active.insert(
+            reference,
+            IngestState {
+                expected,
+                tmp_path: tmp,
+                started_at_unix: now_unix(),
+            },
+        );
+        drop(active);
+        Ok(writer)
     }
 
     /// Mark a digest in use by a lease. The leases module owns lease
@@ -326,6 +358,36 @@ impl ContentStore for LocalStore {
     }
 }
 
+/// An ingest reference has to be usable as the name of one file in the
+/// ingest directory, and as nothing else.
+fn check_ingest_reference(reference: &str) -> Result<(), StoreError> {
+    let refuse = |why: &str| {
+        Err(StoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid ingest reference {reference:?}: {why}"),
+        )))
+    };
+    if reference.is_empty() {
+        return refuse("it is empty");
+    }
+    if reference == "." || reference == ".." {
+        return refuse("it names a directory, not a file");
+    }
+    if reference.contains(['/', '\\']) {
+        return refuse("it contains a path separator");
+    }
+    if reference.contains('\0') {
+        return refuse("it contains a NUL");
+    }
+    // What is left is one normal path component on every platform this
+    // builds for; make sure of it instead of relying on the list above.
+    let mut components = Path::new(reference).components();
+    match (components.next(), components.next()) {
+        (Some(std::path::Component::Normal(name)), None) if name == reference => Ok(()),
+        _ => refuse("it is not a plain file name"),
+    }
+}
+
 pub(crate) fn now_unix() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -361,6 +423,31 @@ mod tests {
         assert!(dir.path().join("blobs/sha256").is_dir());
         assert!(dir.path().join("blobs/sha512").is_dir());
         assert!(dir.path().join("ingest").is_dir());
+    }
+
+    #[test]
+    fn checked_ingest_path_is_a_file_in_the_ingest_directory() {
+        let (dir, store) = tempstore();
+        assert_eq!(
+            store.checked_ingest_path("pull-1").unwrap(),
+            dir.path().join("ingest").join("pull-1")
+        );
+        assert_eq!(
+            store.ingest_path("pull-1"),
+            dir.path().join("ingest").join("pull-1")
+        );
+        for reference in ["", ".", "..", "a/b", "a\\b", "../x", "/x", "x\0"] {
+            match store.checked_ingest_path(reference) {
+                Err(StoreError::Io(e)) => {
+                    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+                    assert!(
+                        e.to_string().contains("invalid ingest reference"),
+                        "got: {e}"
+                    );
+                }
+                other => panic!("{reference:?} was not refused: {other:?}"),
+            }
+        }
     }
 
     #[test]

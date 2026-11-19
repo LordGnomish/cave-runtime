@@ -30,14 +30,15 @@ pub enum WriterError {
     Digest(#[from] DigestError),
 }
 
-enum Hasher {
+/// A running digest in one of the algorithms [`Digest`] supports.
+pub(crate) enum Hasher {
     Sha256(sha2::Sha256),
     Sha384(sha2::Sha384),
     Sha512(sha2::Sha512),
 }
 
 impl Hasher {
-    fn new(alg: DigestAlgorithm) -> Self {
+    pub(crate) fn new(alg: DigestAlgorithm) -> Self {
         match alg {
             DigestAlgorithm::Sha256 => Hasher::Sha256(sha2::Sha256::new()),
             DigestAlgorithm::Sha384 => Hasher::Sha384(sha2::Sha384::new()),
@@ -45,7 +46,7 @@ impl Hasher {
         }
     }
 
-    fn update(&mut self, bytes: &[u8]) {
+    pub(crate) fn update(&mut self, bytes: &[u8]) {
         match self {
             Hasher::Sha256(h) => h.update(bytes),
             Hasher::Sha384(h) => h.update(bytes),
@@ -53,7 +54,7 @@ impl Hasher {
         }
     }
 
-    fn finalize(self, alg: DigestAlgorithm) -> Digest {
+    pub(crate) fn finalize(self, alg: DigestAlgorithm) -> Digest {
         let hex = match self {
             Hasher::Sha256(h) => hex_encode(&h.finalize()),
             Hasher::Sha384(h) => hex_encode(&h.finalize()),
@@ -112,11 +113,16 @@ impl Writer {
         if let Some(parent) = tmp_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let file = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&tmp_path)?;
+        let mut options = fs::OpenOptions::new();
+        options.create(true).write(true).truncate(true);
+        // The ingest file is a file of its own. If its name is taken by a
+        // symlink, fail instead of truncating what the link points to.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(nix::libc::O_NOFOLLOW);
+        }
+        let file = options.open(&tmp_path)?;
         let hasher = Hasher::new(expected.algorithm());
         Ok(Self {
             reference,
