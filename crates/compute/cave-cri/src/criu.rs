@@ -203,12 +203,17 @@ mod tests {
     use tempfile::tempdir;
 
     static INIT_ROOT: Once = Once::new();
-    fn ensure_test_root() {
+    /// Point `CAVE_ROOT_DIR` at a directory of this test run. The variable
+    /// is shared with every other test of the process: the caller keeps the
+    /// returned lock for as long as it uses the state root.
+    fn ensure_test_root() -> crate::paths::tests::RootEnvGuard {
+        let guard = crate::paths::tests::lock_root_env();
         INIT_ROOT.call_once(|| {
             let dir = std::env::temp_dir().join(format!("cave-cri-criu-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             std::env::set_var("CAVE_ROOT_DIR", &dir);
         });
+        guard
     }
 
     fn fixture_manifest(container_id: Uuid) -> CheckpointManifest {
@@ -327,7 +332,7 @@ mod tests {
 
     #[test]
     fn default_images_dir_uses_paths_module() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let id = Uuid::new_v4();
         let dir = default_images_dir(id);
         assert!(dir.to_string_lossy().contains("checkpoints"));

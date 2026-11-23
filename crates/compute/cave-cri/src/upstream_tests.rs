@@ -9,6 +9,7 @@
 #![cfg(test)]
 
 use crate::models::*;
+use crate::paths::tests::RootEnvGuard;
 use crate::registry::RegistryClient;
 use crate::routes::CriState;
 use crate::runtime_handler::RuntimeHandlerRegistry;
@@ -16,18 +17,35 @@ use crate::store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use crate::{paths, runtime};
 use chrono::Utc;
 use dashmap::DashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Once};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
 static INIT_ROOT: Once = Once::new();
-fn ensure_test_root() {
+/// Point `CAVE_ROOT_DIR` at a directory of this test run, once. The caller
+/// holds the lock on the variable.
+fn init_test_root() {
     INIT_ROOT.call_once(|| {
         let dir = std::env::temp_dir().join(format!("cave-cri-ut-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::env::set_var("CAVE_ROOT_DIR", &dir);
     });
+}
+
+/// Set up the state root for a test that is not async. `CAVE_ROOT_DIR` is
+/// shared with every other test of the process: the caller keeps the
+/// returned lock for as long as it uses the state root.
+fn ensure_test_root() -> RootEnvGuard {
+    let guard = paths::tests::lock_root_env();
+    init_test_root();
+    guard
+}
+
+/// [`ensure_test_root`] for an async test.
+async fn ensure_test_root_async() -> RootEnvGuard {
+    let guard = paths::tests::lock_root_env_async().await;
+    init_test_root();
+    guard
 }
 
 fn dummy_image(reference: &str) -> OciImage {
@@ -59,12 +77,12 @@ fn dummy_spec(name: &str, image: &str) -> ContainerSpec {
     }
 }
 
-fn make_state() -> Arc<CriState> {
-    ensure_test_root();
+/// The state of a test that holds the lock on the state root as `_root`.
+fn make_state(_root: &RootEnvGuard) -> Arc<CriState> {
     Arc::new(CriState {
         containers: ContainerStore::new(),
         images: ImageStore::new(),
-        registry: RegistryClient::new(PathBuf::from(paths::image_cache_dir())),
+        registry: RegistryClient::new(paths::image_cache_dir()),
         sandboxes: SandboxStore::new(),
         snapshots: SnapshotStore::new(),
         events: Mutex::new(vec![]),
@@ -78,7 +96,8 @@ fn make_state() -> Arc<CriState> {
 
 #[tokio::test]
 async fn test_container_create() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("c1", "nginx:latest"),
@@ -93,7 +112,8 @@ async fn test_container_create() {
 
 #[tokio::test]
 async fn test_container_start() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("c2", "nginx:latest"),
@@ -112,7 +132,8 @@ async fn test_container_start() {
 
 #[tokio::test]
 async fn test_container_stop() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("c3", "nginx:latest"),
@@ -134,7 +155,8 @@ async fn test_container_stop() {
 
 #[tokio::test]
 async fn test_container_exec() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("c4", "nginx:latest"),
@@ -163,7 +185,8 @@ async fn test_container_exec() {
 
 #[tokio::test]
 async fn test_container_lifecycle() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("alpine:latest"));
     let c = runtime::create_container(
         dummy_spec("life", "alpine:latest"),
@@ -198,7 +221,8 @@ async fn test_container_lifecycle() {
 
 #[tokio::test]
 async fn test_image_pull() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     let img = dummy_image("nginx:1.25");
     state.images.insert(img);
     let got = state.images.get("nginx:1.25").unwrap();
@@ -294,7 +318,8 @@ fn test_snapshot_prepare() {
 
 #[tokio::test]
 async fn test_container_stats() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("redis:7"));
     let c = runtime::create_container(
         dummy_spec("stats", "redis:7"),
@@ -526,8 +551,8 @@ fn test_criu_dir_size_bytes_sums_files() {
 
 #[tokio::test]
 async fn test_checkpoint_container_writes_manifest() {
-    ensure_test_root();
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("redis:7"));
     let c = runtime::create_container(
         dummy_spec("ckpt-1", "redis:7"),
@@ -552,8 +577,8 @@ async fn test_checkpoint_container_writes_manifest() {
 
 #[tokio::test]
 async fn test_restore_container_rejects_mismatched_manifest() {
-    ensure_test_root();
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("rstr", "nginx:latest"),
@@ -583,8 +608,8 @@ async fn test_restore_container_rejects_mismatched_manifest() {
 
 #[tokio::test]
 async fn test_restore_container_succeeds_with_matching_manifest() {
-    ensure_test_root();
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("rok", "nginx:latest"),
@@ -676,7 +701,7 @@ fn test_userns_parse_subid_file() {
 
 #[test]
 fn test_run_pod_sandbox_userns_pod_uses_allocator() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let alloc = userns::UserNsAllocator::new(500_000, 500_000 + 65_536, 65_536);
     let mut spec = sandbox_spec_with_ports("ns-pod", vec![]);
     spec.user_namespace_mode = UserNamespaceMode::Pod;
@@ -686,7 +711,7 @@ fn test_run_pod_sandbox_userns_pod_uses_allocator() {
 
 #[test]
 fn test_run_pod_sandbox_userns_pod_without_allocator_errors() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let mut spec = sandbox_spec_with_ports("ns-fail", vec![]);
     spec.user_namespace_mode = UserNamespaceMode::Pod;
     assert!(sb::run_pod_sandbox(spec, None).is_err());
@@ -694,7 +719,7 @@ fn test_run_pod_sandbox_userns_pod_without_allocator_errors() {
 
 #[test]
 fn test_run_pod_sandbox_userns_host_does_not_consume_allocator() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let alloc = userns::UserNsAllocator::new(700_000, 700_000 + 65_536 * 2, 65_536);
     let r =
         sb::run_pod_sandbox(sandbox_spec_with_ports("host-mode", vec![]), Some(&alloc)).unwrap();
@@ -855,7 +880,7 @@ fn sandbox_spec_with_ports(name: &str, ports: Vec<PortMapping>) -> SandboxSpec {
 
 #[test]
 fn test_run_pod_sandbox_allocates_namespaces() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ns-test", vec![]), None).unwrap();
     assert!(r.namespaces.network.exists());
     assert!(r.namespaces.ipc.exists());
@@ -865,7 +890,7 @@ fn test_run_pod_sandbox_allocates_namespaces() {
 
 #[test]
 fn test_run_pod_sandbox_assigns_pause() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let r = sb::run_pod_sandbox(sandbox_spec_with_ports("p", vec![]), None).unwrap();
     assert_eq!(r.pause.image, sb::DEFAULT_PAUSE_IMAGE);
     assert_eq!(r.pause.sandbox_id, r.sandbox.id);
@@ -873,7 +898,7 @@ fn test_run_pod_sandbox_assigns_pause() {
 
 #[test]
 fn test_run_pod_sandbox_assigns_pod_ip() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ipc", vec![]), None).unwrap();
     let ip = r.sandbox.network_ip.unwrap();
     assert!(ip.starts_with("10.244."));
@@ -881,7 +906,7 @@ fn test_run_pod_sandbox_assigns_pod_ip() {
 
 #[test]
 fn test_stop_pod_sandbox_clears_namespaces() {
-    ensure_test_root();
+    let _root = ensure_test_root();
     let r = sb::run_pod_sandbox(sandbox_spec_with_ports("stop", vec![]), None).unwrap();
     let net = r.namespaces.network.clone();
     sb::stop_pod_sandbox(r.sandbox.id).unwrap();
@@ -1354,7 +1379,8 @@ fn test_runtime_handler_features() {
 
 #[tokio::test]
 async fn test_network_attach() {
-    let state = make_state();
+    let root = ensure_test_root_async().await;
+    let state = make_state(&root);
     state.images.insert(dummy_image("nginx:latest"));
     let c = runtime::create_container(
         dummy_spec("net", "nginx:latest"),

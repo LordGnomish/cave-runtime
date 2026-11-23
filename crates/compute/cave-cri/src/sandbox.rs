@@ -229,12 +229,17 @@ mod tests {
     use std::sync::Once;
 
     static INIT_ROOT: Once = Once::new();
-    fn ensure_test_root() {
+    /// Point `CAVE_ROOT_DIR` at a directory of this test run. The variable
+    /// is shared with every other test of the process: the caller keeps the
+    /// returned lock for as long as it uses the state root.
+    fn ensure_test_root() -> crate::paths::tests::RootEnvGuard {
+        let guard = crate::paths::tests::lock_root_env();
         INIT_ROOT.call_once(|| {
             let dir = std::env::temp_dir().join(format!("cave-cri-sb-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             std::env::set_var("CAVE_ROOT_DIR", &dir);
         });
+        guard
     }
 
     fn spec(name: &str, ports: Vec<PortMapping>) -> SandboxSpec {
@@ -282,7 +287,7 @@ mod tests {
 
     #[test]
     fn namespace_paths_have_expected_layout() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let id = Uuid::new_v4();
         let ns = SandboxNamespaces::for_sandbox(id);
         assert!(ns.network.to_string_lossy().ends_with("net"));
@@ -294,7 +299,7 @@ mod tests {
 
     #[test]
     fn namespace_create_then_teardown_idempotent() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let ns = SandboxNamespaces::for_sandbox(Uuid::new_v4());
         ns.create().unwrap();
         assert!(ns.network.exists());
@@ -308,7 +313,7 @@ mod tests {
 
     #[test]
     fn run_pod_sandbox_marks_ready_and_allocates_ip() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p1", vec![]), None).unwrap();
         assert_eq!(r.sandbox.state, SandboxState::Ready);
         assert!(r
@@ -321,7 +326,7 @@ mod tests {
 
     #[test]
     fn run_pod_sandbox_creates_namespace_files() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p2", vec![]), None).unwrap();
         assert!(r.namespaces.network.exists());
         assert!(r.namespaces.ipc.exists());
@@ -329,7 +334,7 @@ mod tests {
 
     #[test]
     fn run_pod_sandbox_assigns_pause_container() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p3", vec![]), None).unwrap();
         assert_eq!(r.pause.sandbox_id, r.sandbox.id);
         assert_eq!(r.pause.image, DEFAULT_PAUSE_IMAGE);
@@ -337,7 +342,7 @@ mod tests {
 
     #[test]
     fn run_pod_sandbox_keeps_port_mappings() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p4", vec![pm(8080, 80, "TCP")]), None).unwrap();
         assert_eq!(r.port_mappings.len(), 1);
         assert_eq!(r.port_mappings[0].host_port, 8080);
@@ -357,14 +362,14 @@ mod tests {
 
     #[test]
     fn run_pod_sandbox_accepts_udp() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p7", vec![pm(53, 53, "UDP")]), None).unwrap();
         assert_eq!(r.port_mappings[0].protocol, "UDP");
     }
 
     #[test]
     fn run_pod_sandbox_accepts_sctp() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("p8", vec![pm(36412, 36412, "SCTP")]), None).unwrap();
         assert_eq!(r.port_mappings[0].protocol, "SCTP");
     }
@@ -373,7 +378,7 @@ mod tests {
 
     #[test]
     fn stop_pod_sandbox_removes_namespace_files() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         let r = run_pod_sandbox(spec("stop", vec![]), None).unwrap();
         let ns_path = r.namespaces.network.clone();
         assert!(ns_path.exists());
@@ -383,7 +388,7 @@ mod tests {
 
     #[test]
     fn stop_pod_sandbox_unknown_id_is_idempotent() {
-        ensure_test_root();
+        let _root = ensure_test_root();
         // Should not error even if the sandbox was never created.
         stop_pod_sandbox(Uuid::new_v4()).unwrap();
     }
