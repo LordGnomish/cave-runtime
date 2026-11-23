@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v16
+        uses: DavidAnson/markdownlint-cli2-action@v24
         with:
           # If .markdownlint.json doesn't exist the action uses defaults;
           # we lint the docs/ tree and top-level README.
