@@ -43,15 +43,38 @@ pub fn checkpoint_dir(container_id: &str) -> PathBuf {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use tokio::sync::{Mutex, MutexGuard};
+
+    /// `CAVE_ROOT_DIR` is one variable for the whole process, and the unit
+    /// tests of this crate run as threads of one process. A test that sets
+    /// or removes the variable, or that depends on the directory it names,
+    /// holds this lock from before its first use of the variable until after
+    /// its last.
+    ///
+    /// The lock is tokio's because some of those tests are async and hold
+    /// it across an `.await`. A test that fails while it holds the lock does
+    /// not poison it for the tests that follow.
+    static ROOT_ENV: Mutex<()> = Mutex::const_new(());
+
+    /// The lock on `CAVE_ROOT_DIR`, as a test holds it.
+    pub(crate) type RootEnvGuard = MutexGuard<'static, ()>;
+
+    /// Take the lock on `CAVE_ROOT_DIR` in a test that is not async.
+    pub(crate) fn lock_root_env() -> RootEnvGuard {
+        ROOT_ENV.blocking_lock()
+    }
+
+    /// Take the lock on `CAVE_ROOT_DIR` in an async test.
+    pub(crate) async fn lock_root_env_async() -> RootEnvGuard {
+        ROOT_ENV.lock().await
+    }
 
     /// Test helper: scoped env var that resets on drop. Only used inside tests
     /// — `cargo test` runs inside the same process so we serialise via a mutex.
     fn with_root<F: FnOnce()>(value: &str, f: F) {
-        use std::sync::Mutex;
-        static GUARD: Mutex<()> = Mutex::new(());
-        let _g = GUARD.lock().unwrap();
+        let _root = lock_root_env();
         let prev = std::env::var(ENV_VAR).ok();
         std::env::set_var(ENV_VAR, value);
         f();
@@ -65,6 +88,7 @@ mod tests {
     fn root_uses_default_when_env_unset() {
         // Note: don't use with_root here so we don't perturb the real env.
         // We just check that *if* the env is unset, we get the default.
+        let _root = lock_root_env();
         let prev = std::env::var(ENV_VAR).ok();
         std::env::remove_var(ENV_VAR);
         assert_eq!(root(), PathBuf::from(DEFAULT_ROOT));

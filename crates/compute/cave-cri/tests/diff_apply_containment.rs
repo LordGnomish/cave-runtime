@@ -310,7 +310,10 @@ fn apply_creates_nothing_below_a_symlink_that_cannot_be_resolved() {
 
         let result = apply_uncompressed_tar(&raw_tar(&[through]), &scratch.layer);
 
-        assert!(result.is_err(), "{name:?} was applied: {result:?}");
+        assert!(
+            matches!(result, Err(ApplyError::PathEscape(_))),
+            "{name:?} has to be refused with `ApplyError::PathEscape`, got {result:?}"
+        );
         assert_eq!(
             before,
             scratch.snapshot_outside(),
@@ -509,6 +512,68 @@ fn apply_whiteout_of_a_symlink_removes_the_link_not_its_target() {
     assert_eq!(stats.whiteouts_applied, 3);
     assert_eq!(entry_names(&scratch.layer), ["d"]);
     assert!(entry_names(&scratch.layer.join("d")).is_empty());
+}
+
+/// The same for a symlink that points to nothing: a whiteout and an opaque
+/// marker remove the link itself, whether or not there is anything behind
+/// it. The link was left by an earlier layer or comes with the archive.
+#[test]
+fn apply_whiteout_of_a_dangling_symlink_removes_the_link() {
+    for from_archive in [false, true] {
+        let scratch = Scratch::new();
+        let layer = &scratch.layer;
+        // Name and target of each link. One target would be in the target
+        // directory, the other one next to it; neither exists.
+        let absent_outside = scratch.outside_path("absent");
+        let links = [
+            ("stale", "absent"),
+            ("stale-out", absent_outside.as_str()),
+            ("d/stale", "absent"),
+            ("d/stale-out", absent_outside.as_str()),
+        ];
+        let mut members = Vec::new();
+        if from_archive {
+            members.push(dir("d"));
+            members.extend(links.map(|(name, target)| symlink(name, target)));
+        } else {
+            std::fs::create_dir(layer.join("d")).unwrap();
+            for (name, target) in links {
+                scratch.existing_symlink(name, target);
+                let link = layer.join(name);
+                assert!(std::fs::symlink_metadata(&link).is_ok());
+                assert!(
+                    std::fs::metadata(&link).is_err(),
+                    "{name} is meant to point to nothing"
+                );
+            }
+        }
+        members.extend([
+            file(".wh.stale", b""),
+            file(".wh.stale-out", b""),
+            file("d/.wh..wh..opq", b""),
+        ]);
+        let before = scratch.snapshot_outside();
+
+        let stats = apply_uncompressed_tar(&raw_tar(&members), layer).unwrap();
+
+        assert_eq!(
+            before,
+            scratch.snapshot_outside(),
+            "removing dangling symlinks touched paths outside the target directory"
+        );
+        assert_eq!(stats.whiteouts_applied, 3);
+        let left: Vec<&str> = links
+            .into_iter()
+            .map(|(name, _)| name)
+            .filter(|name| std::fs::symlink_metadata(layer.join(name)).is_ok())
+            .collect();
+        assert!(
+            left.is_empty(),
+            "dangling symlinks are still there (links from the archive: {from_archive}): {left:?}"
+        );
+        assert_eq!(entry_names(layer), ["d"]);
+        assert!(entry_names(&layer.join("d")).is_empty());
+    }
 }
 
 /// A member whose name is taken by a symlink replaces the link instead of

@@ -295,6 +295,7 @@ mod tests {
 
     #[test]
     fn test_container_root_path() {
+        let _root = crate::paths::tests::lock_root_env();
         let path = paths::container_dir("test123").join("merged");
         assert!(path.to_string_lossy().contains("test123"));
     }
@@ -302,6 +303,7 @@ mod tests {
     #[test]
     fn test_container_root_path_structure() {
         // Default root is /var/lib/cave when no override is set.
+        let _root = crate::paths::tests::lock_root_env();
         let prev = std::env::var("CAVE_ROOT_DIR").ok();
         std::env::remove_var("CAVE_ROOT_DIR");
         let path = paths::container_dir("abc");
@@ -316,6 +318,7 @@ mod tests {
         // With no layers, assemble_rootfs should still attempt to create dirs.
         // On systems without /var/lib/cave, this will fail with Rootfs error.
         // We just verify the error variant is correct if it fails.
+        let _root = crate::paths::tests::lock_root_env();
         let image = make_empty_image();
         let result = assemble_rootfs(&image, "empty-layer-test");
         match result {
@@ -335,6 +338,7 @@ mod tests {
     #[test]
     fn test_assemble_rootfs_layer_without_local_path() {
         // Layers with no local_path are skipped (no extraction attempted).
+        let _root = crate::paths::tests::lock_root_env();
         let mut image = make_empty_image();
         image.layers.push(OciLayer {
             digest: "sha256:abc".into(),
@@ -383,6 +387,7 @@ mod tests {
     #[test]
     fn test_cleanup_rootfs_nonexistent_container() {
         // Should succeed if directory doesn't exist
+        let _root = crate::paths::tests::lock_root_env();
         let result = cleanup_rootfs("totally-nonexistent-container-id-xyz");
         assert!(result.is_ok());
     }
@@ -1139,6 +1144,7 @@ mod tests {
 
     #[test]
     fn test_cleanup_rootfs_removes_created_dir() {
+        let _root = crate::paths::tests::lock_root_env();
         let container_id = "cleanup-test-container";
         let container_dir = paths::container_dir(container_id);
 
