@@ -15,12 +15,41 @@
 //! whiteouts; cave-cri's overlayfs assembly handles those at mount
 //! time via the overlay driver, so this implementation focuses on
 //! the in-tarball protocol that upstream tar readers understand.
+//!
+//! # Containment
+//!
+//! A layer is untrusted input: nothing in it may create, change or
+//! remove a path outside the target directory. A member that would do
+//! so makes the apply fail with [`ApplyError::PathEscape`], which
+//! names the member. It is not skipped, and members that precede it in
+//! the archive stay applied. These are the rules of
+//! `rootfs::extract_layer`, with the checks of `crate::containment`:
+//!
+//! * a member name that is absolute or has a `..` component is
+//!   refused;
+//! * a member whose directory is, after resolving symlinks, not inside
+//!   the target directory is refused, whether the symlink was in the
+//!   target directory before or comes from the same archive. So is one
+//!   whose directory cannot be resolved;
+//! * a whiteout whose name after `.wh.` is empty, `.` or `..` is
+//!   refused: it names no entry of its directory.
+//!
+//! A symlink member is stored as it is, wherever it points; it is only
+//! never followed out of the target directory. Files and symlinks are
+//! written by [`tar::Entry::unpack_in`], which replaces an entry that
+//! has the member's name rather than writing through it. A whiteout
+//! and an opaque marker remove entries themselves, never what a
+//! symlink points to. Hard link members are not applied at all, as
+//! before, so the target of one is never used. As in the `tar` crate,
+//! a process that changes the target directory during an apply is not
+//! defended against.
 
+use crate::containment::{self, Refusal};
 use crate::diff::compression::{decompress_gzip, CompressionError};
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
-use tar::{Archive, EntryType};
+use tar::{Archive, Entry, EntryType};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApplyError {
@@ -43,6 +72,9 @@ pub struct ApplyStats {
 /// Apply a gzipped layer tarball into `target_dir`. The caller is
 /// expected to have already created `target_dir`. Returns stats on
 /// what was applied.
+///
+/// Nothing outside `target_dir` is created, changed or removed; see the
+/// module documentation for what is refused.
 pub fn apply_layer(gzipped_tar: &[u8], target_dir: &Path) -> Result<ApplyStats, ApplyError> {
     let uncompressed = decompress_gzip(gzipped_tar)?;
     apply_uncompressed_tar(&uncompressed, target_dir)
@@ -54,6 +86,9 @@ pub fn apply_uncompressed_tar(
     target_dir: &Path,
 ) -> Result<ApplyStats, ApplyError> {
     fs::create_dir_all(target_dir)?;
+    // Every containment check below compares resolved paths with this one.
+    let root = target_dir.canonicalize()?;
+    let root = root.as_path();
     let mut stats = ApplyStats::default();
     let mut archive = Archive::new(Cursor::new(tar_bytes));
     // Don't let tar set ownership — we're not root, and the OCI image
@@ -73,52 +108,75 @@ pub fn apply_uncompressed_tar(
         };
 
         if let Some(whiteout_for) = whiteout_target(&file_name) {
-            apply_whiteout(target_dir, &safe_rel, whiteout_for, &mut stats)?;
+            apply_whiteout(root, &safe_rel, whiteout_for, &mut stats)
+                .map_err(|why| refused(&path_in_tar, why))?;
             continue;
         }
 
-        let dst = target_dir.join(&safe_rel);
         match entry.header().entry_type() {
             EntryType::Directory => {
-                fs::create_dir_all(&dst)?;
+                // Resolved first: `create_dir_all` follows symlinks. A
+                // directory that exists is left as it is, also if the
+                // member's name is a symlink to it.
+                let dir = containment::contained_dir(root, &safe_rel)
+                    .map_err(|why| refused(&path_in_tar, why))?;
+                fs::create_dir_all(&dir.path)?;
                 stats.dirs_created += 1;
             }
             EntryType::Symlink => {
-                if dst.exists() {
-                    fs::remove_file(&dst).ok();
+                if entry.link_name()?.is_none() {
+                    return Err(ApplyError::Io(std::io::Error::other(
+                        "symlink without target",
+                    )));
                 }
-                let link_target = entry
-                    .link_name()?
-                    .ok_or_else(|| ApplyError::Io(std::io::Error::other("symlink without target")))?
-                    .into_owned();
-                #[cfg(unix)]
-                {
-                    std::os::unix::fs::symlink(&link_target, &dst)?;
-                }
-                #[cfg(not(unix))]
-                {
-                    // On non-unix targets, materialize as a regular
-                    // file containing the link target. cave-cri only
-                    // ships on Linux so this is a test-only branch.
-                    fs::write(&dst, link_target.to_string_lossy().as_bytes())?;
-                }
+                unpack_member(&mut entry, root, &safe_rel, &path_in_tar)?;
                 stats.symlinks_created += 1;
             }
             EntryType::Regular | EntryType::Continuous => {
-                if let Some(parent) = dst.parent() {
-                    fs::create_dir_all(parent)?;
-                }
-                entry.unpack(&dst)?;
+                unpack_member(&mut entry, root, &safe_rel, &path_in_tar)?;
                 stats.files_written += 1;
             }
             _ => {
                 // Hard links, char/block devices, FIFOs — containerd's
                 // walking_differ handles these too. cave-cri runs in
-                // user namespaces so these are no-ops here.
+                // user namespaces so these are no-ops here. Nothing is
+                // created for them, so a hard link's target is never
+                // looked at.
             }
         }
     }
     Ok(stats)
+}
+
+/// The error for a member that is refused: its name as the archive has
+/// it, then the reason.
+fn refused(member: &Path, why: Refusal) -> ApplyError {
+    ApplyError::PathEscape(format!("{}: {}", member.display(), why))
+}
+
+/// Write the file or symlink member `entry` below `root`, the canonical
+/// target directory. `rel_path` is the sanitized member name, `member`
+/// the name as the archive has it.
+///
+/// [`tar::Entry::unpack_in`] creates missing parent directories, replaces
+/// an entry that has the member's name instead of writing through it, and
+/// stores a symlink as it is. It also refuses to follow a symlink out of
+/// `root`, but reports that as an I/O error like any other. The member's
+/// directory is therefore resolved here first, so that a member that would
+/// leave the target directory is reported as that.
+fn unpack_member<R: Read>(
+    entry: &mut Entry<'_, R>,
+    root: &Path,
+    rel_path: &Path,
+    member: &Path,
+) -> Result<(), ApplyError> {
+    containment::member_dir(root, rel_path).map_err(|why| refused(member, why))?;
+    if entry.unpack_in(root)? {
+        Ok(())
+    } else {
+        // `unpack_in` reports a member it skipped for its name this way.
+        Err(ApplyError::PathEscape(member.display().to_string()))
+    }
 }
 
 /// Returns the target name a whiteout entry refers to, or `None` for
@@ -139,56 +197,53 @@ enum WhiteoutKind<'a> {
     Opaque,
 }
 
+/// Apply the whiteout member `rel_path` (a sanitized member name) below
+/// `root`, the canonical target directory.
+///
+/// The whiteout acts in its own directory, which has to resolve to a path
+/// inside `root`; if that directory does not exist there is nothing to
+/// remove. Entries are removed as what they are: a symlink goes away, what
+/// it points to stays. A whiteout that is refused is not counted.
 fn apply_whiteout(
-    target_dir: &Path,
+    root: &Path,
     rel_path: &Path,
     kind: WhiteoutKind<'_>,
     stats: &mut ApplyStats,
-) -> Result<(), ApplyError> {
-    let parent_rel = rel_path.parent().unwrap_or(Path::new(""));
-    let parent_abs = target_dir.join(parent_rel);
-    match kind {
-        WhiteoutKind::Opaque => {
-            if let Ok(entries) = fs::read_dir(&parent_abs) {
+) -> Result<(), Refusal> {
+    if let WhiteoutKind::DeleteSibling(name) = kind {
+        containment::check_whiteout_name(name)?;
+    }
+    let dir = containment::whiteout_dir(root, rel_path, false)?;
+    match (kind, dir) {
+        (WhiteoutKind::Opaque, Some(dir)) => {
+            if let Ok(entries) = fs::read_dir(&dir) {
                 for e in entries.flatten() {
-                    let p = e.path();
-                    if p.is_dir() {
-                        fs::remove_dir_all(&p).ok();
-                    } else {
-                        fs::remove_file(&p).ok();
-                    }
+                    containment::remove_entry(&e.path());
                 }
             }
-            stats.whiteouts_applied += 1;
         }
-        WhiteoutKind::DeleteSibling(name) => {
-            let victim = parent_abs.join(name);
-            if victim.is_dir() {
-                fs::remove_dir_all(&victim).ok();
-            } else {
-                fs::remove_file(&victim).ok();
-            }
-            stats.whiteouts_applied += 1;
+        (WhiteoutKind::DeleteSibling(name), Some(dir)) => {
+            containment::remove_entry(&dir.join(name));
         }
+        (_, None) => {}
     }
+    stats.whiteouts_applied += 1;
     Ok(())
 }
 
+/// The member name `path` as a path relative to the target directory:
+/// its normal components. A name that is absolute or has a `..`
+/// component is refused.
 fn sanitize_path(path: &Path) -> Result<PathBuf, ApplyError> {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::Normal(s) => out.push(s),
-            Component::CurDir => {}
-            Component::ParentDir => {
-                return Err(ApplyError::PathEscape(path.display().to_string()));
-            }
-            Component::Prefix(_) | Component::RootDir => {
-                return Err(ApplyError::PathEscape(path.display().to_string()));
-            }
-        }
-    }
-    Ok(out)
+    containment::check_member_name(path)
+        .map_err(|_| ApplyError::PathEscape(path.display().to_string()))?;
+    Ok(path
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(part) => Some(part),
+            _ => None,
+        })
+        .collect())
 }
 
 #[cfg(test)]

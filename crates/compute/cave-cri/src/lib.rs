@@ -64,6 +64,7 @@
 pub mod auth;
 pub mod cgroup;
 pub mod cgroup_v2;
+mod containment;
 pub mod content;
 pub mod criu;
 pub mod diff;
