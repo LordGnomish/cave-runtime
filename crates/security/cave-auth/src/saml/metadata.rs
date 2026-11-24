@@ -16,6 +16,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
+use super::xml_text::{TextRun, attr_value, unescape_text};
 use super::{SamlError, ns};
 
 /// Which SAML role this descriptor advertises.
@@ -181,7 +182,7 @@ impl EntityDescriptor {
     /// `xmlns:md` only on the root and unprefix everything else).
     pub fn from_xml(bytes: &[u8]) -> Result<Self, SamlError> {
         let mut reader = Reader::from_reader(bytes);
-        reader.config_mut().trim_text(true);
+        let mut text = TextRun::for_reader(reader.config_mut(), true);
 
         let mut entity_id = None;
         let mut role = None;
@@ -195,7 +196,20 @@ impl EntityDescriptor {
 
         let mut buf = Vec::new();
         loop {
-            match reader.read_event_into(&mut buf) {
+            let event = reader.read_event_into(&mut buf);
+            if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
+                buf.clear();
+                continue;
+            }
+            if let Some(raw) = text.take().filter(|_| in_x509_cert) {
+                let v = unescape_text(&raw)
+                    .map_err(|err| SamlError::Parse(err.to_string()))?
+                    .into_owned();
+                if key_descriptor_use.as_deref() != Some("encryption") {
+                    signing_cert_b64 = Some(v.trim().to_string());
+                }
+            }
+            match event {
                 Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
                 Ok(Event::Eof) => break,
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
@@ -204,8 +218,7 @@ impl EntityDescriptor {
                         "EntityDescriptor" => {
                             for a in e.attributes().flatten() {
                                 if local_name(a.key.as_ref()) == "entityID" {
-                                    let v = a
-                                        .unescape_value()
+                                    let v = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
                                         .into_owned();
                                     entity_id = Some(v);
@@ -219,8 +232,7 @@ impl EntityDescriptor {
                             key_descriptor_use = None;
                             for a in e.attributes().flatten() {
                                 if local_name(a.key.as_ref()) == "use" {
-                                    let v = a
-                                        .unescape_value()
+                                    let v = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
                                         .into_owned();
                                     key_descriptor_use = Some(v);
@@ -234,8 +246,7 @@ impl EntityDescriptor {
                             let mut index = None;
                             for a in e.attributes().flatten() {
                                 let key = local_name(a.key.as_ref());
-                                let val = a
-                                    .unescape_value()
+                                let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
                                     .into_owned();
                                 match key.as_str() {
@@ -258,8 +269,7 @@ impl EntityDescriptor {
                             let mut location = None;
                             for a in e.attributes().flatten() {
                                 let key = local_name(a.key.as_ref());
-                                let val = a
-                                    .unescape_value()
+                                let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
                                     .into_owned();
                                 match key.as_str() {
@@ -277,15 +287,6 @@ impl EntityDescriptor {
                             }
                         }
                         _ => {}
-                    }
-                }
-                Ok(Event::Text(t)) if in_x509_cert => {
-                    let v = t
-                        .unescape()
-                        .map_err(|err| SamlError::Parse(err.to_string()))?
-                        .into_owned();
-                    if key_descriptor_use.as_deref() != Some("encryption") {
-                        signing_cert_b64 = Some(v.trim().to_string());
                     }
                 }
                 Ok(Event::End(ref e)) => {

@@ -56,13 +56,14 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
 use super::SamlError;
+use super::xml_text::{TextRun, attr_value, unescape_text};
 
 /// Canonicalize `xml` with the built-in exc-c14n subset. The
 /// shape used by [`super::signature::SignedDocument`] —
 /// `fn(&[u8]) -> Result<Vec<u8>, SamlError>`.
 pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
     let mut reader = Reader::from_reader(xml);
-    reader.config_mut().trim_text(false);
+    let mut text = TextRun::for_reader(reader.config_mut(), false);
     reader.config_mut().expand_empty_elements = true;
 
     let mut buf_out = Cursor::new(Vec::new());
@@ -72,10 +73,18 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
     let mut buf = Vec::new();
 
     loop {
-        match reader
-            .read_event_into(&mut buf)
-            .map_err(|e| SamlError::Parse(format!("c14n read: {e}")))?
-        {
+        let event = reader.read_event_into(&mut buf);
+        if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
+            buf.clear();
+            continue;
+        }
+        if let Some(raw) = text.take() {
+            let txt =
+                unescape_text(&raw).map_err(|e| SamlError::Parse(format!("c14n text: {e}")))?;
+            w.write_event(Event::Text(BytesText::new(&txt)))
+                .map_err(|e| SamlError::Parse(format!("c14n write: {e}")))?;
+        }
+        match event.map_err(|e| SamlError::Parse(format!("c14n read: {e}")))? {
             Event::Eof => break,
             Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
                 // Drop per exc-c14n.
@@ -105,13 +114,9 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
                 emit_start(&mut w, &e, &frame)?;
                 emit_end(&mut w, &BytesEnd::new(name_str.as_str()))?;
             }
-            Event::Text(t) => {
-                let txt = t
-                    .unescape()
-                    .map_err(|e| SamlError::Parse(format!("c14n text: {e}")))?
-                    .into_owned();
-                w.write_event(Event::Text(BytesText::new(&txt)))
-                    .map_err(|e| SamlError::Parse(format!("c14n write: {e}")))?;
+            Event::Text(_) | Event::GeneralRef(_) => {
+                // Unreachable: both are absorbed into `text` above
+                // and written out as one text node.
             }
             Event::CData(c) => {
                 let txt = std::str::from_utf8(&c)
@@ -119,9 +124,7 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
                     .to_string();
                 w.write_event(Event::Text(BytesText::new(&txt)))
                     .map_err(|e| SamlError::Parse(format!("c14n write: {e}")))?;
-            } // Some quick-xml builds emit GeneralRef for `&amp;`
-              // etc. — our setup decodes those into Text. Any
-              // remaining variants drop through.
+            }
         }
         buf.clear();
     }
@@ -173,8 +176,7 @@ fn build_frame(
         let key = std::str::from_utf8(a.key.as_ref())
             .map_err(|err| SamlError::Parse(format!("c14n key: {err}")))?
             .to_string();
-        let val = a
-            .unescape_value()
+        let val = attr_value(&a)
             .map_err(|err| SamlError::Parse(format!("c14n val: {err}")))?
             .into_owned();
         if key == "xmlns" {
