@@ -42,7 +42,7 @@ http = "1"
 rustls = { version = "0.23", features = ["ring"] }
 rustls-pemfile = "2"
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
-lru = "0.12"
+lru = "0.18.2"
 dashmap = "6"
 rand = "0.8"
 async-trait = "0.1"
