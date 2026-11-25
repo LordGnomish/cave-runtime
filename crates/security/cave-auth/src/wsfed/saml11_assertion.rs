@@ -198,7 +198,7 @@ fn xml_escape_attr(s: &str) -> String {
 /// Parse the subset of SAML 1.1 we emit — enough for round-trip tests
 /// and for the RSTR consumer to lift attributes back out.
 pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
-    use crate::saml::xml_text::{TextRun, attr_value, unescape_text};
+    use crate::saml::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
@@ -361,6 +361,9 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     }
                     _ => {}
                 }
+            }
+            Event::DocType(_) => {
+                return Err(WsFedError::Parse(format!("xml: {DOCTYPE_NOT_ALLOWED}")));
             }
             Event::Eof => break,
             _ => {}

@@ -25,6 +25,11 @@ use quick_xml::events::Event;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::reader::Config;
 
+/// Error text for a document type declaration. SAML and WS-Federation
+/// messages do not carry one, so the parsers refuse it instead of
+/// skipping it.
+pub(crate) const DOCTYPE_NOT_ALLOWED: &str = "a document type declaration is not allowed";
+
 /// The raw bytes of one text node: everything between two pieces of
 /// markup, references included.
 pub(crate) struct TextRun {

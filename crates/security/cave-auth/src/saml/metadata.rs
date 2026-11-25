@@ -16,7 +16,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use super::xml_text::{TextRun, attr_value, unescape_text};
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
 use super::{SamlError, ns};
 
 /// Which SAML role this descriptor advertises.
@@ -211,6 +211,9 @@ impl EntityDescriptor {
             }
             match event {
                 Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
+                Ok(Event::DocType(_)) => {
+                    return Err(SamlError::Parse(format!("xml: {DOCTYPE_NOT_ALLOWED}")));
+                }
                 Ok(Event::Eof) => break,
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let name = local_name(e.name().as_ref());

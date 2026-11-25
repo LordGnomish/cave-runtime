@@ -29,7 +29,8 @@
 //! ## Known limitations
 //!
 //! * No DTD / entity resolution. SAML messages don't carry
-//!   either.
+//!   either; a document type declaration is refused with a
+//!   parse error.
 //! * Attribute-value whitespace is not character-by-character
 //!   normalized (the spec's §2.3 step 4 is approximated — only
 //!   `&` `<` `>` `"` are reserialised). Real IdPs almost never
@@ -56,7 +57,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
 use super::SamlError;
-use super::xml_text::{TextRun, attr_value, unescape_text};
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
 
 /// Canonicalize `xml` with the built-in exc-c14n subset. The
 /// shape used by [`super::signature::SignedDocument`] —
@@ -86,8 +87,13 @@ pub fn exc_c14n(xml: &[u8]) -> Result<Vec<u8>, SamlError> {
         }
         match event.map_err(|e| SamlError::Parse(format!("c14n read: {e}")))? {
             Event::Eof => break,
-            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
+            Event::Decl(_) | Event::PI(_) => {
                 // Drop per exc-c14n.
+            }
+            Event::DocType(_) => {
+                return Err(SamlError::Parse(format!(
+                    "c14n read: {DOCTYPE_NOT_ALLOWED}"
+                )));
             }
             Event::Comment(_) => {
                 // Without-comments profile.

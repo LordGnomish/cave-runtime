@@ -350,6 +350,13 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
                 }
                 path.pop();
             }
+            // A BOM does not need a document type declaration; it is
+            // refused instead of skipped.
+            Ok(Event::DocType(_)) => {
+                return Err(CycloneDxError::Xml(
+                    "a document type declaration is not allowed".to_string(),
+                ));
+            }
             Ok(Event::Eof) => break,
             Err(e) => return Err(CycloneDxError::Xml(e.to_string())),
             _ => {}

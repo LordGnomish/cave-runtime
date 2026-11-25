@@ -17,7 +17,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
-use super::xml_text::{TextRun, attr_value, unescape_text};
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
 use super::{NameIdFormat, SamlError, SamlSubject, ns};
 
 /// The two `<samlp:StatusCode>` values cave-auth ever emits. Real
@@ -387,6 +387,9 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
         }
         match event {
             Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
+            Ok(Event::DocType(_)) => {
+                return Err(SamlError::Parse(format!("xml: {DOCTYPE_NOT_ALLOWED}")));
+            }
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let name = local_name(e.name().as_ref());
