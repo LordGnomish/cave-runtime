@@ -198,11 +198,12 @@ fn xml_escape_attr(s: &str) -> String {
 /// Parse the subset of SAML 1.1 we emit — enough for round-trip tests
 /// and for the RSTR consumer to lift attributes back out.
 pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
+    use crate::saml::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
     let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
+    let mut text = TextRun::for_reader(reader.config_mut(), true);
 
     let mut a = Saml11Assertion {
         assertion_id: String::new(),
@@ -227,10 +228,29 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
     let mut buf = Vec::new();
 
     loop {
-        match reader
+        let event = reader
             .read_event_into(&mut buf)
-            .map_err(|e| WsFedError::Parse(format!("xml: {e}")))?
-        {
+            .map_err(|e| WsFedError::Parse(format!("xml: {e}")))?;
+        if text.absorb(&event) {
+            buf.clear();
+            continue;
+        }
+        if let Some(raw) = text.take() {
+            let s = unescape_text(&raw).unwrap_or_default().to_string();
+            if in_audience {
+                a.audience = Some(s);
+            } else if in_name_id {
+                // Only capture the first NameIdentifier occurrence —
+                // the second occurrence inside AttributeStatement
+                // repeats the same subject and would double the value.
+                if a.name_identifier.is_empty() {
+                    a.name_identifier.push_str(&s);
+                }
+            } else if in_attr_value {
+                current_attr_values.push(s);
+            }
+        }
+        match event {
             Event::Start(e) | Event::Empty(e) => {
                 let name = e.name();
                 let local = std::str::from_utf8(name.as_ref())
@@ -242,7 +262,7 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     "Assertion" => {
                         for attr in e.attributes().flatten() {
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr.unescape_value().unwrap_or_default().to_string();
+                            let val = attr_value(&attr).unwrap_or_default().to_string();
                             match key {
                                 "AssertionID" => a.assertion_id = val,
                                 "Issuer" => a.issuer = val,
@@ -258,7 +278,7 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     "Conditions" => {
                         for attr in e.attributes().flatten() {
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr.unescape_value().unwrap_or_default().to_string();
+                            let val = attr_value(&attr).unwrap_or_default().to_string();
                             match key {
                                 "NotBefore" => {
                                     if let Ok(dt) = DateTime::parse_from_rfc3339(&val) {
@@ -280,7 +300,7 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     "AuthenticationStatement" => {
                         for attr in e.attributes().flatten() {
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr.unescape_value().unwrap_or_default().to_string();
+                            let val = attr_value(&attr).unwrap_or_default().to_string();
                             match key {
                                 "AuthenticationMethod" => a.auth_method = val,
                                 "AuthenticationInstant" => {
@@ -296,7 +316,7 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                         in_name_id = true;
                         for attr in e.attributes().flatten() {
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr.unescape_value().unwrap_or_default().to_string();
+                            let val = attr_value(&attr).unwrap_or_default().to_string();
                             if key == "Format" {
                                 a.name_identifier_format = val;
                             }
@@ -306,7 +326,7 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                         let mut name = None;
                         for attr in e.attributes().flatten() {
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr.unescape_value().unwrap_or_default().to_string();
+                            let val = attr_value(&attr).unwrap_or_default().to_string();
                             match key {
                                 "AttributeName" => name = Some(val),
                                 "AttributeNamespace" => a.attribute_namespace = val,
@@ -342,20 +362,8 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     _ => {}
                 }
             }
-            Event::Text(t) => {
-                let s = t.unescape().unwrap_or_default().to_string();
-                if in_audience {
-                    a.audience = Some(s);
-                } else if in_name_id {
-                    // Only capture the first NameIdentifier occurrence —
-                    // the second occurrence inside AttributeStatement
-                    // repeats the same subject and would double the value.
-                    if a.name_identifier.is_empty() {
-                        a.name_identifier.push_str(&s);
-                    }
-                } else if in_attr_value {
-                    current_attr_values.push(s);
-                }
+            Event::DocType(_) => {
+                return Err(WsFedError::Parse(format!("xml: {DOCTYPE_NOT_ALLOWED}")));
             }
             Event::Eof => break,
             _ => {}

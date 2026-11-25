@@ -63,6 +63,7 @@ pub mod signing_ecdsa;
 pub mod assertion;
 pub mod bindings;
 pub mod name_id;
+pub(crate) mod xml_text;
 
 #[cfg(test)]
 mod tests_a1;

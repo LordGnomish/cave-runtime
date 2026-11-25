@@ -16,6 +16,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
 use super::{NameIdFormat, SamlError, ns};
 
 /// A SAML 2.0 `AuthnRequest`. Field naming follows the spec
@@ -142,7 +143,7 @@ impl AuthnRequest {
     /// (`saml2p:` vs `samlp:`).
     pub fn from_xml(bytes: &[u8]) -> Result<Self, SamlError> {
         let mut reader = Reader::from_reader(bytes);
-        reader.config_mut().trim_text(true);
+        let mut text = TextRun::for_reader(reader.config_mut(), true);
 
         let mut id = None;
         let mut issue_instant = None;
@@ -159,8 +160,22 @@ impl AuthnRequest {
 
         let mut buf = Vec::new();
         loop {
-            match reader.read_event_into(&mut buf) {
+            let event = reader.read_event_into(&mut buf);
+            if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
+                buf.clear();
+                continue;
+            }
+            if let Some(raw) = text.take().filter(|_| in_issuer) {
+                let t = unescape_text(&raw)
+                    .map_err(|err| SamlError::Parse(err.to_string()))?
+                    .into_owned();
+                issuer = Some(t);
+            }
+            match event {
                 Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
+                Ok(Event::DocType(_)) => {
+                    return Err(SamlError::Parse(format!("xml: {DOCTYPE_NOT_ALLOWED}")));
+                }
                 Ok(Event::Eof) => break,
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let name = local_name(e.name().as_ref());
@@ -168,8 +183,7 @@ impl AuthnRequest {
                         "AuthnRequest" => {
                             for a in e.attributes().flatten() {
                                 let key = local_name(a.key.as_ref());
-                                let val = a
-                                    .unescape_value()
+                                let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
                                     .into_owned();
                                 match key.as_str() {
@@ -188,8 +202,7 @@ impl AuthnRequest {
                         "NameIDPolicy" => {
                             for a in e.attributes().flatten() {
                                 if local_name(a.key.as_ref()) == "Format" {
-                                    let val = a
-                                        .unescape_value()
+                                    let val = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
                                         .into_owned();
                                     nameid_policy_format = NameIdFormat::from_urn(&val)
@@ -199,13 +212,6 @@ impl AuthnRequest {
                         }
                         _ => {}
                     }
-                }
-                Ok(Event::Text(e)) if in_issuer => {
-                    let t = e
-                        .unescape()
-                        .map_err(|err| SamlError::Parse(err.to_string()))?
-                        .into_owned();
-                    issuer = Some(t);
                 }
                 Ok(Event::End(ref e)) => {
                     if local_name(e.name().as_ref()) == "Issuer" {

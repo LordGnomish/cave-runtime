@@ -171,13 +171,67 @@ fn ctype_from_str(s: Option<&str>) -> ComponentType {
 
 // ── XML shape (best-effort, hand-rolled with quick-xml events) ─────────────
 
+/// The raw bytes of one XML text node.
+///
+/// Since quick-xml 0.38 the reader reports every reference (`&amp;`,
+/// `&#x20;`, …) as its own `Event::GeneralRef` between the `Event::Text`
+/// pieces around it and trims each piece on its own. `parse_xml` works
+/// on whole text nodes, so the pieces are put back together here and
+/// the node is trimmed as a whole.
+#[derive(Default)]
+struct TextNode {
+    raw: Vec<u8>,
+}
+
+impl TextNode {
+    /// Appends `event` if it is part of a text node. Returns whether
+    /// the event was consumed.
+    fn absorb(&mut self, event: &quick_xml::events::Event<'_>) -> bool {
+        use quick_xml::events::Event;
+        match event {
+            Event::Text(text) => {
+                self.raw.extend_from_slice(text);
+                true
+            }
+            Event::GeneralRef(reference) => {
+                self.raw.push(b'&');
+                self.raw.extend_from_slice(reference);
+                self.raw.push(b';');
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Ends the current node and returns its bytes without the XML
+    /// whitespace around them; `None` if nothing but whitespace was
+    /// absorbed.
+    fn take(&mut self) -> Option<Vec<u8>> {
+        let raw = std::mem::take(&mut self.raw);
+        let is_ws = |b: &u8| matches!(b, b' ' | b'\t' | b'\r' | b'\n');
+        let start = raw.iter().position(|b| !is_ws(b))?;
+        let end = raw.iter().rposition(|b| !is_ws(b))? + 1;
+        Some(raw[start..end].to_vec())
+    }
+}
+
+/// Decodes a text node as UTF-8 and resolves the predefined entities
+/// and character references in it.
+fn unescape_text(raw: &[u8]) -> Result<std::borrow::Cow<'_, str>, quick_xml::Error> {
+    let decoded = std::str::from_utf8(raw).map_err(quick_xml::encoding::EncodingError::from)?;
+    Ok(quick_xml::escape::unescape(decoded)?)
+}
+
 /// Parse CycloneDX XML — minimal but spec-faithful for `bom > components > component`
 /// + `bom > dependencies > dependency` shape used by Dependency-Track integration tests.
 pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
     use quick_xml::Reader;
     use quick_xml::events::Event;
     let mut reader = Reader::from_reader(input);
-    reader.config_mut().trim_text(true);
+    // Text nodes are reassembled, trimmed and unescaped by `TextNode`.
+    reader.config_mut().trim_text(false);
+    reader.config_mut().allow_dangling_amp = true;
+    let mut text = TextNode::default();
     let mut buf = Vec::new();
     let mut components: Vec<Component> = Vec::new();
     let mut dependencies: Vec<(String, Vec<String>)> = Vec::new();
@@ -192,7 +246,27 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
     let mut in_metadata_component = false;
     let mut text_target: Option<&'static str> = None;
     loop {
-        match reader.read_event_into(&mut buf) {
+        let event = reader.read_event_into(&mut buf);
+        if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
+            buf.clear();
+            continue;
+        }
+        if let Some(raw) = text.take() {
+            let s = unescape_text(&raw)
+                .map_err(|e| CycloneDxError::Xml(e.to_string()))?
+                .into_owned();
+            if let (Some(tag), Some(c)) = (text_target, current_component.as_mut()) {
+                match tag {
+                    "name" => c.name = s,
+                    "version" => c.version = s,
+                    "purl" => c.purl = Some(s),
+                    "license_id" => c.license = Some(s),
+                    _ => {}
+                }
+            }
+            text_target = None;
+        }
+        match event {
             Ok(Event::Start(e)) => {
                 let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 path.push(local.clone());
@@ -257,22 +331,6 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
                     });
                 }
             }
-            Ok(Event::Text(t)) => {
-                let s = t
-                    .unescape()
-                    .map_err(|e| CycloneDxError::Xml(e.to_string()))?
-                    .into_owned();
-                if let (Some(tag), Some(c)) = (text_target, current_component.as_mut()) {
-                    match tag {
-                        "name" => c.name = s,
-                        "version" => c.version = s,
-                        "purl" => c.purl = Some(s),
-                        "license_id" => c.license = Some(s),
-                        _ => {}
-                    }
-                }
-                text_target = None;
-            }
             Ok(Event::End(e)) => {
                 let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if local == "component" {
@@ -291,6 +349,13 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
                     }
                 }
                 path.pop();
+            }
+            // A BOM does not need a document type declaration; it is
+            // refused instead of skipped.
+            Ok(Event::DocType(_)) => {
+                return Err(CycloneDxError::Xml(
+                    "a document type declaration is not allowed".to_string(),
+                ));
             }
             Ok(Event::Eof) => break,
             Err(e) => return Err(CycloneDxError::Xml(e.to_string())),

@@ -21,7 +21,7 @@ tokio = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-quick-xml = { version = "0.37", features = ["serialize"] }
+quick-xml = { version = "0.41", features = ["serialize"] }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 
