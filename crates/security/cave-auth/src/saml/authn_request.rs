@@ -16,7 +16,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
-use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, ElementText, attr_value, tag_attributes};
 use super::{NameIdFormat, SamlError, ns};
 
 /// A SAML 2.0 `AuthnRequest`. Field naming follows the spec
@@ -143,7 +143,7 @@ impl AuthnRequest {
     /// (`saml2p:` vs `samlp:`).
     pub fn from_xml(bytes: &[u8]) -> Result<Self, SamlError> {
         let mut reader = Reader::from_reader(bytes);
-        let mut text = TextRun::for_reader(reader.config_mut(), true);
+        let mut element_text = ElementText::for_reader(reader.config_mut());
 
         let mut id = None;
         let mut issue_instant = None;
@@ -155,22 +155,11 @@ impl AuthnRequest {
         let mut issuer = None;
         let mut nameid_policy_format = None;
 
-        // State: which child element are we currently inside?
-        let mut in_issuer = false;
-
         let mut buf = Vec::new();
         loop {
             let event = reader.read_event_into(&mut buf);
-            if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
-                buf.clear();
-                continue;
-            }
-            if let Some(raw) = text.take().filter(|_| in_issuer) {
-                let t = unescape_text(&raw)
-                    .map_err(|err| SamlError::Parse(err.to_string()))?
-                    .into_owned();
-                issuer = Some(t);
-            }
+            // An empty-element tag has no content to read.
+            let has_content = matches!(event, Ok(Event::Start(_)));
             match event {
                 Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
                 Ok(Event::DocType(_)) => {
@@ -181,7 +170,8 @@ impl AuthnRequest {
                     let name = local_name(e.name().as_ref());
                     match name.as_str() {
                         "AuthnRequest" => {
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 let key = local_name(a.key.as_ref());
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -198,9 +188,15 @@ impl AuthnRequest {
                                 }
                             }
                         }
-                        "Issuer" => in_issuer = true,
+                        "Issuer" if has_content => {
+                            let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                            if let Some(t) = value {
+                                issuer = Some(t);
+                            }
+                        }
                         "NameIDPolicy" => {
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 if local_name(a.key.as_ref()) == "Format" {
                                     let val = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -211,11 +207,6 @@ impl AuthnRequest {
                             }
                         }
                         _ => {}
-                    }
-                }
-                Ok(Event::End(ref e)) => {
-                    if local_name(e.name().as_ref()) == "Issuer" {
-                        in_issuer = false;
                     }
                 }
                 _ => {}

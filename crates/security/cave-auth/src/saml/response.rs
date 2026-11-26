@@ -17,7 +17,9 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
-use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
+use super::xml_text::{
+    DOCTYPE_NOT_ALLOWED, ElementText, TextRun, attr_value, tag_attributes, unescape_text,
+};
 use super::{NameIdFormat, SamlError, SamlSubject, ns};
 
 /// The two `<samlp:StatusCode>` values cave-auth ever emits. Real
@@ -332,6 +334,7 @@ fn write_assertion<W: std::io::Write>(w: &mut Writer<W>, a: &Assertion) -> Resul
 fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
     let mut reader = Reader::from_reader(bytes);
     let mut text = TextRun::for_reader(reader.config_mut(), true);
+    let mut element_text = ElementText::for_reader(reader.config_mut());
 
     let mut response_id = None;
     let mut response_issue = None;
@@ -351,10 +354,7 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
     let mut attributes: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut session_index: Option<String> = None;
 
-    let mut current_text_target: Option<&'static str> = None;
-    let mut in_response_issuer = false;
     let mut in_assertion = false;
-    let mut in_assertion_issuer = false;
     let mut current_attr: Option<String> = None;
 
     let mut buf = Vec::new();
@@ -364,27 +364,13 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
             buf.clear();
             continue;
         }
+        // The values are read by `element_text` below. Text anywhere
+        // else is not used, but a malformed reference in it is an error.
         if let Some(raw) = text.take() {
-            let txt = unescape_text(&raw)
-                .map_err(|err| SamlError::Parse(err.to_string()))?
-                .into_owned();
-            if in_response_issuer {
-                response_issuer = Some(txt);
-            } else if in_assertion_issuer {
-                assertion_issuer = Some(txt);
-            } else if let Some(target) = current_text_target {
-                match target {
-                    "subject_name_id" => subject_name_id = Some(txt),
-                    "audience" => audiences.push(txt),
-                    "attribute_value" => {
-                        if let Some(name) = &current_attr {
-                            attributes.entry(name.clone()).or_default().push(txt);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            unescape_text(&raw).map_err(|err| SamlError::Parse(err.to_string()))?;
         }
+        // An empty-element tag has no content to read.
+        let has_content = matches!(event, Ok(Event::Start(_)));
         match event {
             Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
             Ok(Event::DocType(_)) => {
@@ -395,7 +381,8 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                 let name = local_name(e.name().as_ref());
                 match name.as_str() {
                     "Response" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             let key = local_name(a.key.as_ref());
                             let val = attr_value(&a)
                                 .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -409,15 +396,19 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                             }
                         }
                     }
-                    "Issuer" => {
-                        if in_assertion {
-                            in_assertion_issuer = true;
-                        } else {
-                            in_response_issuer = true;
+                    "Issuer" if has_content => {
+                        let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                        if let Some(txt) = value {
+                            if in_assertion {
+                                assertion_issuer = Some(txt);
+                            } else {
+                                response_issuer = Some(txt);
+                            }
                         }
                     }
                     "StatusCode" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             if local_name(a.key.as_ref()) == "Value" {
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?;
@@ -428,7 +419,8 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                     }
                     "Assertion" => {
                         in_assertion = true;
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             let key = local_name(a.key.as_ref());
                             let val = attr_value(&a)
                                 .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -441,7 +433,8 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                         }
                     }
                     "NameID" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             if local_name(a.key.as_ref()) == "Format" {
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?;
@@ -449,10 +442,16 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                                     .unwrap_or(NameIdFormat::Unspecified);
                             }
                         }
-                        current_text_target = Some("subject_name_id");
+                        if has_content {
+                            let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                            if let Some(txt) = value {
+                                subject_name_id = Some(txt);
+                            }
+                        }
                     }
                     "Conditions" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             let key = local_name(a.key.as_ref());
                             let val = attr_value(&a)
                                 .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -464,9 +463,15 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                             }
                         }
                     }
-                    "Audience" => current_text_target = Some("audience"),
+                    "Audience" if has_content => {
+                        let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                        if let Some(txt) = value {
+                            audiences.push(txt);
+                        }
+                    }
                     "AuthnStatement" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             if local_name(a.key.as_ref()) == "SessionIndex" {
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -476,7 +481,8 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                         }
                     }
                     "Attribute" => {
-                        for a in e.attributes().flatten() {
+                        for a in tag_attributes(e) {
+                            let a = a.map_err(SamlError::Parse)?;
                             if local_name(a.key.as_ref()) == "Name" {
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -485,22 +491,20 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                             }
                         }
                     }
-                    "AttributeValue" => current_text_target = Some("attribute_value"),
+                    "AttributeValue" if has_content => {
+                        let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                        if let (Some(txt), Some(name)) = (value, &current_attr) {
+                            attributes.entry(name.clone()).or_default().push(txt);
+                        }
+                    }
                     _ => {}
                 }
             }
             Ok(Event::End(ref e)) => {
                 let name = local_name(e.name().as_ref());
                 match name.as_str() {
-                    "Issuer" => {
-                        in_response_issuer = false;
-                        in_assertion_issuer = false;
-                    }
                     "Assertion" => in_assertion = false,
                     "Attribute" => current_attr = None,
-                    "NameID" | "Audience" | "AttributeValue" => {
-                        current_text_target = None;
-                    }
                     _ => {}
                 }
             }

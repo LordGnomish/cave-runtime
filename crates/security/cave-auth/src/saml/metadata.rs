@@ -16,7 +16,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use super::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
+use super::xml_text::{DOCTYPE_NOT_ALLOWED, ElementText, attr_value, tag_attributes};
 use super::{SamlError, ns};
 
 /// Which SAML role this descriptor advertises.
@@ -182,7 +182,7 @@ impl EntityDescriptor {
     /// `xmlns:md` only on the root and unprefix everything else).
     pub fn from_xml(bytes: &[u8]) -> Result<Self, SamlError> {
         let mut reader = Reader::from_reader(bytes);
-        let mut text = TextRun::for_reader(reader.config_mut(), true);
+        let mut element_text = ElementText::for_reader(reader.config_mut());
 
         let mut entity_id = None;
         let mut role = None;
@@ -192,23 +192,12 @@ impl EntityDescriptor {
 
         let mut in_key_descriptor = false;
         let mut key_descriptor_use: Option<String> = None;
-        let mut in_x509_cert = false;
 
         let mut buf = Vec::new();
         loop {
             let event = reader.read_event_into(&mut buf);
-            if event.as_ref().is_ok_and(|ev| text.absorb(ev)) {
-                buf.clear();
-                continue;
-            }
-            if let Some(raw) = text.take().filter(|_| in_x509_cert) {
-                let v = unescape_text(&raw)
-                    .map_err(|err| SamlError::Parse(err.to_string()))?
-                    .into_owned();
-                if key_descriptor_use.as_deref() != Some("encryption") {
-                    signing_cert_b64 = Some(v.trim().to_string());
-                }
-            }
+            // An empty-element tag has no content to read.
+            let has_content = matches!(event, Ok(Event::Start(_)));
             match event {
                 Err(e) => return Err(SamlError::Parse(format!("xml: {e}"))),
                 Ok(Event::DocType(_)) => {
@@ -219,7 +208,8 @@ impl EntityDescriptor {
                     let name = local_name(e.name().as_ref());
                     match name.as_str() {
                         "EntityDescriptor" => {
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 if local_name(a.key.as_ref()) == "entityID" {
                                     let v = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -233,7 +223,8 @@ impl EntityDescriptor {
                         "KeyDescriptor" => {
                             in_key_descriptor = true;
                             key_descriptor_use = None;
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 if local_name(a.key.as_ref()) == "use" {
                                     let v = attr_value(&a)
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -242,12 +233,20 @@ impl EntityDescriptor {
                                 }
                             }
                         }
-                        "X509Certificate" if in_key_descriptor => in_x509_cert = true,
+                        "X509Certificate" if in_key_descriptor && has_content => {
+                            let value = element_text.read(&mut reader).map_err(SamlError::Parse)?;
+                            if let Some(v) = value {
+                                if key_descriptor_use.as_deref() != Some("encryption") {
+                                    signing_cert_b64 = Some(v.trim().to_string());
+                                }
+                            }
+                        }
                         "SingleSignOnService" | "AssertionConsumerService" => {
                             let mut binding = None;
                             let mut location = None;
                             let mut index = None;
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 let key = local_name(a.key.as_ref());
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -270,7 +269,8 @@ impl EntityDescriptor {
                         "SingleLogoutService" => {
                             let mut binding = None;
                             let mut location = None;
-                            for a in e.attributes().flatten() {
+                            for a in tag_attributes(e) {
+                                let a = a.map_err(SamlError::Parse)?;
                                 let key = local_name(a.key.as_ref());
                                 let val = attr_value(&a)
                                     .map_err(|err| SamlError::Parse(err.to_string()))?
@@ -294,10 +294,8 @@ impl EntityDescriptor {
                 }
                 Ok(Event::End(ref e)) => {
                     let name = local_name(e.name().as_ref());
-                    match name.as_str() {
-                        "KeyDescriptor" => in_key_descriptor = false,
-                        "X509Certificate" => in_x509_cert = false,
-                        _ => {}
+                    if name == "KeyDescriptor" {
+                        in_key_descriptor = false;
                     }
                 }
                 _ => {}

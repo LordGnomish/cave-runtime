@@ -198,12 +198,12 @@ fn xml_escape_attr(s: &str) -> String {
 /// Parse the subset of SAML 1.1 we emit — enough for round-trip tests
 /// and for the RSTR consumer to lift attributes back out.
 pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
-    use crate::saml::xml_text::{DOCTYPE_NOT_ALLOWED, TextRun, attr_value, unescape_text};
+    use crate::saml::xml_text::{DOCTYPE_NOT_ALLOWED, ElementText, attr_value, tag_attributes};
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
     let mut reader = Reader::from_str(xml);
-    let mut text = TextRun::for_reader(reader.config_mut(), true);
+    let mut element_text = ElementText::for_reader(reader.config_mut());
 
     let mut a = Saml11Assertion {
         assertion_id: String::new(),
@@ -222,34 +222,14 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
 
     let mut current_attr_name: Option<String> = None;
     let mut current_attr_values: Vec<String> = Vec::new();
-    let mut in_audience = false;
-    let mut in_name_id = false;
-    let mut in_attr_value = false;
     let mut buf = Vec::new();
 
     loop {
         let event = reader
             .read_event_into(&mut buf)
             .map_err(|e| WsFedError::Parse(format!("xml: {e}")))?;
-        if text.absorb(&event) {
-            buf.clear();
-            continue;
-        }
-        if let Some(raw) = text.take() {
-            let s = unescape_text(&raw).unwrap_or_default().to_string();
-            if in_audience {
-                a.audience = Some(s);
-            } else if in_name_id {
-                // Only capture the first NameIdentifier occurrence —
-                // the second occurrence inside AttributeStatement
-                // repeats the same subject and would double the value.
-                if a.name_identifier.is_empty() {
-                    a.name_identifier.push_str(&s);
-                }
-            } else if in_attr_value {
-                current_attr_values.push(s);
-            }
-        }
+        // An empty-element tag has no content to read.
+        let has_content = matches!(event, Event::Start(_));
         match event {
             Event::Start(e) | Event::Empty(e) => {
                 let name = e.name();
@@ -260,9 +240,12 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     .unwrap_or("");
                 match local {
                     "Assertion" => {
-                        for attr in e.attributes().flatten() {
+                        for attr in tag_attributes(&e) {
+                            let attr = attr.map_err(WsFedError::Parse)?;
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr_value(&attr).unwrap_or_default().to_string();
+                            let val = attr_value(&attr)
+                                .map_err(|err| WsFedError::Parse(err.to_string()))?
+                                .into_owned();
                             match key {
                                 "AssertionID" => a.assertion_id = val,
                                 "Issuer" => a.issuer = val,
@@ -276,9 +259,12 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                         }
                     }
                     "Conditions" => {
-                        for attr in e.attributes().flatten() {
+                        for attr in tag_attributes(&e) {
+                            let attr = attr.map_err(WsFedError::Parse)?;
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr_value(&attr).unwrap_or_default().to_string();
+                            let val = attr_value(&attr)
+                                .map_err(|err| WsFedError::Parse(err.to_string()))?
+                                .into_owned();
                             match key {
                                 "NotBefore" => {
                                     if let Ok(dt) = DateTime::parse_from_rfc3339(&val) {
@@ -294,13 +280,19 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                             }
                         }
                     }
-                    "Audience" => {
-                        in_audience = true;
+                    "Audience" if has_content => {
+                        let value = element_text.read(&mut reader).map_err(WsFedError::Parse)?;
+                        if let Some(s) = value {
+                            a.audience = Some(s);
+                        }
                     }
                     "AuthenticationStatement" => {
-                        for attr in e.attributes().flatten() {
+                        for attr in tag_attributes(&e) {
+                            let attr = attr.map_err(WsFedError::Parse)?;
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr_value(&attr).unwrap_or_default().to_string();
+                            let val = attr_value(&attr)
+                                .map_err(|err| WsFedError::Parse(err.to_string()))?
+                                .into_owned();
                             match key {
                                 "AuthenticationMethod" => a.auth_method = val,
                                 "AuthenticationInstant" => {
@@ -313,20 +305,35 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                         }
                     }
                     "NameIdentifier" => {
-                        in_name_id = true;
-                        for attr in e.attributes().flatten() {
+                        for attr in tag_attributes(&e) {
+                            let attr = attr.map_err(WsFedError::Parse)?;
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr_value(&attr).unwrap_or_default().to_string();
+                            let val = attr_value(&attr)
+                                .map_err(|err| WsFedError::Parse(err.to_string()))?
+                                .into_owned();
                             if key == "Format" {
                                 a.name_identifier_format = val;
+                            }
+                        }
+                        if has_content {
+                            let value =
+                                element_text.read(&mut reader).map_err(WsFedError::Parse)?;
+                            // Only capture the first NameIdentifier occurrence —
+                            // the second occurrence inside AttributeStatement
+                            // repeats the same subject and would double the value.
+                            if let Some(s) = value.filter(|_| a.name_identifier.is_empty()) {
+                                a.name_identifier.push_str(&s);
                             }
                         }
                     }
                     "Attribute" => {
                         let mut name = None;
-                        for attr in e.attributes().flatten() {
+                        for attr in tag_attributes(&e) {
+                            let attr = attr.map_err(WsFedError::Parse)?;
                             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            let val = attr_value(&attr).unwrap_or_default().to_string();
+                            let val = attr_value(&attr)
+                                .map_err(|err| WsFedError::Parse(err.to_string()))?
+                                .into_owned();
                             match key {
                                 "AttributeName" => name = Some(val),
                                 "AttributeNamespace" => a.attribute_namespace = val,
@@ -336,8 +343,11 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                         current_attr_name = name;
                         current_attr_values.clear();
                     }
-                    "AttributeValue" => {
-                        in_attr_value = true;
+                    "AttributeValue" if has_content => {
+                        let value = element_text.read(&mut reader).map_err(WsFedError::Parse)?;
+                        if let Some(s) = value {
+                            current_attr_values.push(s);
+                        }
                     }
                     _ => {}
                 }
@@ -349,17 +359,11 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     .rsplit(':')
                     .next()
                     .unwrap_or("");
-                match local {
-                    "Audience" => in_audience = false,
-                    "NameIdentifier" => in_name_id = false,
-                    "AttributeValue" => in_attr_value = false,
-                    "Attribute" => {
-                        if let Some(n) = current_attr_name.take() {
-                            a.attributes
-                                .insert(n, std::mem::take(&mut current_attr_values));
-                        }
+                if local == "Attribute" {
+                    if let Some(n) = current_attr_name.take() {
+                        a.attributes
+                            .insert(n, std::mem::take(&mut current_attr_values));
                     }
-                    _ => {}
                 }
             }
             Event::DocType(_) => {
